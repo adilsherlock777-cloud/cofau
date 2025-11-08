@@ -25,7 +25,14 @@ async def lifespan(app: FastAPI):
     # Shutdown
     await close_mongo_connection()
 
-app = FastAPI(title="Cofau API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="Cofau API", 
+    version="1.0.0", 
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
+)
 
 # CORS Middleware
 app.add_middleware(
