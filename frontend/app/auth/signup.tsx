@@ -9,21 +9,25 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { signup } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     // Basic validation
     if (!fullName || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -40,17 +44,34 @@ export default function SignupScreen() {
       return;
     }
 
-    // Dummy signup - redirect to verification
-    Alert.alert(
-      'Account Created! 🎉',
-      'Please verify your email',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.push('/auth/verify'),
-        },
-      ]
-    );
+    setLoading(true);
+
+    try {
+      // Call backend signup API
+      const result = await signup(fullName, email, password);
+
+      if (result.success) {
+        // Success - AuthContext will handle redirect
+        Alert.alert(
+          'Account Created! 🎉',
+          'Welcome to Cofau',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/feed'),
+            },
+          ]
+        );
+      } else {
+        // Show error from backend
+        Alert.alert('Signup Failed', result.error || 'Please try again');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      console.error('Signup error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
