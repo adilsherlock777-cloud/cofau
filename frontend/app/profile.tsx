@@ -153,9 +153,9 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => router.push('/chat')}
+          onPress={() => router.push('/happening')}
         >
-          <Ionicons name="notifications-outline" size={26} color="#999" />
+          <Ionicons name="flame-outline" size={26} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
