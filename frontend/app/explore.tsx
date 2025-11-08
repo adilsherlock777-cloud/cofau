@@ -236,7 +236,7 @@ export default function ExploreScreen() {
           </View>
           
           <View style={styles.gridContainer}>
-            {topRatedPosts.length > 0 ? topRatedPosts.map((post) => (
+            {topRatedPosts.map((post) => (
               <TouchableOpacity
                 key={post.id}
                 style={styles.gridCard}
