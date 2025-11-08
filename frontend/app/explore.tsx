@@ -232,16 +232,6 @@ const styles = StyleSheet.create({
     color: '#4dd0e1',
     fontWeight: '600',
   },
-  horizontalScroll: {
-    paddingLeft: 16,
-  },
-  trendingCard: {
-    width: CARD_WIDTH,
-    height: 200,
-    marginRight: 12,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
   trendingImage: {
     width: '100%',
     height: '100%',
