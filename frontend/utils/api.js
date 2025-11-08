@@ -120,11 +120,8 @@ export const addComment = async (postId, commentText) => {
     const formData = new FormData();
     formData.append('comment_text', commentText);
     
-    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // Don't set Content-Type manually - let axios handle it for FormData
+    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData);
     return response.data;
   } catch (error) {
     console.error('❌ Error adding comment:', error.response?.data || error.message);
