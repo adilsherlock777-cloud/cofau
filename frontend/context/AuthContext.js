@@ -130,8 +130,8 @@ export const AuthProvider = ({ children }) => {
 
       const { access_token } = response.data;
       
-      // Store token in SecureStore
-      await SecureStore.setItemAsync('userToken', access_token);
+      // Store token in storage
+      await storage.setItem('userToken', access_token);
       setToken(access_token);
 
       // Set axios authorization header
