@@ -8,6 +8,8 @@ import requests
 import json
 import sys
 from datetime import datetime
+from io import BytesIO
+from PIL import Image
 
 # Backend URL from environment
 BACKEND_URL = "https://food-app-debug.preview.emergentagent.com/api"
