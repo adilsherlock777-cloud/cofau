@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.log('Error loading user:', error.message);
       try {
-        await SecureStore.deleteItemAsync('userToken');
+        await storage.deleteItem('userToken');
       } catch (deleteError) {
         console.log('Error deleting token:', deleteError);
       }
