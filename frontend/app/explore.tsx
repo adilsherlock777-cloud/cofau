@@ -388,7 +388,46 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    justifyContent: 'flex-start',
+  },
+  gridItem: {
+    width: GRID_ITEM_WIDTH,
+    height: GRID_ITEM_WIDTH,
+    margin: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
+  },
+  gridItemImage: {
+    width: '100%',
+    height: '100%',
+  },
+  gridItemPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+  gridItemOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+  },
+  gridItemBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 2,
+  },
+  gridItemRating: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFF',
   },
   gridCard: {
     width: (width - 48) / 2,
