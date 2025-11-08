@@ -125,29 +125,68 @@ export default function FeedScreen() {
         <Text style={styles.headerTitle}>Cofau</Text>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* User Header Section */}
-        <View style={styles.userSection}>
-          <View style={styles.userHeader}>
-            <View style={styles.avatarLarge}>
-              <Ionicons name="person" size={32} color="#FFF" />
-            </View>
-            <View style={styles.userInfo}>
-              <View style={styles.levelRow}>
-                <Text style={styles.levelText}>Level 3</Text>
+        {user && (
+          <View style={styles.userSection}>
+            <View style={styles.userHeader}>
+              <View style={styles.avatarLarge}>
+                <Text style={styles.avatarLetter}>
+                  {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                </Text>
               </View>
-              <RatingBar current={85} total={100} label="" />
+              <View style={styles.userInfo}>
+                <Text style={styles.userNameText}>{user.full_name}</Text>
+                <View style={styles.levelRow}>
+                  <Text style={styles.levelText}>Level {user.level || 1}</Text>
+                </View>
+                <RatingBar current={user.points || 0} total={(user.level || 1) * 100} label="" />
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Reviewer Circles */}
         <View style={styles.reviewerSection}>
           <ReviewerCircles reviewers={reviewers} />
         </View>
 
+        {/* Loading State */}
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4dd0e1" />
+            <Text style={styles.loadingText}>Loading feed...</Text>
+          </View>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchFeed}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && feedPosts.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="restaurant-outline" size={64} color="#CCC" />
+            <Text style={styles.emptyText}>No posts yet</Text>
+            <Text style={styles.emptySubtext}>Be the first to share a food experience!</Text>
+          </View>
+        )}
+
         {/* Feed Cards */}
-        {feedPosts.map((post) => (
+        {!loading && !error && feedPosts.map((post) => (
           <FeedCard key={post.id} post={post} />
         ))}
 
