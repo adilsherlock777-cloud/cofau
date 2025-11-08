@@ -25,43 +25,50 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    console.log('🚀 Login Screen: handleLogin called');
+    console.log('📧 Email input:', email);
+    console.log('🔒 Password length:', password.length);
+    
     // Basic validation
     if (!email || !password) {
+      console.log('❌ Validation failed: Missing fields');
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     if (password.length < 4) {
+      console.log('❌ Validation failed: Password too short');
       Alert.alert('Error', 'Password must be at least 4 characters');
       return;
     }
 
+    console.log('✅ Validation passed, setting loading state');
     setLoading(true);
 
     try {
+      console.log('🔄 Calling login from AuthContext...');
       // Call backend login API
       const result = await login(email, password);
+      console.log('📥 Login result received:', result);
 
       if (result.success) {
-        // Success - AuthContext will handle redirect via _layout.tsx
-        Alert.alert(
-          'Login Successful! 🎉',
-          'Welcome back to Cofau',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/feed'),
-            },
-          ]
-        );
+        console.log('✅ Login successful! Navigating to feed...');
+        // Navigate immediately
+        router.replace('/feed');
+        // Show success message
+        setTimeout(() => {
+          Alert.alert('Login Successful! 🎉', 'Welcome back to Cofau');
+        }, 100);
       } else {
         // Show error from backend
+        console.log('❌ Login failed:', result.error);
         Alert.alert('Login Failed', result.error || 'Please check your credentials');
       }
     } catch (error) {
+      console.error('💥 Unexpected error in handleLogin:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-      console.error('Login error:', error);
     } finally {
+      console.log('🏁 Login process completed, clearing loading state');
       setLoading(false);
     }
   };
