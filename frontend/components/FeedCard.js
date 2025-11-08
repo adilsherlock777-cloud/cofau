@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import MapButton from './MapButton';
 import { LinearGradient } from 'expo-linear-gradient';
+import { likePost, unlikePost } from '../utils/api';
 
 const formatTimestamp = (timestamp) => {
   const now = new Date();
