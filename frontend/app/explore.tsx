@@ -143,17 +143,18 @@ export default function ExploreScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.horizontalScroll}
           >
-            {trendingPosts.map((post) => (
+            {trendingPosts.length > 0 ? trendingPosts.map((post) => (
               <TouchableOpacity
                 key={post.id}
                 style={styles.trendingCard}
                 onPress={() => router.push(`/post-details`)}
               >
-                {post.image_url ? (
+                {post.full_image_url ? (
                   <Image
-                    source={{ uri: `${API_BASE_URL}${post.image_url}` }}
+                    source={{ uri: post.full_image_url }}
                     style={styles.trendingImage}
                     resizeMode="cover"
+                    onError={(e) => console.log('❌ Failed to load trending image:', post.full_image_url)}
                   />
                 ) : (
                   <LinearGradient
@@ -161,7 +162,11 @@ export default function ExploreScreen() {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.trendingImage}
-                  />
+                  >
+                    <View style={styles.placeholderContent}>
+                      <Text style={styles.placeholderText}>No Image</Text>
+                    </View>
+                  </LinearGradient>
                 )}
                 <View style={styles.trendingOverlay}>
                   <View style={styles.trendingInfo}>
