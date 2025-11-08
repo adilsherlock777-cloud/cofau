@@ -182,8 +182,11 @@ export default function AddPostScreen() {
       if (Platform.OS === 'web') {
         window.alert('Post Submitted Successfully! 🎉');
         router.push('/feed');
-            },
-          ]
+      } else {
+        Alert.alert(
+          'Success!',
+          'Your post has been submitted successfully! 🎉',
+          [{ text: 'OK', onPress: () => router.push('/feed') }]
         );
       }
     } catch (error) {
