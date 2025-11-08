@@ -96,11 +96,14 @@ export default function FeedCard({ post, onLikeUpdate }) {
       <TouchableOpacity onPress={handleImagePress} activeOpacity={0.9}>
         {post.media_url ? (
           <Image 
-            source={{ uri: post.media_url }} 
+            source={{ 
+              uri: post.media_url,
+              cache: 'reload' // Force fresh load to bypass any caching issues
+            }} 
             style={styles.postImage}
             resizeMode="cover"
             onError={(error) => {
-              console.error('❌ Image failed to load:', post.media_url, error);
+              console.error('❌ Image failed to load:', post.media_url, error.nativeEvent);
             }}
             onLoad={() => {
               console.log('✅ Image loaded successfully:', post.media_url);
