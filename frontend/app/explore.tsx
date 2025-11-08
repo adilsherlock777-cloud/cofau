@@ -172,82 +172,9 @@ export default function ExploreScreen() {
             </View>
           </View>
 
-        {/* Top Reviewers */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>👑 Top Reviewers</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.reviewersScroll}
-          >
-            {topReviewers.map((reviewer) => (
-              <TouchableOpacity
-                key={reviewer.id}
-                style={styles.reviewerCard}
-                onPress={() => router.push(`/profile/${reviewer.id}`)}
-              >
-                <View style={styles.reviewerAvatar}>
-                  <Text style={styles.reviewerAvatarText}>
-                    {reviewer.username.charAt(0).toUpperCase()}
-                  </Text>
-                  {reviewer.badge && (
-                    <View style={styles.reviewerBadge}>
-                      <Text style={styles.badgeEmoji}>🏆</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.reviewerName} numberOfLines={1}>
-                  {reviewer.username}
-                </Text>
-                <Text style={styles.reviewerLevel}>Level {reviewer.level}</Text>
-                <Text style={styles.reviewerStats}>{reviewer.posts_count} posts</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/feed')}
-        >
-          <Ionicons name="home-outline" size={26} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/search')}
-        >
-          <Ionicons name="search-outline" size={26} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/add-post')}
-        >
-          <Ionicons name="add-circle" size={32} color="#4dd0e1" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/explore')}
-        >
-          <Ionicons name="compass" size={26} color="#4dd0e1" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/profile')}
-        >
-          <Ionicons name="person-outline" size={26} color="#999" />
-        </TouchableOpacity>
-      </View>
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      )}
     </View>
   );
 }
