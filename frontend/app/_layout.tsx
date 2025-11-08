@@ -24,15 +24,18 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === 'auth';
     console.log('   - inAuthGroup:', inAuthGroup);
 
-    if (!isAuthenticated && !inAuthGroup) {
-      console.log('🔐 _layout: Not authenticated, redirecting to login');
-      router.replace('/auth/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      console.log('✅ _layout: Authenticated in auth group, redirecting to feed');
-      router.replace('/feed');
-    } else {
-      console.log('✅ _layout: No redirect needed');
-    }
+    // Use setTimeout to ensure navigation happens after state updates complete
+    setTimeout(() => {
+      if (!isAuthenticated && !inAuthGroup) {
+        console.log('🔐 _layout: Not authenticated, redirecting to login');
+        router.replace('/auth/login');
+      } else if (isAuthenticated && inAuthGroup) {
+        console.log('✅ _layout: Authenticated in auth group, redirecting to feed');
+        router.replace('/feed');
+      } else {
+        console.log('✅ _layout: No redirect needed, current route is correct');
+      }
+    }, 100);
   }, [isAuthenticated, loading, segments, user]);
 
   return (
