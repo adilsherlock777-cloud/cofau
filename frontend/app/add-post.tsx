@@ -182,32 +182,6 @@ export default function AddPostScreen() {
       if (Platform.OS === 'web') {
         window.alert('Post Submitted Successfully! 🎉');
         router.push('/feed');
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/explore')}
-        >
-          <Ionicons name="compass-outline" size={26} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-      } else {
-        Alert.alert(
-          'Post Submitted Successfully! 🎉',
-          'Your post has been added to the feed',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.push('/feed'),
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/explore')}
-        >
-          <Ionicons name="compass-outline" size={26} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
             },
           ]
         );
