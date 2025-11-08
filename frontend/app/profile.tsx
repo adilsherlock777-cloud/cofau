@@ -1,277 +1,87 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://meal-snap-4.preview.emergentagent.com';
-const API_URL = `${API_BASE_URL}/api`;
+import { useRouter } from 'expo-router';
+import { API_URL } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('Photo');
-  const [bio, setBio] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { user, token } = useAuth();
   const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      setUserData(user);
-      setBio(user.bio || '');
-    }
-  }, [user]);
+    if (!token) return;
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/auth/login');
-  };
-
-  const handleUpdateProfile = async () => {
-    setLoading(true);
-    try {
-      // TODO: Implement update profile API call
-      console.log('Updating profile with bio:', bio);
-      // For now, just refresh user data
-      await refreshUser();
-      setIsEditing(false);
-      if (Platform.OS === 'web') {
-        window.alert('Profile updated successfully!');
+    const fetchUser = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUserData(res.data.user);
+      } catch (err) {
+        console.log("Error fetching profile:", err);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      if (Platform.OS === 'web') {
-        window.alert('Failed to update profile');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  if (!userData) {
+    fetchUser();
+  }, [token]);
+
+  if (loading) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#4dd0e1" />
+      <View style={styles.centered}>
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
   }
 
-  // Calculate level progress
-  const level = userData.level || 1;
-  const currentPoints = userData.points || 0;
-  const totalPoints = level * 100; // Each level requires 100 points
-  const postsCount = 0; // Will be from posts API later
-  const followersCount = userData.followers_count || 0;
-
-  // Generate dummy gradient photos (3 per row)
-  const photoGridItems = Array(12).fill(null);
-
-  // Get first letter of name for avatar
-  const avatarLetter = userData.full_name ? userData.full_name.charAt(0).toUpperCase() : 'U';
+  if (!userData) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Unable to load profile.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>PROFILE</Text>
-        <View style={styles.pointsBadge}>
-          <Text style={styles.pointsText}>{currentPoints}/{totalPoints}</Text>
-        </View>
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Top Profile Section */}
-        <View style={styles.topSection}>
-          {/* Avatar */}
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarLetter}>{avatarLetter}</Text>
-            </View>
-            {/* User name and email */}
-            <Text style={styles.userName}>{userData.full_name}</Text>
-            <Text style={styles.userEmail}>{userData.email}</Text>
-            <Text style={styles.userLevel}>Level {level}</Text>
-          </View>
-
-          {/* Badge Icon */}
-          {userData.badge && (
-            <View style={styles.badgeContainer}>
-              <LinearGradient
-                colors={['#FFD700', '#FFA500']}
-                style={styles.badge}
-              >
-                <Text style={styles.badgeText}>{userData.badge}</Text>
-              </LinearGradient>
-            </View>
-          )}
-        </View>
-
-        {/* Stats Boxes */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{postsCount}</Text>
-            <Text style={styles.statLabel}>POSTS</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{followersCount}</Text>
-            <Text style={styles.statLabel}>FOLLOWERS</Text>
-          </View>
-        </View>
-
-        {/* BIO Section */}
-        <View style={styles.bioSection}>
-          <View style={styles.bioHeader}>
-            <Text style={styles.bioLabel}>BIO:</Text>
-            <TouchableOpacity
-              onPress={() => setIsEditing(!isEditing)}
-              style={styles.editButton}
-            >
-              <Ionicons 
-                name={isEditing ? "close-circle" : "create-outline"} 
-                size={20} 
-                color={isEditing ? "#FF6B6B" : "#4dd0e1"} 
-              />
-              <Text style={styles.editButtonText}>
-                {isEditing ? 'Cancel' : 'Edit'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <TextInput
-            style={styles.bioInput}
-            placeholder="Write your bio here..."
-            placeholderTextColor="#999"
-            value={bio}
-            onChangeText={setBio}
-            multiline
-            editable={isEditing}
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+        
+        <View style={styles.header}>
+          <Image 
+            source={{ uri: userData.avatar || 'https://placehold.co/200x200' }}
+            style={styles.avatar}
           />
-          {isEditing && (
-            <TouchableOpacity
-              style={styles.updateButton}
-              onPress={handleUpdateProfile}
-              disabled={loading}
-            >
-              <LinearGradient
-                colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.updateButtonGradient}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-                    <Text style={styles.updateButtonText}>Update Profile</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
+          <Text style={styles.name}>{userData.username}</Text>
+          <Text style={styles.email}>{userData.email}</Text>
         </View>
 
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'Photo' && styles.activeTab]}
-            onPress={() => setActiveTab('Photo')}
-          >
-            <Text style={[styles.tabText, activeTab === 'Photo' && styles.activeTabText]}>
-              Photo
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'Video' && styles.activeTab]}
-            onPress={() => setActiveTab('Video')}
-          >
-            <Text style={[styles.tabText, activeTab === 'Video' && styles.activeTabText]}>
-              Video
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'Collabs' && styles.activeTab]}
-            onPress={() => setActiveTab('Collabs')}
-          >
-            <Text style={[styles.tabText, activeTab === 'Collabs' && styles.activeTabText]}>
-              Collabs
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Photo Grid */}
-        <View style={styles.photoGrid}>
-          {photoGridItems.map((_, index) => (
-            <TouchableOpacity key={index} style={styles.gridItem}>
-              <LinearGradient
-                colors={['#66D9E8', '#F093FB', '#F5576C']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gridItemGradient}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
+      {/* ✅ BOTTOM NAVIGATION CLEAN + FIXED */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/feed')}
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/feed')}>
+          <Ionicons name="home-outline" size={26} color="#777" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/explore')}
-        >
-          <Ionicons name="compass-outline" size={26} color="#999" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/explore')}>
+          <Ionicons name="compass" size={26} color="#4dd0e1" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-        >
-          <Ionicons name="home-outline" size={26} color="#999" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/add-post')}>
+          <Ionicons name="add-circle-outline" size={30} color="#777" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/search')}
-        >
-          <Ionicons name="search-outline" size={26} color="#999" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/happening')}>
+          <Ionicons name="flame-outline" size={26} color="#777" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/add-post')}
-        >
-          <Ionicons name="add-circle-outline" size={32} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/happening')}
-        >
-          <Ionicons name="flame-outline" size={26} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/profile')}
-        >
-          <Ionicons name="person" size={26} color="#333" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/profile')}>
+          <Ionicons name="person-circle-outline" size={28} color="#4dd0e1" />
         </TouchableOpacity>
       </View>
     </View>
@@ -279,255 +89,31 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  header: {
-    backgroundColor: '#FFF',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    letterSpacing: 1,
-  },
-  pointsBadge: {
-    backgroundColor: '#F0F0F0',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  pointsText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  topSection: {
-    backgroundColor: '#FFF',
-    paddingVertical: 32,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  avatarContainer: {
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#66D9E8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  avatarLetter: {
-    fontSize: 56,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  badgeContainer: {
-    position: 'absolute',
-    right: 40,
-    top: 40,
-  },
-  badge: {
-    width: 80,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    transform: [{ rotate: '45deg' }],
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#FFF',
-    transform: [{ rotate: '-45deg' }],
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    gap: 16,
-    backgroundColor: '#FFF',
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: '#F8F8F8',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#999',
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  bioSection: {
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    marginTop: 1,
-  },
-  bioLabel: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  bioInput: {
-    fontSize: 14,
-    color: '#333',
-    minHeight: 40,
-    paddingVertical: 8,
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 24,
-    borderBottomWidth: 2,
-    borderBottomColor: '#E5E5E5',
-  },
-  tab: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  activeTab: {
-    borderBottomColor: '#333',
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#999',
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 2,
-    backgroundColor: '#FFF',
-  },
-  gridItem: {
-    width: '33.333%',
-    aspectRatio: 1,
-    padding: 2,
-  },
-  gridItemGradient: {
-    flex: 1,
-    borderRadius: 4,
-  },
-  bottomSpacer: {
-    height: 20,
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+
+  loadingText: { fontSize: 16, color: "#888" },
+  errorText: { fontSize: 16, color: "red" },
+
+  header: { alignItems: "center", marginTop: 40 },
+  avatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 16 },
+  name: { fontSize: 24, fontWeight: "bold" },
+  email: { fontSize: 16, color: "#666", marginTop: 4 },
+
   bottomNav: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    position: "absolute",
+    width: "100%",
+    bottom: 0,
+    height: 70,
+    backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    borderColor: "#eee",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingBottom: 10,
   },
-  navButton: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
-  },
-  userLevel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4dd0e1',
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    backgroundColor: '#E8F9FD',
-    borderRadius: 12,
-  },
-  bioHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4dd0e1',
-  },
-  updateButton: {
-    marginTop: 16,
-  },
-  updateButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  updateButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
+
+  navButton: { alignItems: "center" },
 });
