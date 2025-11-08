@@ -49,37 +49,51 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
+    console.log('🔐 AuthContext: Starting login process...');
+    console.log('📧 Email:', email);
+    console.log('🌐 API URL:', `${API_BASE_URL}/auth/login`);
+    
     try {
       // FastAPI OAuth2 expects form data with 'username' field
       const formData = new URLSearchParams();
       formData.append('username', email);
       formData.append('password', password);
 
+      console.log('📤 Sending login request...');
       const response = await axios.post(`${API_BASE_URL}/auth/login`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       });
 
+      console.log('✅ Login response received:', response.status);
       const { access_token } = response.data;
+      console.log('🔑 Token received:', access_token ? 'Yes' : 'No');
       
       // Store token in SecureStore
       await SecureStore.setItemAsync('userToken', access_token);
+      console.log('💾 Token stored in SecureStore');
       setToken(access_token);
 
       // Set axios authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      console.log('🔐 Authorization header set');
 
       // Fetch user info
+      console.log('👤 Fetching user info...');
       const userResponse = await axios.get(`${API_BASE_URL}/auth/me`);
       setUser(userResponse.data);
+      console.log('✅ User data loaded:', userResponse.data.email);
 
+      console.log('🎉 Login successful!');
       return { success: true };
     } catch (error) {
-      console.log('Login error:', error.response?.data || error.message);
+      console.error('❌ Login error:', error.response?.status);
+      console.error('❌ Error data:', error.response?.data);
+      console.error('❌ Error message:', error.message);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Login failed',
+        error: error.response?.data?.detail || error.message || 'Login failed',
       };
     }
   };
