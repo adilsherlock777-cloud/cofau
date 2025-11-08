@@ -145,6 +145,7 @@ export default function LoginScreen() {
             style={styles.buttonContainer}
             onPress={handleLogin}
             activeOpacity={0.8}
+            disabled={loading}
           >
             <LinearGradient
               colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
@@ -152,7 +153,11 @@ export default function LoginScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.button}
             >
-              <Text style={styles.buttonText}>Login</Text>
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.buttonText}>Login</Text>
+              )}
             </LinearGradient>
           </TouchableOpacity>
 
