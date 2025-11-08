@@ -77,10 +77,12 @@ export const AuthProvider = ({ children }) => {
 
       // Set axios authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      console.log('🔐 Authorization header set');
+      console.log('🔐 Authorization header set:', axios.defaults.headers.common['Authorization']);
 
       // Fetch user info
       console.log('👤 Fetching user info from /auth/me...');
+      console.log('📡 Request URL:', `${API_BASE_URL}/auth/me`);
+      console.log('📡 Request headers:', axios.defaults.headers.common);
       const userResponse = await axios.get(`${API_BASE_URL}/auth/me`);
       console.log('📥 User response received:', JSON.stringify(userResponse.data));
       
