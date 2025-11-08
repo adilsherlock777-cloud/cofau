@@ -171,6 +171,29 @@ export default function ExploreScreen() {
           <View style={styles.bottomSpacer} />
         </ScrollView>
       )}
+
+      {/* Bottom Navigation */}
+      <View style={styles.navBar}>
+        <TouchableOpacity onPress={() => router.push('/feed')}>
+          <Ionicons name="home-outline" size={28} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/explore')}>
+          <Ionicons name="compass-outline" size={28} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/add-post')}>
+          <Ionicons name="add-circle-outline" size={28} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/happening')}>
+          <Ionicons name="flame-outline" size={28} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/profile')}>
+          <Ionicons name="person-outline" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
