@@ -80,13 +80,17 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 Authorization header set');
 
       // Fetch user info
-      console.log('👤 Fetching user info...');
+      console.log('👤 Fetching user info from /auth/me...');
       const userResponse = await axios.get(`${API_BASE_URL}/auth/me`);
+      console.log('📥 User response received:', JSON.stringify(userResponse.data));
+      
+      // Set user state
       setUser(userResponse.data);
-      console.log('✅ User data loaded:', userResponse.data.email);
+      console.log('✅ User state set:', userResponse.data.email);
+      console.log('✅ isAuthenticated will be:', !!access_token);
 
-      console.log('🎉 Login successful!');
-      return { success: true };
+      console.log('🎉 Login successful! Returning success...');
+      return { success: true, user: userResponse.data };
     } catch (error) {
       console.error('❌ Login error:', error.response?.status);
       console.error('❌ Error data:', error.response?.data);
