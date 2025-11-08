@@ -70,7 +70,7 @@ export default function FeedScreen() {
           user_profile_picture: post.user_profile_picture,
           user_badge: post.user_badge,
           description: post.review_text,
-          rating: post.rating / 10, // Backend uses 1-10, display as 0-1 scale
+          rating: post.rating, // Backend returns 1-10, display as-is
           ratingLabel: getRatingLabel(post.rating),
           location: extractLocationFromMapLink(post.map_link),
           mapsUrl: post.map_link,
