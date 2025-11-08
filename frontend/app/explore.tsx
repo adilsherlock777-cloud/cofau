@@ -149,6 +149,16 @@ export default function ExploreScreen() {
     );
   }
 
+  // Show loading if not authenticated yet
+  if (!user || !token) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#4dd0e1" />
+        <Text style={styles.loadingText}>Authenticating...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
