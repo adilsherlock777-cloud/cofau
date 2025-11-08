@@ -18,8 +18,10 @@ import axios from 'axios';
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://food-app-debug.preview.emergentagent.com';
 const API_URL = `${API_BASE_URL}/api`;
 
-const { width } = Dimensions.get('window');
-const GRID_ITEM_WIDTH = (width - 48) / 3; // 3 columns with padding
+// Screen dimensions and card sizing for 3-column grid
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_MARGIN = 6;
+const CARD_WIDTH = (SCREEN_WIDTH - CARD_MARGIN * 4) / 3;
 
 export default function ExploreScreen() {
   const router = useRouter();
