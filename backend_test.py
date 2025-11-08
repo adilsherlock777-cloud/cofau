@@ -309,6 +309,170 @@ def test_feed():
         print(f"❌ Feed error: {str(e)}")
         return False
 
+def test_comment_endpoints():
+    """Test comment endpoints as requested in the review"""
+    print("\n" + "=" * 60)
+    print("TESTING COMMENT ENDPOINTS")
+    print("=" * 60)
+    
+    # Step 1: Login to get token
+    print("\n1. Testing Login to get authentication token...")
+    login_url = f"{BACKEND_URL}/auth/login"
+    login_data = {
+        "username": "test@test.com",
+        "password": "password123"
+    }
+    
+    try:
+        login_response = requests.post(login_url, data=login_data)
+        print(f"Login Status Code: {login_response.status_code}")
+        
+        if login_response.status_code == 200:
+            login_result = login_response.json()
+            token = login_result.get("access_token")
+            print(f"✅ Login successful! Token obtained: {token[:20]}...")
+            
+            # Step 2: Test adding a comment
+            print(f"\n2. Testing Add Comment endpoint...")
+            post_id = "690fa2cc8a6be6239d38e7e5"
+            comment_url = f"{BACKEND_URL}/posts/{post_id}/comment"
+            
+            headers = {
+                "Authorization": f"Bearer {token}"
+            }
+            
+            comment_data = {
+                "comment_text": "This is a test comment"
+            }
+            
+            try:
+                comment_response = requests.post(comment_url, headers=headers, data=comment_data)
+                print(f"Add Comment Status Code: {comment_response.status_code}")
+                print(f"Add Comment Response: {comment_response.text}")
+                
+                if comment_response.status_code == 200:
+                    comment_result = comment_response.json()
+                    print(f"✅ Comment added successfully! Comment ID: {comment_result.get('comment_id')}")
+                    
+                    # Step 3: Get comments for the post
+                    print(f"\n3. Testing Get Comments endpoint...")
+                    get_comments_url = f"{BACKEND_URL}/posts/{post_id}/comments"
+                    
+                    try:
+                        get_response = requests.get(get_comments_url)
+                        print(f"Get Comments Status Code: {get_response.status_code}")
+                        
+                        if get_response.status_code == 200:
+                            comments = get_response.json()
+                            print(f"✅ Comments retrieved successfully! Found {len(comments)} comments")
+                            
+                            # Show the latest comment (should be our test comment)
+                            if comments:
+                                latest_comment = comments[0]  # Comments are sorted by created_at desc
+                                print(f"Latest comment: '{latest_comment.get('comment_text')}'")
+                                print(f"By user: {latest_comment.get('username')}")
+                                print(f"Comment ID: {latest_comment.get('id')}")
+                            
+                            return True
+                        else:
+                            print(f"❌ Failed to get comments: {get_response.text}")
+                            return False
+                            
+                    except Exception as e:
+                        print(f"❌ Error getting comments: {str(e)}")
+                        return False
+                        
+                else:
+                    print(f"❌ Failed to add comment: {comment_response.text}")
+                    return False
+                    
+            except Exception as e:
+                print(f"❌ Error adding comment: {str(e)}")
+                return False
+                
+        else:
+            print(f"❌ Login failed: {login_response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Login error: {str(e)}")
+        return False
+
+def test_comment_endpoint_formats():
+    """Test different request formats for comment endpoint"""
+    print("\n" + "=" * 60)
+    print("TESTING COMMENT ENDPOINT REQUEST FORMATS")
+    print("=" * 60)
+    
+    # First get a token
+    login_url = f"{BACKEND_URL}/auth/login"
+    login_data = {"username": "test@test.com", "password": "password123"}
+    
+    try:
+        login_response = requests.post(login_url, data=login_data)
+        if login_response.status_code != 200:
+            print("❌ Cannot test formats - login failed")
+            return False
+            
+        token = login_response.json().get("access_token")
+        post_id = "690fa2cc8a6be6239d38e7e5"
+        comment_url = f"{BACKEND_URL}/posts/{post_id}/comment"
+        
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # Test 1: multipart/form-data (as specified in review request)
+        print("\n1. Testing with multipart/form-data...")
+        
+        comment_data = {"comment_text": "Test comment with multipart form data"}
+        
+        try:
+            # requests automatically sets multipart/form-data when using data parameter
+            response = requests.post(comment_url, headers=headers, data=comment_data)
+            print(f"Multipart Status Code: {response.status_code}")
+            print(f"Multipart Response: {response.text}")
+            
+            if response.status_code == 200:
+                print("✅ Multipart form-data format works!")
+                return True
+            else:
+                print("❌ Multipart form-data format failed")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Multipart test error: {str(e)}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Format testing error: {str(e)}")
+        return False
+
+def verify_post_exists():
+    """Verify the post ID exists before testing comments"""
+    print("\n" + "=" * 60)
+    print("VERIFYING POST EXISTS")
+    print("=" * 60)
+    
+    post_id = "690fa2cc8a6be6239d38e7e5"
+    post_url = f"{BACKEND_URL}/posts/{post_id}"
+    
+    try:
+        response = requests.get(post_url)
+        print(f"Get Post Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            post = response.json()
+            print(f"✅ Post exists! Review: '{post.get('review_text', 'No review text')}'")
+            print(f"Post by: {post.get('username')}")
+            print(f"Rating: {post.get('rating')}")
+            return True
+        else:
+            print(f"❌ Post not found: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error checking post: {str(e)}")
+        return False
+
 def main():
     """Run all backend tests"""
     print(f"Backend URL: {BACKEND_URL}")
@@ -325,6 +489,16 @@ def main():
     post_result = test_create_post()
     results.append(("Post Creation", bool(post_result)))
     results.append(("Feed Retrieval", test_feed()))
+    
+    # Run comment tests as requested in review
+    post_exists = verify_post_exists()
+    if post_exists:
+        results.append(("Comment Endpoints", test_comment_endpoints()))
+        results.append(("Comment Formats", test_comment_endpoint_formats()))
+    else:
+        print("⚠️  Skipping comment tests - post doesn't exist")
+        results.append(("Comment Endpoints", False))
+        results.append(("Comment Formats", False))
     
     # Summary
     print("\n" + "=" * 60)
