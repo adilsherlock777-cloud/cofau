@@ -67,14 +67,10 @@ export default function ExploreScreen() {
         }),
       ]);
 
-      console.log('📊 Explore data fetched:');
+      console.log('📊 Explore API data received:');
       console.log('  - All Posts:', exploreAll.data.length, 'posts');
       console.log('  - Top Reviewers:', reviewers.data.length, 'users');
-
-      // Log first post to see structure
-      if (exploreAll.data.length > 0) {
-        console.log('  - Sample post:', JSON.stringify(exploreAll.data[0], null, 2));
-      }
+      console.log('  - Raw data sample:', JSON.stringify(exploreAll.data[0], null, 2));
 
       // Transform data to add full image URLs
       const transformedPosts = exploreAll.data.map(post => {
