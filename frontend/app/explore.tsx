@@ -23,6 +23,8 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_MARGIN = 6;
 const CARD_WIDTH = (SCREEN_WIDTH - CARD_MARGIN * 4) / 3;
 
+console.log('✅ NEW Explore.tsx loaded - This is the CLEAN version with NO gradients!');
+
 export default function ExploreScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
