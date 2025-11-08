@@ -1,0 +1,69 @@
+<analysis>
+The previous AI engineer successfully developed the Cofau mobile application's UI, including Feed, Profile, Search, Happening Places, Add Post, and a complete suite of Authentication screens, all adhering to pixel-perfect design specifications and utilizing static dummy data. A full FastAPI and MongoDB backend was then implemented, covering user authentication, posts, feed, likes, comments, followers, and user profiles with JWT, bcrypt, and a points/level system.
+
+The most challenging aspect has been integrating the frontend authentication with the backend. Repeated issues arose with Expo Router navigation,  API usage,  header management, and ensuring the  correctly handles user state and redirects after login. The system currently recognizes a successful backend login, but the frontend navigation to the  screen remains dysfunctional, which the AI engineer is actively debugging by adding more console logs in .
+</analysis>
+
+<product_requirements>
+The Cofau app is a food-photo and review community. The task was to build a UI-only mobile application using React Native (Expo) and then integrate it with a FastAPI + MongoDB backend.
+**UI Screens (Static Data First):**
+*   **Feed Screen:** User header, reviewer circles, image section (gradient placeholders), action row, description, Google Maps button (opens real link), horizontal popular photos.
+*   **Profile Screen:** Large user avatar, level bar, badge icon, stats boxes (posts, followers), BIO section (editable), Photo/Video/Collabs tabs, 3-column photo grid (gradient placeholders).
+*   **Search/Gallery Screen:** Top search bar, 3-column photo grid (gradient placeholders) with heart icon overlays, infinite scroll simulation.
+*   **Happening Places Screen:** Title, restaurant ranking list (rank number, name, upload count, 3-image photo strip with gradient placeholders, +X bubble).
+*   **Add Post Screen:** Photo/video upload (camera/gallery, max 15s video), rating (10-star tappable system, real-time update), review text box, Google Maps link input, Open in Maps button, POST button.
+*   **Authentication Screens:** Login, Signup, Forgot Password, OTP/Verification, with a consistent UI style, placeholder auth logic (any email/password, OTP 123456), and redirects.
+**Backend (FastAPI + MongoDB):**
+*   Full API for User Authentication (Signup, Login, Forgot Password, OTP, JWT, bcrypt), Posts (CRUD, file upload), Feed, Likes, Comments, Followers, User Profiles (including points, levels, badges).
+*   Points and Level calculation logic: +25 points per post, badges at levels 4, 8, 12.
+*   Security: JWT, OAuth2PasswordBearer, bcrypt, Pydantic models, async operations, error handling, CORS.
+**Integration:**
+*   Frontend auth screens to POST /auth/signup, POST /auth/login.
+*   Save JWT in SecureStore, redirect to /feed.
+*   On app start, GET /auth/me to validate token.
+*   Feed Screen to GET /feed (replace static data).
+*   Add Post Screen to POST /posts/create (multipart/form-data).
+*   Profile Screen to GET /users/{id}.
+*   Likes/Comments APIs.
+*   Bottom tabs redirect to login if no JWT token.
+</product_requirements>
+
+<key_technical_concepts>
+- **Frontend Framework:** React Native (Expo) with Expo Router for file-based routing.
+- **UI Libraries:** , , , , .
+- **Backend Framework:** FastAPI with MongoDB (using Motor for async operations).
+- **Authentication:** JWT,  for password hashing.
+- **State Management:** React Context ().
+- **Data Models:** Pydantic for API schemas.
+</key_technical_concepts>
+
+<code_architecture>
+
+- ****: Important for global layout, embedding , and managing top-level authentication-based redirects between auth screens and the main app.
+- ****: Acts as a simple redirect to  for authenticated users.
+- ****: Centralized authentication logic. Manages user state, JWT token storage (), login/signup calls, and token validation (). Crucial for redirecting authenticated/unauthenticated users. Recent changes involved correcting  API usage, implementing  after login, and ensuring  state correctly reflects the presence of a  object.
+- ****: Configures  for API requests, setting the base URL and handling the  header.
+- ****: The main entry point for the FastAPI backend, registering all routers and configuring the Swagger documentation to be accessible at . Replaced the initial  implementation.
+- ****: Contains the complex 10-star rating logic, managing selected stars and updating the rating value.
+</code_architecture>
+
+<pending_tasks>
+- Fully integrate Feed Screen with backend data from .
+- Implement  with image/video upload from Add Post screen.
+- Integrate Profile Screen with user data from  (real levels, points, badge).
+- Implement Likes (, ) and Comments (, ).
+- Ensure bottom tabs redirect to login if no JWT token (beyond current auth context).
+- Complete OTP and Forgot Password backend logic (currently dummy).
+</pending_tasks>
+
+<current_work>
+The immediate focus is debugging the authentication flow. While the backend login API () is successfully returning an  and the  is designed to save this token, call  to fetch user details, and then update the user state, the frontend application is not navigating away from the login screen.
+
+The  has been updated to use  (instead of ) to ensure navigation triggers only when the user profile is fully loaded. Logging has been extensively added to  (specifically in the  function and the initial token loading ) and  to trace the authentication state changes and navigation attempts.
+
+The last action taken by the AI engineer was modifying  to add further debugging statements, specifically  messages, around the  API call after a successful login to ascertain if the call is being made, its response, and how the  state is being updated, as this is suspected to be the point of failure for navigation.
+</current_work>
+
+<optional_next_step>
+Investigate why  is not fetching the user profile or why the  state update isn't triggering navigation.
+</optional_next_step>
