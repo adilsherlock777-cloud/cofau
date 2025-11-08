@@ -245,6 +245,90 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+  - task: "Like Post API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "POST /api/posts/{post_id}/like endpoint implemented. Needs testing to verify like toggling, authentication requirement, and response format."
+
+  - task: "Unlike Post API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "POST /api/posts/{post_id}/unlike endpoint implemented. Needs testing to verify unlike functionality and authentication."
+
+  - task: "Explore Trending Posts API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "GET /api/explore/trending endpoint implemented. Should return posts sorted by recent activity. Needs validation for data structure and image_url consistency."
+
+  - task: "Explore Top Rated Posts API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "GET /api/explore/top-rated endpoint implemented. Should return posts sorted by rating. Needs validation for data structure and image_url consistency."
+
+  - task: "Explore Reviewers API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "GET /api/explore/reviewers endpoint implemented. Should return top users by points. Needs validation for data structure."
+
+  - task: "Explore Categories API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "GET /api/explore/categories endpoint implemented. Should return categories with post counts. Needs validation."
+
+  - task: "Static File Serving"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Static files mounted at /api/static for serving uploaded images. Image URLs should follow format /api/static/uploads/{filename}. Needs validation that images are accessible."
+
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://meal-snap-4.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
@@ -252,3 +336,5 @@ agent_communication:
       message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
     - agent: "testing"
       message: "Completed comment endpoints testing as requested in review. Both POST /api/posts/{post_id}/comment and GET /api/posts/{post_id}/comments are working correctly. Comment creation requires Bearer token authentication and accepts multipart/form-data with comment_text parameter. Get comments endpoint works without authentication. Successfully tested with post ID 690fa2cc8a6be6239d38e7e5. All comment functionality is working as expected."
+    - agent: "main"
+      message: "Added new backend tasks for comprehensive testing: Like/Unlike endpoints, all Explore endpoints (trending, top-rated, reviewers, categories), and static file serving. User wants to validate all endpoints work correctly with proper image URLs, authentication, and data consistency. Focus on ensuring feed -> comments flow is stable. Testing priority: authentication > feed/posts > comments > likes > explore endpoints > static files."
