@@ -182,6 +182,7 @@ export default function SignupScreen() {
             style={styles.buttonContainer}
             onPress={handleSignup}
             activeOpacity={0.8}
+            disabled={loading}
           >
             <LinearGradient
               colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
@@ -189,7 +190,11 @@ export default function SignupScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.button}
             >
-              <Text style={styles.buttonText}>Create Account</Text>
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.buttonText}>Create Account</Text>
+              )}
             </LinearGradient>
           </TouchableOpacity>
 
