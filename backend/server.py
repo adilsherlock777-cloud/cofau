@@ -200,7 +200,7 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
 # ==================== FEED ENDPOINT ====================
 
 @app.get("/api/feed")
-async def get_feed(skip: int = 0, limit: int = 20):
+async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get feed posts with full image URLs"""
     db = get_database()
     
@@ -209,6 +209,12 @@ async def get_feed(skip: int = 0, limit: int = 20):
     result = []
     for post in posts:
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
+        # Check if current user liked this post
+        is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
         
         # Construct full image URL
         media_url = post.get("media_url", "")
@@ -230,6 +236,7 @@ async def get_feed(skip: int = 0, limit: int = 20):
             "map_link": post.get("map_link"),
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
+            "is_liked_by_user": is_liked,
             "created_at": post["created_at"]
         })
     
