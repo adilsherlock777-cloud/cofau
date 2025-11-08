@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
           // Token invalid - delete it
           console.log('Token validation failed:', error.response?.status);
-          await SecureStore.deleteItemAsync('userToken');
+          await storage.deleteItem('userToken');
           delete axios.defaults.headers.common['Authorization'];
         }
       }
