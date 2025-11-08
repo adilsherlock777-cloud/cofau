@@ -419,25 +419,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
-  ratingInput: {
-    fontSize: 32,
+  ratingNumber: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    width: 80,
-    textAlign: 'center',
+    marginBottom: 12,
   },
   starsContainer: {
     flexDirection: 'row',
-    marginLeft: 16,
+    flexWrap: 'wrap',
     gap: 4,
+  },
+  starButton: {
+    padding: 2,
   },
   reviewInput: {
     backgroundColor: '#FFF',
