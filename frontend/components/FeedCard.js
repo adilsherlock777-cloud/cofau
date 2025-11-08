@@ -57,6 +57,12 @@ export default function FeedCard({ post }) {
             source={{ uri: post.media_url }} 
             style={styles.postImage}
             resizeMode="cover"
+            onError={(error) => {
+              console.error('❌ Image failed to load:', post.media_url, error);
+            }}
+            onLoad={() => {
+              console.log('✅ Image loaded successfully:', post.media_url);
+            }}
           />
         ) : (
           <LinearGradient
