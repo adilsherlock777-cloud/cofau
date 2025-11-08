@@ -17,9 +17,25 @@ export default function FeedCard({ post }) {
       {/* User Info */}
       <View style={styles.userHeader}>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={20} color="#FFF" />
+          {post.user_profile_picture ? (
+            <Image source={{ uri: post.user_profile_picture }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarLetter}>
+              {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
+            </Text>
+          )}
         </View>
-        <Text style={styles.username}>{post.username}</Text>
+        <View style={styles.userTextContainer}>
+          <Text style={styles.username}>{post.username}</Text>
+          {post.created_at && (
+            <Text style={styles.timestamp}>{formatTimestamp(post.created_at)}</Text>
+          )}
+        </View>
+        {post.user_badge && (
+          <View style={styles.badgeIcon}>
+            <Text style={styles.badgeIconText}>🏆</Text>
+          </View>
+        )}
       </View>
 
       {/* Image Section */}
