@@ -120,17 +120,30 @@ export default function FeedCard({ post, onLikeUpdate }) {
 
       {/* Action Row */}
       <View style={styles.actionRow}>
-        <View style={styles.actionItem}>
-          <Ionicons name="heart-outline" size={24} color="#999" />
-          <Text style={styles.actionText}>{post.likes}</Text>
-        </View>
-        <View style={styles.actionItem}>
+        <TouchableOpacity 
+          style={styles.actionItem} 
+          onPress={handleLike}
+          disabled={isLiking}
+        >
+          <Ionicons 
+            name={isLiked ? "heart" : "heart-outline"} 
+            size={24} 
+            color={isLiked ? "#FF6B6B" : "#999"} 
+          />
+          <Text style={[styles.actionText, isLiked && styles.likedText]}>
+            {likesCount}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionItem}
+          onPress={handleCommentPress}
+        >
           <Ionicons name="chatbubble-outline" size={22} color="#999" />
-          <Text style={styles.actionText}>{post.comments}</Text>
-        </View>
+          <Text style={styles.actionText}>{post.comments || 0}</Text>
+        </TouchableOpacity>
         <View style={styles.actionItem}>
           <Ionicons name="paper-plane-outline" size={22} color="#999" />
-          <Text style={styles.actionText}>{post.shares}</Text>
+          <Text style={styles.actionText}>{post.shares || 0}</Text>
         </View>
       </View>
 
