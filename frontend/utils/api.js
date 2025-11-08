@@ -73,4 +73,115 @@ export const createPost = async (postData) => {
   }
 };
 
+/**
+ * Like a post
+ */
+export const likePost = async (postId) => {
+  try {
+    const response = await axios.post(`${API_URL}/posts/${postId}/like`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error liking post:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Unlike a post
+ */
+export const unlikePost = async (postId) => {
+  try {
+    const response = await axios.delete(`${API_URL}/posts/${postId}/like`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error unliking post:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get comments for a post
+ */
+export const getComments = async (postId) => {
+  try {
+    const response = await axios.get(`${API_URL}/posts/${postId}/comments`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error fetching comments:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Add a comment to a post
+ */
+export const addComment = async (postId, commentText) => {
+  try {
+    const formData = new FormData();
+    formData.append('comment_text', commentText);
+    
+    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error adding comment:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Follow a user
+ */
+export const followUser = async (userId) => {
+  try {
+    const response = await axios.post(`${API_URL}/users/${userId}/follow`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error following user:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Unfollow a user
+ */
+export const unfollowUser = async (userId) => {
+  try {
+    const response = await axios.delete(`${API_URL}/users/${userId}/follow`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error unfollowing user:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get user's followers
+ */
+export const getFollowers = async (userId) => {
+  try {
+    const response = await axios.get(`${API_URL}/users/${userId}/followers`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error fetching followers:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get users that a user is following
+ */
+export const getFollowing = async (userId) => {
+  try {
+    const response = await axios.get(`${API_URL}/users/${userId}/following`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error fetching following:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export default api;
