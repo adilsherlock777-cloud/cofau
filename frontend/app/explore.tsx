@@ -28,6 +28,7 @@ const CARD_WIDTH = (SCREEN_WIDTH - CARD_MARGIN * 4) / 3;
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { user, token } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [allPosts, setAllPosts] = useState([]);
@@ -38,20 +39,32 @@ export default function ExploreScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchExploreData();
-    }, [])
+      if (user && token) {
+        fetchExploreData();
+      }
+    }, [user, token])
   );
 
   const fetchExploreData = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching explore data...');
+      console.log('🔍 Explore fetch starting with token:', token ? 'Present' : 'Missing');
+      console.log('   User:', user?.email);
       console.log('   Authorization header:', axios.defaults.headers.common['Authorization'] ? 'Present' : 'Missing');
 
       // Fetch explore all (engagement-based) and reviewers
+      // Use axios with Authorization header explicitly
       const [exploreAll, reviewers] = await Promise.all([
-        axios.get(`${API_URL}/explore/all?limit=30`),
-        axios.get(`${API_URL}/explore/reviewers?limit=10`),
+        axios.get(`${API_URL}/explore/all?limit=30`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        axios.get(`${API_URL}/explore/reviewers?limit=10`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
       ]);
 
       console.log('📊 Explore data fetched:');
