@@ -182,6 +182,15 @@ export default function AddPostScreen() {
       if (Platform.OS === 'web') {
         window.alert('Post Submitted Successfully! 🎉');
         router.push('/feed');
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => router.push('/explore')}
+        >
+          <Ionicons name="compass-outline" size={26} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
       } else {
         Alert.alert(
           'Post Submitted Successfully! 🎉',
@@ -190,6 +199,15 @@ export default function AddPostScreen() {
             {
               text: 'OK',
               onPress: () => router.push('/feed'),
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => router.push('/explore')}
+        >
+          <Ionicons name="compass-outline" size={26} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
             },
           ]
         );
@@ -357,6 +375,15 @@ export default function AddPostScreen() {
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => router.push('/feed')}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => router.push('/explore')}
+        >
+          <Ionicons name="compass-outline" size={26} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
         >
           <Ionicons name="home-outline" size={26} color="#999" />
         </TouchableOpacity>
