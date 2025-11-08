@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
  */
 
 const isWeb = Platform.OS === 'web';
+console.log('🔧 Storage initialized - Platform:', Platform.OS, '| Using:', isWeb ? 'localStorage' : 'SecureStore');
 
 export const storage = {
   async setItem(key, value) {
