@@ -1,21 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
 import RatingBar from '../components/RatingBar';
 import ReviewerCircles from '../components/ReviewerCircles';
 import FeedCard from '../components/FeedCard';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://food-app-debug.preview.emergentagent.com';
+const API_URL = `${API_BASE_URL}/api`;
 
 export default function FeedScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const [feedPosts, setFeedPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Dummy data for reviewers
+  // Dummy data for reviewers - can be fetched from backend later
   const reviewers = [
     { letter: 'H', count: 5 },
     { letter: 'B', count: 2 },
@@ -25,48 +38,85 @@ export default function FeedScreen() {
     { letter: 'S', count: 4 },
   ];
 
-  // Dummy feed posts
-  const feedPosts = [
-    {
-      id: 1,
-      username: 'ADIL',
-      description: 'Amazing pasta with incredible flavors!',
-      rating: 4.7,
-      ratingLabel: 'Very Good Food',
-      location: '2nd Road, Bangalore',
-      mapsUrl: 'https://maps.google.com/?q=2nd+Road+Bangalore',
-      likes: 565,
-      comments: 768,
-      shares: 45,
-      popularPhotos: [1, 2, 3],
-    },
-    {
-      id: 2,
-      username: 'ADIL',
-      description: 'Delicious food at a great location.',
-      rating: 4.7,
-      ratingLabel: 'Very Good Food',
-      location: '2nd Road, Bangalore',
-      mapsUrl: 'https://maps.google.com/?q=2nd+Road+Bangalore',
-      likes: 432,
-      comments: 654,
-      shares: 32,
-      popularPhotos: [1, 2, 3, 4],
-    },
-    {
-      id: 3,
-      username: 'SARAH',
-      description: 'Perfect dinner spot with amazing ambiance.',
-      rating: 4.9,
-      ratingLabel: 'Excellent Food',
-      location: 'MG Road, Mumbai',
-      mapsUrl: 'https://maps.google.com/?q=MG+Road+Mumbai',
-      likes: 892,
-      comments: 923,
-      shares: 76,
-      popularPhotos: [1, 2, 3],
-    },
-  ];
+  useEffect(() => {
+    fetchFeed();
+  }, []);
+
+  const fetchFeed = async () => {
+    try {
+      setError(null);
+      console.log('📡 Fetching feed from:', `${API_URL}/feed`);
+      
+      const response = await axios.get(`${API_URL}/feed`);
+      console.log('✅ Feed data received:', response.data.length, 'posts');
+      
+      // Transform the data to match the component expectations
+      const transformedPosts = response.data.map(post => ({
+        id: post.id,
+        user_id: post.user_id,
+        username: post.username,
+        user_profile_picture: post.user_profile_picture,
+        user_badge: post.user_badge,
+        description: post.review_text,
+        rating: post.rating / 10, // Backend uses 1-10, display as 0-1 scale
+        ratingLabel: getRatingLabel(post.rating),
+        location: extractLocationFromMapLink(post.map_link),
+        mapsUrl: post.map_link,
+        likes: post.likes_count,
+        comments: post.comments_count,
+        shares: 0, // Not implemented yet
+        media_url: post.media_url,
+        media_type: post.media_type,
+        created_at: post.created_at,
+        popularPhotos: [], // Can be populated later
+      }));
+      
+      setFeedPosts(transformedPosts);
+      setLoading(false);
+      setRefreshing(false);
+    } catch (error) {
+      console.error('❌ Error fetching feed:', error);
+      setError('Failed to load feed');
+      setLoading(false);
+      setRefreshing(false);
+      
+      // Show alert on web
+      if (Platform.OS === 'web') {
+        // Don't block the UI with alerts in case of errors
+        console.error('Feed fetch error:', error.message);
+      }
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchFeed();
+  };
+
+  const getRatingLabel = (rating) => {
+    if (rating >= 9) return 'Excellent Food';
+    if (rating >= 7) return 'Very Good Food';
+    if (rating >= 5) return 'Good Food';
+    if (rating >= 3) return 'Average Food';
+    return 'Below Average';
+  };
+
+  const extractLocationFromMapLink = (mapLink) => {
+    if (!mapLink) return 'No location';
+    
+    // Try to extract location from Google Maps URL
+    try {
+      const url = new URL(mapLink);
+      const query = url.searchParams.get('q');
+      if (query) return query;
+      
+      // Fallback to basic parsing
+      const match = mapLink.match(/q=([^&]+)/);
+      return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : 'Location';
+    } catch {
+      return 'Location';
+    }
+  };
 
   return (
     <View style={styles.container}>
