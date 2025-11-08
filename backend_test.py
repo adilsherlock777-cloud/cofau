@@ -310,16 +310,21 @@ def test_feed():
         return False
 
 def main():
-    """Run all authentication tests"""
+    """Run all backend tests"""
     print(f"Backend URL: {BACKEND_URL}")
     print(f"Test started at: {datetime.now()}")
     
     results = []
     
-    # Run tests
+    # Run authentication tests
     results.append(("Auth Flow", test_auth_flow()))
     results.append(("Invalid Credentials", test_invalid_credentials()))
     results.append(("Unauthorized Access", test_unauthorized_access()))
+    
+    # Run post and feed tests
+    post_result = test_create_post()
+    results.append(("Post Creation", bool(post_result)))
+    results.append(("Feed Retrieval", test_feed()))
     
     # Summary
     print("\n" + "=" * 60)
@@ -338,7 +343,7 @@ def main():
     print(f"\nResults: {passed}/{total} tests passed")
     
     if passed == total:
-        print("🎉 All authentication tests passed!")
+        print("🎉 All backend tests passed!")
         return True
     else:
         print("⚠️  Some tests failed - check logs above")
