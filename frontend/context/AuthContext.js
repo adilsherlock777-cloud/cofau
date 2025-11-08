@@ -167,7 +167,7 @@ export const AuthProvider = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/auth/me`);
+      const response = await axios.get(`${API_URL}/auth/me`);
       setUser(response.data);
     } catch (error) {
       console.log('Error refreshing user:', error);
