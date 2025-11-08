@@ -1,29 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter } from 'expo-router';
 import MapButton from './MapButton';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function FeedCard({ post }) {
-  let router;
-  let segments;
-  
-  try {
-    router = useRouter();
-    segments = useSegments();
-  } catch (e) {
-    // Router not ready yet
-  }
+  const router = useRouter();
 
   const handleImagePress = () => {
-    try {
-      if (router) {
-        router.push('/post-details');
-      }
-    } catch (error) {
-      console.log('Router not ready yet');
-    }
+    router.push('/post-details');
   };
 
   return (
