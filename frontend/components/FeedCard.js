@@ -149,10 +149,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 8,
   },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  avatarLetter: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  userTextContainer: {
+    flex: 1,
+  },
   username: {
     fontSize: 15,
     fontWeight: 'bold',
     color: '#333',
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  badgeIcon: {
+    marginLeft: 8,
+  },
+  badgeIconText: {
+    fontSize: 16,
+  },
+  postImage: {
+    width: '100%',
+    height: 240,
+    borderRadius: 12,
   },
   imageGradient: {
     width: '100%',
