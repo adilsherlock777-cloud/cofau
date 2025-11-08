@@ -19,6 +19,10 @@ const formatTimestamp = (timestamp) => {
 
 export default function FeedCard({ post }) {
   const router = useRouter();
+  
+  // Debug: Log the media_url to see what we're receiving
+  console.log('🎴 FeedCard received post with media_url:', post.media_url);
+  console.log('🎴 Post data:', JSON.stringify(post, null, 2));
 
   const handleImagePress = () => {
     router.push('/post-details');
