@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 20,
   },
-  bottomNav: {
+  navBar: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
     paddingVertical: 12,
@@ -116,10 +116,5 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E5E5',
     justifyContent: 'space-around',
     alignItems: 'center',
-  },
-  navButton: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
