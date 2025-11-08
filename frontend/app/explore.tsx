@@ -42,6 +42,8 @@ export default function ExploreScreen() {
   const fetchExploreData = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching explore data...');
+      console.log('   Authorization header:', axios.defaults.headers.common['Authorization'] ? 'Present' : 'Missing');
 
       // Fetch explore all (engagement-based) and reviewers
       const [exploreAll, reviewers] = await Promise.all([
