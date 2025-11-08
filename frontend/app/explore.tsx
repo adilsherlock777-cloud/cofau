@@ -19,14 +19,13 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://food-app-de
 const API_URL = `${API_BASE_URL}/api`;
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width * 0.7;
+const GRID_ITEM_WIDTH = (width - 48) / 3; // 3 columns with padding
 
 export default function ExploreScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [trendingPosts, setTrendingPosts] = useState([]);
-  const [topRatedPosts, setTopRatedPosts] = useState([]);
+  const [allPosts, setAllPosts] = useState([]);
   const [topReviewers, setTopReviewers] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -42,31 +41,33 @@ export default function ExploreScreen() {
     try {
       setLoading(true);
 
-      // Fetch all explore data in parallel
-      const [trending, topRated, reviewers] = await Promise.all([
-        axios.get(`${API_URL}/explore/trending?limit=10`),
-        axios.get(`${API_URL}/explore/top-rated?limit=6`),
+      // Fetch explore all (engagement-based) and reviewers
+      const [exploreAll, reviewers] = await Promise.all([
+        axios.get(`${API_URL}/explore/all?limit=30`),
         axios.get(`${API_URL}/explore/reviewers?limit=10`),
       ]);
 
       console.log('📊 Explore data fetched:');
-      console.log('  - Trending:', trending.data.length, 'posts');
-      console.log('  - Top Rated:', topRated.data.length, 'posts');
+      console.log('  - All Posts:', exploreAll.data.length, 'posts');
       console.log('  - Top Reviewers:', reviewers.data.length, 'users');
 
+      // Log first post to see structure
+      if (exploreAll.data.length > 0) {
+        console.log('  - Sample post:', JSON.stringify(exploreAll.data[0], null, 2));
+      }
+
       // Transform data to add full image URLs
-      const transformedTrending = trending.data.map(post => ({
-        ...post,
-        full_image_url: post.image_url ? `${API_BASE_URL}${post.image_url}` : null,
-      }));
+      const transformedPosts = exploreAll.data.map(post => {
+        const imageUrl = post.image_url || post.media_url;
+        const fullUrl = imageUrl ? `${API_BASE_URL}${imageUrl}` : null;
+        console.log(`📸 Post ${post.id}: ${imageUrl} → ${fullUrl}`);
+        return {
+          ...post,
+          full_image_url: fullUrl,
+        };
+      });
 
-      const transformedTopRated = topRated.data.map(post => ({
-        ...post,
-        full_image_url: post.image_url ? `${API_BASE_URL}${post.image_url}` : null,
-      }));
-
-      setTrendingPosts(transformedTrending);
-      setTopRatedPosts(transformedTopRated);
+      setAllPosts(transformedPosts);
       setTopReviewers(reviewers.data);
       setLoading(false);
       setRefreshing(false);
