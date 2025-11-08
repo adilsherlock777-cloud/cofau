@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Cofau App
-Tests authentication flow: signup, login, and protected endpoints
+Comprehensive Backend Testing for Cofau Food Review App
+Tests all backend endpoints including Auth, Feed, Posts, Comments, Likes, and Explore endpoints
 """
 
 import requests
@@ -9,7 +9,6 @@ import json
 import sys
 from datetime import datetime
 from io import BytesIO
-from PIL import Image
 
 # Backend URL from environment
 BACKEND_URL = "https://meal-snap-4.preview.emergentagent.com/api"
