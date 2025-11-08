@@ -45,7 +45,9 @@ app.add_middleware(
 
 # Mount static files under /api prefix to match Kubernetes ingress routing
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-app.mount("/api/static", StaticFiles(directory="static"), name="static")
+# Use absolute path for static files
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/api/static", StaticFiles(directory=static_dir), name="static")
 
 # Include routers
 app.include_router(auth_router)
