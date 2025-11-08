@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }) => {
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
 
       // Fetch user info
-      const userResponse = await axios.get(`${API_BASE_URL}/auth/me`);
+      const userResponse = await axios.get(`${API_URL}/auth/me`);
       setUser(userResponse.data);
 
       return { success: true };
