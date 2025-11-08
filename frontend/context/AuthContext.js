@@ -74,8 +74,8 @@ export const AuthProvider = ({ children }) => {
       const { access_token } = response.data;
       console.log('🔑 Token received:', access_token ? 'Yes' : 'No');
       
-      // Store token in SecureStore
-      await SecureStore.setItemAsync('userToken', access_token);
+      // Store token in storage
+      await storage.setItem('userToken', access_token);
       console.log('💾 Token stored in SecureStore');
       setToken(access_token);
 
