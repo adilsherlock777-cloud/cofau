@@ -137,7 +137,22 @@ export default function ProfileScreen() {
 
         {/* BIO Section */}
         <View style={styles.bioSection}>
-          <Text style={styles.bioLabel}>BIO:</Text>
+          <View style={styles.bioHeader}>
+            <Text style={styles.bioLabel}>BIO:</Text>
+            <TouchableOpacity
+              onPress={() => setIsEditing(!isEditing)}
+              style={styles.editButton}
+            >
+              <Ionicons 
+                name={isEditing ? "close-circle" : "create-outline"} 
+                size={20} 
+                color={isEditing ? "#FF6B6B" : "#4dd0e1"} 
+              />
+              <Text style={styles.editButtonText}>
+                {isEditing ? 'Cancel' : 'Edit'}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
             style={styles.bioInput}
             placeholder="Write your bio here..."
@@ -145,7 +160,31 @@ export default function ProfileScreen() {
             value={bio}
             onChangeText={setBio}
             multiline
+            editable={isEditing}
           />
+          {isEditing && (
+            <TouchableOpacity
+              style={styles.updateButton}
+              onPress={handleUpdateProfile}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.updateButtonGradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                    <Text style={styles.updateButtonText}>Update Profile</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Tabs */}
