@@ -237,6 +237,15 @@ export default function ProfileScreen() {
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => router.push('/feed')}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => router.push('/explore')}
+        >
+          <Ionicons name="compass-outline" size={26} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
         >
           <Ionicons name="home-outline" size={26} color="#999" />
         </TouchableOpacity>
