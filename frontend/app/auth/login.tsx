@@ -23,6 +23,15 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}\n${message}`);
+    } else {
+      // For native, you'd use Alert.alert (not imported for now)
+      console.log(`Alert: ${title} - ${message}`);
+    }
+  };
+
   const handleLogin = async () => {
     console.log('🚀 Login Screen: handleLogin called');
     console.log('📧 Email input:', email);
@@ -31,13 +40,13 @@ export default function LoginScreen() {
     // Basic validation
     if (!email || !password) {
       console.log('❌ Validation failed: Missing fields');
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
 
     if (password.length < 4) {
       console.log('❌ Validation failed: Password too short');
-      Alert.alert('Error', 'Password must be at least 4 characters');
+      showAlert('Error', 'Password must be at least 4 characters');
       return;
     }
 
@@ -54,16 +63,16 @@ export default function LoginScreen() {
         console.log('✅ Login successful! Auth state updated.');
         console.log('   _layout will handle navigation automatically.');
         // Show success message
-        Alert.alert('Login Successful! 🎉', 'Welcome back to Cofau');
+        showAlert('Login Successful! 🎉', 'Welcome back to Cofau');
         // Don't manually navigate - let _layout handle it based on auth state
       } else {
         // Show error from backend
         console.log('❌ Login failed:', result.error);
-        Alert.alert('Login Failed', result.error || 'Please check your credentials');
+        showAlert('Login Failed', result.error || 'Please check your credentials');
       }
     } catch (error) {
       console.error('💥 Unexpected error in handleLogin:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      showAlert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       console.log('🏁 Login process completed, clearing loading state');
       setLoading(false);
