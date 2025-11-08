@@ -208,36 +208,25 @@ export default function FeedScreen() {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/feed')}
-        >
-          <Ionicons name="home" size={26} color="#333" />
+      <View style={styles.navBar}>
+        <TouchableOpacity onPress={() => router.push('/feed')}>
+          <Ionicons name="home-outline" size={28} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/explore')}
-        >
-          <Ionicons name="compass-outline" size={26} color="#999" />
+
+        <TouchableOpacity onPress={() => router.push('/explore')}>
+          <Ionicons name="compass-outline" size={28} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/search')}
-        >
-          <Ionicons name="search-outline" size={26} color="#999" />
+
+        <TouchableOpacity onPress={() => router.push('/add-post')}>
+          <Ionicons name="add-circle-outline" size={28} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/add-post')}
-        >
-          <Ionicons name="add-circle-outline" size={32} color="#999" />
+
+        <TouchableOpacity onPress={() => router.push('/happening')}>
+          <Ionicons name="flame-outline" size={28} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/profile')}
-        >
-          <Ionicons name="person-outline" size={26} color="#999" />
+
+        <TouchableOpacity onPress={() => router.push('/profile')}>
+          <Ionicons name="person-outline" size={28} color="#000" />
         </TouchableOpacity>
       </View>
     </View>
