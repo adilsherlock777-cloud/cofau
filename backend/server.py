@@ -58,9 +58,9 @@ async def root():
 
 @app.post("/api/posts/create")
 async def create_post(
-    rating: int,
-    review_text: str,
-    map_link: str = None,
+    rating: int = Form(...),
+    review_text: str = Form(...),
+    map_link: str = Form(None),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
