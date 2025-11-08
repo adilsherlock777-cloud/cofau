@@ -33,7 +33,7 @@ function RootLayoutNav() {
     } else {
       console.log('✅ _layout: No redirect needed');
     }
-  }, [isAuthenticated, loading, segments]);
+  }, [isAuthenticated, loading, segments, user]);
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
