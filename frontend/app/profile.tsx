@@ -80,12 +80,15 @@ export default function ProfileScreen() {
   // Generate dummy gradient photos (3 per row)
   const photoGridItems = Array(12).fill(null);
 
+  // Get first letter of name for avatar
+  const avatarLetter = userData.full_name ? userData.full_name.charAt(0).toUpperCase() : 'U';
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+        <TouchableOpacity onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>PROFILE</Text>
         <View style={styles.pointsBadge}>
