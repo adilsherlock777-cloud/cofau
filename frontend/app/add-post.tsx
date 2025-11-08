@@ -9,11 +9,14 @@ import {
   Alert,
   Image,
   Linking,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { createPost } from '../utils/api';
 
 export default function AddPostScreen() {
   const router = useRouter();
@@ -22,6 +25,7 @@ export default function AddPostScreen() {
   const [rating, setRating] = useState('');
   const [review, setReview] = useState('');
   const [mapsLink, setMapsLink] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Request permissions and pick image
   const pickImage = async () => {
