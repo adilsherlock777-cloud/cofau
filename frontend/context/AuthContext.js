@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     console.log('🔐 AuthContext: Starting login process...');
     console.log('📧 Email:', email);
-    console.log('🌐 API URL:', `${API_BASE_URL}/auth/login`);
+    console.log('🌐 API URL:', `${API_URL}/auth/login`);
     
     try {
       // FastAPI OAuth2 expects form data with 'username' field
