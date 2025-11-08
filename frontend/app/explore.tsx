@@ -89,7 +89,11 @@ export default function ExploreScreen() {
     } else {
       try {
         const response = await axios.get(`${API_URL}/explore/category?name=${category}&limit=6`);
-        setTopRatedPosts(response.data);
+        const transformedPosts = response.data.map(post => ({
+          ...post,
+          full_image_url: post.image_url ? `${API_BASE_URL}${post.image_url}` : null,
+        }));
+        setTopRatedPosts(transformedPosts);
       } catch (error) {
         console.error('❌ Error fetching category:', error);
       }
