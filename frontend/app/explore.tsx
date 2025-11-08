@@ -600,4 +600,14 @@ const styles = StyleSheet.create({
   navButton: {
     padding: 8,
   },
+  placeholderContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 12,
+    color: '#FFF',
+    fontWeight: '600',
+  },
 });
