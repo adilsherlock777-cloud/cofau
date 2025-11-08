@@ -292,4 +292,14 @@ const styles = StyleSheet.create({
   bottomSpacer: {
     height: 100,
   },
+
+  navBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
+  },
 });
