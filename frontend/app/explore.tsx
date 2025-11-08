@@ -13,10 +13,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://food-app-debug.preview.emergentagent.com';
 const API_URL = `${API_BASE_URL}/api`;
+
+console.log('🔧 Explore screen initialized with API_URL:', API_URL);
 
 // Screen dimensions and card sizing for 3-column grid
 const SCREEN_WIDTH = Dimensions.get('window').width;
