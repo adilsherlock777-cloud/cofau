@@ -9,7 +9,13 @@ export default function FeedCard({ post }) {
   const router = useRouter();
 
   const handleImagePress = () => {
-    router.push('/post-details');
+    try {
+      if (router) {
+        router.push('/post-details');
+      }
+    } catch (error) {
+      console.log('Router not ready yet');
+    }
   };
 
   return (
