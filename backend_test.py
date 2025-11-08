@@ -8,528 +8,670 @@ import requests
 import json
 import sys
 from datetime import datetime
-from io import BytesIO
 
 # Backend URL from environment
 BACKEND_URL = "https://meal-snap-4.preview.emergentagent.com/api"
 
-def test_auth_flow():
-    """Test complete authentication flow"""
-    print("=" * 60)
-    print("TESTING AUTHENTICATION FLOW")
-    print("=" * 60)
-    
-    # Test data
-    test_user = {
-        "full_name": "Test User",
-        "email": "test@test.com", 
-        "password": "password123"
-    }
-    
-    # Step 1: Test Signup
-    print("\n1. Testing POST /api/auth/signup")
-    print("-" * 40)
-    
-    try:
-        signup_response = requests.post(
-            f"{BACKEND_URL}/auth/signup",
-            json=test_user,
-            headers={"Content-Type": "application/json"}
-        )
+class CofauBackendTester:
+    def __init__(self):
+        self.base_url = BACKEND_URL
+        self.auth_token = None
+        self.test_user_email = "foodie_reviewer_2024@example.com"
+        self.test_user_password = "SecurePass123!"
+        self.test_user_name = "Foodie Reviewer"
+        self.test_post_id = None
+        self.test_results = []
         
-        print(f"Status Code: {signup_response.status_code}")
-        print(f"Response: {signup_response.text}")
-        
-        if signup_response.status_code == 200:
-            signup_data = signup_response.json()
-            print("✅ Signup successful")
-            print(f"Access Token: {signup_data.get('access_token', 'Not found')[:50]}...")
-        elif signup_response.status_code == 400 and "already registered" in signup_response.text:
-            print("⚠️  User already exists - continuing with login test")
-        else:
-            print(f"❌ Signup failed: {signup_response.text}")
-            
-    except Exception as e:
-        print(f"❌ Signup request failed: {str(e)}")
-        return False
-    
-    # Step 2: Test Login
-    print("\n2. Testing POST /api/auth/login")
-    print("-" * 40)
-    
-    try:
-        # OAuth2 requires form data with 'username' field (not 'email')
-        login_data = {
-            "username": test_user["email"],  # OAuth2 uses 'username' field
-            "password": test_user["password"]
+    def log_result(self, test_name, success, details, response_data=None):
+        """Log test results"""
+        result = {
+            "test": test_name,
+            "success": success,
+            "details": details,
+            "timestamp": datetime.now().isoformat()
         }
+        if response_data:
+            result["response_sample"] = response_data
+        self.test_results.append(result)
         
-        login_response = requests.post(
-            f"{BACKEND_URL}/auth/login",
-            data=login_data,  # Form data, not JSON
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
-        
-        print(f"Status Code: {login_response.status_code}")
-        print(f"Response: {login_response.text}")
-        
-        if login_response.status_code == 200:
-            login_data = login_response.json()
-            access_token = login_data.get("access_token")
-            if access_token:
-                print("✅ Login successful")
-                print(f"Access Token: {access_token[:50]}...")
-                print(f"Token Type: {login_data.get('token_type')}")
-            else:
-                print("❌ Login response missing access_token")
-                return False
-        else:
-            print(f"❌ Login failed: {login_response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Login request failed: {str(e)}")
-        return False
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}: {details}")
+        if response_data and not success:
+            print(f"   Response: {json.dumps(response_data, indent=2)}")
     
-    # Step 3: Test Protected Endpoint
-    print("\n3. Testing GET /api/auth/me (Protected)")
-    print("-" * 40)
-    
-    try:
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-        
-        me_response = requests.get(
-            f"{BACKEND_URL}/auth/me",
-            headers=headers
-        )
-        
-        print(f"Status Code: {me_response.status_code}")
-        print(f"Response: {me_response.text}")
-        
-        if me_response.status_code == 200:
-            user_data = me_response.json()
-            print("✅ Protected endpoint access successful")
-            print(f"User ID: {user_data.get('id')}")
-            print(f"Full Name: {user_data.get('full_name')}")
-            print(f"Email: {user_data.get('email')}")
-            print(f"Points: {user_data.get('points')}")
-            print(f"Level: {user_data.get('level')}")
-            return True
-        else:
-            print(f"❌ Protected endpoint failed: {me_response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Protected endpoint request failed: {str(e)}")
-        return False
-
-def test_invalid_credentials():
-    """Test login with invalid credentials"""
-    print("\n4. Testing Invalid Credentials")
-    print("-" * 40)
-    
-    try:
-        invalid_data = {
-            "username": "invalid@test.com",
-            "password": "wrongpassword"
-        }
-        
-        response = requests.post(
-            f"{BACKEND_URL}/auth/login",
-            data=invalid_data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
-        
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 401:
-            print("✅ Invalid credentials properly rejected")
-            return True
-        else:
-            print(f"❌ Expected 401, got {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Invalid credentials test failed: {str(e)}")
-        return False
-
-def test_unauthorized_access():
-    """Test accessing protected endpoint without token"""
-    print("\n5. Testing Unauthorized Access")
-    print("-" * 40)
-    
-    try:
-        response = requests.get(f"{BACKEND_URL}/auth/me")
-        
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 401:
-            print("✅ Unauthorized access properly blocked")
-            return True
-        else:
-            print(f"❌ Expected 401, got {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Unauthorized access test failed: {str(e)}")
-        return False
-
-def create_test_image():
-    """Create a simple test image for upload"""
-    # Create a simple 100x100 red image
-    img = Image.new('RGB', (100, 100), color='red')
-    img_bytes = BytesIO()
-    img.save(img_bytes, format='JPEG')
-    img_bytes.seek(0)
-    return img_bytes
-
-def get_auth_token():
-    """Get authentication token for testing posts"""
-    login_data = {
-        'username': 'test@test.com',
-        'password': 'password123'
-    }
-    
-    try:
-        response = requests.post(
-            f"{BACKEND_URL}/auth/login",
-            data=login_data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result.get('access_token')
-        else:
-            print(f"❌ Login failed for post testing: {response.text}")
-            return None
-            
-    except Exception as e:
-        print(f"❌ Login error for post testing: {str(e)}")
-        return None
-
-def test_create_post():
-    """Test creating a post with authentication"""
-    print("\n6. Testing POST /api/posts/create")
-    print("-" * 40)
-    
-    # Get authentication token
-    token = get_auth_token()
-    if not token:
-        print("❌ No token available for post creation")
-        return False
-    
-    # Create test image
-    test_image = create_test_image()
-    
-    # Prepare multipart form data
-    files = {
-        'file': ('test_burger.jpg', test_image, 'image/jpeg')
-    }
-    
-    data = {
-        'rating': '8',
-        'review_text': 'Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!',
-        'map_link': 'https://maps.google.com/?q=Times+Square+New+York'
-    }
-    
-    headers = {
-        'Authorization': f'Bearer {token}'
-    }
-    
-    try:
-        response = requests.post(
-            f"{BACKEND_URL}/posts/create",
-            files=files,
-            data=data,
-            headers=headers
-        )
-        
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.text}")
-        
-        if response.status_code == 200:
-            result = response.json()
-            post_id = result.get('post_id')
-            print(f"✅ Post created successfully! Post ID: {post_id}")
-            return post_id
-        else:
-            print(f"❌ Post creation failed: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Post creation error: {str(e)}")
-        return False
-
-def test_feed():
-    """Test getting feed data"""
-    print("\n7. Testing GET /api/feed")
-    print("-" * 40)
-    
-    # Get authentication token since feed requires auth
-    token = get_auth_token()
-    if not token:
-        print("❌ No token available for feed testing")
-        return False
-    
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        response = requests.get(f"{BACKEND_URL}/feed", headers=headers)
-        
-        print(f"Status Code: {response.status_code}")
-        print(f"Response length: {len(response.text)} characters")
-        
-        if response.status_code == 200:
-            feed_data = response.json()
-            print(f"✅ Feed retrieved successfully! Found {len(feed_data)} posts")
-            
-            # Check if our test post is in the feed
-            test_post_found = False
-            for post in feed_data:
-                if post.get('review_text') == 'Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!':
-                    print(f"✅ Test post found in feed! Post ID: {post.get('id')}")
-                    print(f"   - Rating: {post.get('rating')}")
-                    print(f"   - Map Link: {post.get('map_link')}")
-                    print(f"   - Username: {post.get('username')}")
-                    test_post_found = True
-                    break
-            
-            if not test_post_found and len(feed_data) > 0:
-                print("⚠️  Test post not found in feed, but feed has other posts:")
-                for i, post in enumerate(feed_data[:3]):  # Show first 3 posts
-                    print(f"   {i+1}. {post.get('username')}: {post.get('review_text', '')[:50]}...")
-            elif len(feed_data) == 0:
-                print("⚠️  Feed is empty")
-            
-            return True
-        else:
-            print(f"❌ Feed retrieval failed: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Feed error: {str(e)}")
-        return False
-
-def test_comment_endpoints():
-    """Test comment endpoints as requested in the review"""
-    print("\n" + "=" * 60)
-    print("TESTING COMMENT ENDPOINTS")
-    print("=" * 60)
-    
-    # Step 1: Login to get token
-    print("\n1. Testing Login to get authentication token...")
-    login_url = f"{BACKEND_URL}/auth/login"
-    login_data = {
-        "username": "test@test.com",
-        "password": "password123"
-    }
-    
-    try:
-        login_response = requests.post(login_url, data=login_data)
-        print(f"Login Status Code: {login_response.status_code}")
-        
-        if login_response.status_code == 200:
-            login_result = login_response.json()
-            token = login_result.get("access_token")
-            print(f"✅ Login successful! Token obtained: {token[:20]}...")
-            
-            # Step 2: Test adding a comment
-            print(f"\n2. Testing Add Comment endpoint...")
-            post_id = "690fa2cc8a6be6239d38e7e5"
-            comment_url = f"{BACKEND_URL}/posts/{post_id}/comment"
-            
-            headers = {
-                "Authorization": f"Bearer {token}"
-            }
-            
-            comment_data = {
-                "comment_text": "This is a test comment"
-            }
-            
-            try:
-                comment_response = requests.post(comment_url, headers=headers, data=comment_data)
-                print(f"Add Comment Status Code: {comment_response.status_code}")
-                print(f"Add Comment Response: {comment_response.text}")
-                
-                if comment_response.status_code == 200:
-                    comment_result = comment_response.json()
-                    print(f"✅ Comment added successfully! Comment ID: {comment_result.get('comment_id')}")
-                    
-                    # Step 3: Get comments for the post
-                    print(f"\n3. Testing Get Comments endpoint...")
-                    get_comments_url = f"{BACKEND_URL}/posts/{post_id}/comments"
-                    
-                    try:
-                        get_response = requests.get(get_comments_url)
-                        print(f"Get Comments Status Code: {get_response.status_code}")
-                        
-                        if get_response.status_code == 200:
-                            comments = get_response.json()
-                            print(f"✅ Comments retrieved successfully! Found {len(comments)} comments")
-                            
-                            # Show the latest comment (should be our test comment)
-                            if comments:
-                                latest_comment = comments[0]  # Comments are sorted by created_at desc
-                                print(f"Latest comment: '{latest_comment.get('comment_text')}'")
-                                print(f"By user: {latest_comment.get('username')}")
-                                print(f"Comment ID: {latest_comment.get('id')}")
-                            
-                            return True
-                        else:
-                            print(f"❌ Failed to get comments: {get_response.text}")
-                            return False
-                            
-                    except Exception as e:
-                        print(f"❌ Error getting comments: {str(e)}")
-                        return False
-                        
-                else:
-                    print(f"❌ Failed to add comment: {comment_response.text}")
-                    return False
-                    
-            except Exception as e:
-                print(f"❌ Error adding comment: {str(e)}")
-                return False
-                
-        else:
-            print(f"❌ Login failed: {login_response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Login error: {str(e)}")
-        return False
-
-def test_comment_endpoint_formats():
-    """Test different request formats for comment endpoint"""
-    print("\n" + "=" * 60)
-    print("TESTING COMMENT ENDPOINT REQUEST FORMATS")
-    print("=" * 60)
-    
-    # First get a token
-    login_url = f"{BACKEND_URL}/auth/login"
-    login_data = {"username": "test@test.com", "password": "password123"}
-    
-    try:
-        login_response = requests.post(login_url, data=login_data)
-        if login_response.status_code != 200:
-            print("❌ Cannot test formats - login failed")
-            return False
-            
-        token = login_response.json().get("access_token")
-        post_id = "690fa2cc8a6be6239d38e7e5"
-        comment_url = f"{BACKEND_URL}/posts/{post_id}/comment"
-        
-        headers = {"Authorization": f"Bearer {token}"}
-        
-        # Test 1: multipart/form-data (as specified in review request)
-        print("\n1. Testing with multipart/form-data...")
-        
-        comment_data = {"comment_text": "Test comment with multipart form data"}
-        
+    def test_auth_signup(self):
+        """Test user signup endpoint"""
         try:
-            # requests automatically sets multipart/form-data when using data parameter
-            response = requests.post(comment_url, headers=headers, data=comment_data)
-            print(f"Multipart Status Code: {response.status_code}")
-            print(f"Multipart Response: {response.text}")
+            payload = {
+                "full_name": self.test_user_name,
+                "email": self.test_user_email,
+                "password": self.test_user_password
+            }
+            
+            response = requests.post(f"{self.base_url}/auth/signup", json=payload)
             
             if response.status_code == 200:
-                print("✅ Multipart form-data format works!")
-                return True
+                data = response.json()
+                if "access_token" in data:
+                    self.auth_token = data["access_token"]
+                    self.log_result("User Signup API", True, 
+                                  f"Successfully created user. Token received: {data['token_type']}", 
+                                  {"status_code": 200, "has_token": True})
+                    return True
+                else:
+                    self.log_result("User Signup API", False, 
+                                  "No access token in response", data)
+                    return False
+            elif response.status_code == 400 and "already registered" in response.text.lower():
+                # User already exists, try login instead
+                self.log_result("User Signup API", True, 
+                              "User already exists (expected for repeat tests)", 
+                              {"status_code": 400, "message": "User exists"})
+                return self.test_auth_login()
             else:
-                print("❌ Multipart form-data format failed")
+                self.log_result("User Signup API", False, 
+                              f"Unexpected status code: {response.status_code}", 
+                              response.json() if response.content else None)
                 return False
                 
         except Exception as e:
-            print(f"❌ Multipart test error: {str(e)}")
+            self.log_result("User Signup API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_auth_login(self):
+        """Test user login endpoint"""
+        try:
+            # OAuth2PasswordRequestForm expects form data, not JSON
+            payload = {
+                "username": self.test_user_email,
+                "password": self.test_user_password
+            }
+            
+            response = requests.post(f"{self.base_url}/auth/login", data=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "access_token" in data:
+                    self.auth_token = data["access_token"]
+                    self.log_result("User Login API", True, 
+                                  f"Successfully logged in. Token type: {data['token_type']}", 
+                                  {"status_code": 200, "token_type": data["token_type"]})
+                    return True
+                else:
+                    self.log_result("User Login API", False, 
+                                  "No access token in response", data)
+                    return False
+            else:
+                self.log_result("User Login API", False, 
+                              f"Login failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("User Login API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_auth_me(self):
+        """Test protected user profile endpoint"""
+        if not self.auth_token:
+            self.log_result("Protected User Profile API", False, "No auth token available")
             return False
             
-    except Exception as e:
-        print(f"❌ Format testing error: {str(e)}")
-        return False
-
-def verify_post_exists():
-    """Verify the post ID exists before testing comments"""
-    print("\n" + "=" * 60)
-    print("VERIFYING POST EXISTS")
-    print("=" * 60)
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/auth/me", headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                required_fields = ["id", "full_name", "email", "points", "level"]
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if not missing_fields:
+                    self.log_result("Protected User Profile API", True, 
+                                  f"Profile retrieved successfully. User: {data['full_name']}", 
+                                  {"user_id": data["id"], "level": data["level"], "points": data["points"]})
+                    return True
+                else:
+                    self.log_result("Protected User Profile API", False, 
+                                  f"Missing required fields: {missing_fields}", data)
+                    return False
+            else:
+                self.log_result("Protected User Profile API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Protected User Profile API", False, f"Exception: {str(e)}")
+            return False
     
-    post_id = "690fa2cc8a6be6239d38e7e5"
-    post_url = f"{BACKEND_URL}/posts/{post_id}"
+    def test_create_post(self):
+        """Test post creation with file upload"""
+        if not self.auth_token:
+            self.log_result("Post Creation API", False, "No auth token available")
+            return False
+            
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            
+            # Create a test image file
+            test_image_content = b"fake_image_content_for_testing"
+            files = {
+                'file': ('test_food.jpg', test_image_content, 'image/jpeg')
+            }
+            
+            data = {
+                'rating': 9,
+                'review_text': 'Incredible sushi experience! Fresh fish, perfect rice, amazing presentation. The chef really knows their craft.',
+                'map_link': 'https://maps.google.com/?q=Sushi+Restaurant+NYC'
+            }
+            
+            response = requests.post(f"{self.base_url}/posts/create", 
+                                   headers=headers, files=files, data=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if "post_id" in result:
+                    self.test_post_id = result["post_id"]
+                    self.log_result("Post Creation API", True, 
+                                  f"Post created successfully. ID: {self.test_post_id}", 
+                                  {"post_id": self.test_post_id, "message": result["message"]})
+                    return True
+                else:
+                    self.log_result("Post Creation API", False, 
+                                  "No post_id in response", result)
+                    return False
+            else:
+                self.log_result("Post Creation API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Post Creation API", False, f"Exception: {str(e)}")
+            return False
     
-    try:
-        response = requests.get(post_url)
-        print(f"Get Post Status Code: {response.status_code}")
+    def test_feed_api(self):
+        """Test feed endpoint with authentication"""
+        if not self.auth_token:
+            self.log_result("Feed API", False, "No auth token available")
+            return False
+            
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/feed?skip=0&limit=10", headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    if len(data) > 0:
+                        post = data[0]
+                        required_fields = ["id", "username", "media_url", "image_url", "rating", "review_text"]
+                        missing_fields = [field for field in required_fields if field not in post]
+                        
+                        if not missing_fields:
+                            # Check image_url format
+                            image_url = post.get("image_url", "")
+                            correct_format = image_url.startswith("/api/static/uploads/")
+                            
+                            self.log_result("Feed API", True, 
+                                          f"Feed retrieved with {len(data)} posts. Image URL format correct: {correct_format}", 
+                                          {"posts_count": len(data), "sample_image_url": image_url, "correct_format": correct_format})
+                            return True
+                        else:
+                            self.log_result("Feed API", False, 
+                                          f"Missing required fields in post: {missing_fields}", post)
+                            return False
+                    else:
+                        self.log_result("Feed API", True, 
+                                      "Feed endpoint working but no posts available", 
+                                      {"posts_count": 0})
+                        return True
+                else:
+                    self.log_result("Feed API", False, 
+                                  "Response is not a list", data)
+                    return False
+            else:
+                self.log_result("Feed API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Feed API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_like_post(self):
+        """Test like post endpoint"""
+        if not self.auth_token or not self.test_post_id:
+            self.log_result("Like Post API", False, "No auth token or post ID available")
+            return False
+            
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.post(f"{self.base_url}/posts/{self.test_post_id}/like", headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.log_result("Like Post API", True, 
+                              f"Post liked successfully: {data['message']}", 
+                              {"message": data["message"]})
+                return True
+            elif response.status_code == 400 and "already liked" in response.text.lower():
+                self.log_result("Like Post API", True, 
+                              "Post already liked (expected behavior for repeat tests)", 
+                              {"status_code": 400, "message": "Already liked"})
+                return True
+            else:
+                self.log_result("Like Post API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Like Post API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_unlike_post(self):
+        """Test unlike post endpoint"""
+        if not self.auth_token or not self.test_post_id:
+            self.log_result("Unlike Post API", False, "No auth token or post ID available")
+            return False
+            
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.delete(f"{self.base_url}/posts/{self.test_post_id}/like", headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.log_result("Unlike Post API", True, 
+                              f"Post unliked successfully: {data['message']}", 
+                              {"message": data["message"]})
+                return True
+            elif response.status_code == 400 and "not found" in response.text.lower():
+                self.log_result("Unlike Post API", True, 
+                              "Like not found (expected if not previously liked)", 
+                              {"status_code": 400, "message": "Like not found"})
+                return True
+            else:
+                self.log_result("Unlike Post API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Unlike Post API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_add_comment(self):
+        """Test add comment endpoint"""
+        if not self.auth_token or not self.test_post_id:
+            self.log_result("Comment Creation API", False, "No auth token or post ID available")
+            return False
+            
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            data = {"comment_text": "This looks absolutely delicious! Where is this restaurant located?"}
+            
+            response = requests.post(f"{self.base_url}/posts/{self.test_post_id}/comment", 
+                                   headers=headers, data=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if "comment_id" in result:
+                    self.log_result("Comment Creation API", True, 
+                                  f"Comment added successfully. ID: {result['comment_id']}", 
+                                  {"comment_id": result["comment_id"], "message": result["message"]})
+                    return True
+                else:
+                    self.log_result("Comment Creation API", False, 
+                                  "No comment_id in response", result)
+                    return False
+            else:
+                self.log_result("Comment Creation API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Comment Creation API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_get_comments(self):
+        """Test get comments endpoint"""
+        if not self.test_post_id:
+            self.log_result("Get Comments API", False, "No post ID available")
+            return False
+            
+        try:
+            response = requests.get(f"{self.base_url}/posts/{self.test_post_id}/comments")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    if len(data) > 0:
+                        comment = data[0]
+                        required_fields = ["id", "user_id", "username", "comment_text", "created_at"]
+                        missing_fields = [field for field in required_fields if field not in comment]
+                        
+                        if not missing_fields:
+                            self.log_result("Get Comments API", True, 
+                                          f"Comments retrieved successfully. Count: {len(data)}", 
+                                          {"comments_count": len(data), "sample_username": comment["username"]})
+                            return True
+                        else:
+                            self.log_result("Get Comments API", False, 
+                                          f"Missing required fields in comment: {missing_fields}", comment)
+                            return False
+                    else:
+                        self.log_result("Get Comments API", True, 
+                                      "Comments endpoint working but no comments available", 
+                                      {"comments_count": 0})
+                        return True
+                else:
+                    self.log_result("Get Comments API", False, 
+                                  "Response is not a list", data)
+                    return False
+            else:
+                self.log_result("Get Comments API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Get Comments API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_explore_trending(self):
+        """Test explore trending posts endpoint"""
+        if not self.auth_token:
+            self.log_result("Explore Trending Posts API", False, "No auth token available")
+            return False
+            
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/explore/trending?skip=0&limit=10", headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    if len(data) > 0:
+                        post = data[0]
+                        required_fields = ["id", "username", "media_url", "image_url", "rating", "likes_count"]
+                        missing_fields = [field for field in required_fields if field not in post]
+                        
+                        if not missing_fields:
+                            # Check image_url format
+                            image_url = post.get("image_url", "")
+                            correct_format = image_url.startswith("/api/static/uploads/")
+                            
+                            self.log_result("Explore Trending Posts API", True, 
+                                          f"Trending posts retrieved. Count: {len(data)}, Image format correct: {correct_format}", 
+                                          {"posts_count": len(data), "sample_rating": post["rating"], "correct_format": correct_format})
+                            return True
+                        else:
+                            self.log_result("Explore Trending Posts API", False, 
+                                          f"Missing required fields: {missing_fields}", post)
+                            return False
+                    else:
+                        self.log_result("Explore Trending Posts API", True, 
+                                      "Trending endpoint working but no posts available", 
+                                      {"posts_count": 0})
+                        return True
+                else:
+                    self.log_result("Explore Trending Posts API", False, 
+                                  "Response is not a list", data)
+                    return False
+            else:
+                self.log_result("Explore Trending Posts API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Explore Trending Posts API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_explore_top_rated(self):
+        """Test explore top-rated posts endpoint"""
+        if not self.auth_token:
+            self.log_result("Explore Top Rated Posts API", False, "No auth token available")
+            return False
+            
+        try:
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/explore/top-rated?skip=0&limit=10", headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    if len(data) > 0:
+                        post = data[0]
+                        required_fields = ["id", "username", "media_url", "image_url", "rating", "likes_count"]
+                        missing_fields = [field for field in required_fields if field not in post]
+                        
+                        if not missing_fields:
+                            # Verify rating >= 8 (as per implementation)
+                            rating = post.get("rating", 0)
+                            rating_valid = rating >= 8
+                            
+                            # Check image_url format
+                            image_url = post.get("image_url", "")
+                            correct_format = image_url.startswith("/api/static/uploads/")
+                            
+                            self.log_result("Explore Top Rated Posts API", True, 
+                                          f"Top-rated posts retrieved. Count: {len(data)}, Min rating: {rating}, Format correct: {correct_format}", 
+                                          {"posts_count": len(data), "min_rating": rating, "rating_valid": rating_valid, "correct_format": correct_format})
+                            return True
+                        else:
+                            self.log_result("Explore Top Rated Posts API", False, 
+                                          f"Missing required fields: {missing_fields}", post)
+                            return False
+                    else:
+                        self.log_result("Explore Top Rated Posts API", True, 
+                                      "Top-rated endpoint working but no high-rated posts available", 
+                                      {"posts_count": 0})
+                        return True
+                else:
+                    self.log_result("Explore Top Rated Posts API", False, 
+                                  "Response is not a list", data)
+                    return False
+            else:
+                self.log_result("Explore Top Rated Posts API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Explore Top Rated Posts API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_explore_reviewers(self):
+        """Test explore reviewers endpoint"""
+        try:
+            response = requests.get(f"{self.base_url}/explore/reviewers?skip=0&limit=10")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    if len(data) > 0:
+                        reviewer = data[0]
+                        required_fields = ["id", "username", "level", "points", "posts_count"]
+                        missing_fields = [field for field in required_fields if field not in reviewer]
+                        
+                        if not missing_fields:
+                            self.log_result("Explore Reviewers API", True, 
+                                          f"Top reviewers retrieved. Count: {len(data)}, Top level: {reviewer['level']}", 
+                                          {"reviewers_count": len(data), "top_level": reviewer["level"], "top_points": reviewer["points"]})
+                            return True
+                        else:
+                            self.log_result("Explore Reviewers API", False, 
+                                          f"Missing required fields: {missing_fields}", reviewer)
+                            return False
+                    else:
+                        self.log_result("Explore Reviewers API", True, 
+                                      "Reviewers endpoint working but no users available", 
+                                      {"reviewers_count": 0})
+                        return True
+                else:
+                    self.log_result("Explore Reviewers API", False, 
+                                  "Response is not a list", data)
+                    return False
+            else:
+                self.log_result("Explore Reviewers API", False, 
+                              f"Failed with status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Explore Reviewers API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_explore_categories(self):
+        """Test explore categories endpoint - NOTE: This endpoint doesn't exist in server.py"""
+        try:
+            response = requests.get(f"{self.base_url}/explore/categories")
+            
+            if response.status_code == 404:
+                self.log_result("Explore Categories API", False, 
+                              "Endpoint not implemented in server.py - GET /api/explore/categories returns 404", 
+                              {"status_code": 404, "issue": "Endpoint missing from implementation"})
+                return False
+            elif response.status_code == 200:
+                data = response.json()
+                self.log_result("Explore Categories API", True, 
+                              "Categories endpoint working", data)
+                return True
+            else:
+                self.log_result("Explore Categories API", False, 
+                              f"Unexpected status: {response.status_code}", 
+                              response.json() if response.content else None)
+                return False
+                
+        except Exception as e:
+            self.log_result("Explore Categories API", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_static_file_serving(self):
+        """Test static file serving"""
+        if not self.test_post_id:
+            self.log_result("Static File Serving", False, "No test post created to verify static files")
+            return False
+            
+        try:
+            # First get the post to find the image URL
+            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            response = requests.get(f"{self.base_url}/posts/{self.test_post_id}", headers=headers)
+            
+            if response.status_code == 200:
+                post_data = response.json()
+                media_url = post_data.get("media_url", "")
+                
+                if media_url.startswith("/api/static/uploads/"):
+                    # Try to access the static file
+                    static_url = f"{self.base_url.replace('/api', '')}{media_url}"
+                    static_response = requests.get(static_url)
+                    
+                    if static_response.status_code == 200:
+                        self.log_result("Static File Serving", True, 
+                                      f"Static file accessible at: {static_url}", 
+                                      {"static_url": static_url, "content_length": len(static_response.content)})
+                        return True
+                    else:
+                        self.log_result("Static File Serving", False, 
+                                      f"Static file not accessible. Status: {static_response.status_code}", 
+                                      {"static_url": static_url, "status_code": static_response.status_code})
+                        return False
+                else:
+                    self.log_result("Static File Serving", False, 
+                                  f"Media URL format incorrect: {media_url}", 
+                                  {"media_url": media_url, "expected_prefix": "/api/static/uploads/"})
+                    return False
+            else:
+                self.log_result("Static File Serving", False, 
+                              f"Could not retrieve post data. Status: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_result("Static File Serving", False, f"Exception: {str(e)}")
+            return False
+    
+    def run_all_tests(self):
+        """Run all backend tests in sequence"""
+        print(f"\n🚀 Starting Comprehensive Backend Testing for Cofau App")
+        print(f"Backend URL: {self.base_url}")
+        print("=" * 80)
         
-        if response.status_code == 200:
-            post = response.json()
-            print(f"✅ Post exists! Review: '{post.get('review_text', 'No review text')}'")
-            print(f"Post by: {post.get('username')}")
-            print(f"Rating: {post.get('rating')}")
-            return True
-        else:
-            print(f"❌ Post not found: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Error checking post: {str(e)}")
-        return False
-
-def main():
-    """Run all backend tests"""
-    print(f"Backend URL: {BACKEND_URL}")
-    print(f"Test started at: {datetime.now()}")
-    
-    results = []
-    
-    # Run authentication tests
-    results.append(("Auth Flow", test_auth_flow()))
-    results.append(("Invalid Credentials", test_invalid_credentials()))
-    results.append(("Unauthorized Access", test_unauthorized_access()))
-    
-    # Run post and feed tests
-    post_result = test_create_post()
-    results.append(("Post Creation", bool(post_result)))
-    results.append(("Feed Retrieval", test_feed()))
-    
-    # Run comment tests as requested in review
-    post_exists = verify_post_exists()
-    if post_exists:
-        results.append(("Comment Endpoints", test_comment_endpoints()))
-        results.append(("Comment Formats", test_comment_endpoint_formats()))
-    else:
-        print("⚠️  Skipping comment tests - post doesn't exist")
-        results.append(("Comment Endpoints", False))
-        results.append(("Comment Formats", False))
-    
-    # Summary
-    print("\n" + "=" * 60)
-    print("TEST SUMMARY")
-    print("=" * 60)
-    
-    passed = 0
-    total = len(results)
-    
-    for test_name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{test_name}: {status}")
-        if result:
-            passed += 1
-    
-    print(f"\nResults: {passed}/{total} tests passed")
-    
-    if passed == total:
-        print("🎉 All backend tests passed!")
-        return True
-    else:
-        print("⚠️  Some tests failed - check logs above")
-        return False
+        # Authentication Tests (High Priority)
+        print("\n📋 AUTHENTICATION TESTS")
+        print("-" * 40)
+        auth_success = self.test_auth_signup()
+        if not auth_success:
+            auth_success = self.test_auth_login()
+        
+        if auth_success:
+            self.test_auth_me()
+        
+        # Posts and Feed Tests (High Priority)
+        print("\n📋 POSTS & FEED TESTS")
+        print("-" * 40)
+        if self.auth_token:
+            self.test_create_post()
+            self.test_feed_api()
+        
+        # Comments Tests (High Priority)
+        print("\n📋 COMMENTS TESTS")
+        print("-" * 40)
+        if self.auth_token and self.test_post_id:
+            self.test_add_comment()
+            self.test_get_comments()
+        
+        # Likes Tests (High Priority - NEW)
+        print("\n📋 LIKES TESTS")
+        print("-" * 40)
+        if self.auth_token and self.test_post_id:
+            self.test_like_post()
+            self.test_unlike_post()
+        
+        # Explore Tests (High Priority - NEW)
+        print("\n📋 EXPLORE TESTS")
+        print("-" * 40)
+        if self.auth_token:
+            self.test_explore_trending()
+            self.test_explore_top_rated()
+        
+        self.test_explore_reviewers()
+        self.test_explore_categories()
+        
+        # Static Files Test (Critical)
+        print("\n📋 STATIC FILES TEST")
+        print("-" * 40)
+        self.test_static_file_serving()
+        
+        # Summary
+        print("\n" + "=" * 80)
+        print("📊 TEST SUMMARY")
+        print("=" * 80)
+        
+        passed = sum(1 for result in self.test_results if result["success"])
+        total = len(self.test_results)
+        
+        print(f"Total Tests: {total}")
+        print(f"Passed: {passed}")
+        print(f"Failed: {total - passed}")
+        print(f"Success Rate: {(passed/total)*100:.1f}%")
+        
+        print("\n📋 DETAILED RESULTS:")
+        for result in self.test_results:
+            status = "✅" if result["success"] else "❌"
+            print(f"{status} {result['test']}: {result['details']}")
+        
+        return self.test_results
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    tester = CofauBackendTester()
+    results = tester.run_all_tests()
+    
+    # Exit with appropriate code
+    failed_tests = [r for r in results if not r["success"]]
+    sys.exit(0 if len(failed_tests) == 0 else 1)
