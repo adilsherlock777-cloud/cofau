@@ -141,9 +141,15 @@ export default function ExploreScreen() {
                   >
                     {post.full_image_url ? (
                       <Image
-                        source={{ uri: post.full_image_url }}
+                        source={{ 
+                          uri: post.full_image_url,
+                          cache: 'reload'
+                        }}
                         style={styles.gridItemImage}
                         resizeMode="cover"
+                        onError={(error) => {
+                          console.error('❌ Explore image failed to load:', post.full_image_url, error.nativeEvent);
+                        }}
                       />
                     ) : (
                       <View style={styles.noImageContainer}>
