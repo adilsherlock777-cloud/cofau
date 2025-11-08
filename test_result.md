@@ -181,6 +181,48 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+  - task: "Post Creation API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/posts/create working correctly after fixing Form parameter issue. Successfully creates posts with multipart form data including rating, review_text, map_link, and file upload. Returns post_id and updates user points/level. Authentication required and working properly."
+
+  - task: "Feed API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/feed working correctly. Successfully retrieves posts with pagination support (skip/limit). Returns complete post data including user info, media details, ratings, and timestamps. Test post created and verified in feed."
+
+frontend:
+  # No frontend testing performed as per instructions
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 2
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Post creation and feed functionality complete"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://food-app-debug.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+    - agent: "testing"
+      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
