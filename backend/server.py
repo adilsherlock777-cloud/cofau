@@ -341,6 +341,230 @@ async def get_comments(post_id: str):
     
     return result
 
+# ==================== EXPLORE ENDPOINTS ====================
+
+@app.get("/api/explore/trending")
+async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
+    """Get trending posts sorted by engagement"""
+    db = get_database()
+    
+    # Sort by likes_count, rating, and recency
+    posts = await db.posts.find().sort([
+        ("likes_count", -1),
+        ("rating", -1),
+        ("created_at", -1)
+    ]).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("media_url", ""),
+            "rating": post["rating"],
+            "review_text": post["review_text"],
+            "map_link": post.get("map_link"),
+            "likes_count": post["likes_count"],
+            "comments_count": post["comments_count"],
+            "is_liked_by_user": is_liked,
+            "created_at": post["created_at"]
+        })
+    
+    return result
+
+@app.get("/api/explore/top-rated")
+async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
+    """Get top-rated posts (rating >= 8)"""
+    db = get_database()
+    
+    # Filter posts with rating >= 8 and sort
+    posts = await db.posts.find({"rating": {"$gte": 8}}).sort([
+        ("rating", -1),
+        ("likes_count", -1)
+    ]).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("media_url", ""),
+            "rating": post["rating"],
+            "review_text": post["review_text"],
+            "map_link": post.get("map_link"),
+            "likes_count": post["likes_count"],
+            "comments_count": post["comments_count"],
+            "is_liked_by_user": is_liked,
+            "created_at": post["created_at"]
+        })
+    
+    return result
+
+@app.get("/api/explore/reviewers")
+async def get_top_reviewers(skip: int = 0, limit: int = 20):
+    """Get top reviewers sorted by level and points"""
+    db = get_database()
+    
+    # Get users sorted by level and points
+    users = await db.users.find().sort([
+        ("level", -1),
+        ("points", -1)
+    ]).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for user in users:
+        # Count posts for this user
+        posts_count = await db.posts.count_documents({"user_id": str(user["_id"])})
+        
+        result.append({
+            "id": str(user["_id"]),
+            "username": user["full_name"],
+            "email": user["email"],
+            "profile_picture": user.get("profile_picture"),
+            "level": user.get("level", 1),
+            "points": user.get("points", 0),
+            "badge": user.get("badge"),
+            "posts_count": posts_count,
+            "followers_count": user.get("followers_count", 0)
+        })
+    
+    return result
+
+@app.get("/api/explore/all")
+async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
+    """Get all posts sorted by engagement (likes + comments + rating)"""
+    db = get_database()
+    
+    # Get all posts and calculate engagement score
+    posts = await db.posts.find().to_list(None)
+    
+    # Calculate engagement score for each post
+    for post in posts:
+        engagement_score = post["likes_count"] + post["comments_count"] + (post["rating"] * 2)
+        post["engagement_score"] = engagement_score
+    
+    # Sort by engagement score
+    posts.sort(key=lambda x: x["engagement_score"], reverse=True)
+    
+    # Apply pagination
+    paginated_posts = posts[skip:skip + limit]
+    
+    result = []
+    for post in paginated_posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("media_url", ""),
+            "rating": post["rating"],
+            "review_text": post["review_text"],
+            "map_link": post.get("map_link"),
+            "likes_count": post["likes_count"],
+            "comments_count": post["comments_count"],
+            "is_liked_by_user": is_liked,
+            "engagement_score": post["engagement_score"],
+            "created_at": post["created_at"]
+        })
+    
+    return result
+
+@app.get("/api/explore/category")
+async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
+    """Get posts filtered by category keyword in review text"""
+    db = get_database()
+    
+    # Search for category keyword in review_text (case-insensitive)
+    posts = await db.posts.find({
+        "review_text": {"$regex": name, "$options": "i"}
+    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("media_url", ""),
+            "rating": post["rating"],
+            "review_text": post["review_text"],
+            "map_link": post.get("map_link"),
+            "likes_count": post["likes_count"],
+            "comments_count": post["comments_count"],
+            "is_liked_by_user": is_liked,
+            "created_at": post["created_at"]
+        })
+    
+    return result
+
+@app.get("/api/explore/nearby")
+async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
+    """Get posts near a location using Haversine formula"""
+    db = get_database()
+    
+    # For now, return all posts (location extraction from map_link would be complex)
+    # In production, you'd store lat/lng in the post document
+    posts = await db.posts.find().sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("media_url", ""),
+            "rating": post["rating"],
+            "review_text": post["review_text"],
+            "map_link": post.get("map_link"),
+            "likes_count": post["likes_count"],
+            "comments_count": post["comments_count"],
+            "is_liked_by_user": is_liked,
+            "created_at": post["created_at"]
+        })
+    
+    return result
+
 # ==================== FOLLOW ENDPOINTS ====================
 
 @app.post("/api/users/{user_id}/follow")
