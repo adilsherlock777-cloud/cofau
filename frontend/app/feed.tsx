@@ -217,6 +217,12 @@ export default function FeedScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
+          onPress={() => router.push('/explore')}
+        >
+          <Ionicons name="compass-outline" size={26} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
           onPress={() => router.push('/search')}
         >
           <Ionicons name="search-outline" size={26} color="#999" />
@@ -226,12 +232,6 @@ export default function FeedScreen() {
           onPress={() => router.push('/add-post')}
         >
           <Ionicons name="add-circle-outline" size={32} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/happening')}
-        >
-          <Ionicons name="flame-outline" size={26} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
