@@ -158,7 +158,10 @@ export default function LoginScreen() {
           {/* Login Button */}
           <TouchableOpacity
             style={styles.buttonContainer}
-            onPress={handleLogin}
+            onPress={() => {
+              console.log('🔘 Login button onPress triggered!');
+              handleLogin();
+            }}
             activeOpacity={0.8}
             disabled={loading}
           >
