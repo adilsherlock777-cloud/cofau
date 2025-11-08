@@ -114,30 +114,98 @@ export default function AddPostScreen() {
   };
 
   // Handle post submission
-  const handlePost = () => {
+  const handlePost = async () => {
+    // Validation
     if (!mediaUri) {
-      Alert.alert('Media Required', 'Please add a photo or video');
+      if (Platform.OS === 'web') {
+        window.alert('Please add a photo or video');
+      } else {
+        Alert.alert('Media Required', 'Please add a photo or video');
+      }
       return;
     }
-    if (!rating) {
-      Alert.alert('Rating Required', 'Please add a rating (0-10)');
+    if (!rating || rating < 1 || rating > 10) {
+      if (Platform.OS === 'web') {
+        window.alert('Please add a rating between 1-10');
+      } else {
+        Alert.alert('Rating Required', 'Please add a rating between 1-10');
+      }
       return;
     }
-    if (!review) {
-      Alert.alert('Review Required', 'Please write a review');
+    if (!review.trim()) {
+      if (Platform.OS === 'web') {
+        window.alert('Please write a review');
+      } else {
+        Alert.alert('Review Required', 'Please write a review');
+      }
       return;
     }
 
-    Alert.alert(
-      'Post Submitted Successfully! 🎉',
-      'Your post has been added to the feed',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.push('/feed'),
-        },
-      ]
-    );
+    setLoading(true);
+
+    try {
+      console.log('📝 Preparing to create post...');
+      
+      // Prepare file object for upload
+      let fileToUpload;
+      
+      if (Platform.OS === 'web') {
+        // On web, we need to fetch the image and convert to blob
+        const response = await fetch(mediaUri);
+        const blob = await response.blob();
+        const filename = `image_${Date.now()}.jpg`;
+        fileToUpload = new File([blob], filename, { type: blob.type });
+      } else {
+        // On native, pass the URI with metadata
+        const filename = mediaUri.split('/').pop() || `image_${Date.now()}.jpg`;
+        fileToUpload = {
+          uri: mediaUri,
+          name: filename,
+          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+        };
+      }
+
+      const postData = {
+        rating: parseInt(rating),
+        review_text: review,
+        map_link: mapsLink || null,
+        file: fileToUpload,
+      };
+
+      console.log('📤 Submitting post to backend...');
+      const result = await createPost(postData);
+      console.log('✅ Post created successfully!', result);
+
+      setLoading(false);
+
+      // Show success message and redirect
+      if (Platform.OS === 'web') {
+        window.alert('Post Submitted Successfully! 🎉');
+        router.push('/feed');
+      } else {
+        Alert.alert(
+          'Post Submitted Successfully! 🎉',
+          'Your post has been added to the feed',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.push('/feed'),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('❌ Error creating post:', error);
+      setLoading(false);
+      
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to create post';
+      
+      if (Platform.OS === 'web') {
+        window.alert(`Error: ${errorMessage}`);
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
+    }
   };
 
   return (
