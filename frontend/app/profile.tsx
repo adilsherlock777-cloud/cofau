@@ -102,19 +102,25 @@ export default function ProfileScreen() {
           {/* Avatar */}
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarLetter}>S</Text>
+              <Text style={styles.avatarLetter}>{avatarLetter}</Text>
             </View>
+            {/* User name and email */}
+            <Text style={styles.userName}>{userData.full_name}</Text>
+            <Text style={styles.userEmail}>{userData.email}</Text>
+            <Text style={styles.userLevel}>Level {level}</Text>
           </View>
 
           {/* Badge Icon */}
-          <View style={styles.badgeContainer}>
-            <LinearGradient
-              colors={['#FFD700', '#FFA500']}
-              style={styles.badge}
-            >
-              <Text style={styles.badgeText}>BADGE</Text>
-            </LinearGradient>
-          </View>
+          {userData.badge && (
+            <View style={styles.badgeContainer}>
+              <LinearGradient
+                colors={['#FFD700', '#FFA500']}
+                style={styles.badge}
+              >
+                <Text style={styles.badgeText}>{userData.badge}</Text>
+              </LinearGradient>
+            </View>
+          )}
         </View>
 
         {/* Stats Boxes */}
