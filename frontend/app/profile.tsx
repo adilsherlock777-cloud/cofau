@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,74 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://food-app-debug.preview.emergentagent.com';
+const API_URL = `${API_BASE_URL}/api`;
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { user, logout, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState('Photo');
   const [bio, setBio] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState(null);
 
-  // Dummy data
-  const postsCount = 152;
-  const followersCount = 556;
-  const level = 3;
-  const currentPoints = 85;
-  const totalPoints = 100;
+  useEffect(() => {
+    if (user) {
+      setUserData(user);
+      setBio(user.bio || '');
+    }
+  }, [user]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/auth/login');
+  };
+
+  const handleUpdateProfile = async () => {
+    setLoading(true);
+    try {
+      // TODO: Implement update profile API call
+      console.log('Updating profile with bio:', bio);
+      // For now, just refresh user data
+      await refreshUser();
+      setIsEditing(false);
+      if (Platform.OS === 'web') {
+        window.alert('Profile updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      if (Platform.OS === 'web') {
+        window.alert('Failed to update profile');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!userData) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#4dd0e1" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  // Calculate level progress
+  const level = userData.level || 1;
+  const currentPoints = userData.points || 0;
+  const totalPoints = level * 100; // Each level requires 100 points
+  const postsCount = 0; // Will be from posts API later
+  const followersCount = userData.followers_count || 0;
 
   // Generate dummy gradient photos (3 per row)
   const photoGridItems = Array(12).fill(null);
