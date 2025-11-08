@@ -9,18 +9,22 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     // Basic validation
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -32,17 +36,34 @@ export default function LoginScreen() {
       return;
     }
 
-    // Dummy authentication - accept any valid email/password
-    Alert.alert(
-      'Login Successful! 🎉',
-      'Welcome back to Cofau',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/feed'),
-        },
-      ]
-    );
+    setLoading(true);
+
+    try {
+      // Call backend login API
+      const result = await login(email, password);
+
+      if (result.success) {
+        // Success - AuthContext will handle redirect via _layout.tsx
+        Alert.alert(
+          'Login Successful! 🎉',
+          'Welcome back to Cofau',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/feed'),
+            },
+          ]
+        );
+      } else {
+        // Show error from backend
+        Alert.alert('Login Failed', result.error || 'Please check your credentials');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      console.error('Login error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
