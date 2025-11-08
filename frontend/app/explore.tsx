@@ -232,78 +232,6 @@ const styles = StyleSheet.create({
     color: '#4dd0e1',
     fontWeight: '600',
   },
-  trendingImage: {
-    width: '100%',
-    height: '100%',
-  },
-  trendingOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  trendingInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  trendingUsername: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  engagementRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  engagementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  engagementText: {
-    fontSize: 12,
-    color: '#FFF',
-    fontWeight: '600',
-  },
-  categoriesScroll: {
-    paddingLeft: 16,
-  },
-  categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    marginRight: 8,
-  },
-  categoryChipActive: {
-    backgroundColor: '#4dd0e1',
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  categoryTextActive: {
-    color: '#FFF',
-  },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -311,9 +239,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   gridItem: {
-    width: GRID_ITEM_WIDTH,
-    height: GRID_ITEM_WIDTH,
-    margin: 4,
+    width: CARD_WIDTH,
+    height: CARD_WIDTH,
+    margin: CARD_MARGIN,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#F5F5F5',
