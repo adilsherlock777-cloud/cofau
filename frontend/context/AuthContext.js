@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { storage } from '../utils/storage';
 
 // Use EXPO_PUBLIC_ prefix for environment variables accessible in Expo
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://food-app-debug.preview.emergentagent.com';
