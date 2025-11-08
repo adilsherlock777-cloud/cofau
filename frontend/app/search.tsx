@@ -56,6 +56,12 @@ export default function SearchScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
+          onPress={() => router.push('/explore')}
+        >
+          <Ionicons name="compass-outline" size={26} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
           onPress={() => router.push('/search')}
         >
           <Ionicons name="search" size={26} color="#333" />
@@ -65,12 +71,6 @@ export default function SearchScreen() {
           onPress={() => router.push('/add-post')}
         >
           <Ionicons name="add-circle-outline" size={32} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/happening')}
-        >
-          <Ionicons name="flame-outline" size={26} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
