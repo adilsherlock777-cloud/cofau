@@ -180,6 +180,135 @@ def test_unauthorized_access():
         print(f"❌ Unauthorized access test failed: {str(e)}")
         return False
 
+def create_test_image():
+    """Create a simple test image for upload"""
+    # Create a simple 100x100 red image
+    img = Image.new('RGB', (100, 100), color='red')
+    img_bytes = BytesIO()
+    img.save(img_bytes, format='JPEG')
+    img_bytes.seek(0)
+    return img_bytes
+
+def get_auth_token():
+    """Get authentication token for testing posts"""
+    login_data = {
+        'username': 'test@test.com',
+        'password': 'password123'
+    }
+    
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/auth/login",
+            data=login_data,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('access_token')
+        else:
+            print(f"❌ Login failed for post testing: {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Login error for post testing: {str(e)}")
+        return None
+
+def test_create_post():
+    """Test creating a post with authentication"""
+    print("\n6. Testing POST /api/posts/create")
+    print("-" * 40)
+    
+    # Get authentication token
+    token = get_auth_token()
+    if not token:
+        print("❌ No token available for post creation")
+        return False
+    
+    # Create test image
+    test_image = create_test_image()
+    
+    # Prepare multipart form data
+    files = {
+        'file': ('test_burger.jpg', test_image, 'image/jpeg')
+    }
+    
+    data = {
+        'rating': '8',
+        'review_text': 'Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!',
+        'map_link': 'https://maps.google.com/?q=Times+Square+New+York'
+    }
+    
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/posts/create",
+            files=files,
+            data=data,
+            headers=headers
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {response.text}")
+        
+        if response.status_code == 200:
+            result = response.json()
+            post_id = result.get('post_id')
+            print(f"✅ Post created successfully! Post ID: {post_id}")
+            return post_id
+        else:
+            print(f"❌ Post creation failed: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Post creation error: {str(e)}")
+        return False
+
+def test_feed():
+    """Test getting feed data"""
+    print("\n7. Testing GET /api/feed")
+    print("-" * 40)
+    
+    try:
+        response = requests.get(f"{BACKEND_URL}/feed")
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response length: {len(response.text)} characters")
+        
+        if response.status_code == 200:
+            feed_data = response.json()
+            print(f"✅ Feed retrieved successfully! Found {len(feed_data)} posts")
+            
+            # Check if our test post is in the feed
+            test_post_found = False
+            for post in feed_data:
+                if post.get('review_text') == 'Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!':
+                    print(f"✅ Test post found in feed! Post ID: {post.get('id')}")
+                    print(f"   - Rating: {post.get('rating')}")
+                    print(f"   - Map Link: {post.get('map_link')}")
+                    print(f"   - Username: {post.get('username')}")
+                    test_post_found = True
+                    break
+            
+            if not test_post_found and len(feed_data) > 0:
+                print("⚠️  Test post not found in feed, but feed has other posts:")
+                for i, post in enumerate(feed_data[:3]):  # Show first 3 posts
+                    print(f"   {i+1}. {post.get('username')}: {post.get('review_text', '')[:50]}...")
+            elif len(feed_data) == 0:
+                print("⚠️  Feed is empty")
+            
+            return True
+        else:
+            print(f"❌ Feed retrieval failed: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Feed error: {str(e)}")
+        return False
+
 def main():
     """Run all authentication tests"""
     print(f"Backend URL: {BACKEND_URL}")
