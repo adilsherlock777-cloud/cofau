@@ -49,8 +49,24 @@ export default function ExploreScreen() {
         axios.get(`${API_URL}/explore/reviewers?limit=10`),
       ]);
 
-      setTrendingPosts(trending.data);
-      setTopRatedPosts(topRated.data);
+      console.log('📊 Explore data fetched:');
+      console.log('  - Trending:', trending.data.length, 'posts');
+      console.log('  - Top Rated:', topRated.data.length, 'posts');
+      console.log('  - Top Reviewers:', reviewers.data.length, 'users');
+
+      // Transform data to add full image URLs
+      const transformedTrending = trending.data.map(post => ({
+        ...post,
+        full_image_url: post.image_url ? `${API_BASE_URL}${post.image_url}` : null,
+      }));
+
+      const transformedTopRated = topRated.data.map(post => ({
+        ...post,
+        full_image_url: post.image_url ? `${API_BASE_URL}${post.image_url}` : null,
+      }));
+
+      setTrendingPosts(transformedTrending);
+      setTopRatedPosts(transformedTopRated);
       setTopReviewers(reviewers.data);
       setLoading(false);
       setRefreshing(false);
