@@ -240,9 +240,15 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Comment endpoints testing complete"
+    - "Like Post API"
+    - "Unlike Post API"
+    - "Explore Trending Posts API"
+    - "Explore Top Rated Posts API"
+    - "Explore Reviewers API"
+    - "Explore Categories API"
+    - "Static File Serving"
   stuck_tasks: []
-  test_all: false
+  test_all: true
   test_priority: "high_first"
 
   - task: "Like Post API"
