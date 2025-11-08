@@ -562,19 +562,13 @@ const styles = StyleSheet.create({
   bottomSpacer: {
     height: 20,
   },
-  bottomNav: {
+  navBar: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
     justifyContent: 'space-around',
     alignItems: 'center',
-  },
-  navButton: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
   },
 });
