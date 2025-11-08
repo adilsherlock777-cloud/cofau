@@ -12,7 +12,7 @@ from io import BytesIO
 from PIL import Image
 
 # Backend URL from environment
-BACKEND_URL = "https://food-app-debug.preview.emergentagent.com/api"
+BACKEND_URL = "https://meal-snap-4.preview.emergentagent.com/api"
 
 def test_auth_flow():
     """Test complete authentication flow"""
