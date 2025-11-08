@@ -52,13 +52,15 @@ export default function FeedScreen() {
       
       // Transform the data to match the component expectations
       const transformedPosts = response.data.map(post => {
-        // Convert media_url to full URL if it's a relative path
-        let mediaUrl = post.media_url;
-        console.log('📸 Original media_url:', mediaUrl);
+        // Use image_url if provided, otherwise fall back to media_url
+        let mediaUrl = post.image_url || post.media_url;
+        console.log('📸 Original image_url/media_url:', mediaUrl);
+        
+        // Convert to full URL if it's a relative path
         if (mediaUrl && !mediaUrl.startsWith('http')) {
           // Remove leading slash if present and construct full URL
           mediaUrl = `${API_BASE_URL}${mediaUrl.startsWith('/') ? mediaUrl : '/' + mediaUrl}`;
-          console.log('📸 Converted media_url:', mediaUrl);
+          console.log('📸 Converted to full URL:', mediaUrl);
         }
         
         return {
