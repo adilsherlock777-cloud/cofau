@@ -18,15 +18,52 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-export default function FeedCard({ post }) {
+export default function FeedCard({ post, onLikeUpdate }) {
   const router = useRouter();
-  
-  // Debug: Log the media_url to see what we're receiving
-  console.log('🎴 FeedCard received post with media_url:', post.media_url);
-  console.log('🎴 Post data:', JSON.stringify(post, null, 2));
+  const [isLiked, setIsLiked] = useState(post.is_liked || false);
+  const [likesCount, setLikesCount] = useState(post.likes || 0);
+  const [isLiking, setIsLiking] = useState(false);
 
   const handleImagePress = () => {
     router.push('/post-details');
+  };
+
+  const handleLike = async () => {
+    if (isLiking) return; // Prevent multiple clicks
+    
+    // Optimistic update
+    const previousIsLiked = isLiked;
+    const previousLikesCount = likesCount;
+    
+    setIsLiked(!isLiked);
+    setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
+    setIsLiking(true);
+
+    try {
+      if (isLiked) {
+        await unlikePost(post.id);
+        console.log('✅ Post unliked');
+      } else {
+        await likePost(post.id);
+        console.log('✅ Post liked');
+      }
+      
+      // Notify parent component to refresh feed if needed
+      if (onLikeUpdate) {
+        onLikeUpdate(post.id, !isLiked);
+      }
+    } catch (error) {
+      console.error('❌ Error toggling like:', error);
+      // Revert optimistic update on error
+      setIsLiked(previousIsLiked);
+      setLikesCount(previousLikesCount);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  const handleCommentPress = () => {
+    router.push(`/comments/${post.id}`);
   };
 
   return (
