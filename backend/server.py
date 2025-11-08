@@ -81,9 +81,12 @@ async def create_post(
     media_type = "video" if file_ext in ["mp4", "mov"] else "image"
     
     # Create post document
+    # Convert file path to URL format - remove 'static' prefix since it's mounted at /static
+    media_url = f"/{file_path.replace('static/', '')}"
+    
     post_doc = {
         "user_id": str(current_user["_id"]),
-        "media_url": f"/{file_path}",
+        "media_url": media_url,
         "media_type": media_type,
         "rating": rating,
         "review_text": review_text,
