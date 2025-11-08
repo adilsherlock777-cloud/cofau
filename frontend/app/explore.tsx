@@ -127,13 +127,19 @@ export default function ExploreScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
+      {loading ? (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color="#4dd0e1" />
+          <Text style={styles.loadingText}>Loading explore...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
         {/* Trending Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
