@@ -16,12 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LoginScreen() {
+  console.log('🎬 LoginScreen component rendered');
   const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  console.log('✅ LoginScreen hooks initialized, email:', email, 'password length:', password.length);
 
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
