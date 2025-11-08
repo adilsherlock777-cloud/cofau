@@ -232,17 +232,18 @@ export default function ExploreScreen() {
           </View>
           
           <View style={styles.gridContainer}>
-            {topRatedPosts.map((post) => (
+            {topRatedPosts.length > 0 ? topRatedPosts.map((post) => (
               <TouchableOpacity
                 key={post.id}
                 style={styles.gridCard}
                 onPress={() => router.push(`/post-details`)}
               >
-                {post.image_url ? (
+                {post.full_image_url ? (
                   <Image
-                    source={{ uri: `${API_BASE_URL}${post.image_url}` }}
+                    source={{ uri: post.full_image_url }}
                     style={styles.gridImage}
                     resizeMode="cover"
+                    onError={(e) => console.log('❌ Failed to load grid image:', post.full_image_url)}
                   />
                 ) : (
                   <LinearGradient
@@ -250,7 +251,11 @@ export default function ExploreScreen() {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.gridImage}
-                  />
+                  >
+                    <View style={styles.placeholderContent}>
+                      <Text style={styles.placeholderText}>No Image</Text>
+                    </View>
+                  </LinearGradient>
                 )}
                 <View style={styles.gridOverlay}>
                   <View style={styles.ratingBadge}>
