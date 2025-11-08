@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
         
         // Validate token with backend
         try {
-          const response = await axios.get(`${API_BASE_URL}/auth/me`);
+          const response = await axios.get(`${API_URL}/auth/me`);
           setUser(response.data);
           setToken(storedToken);
         } catch (error) {
