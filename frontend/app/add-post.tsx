@@ -213,24 +213,24 @@ export default function AddPostScreen() {
 
         {/* Rating Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Rating (0-10)</Text>
+          <Text style={styles.sectionLabel}>Rating</Text>
           <View style={styles.ratingContainer}>
-            <TextInput
-              style={styles.ratingInput}
-              placeholder="0"
-              placeholderTextColor="#999"
-              value={rating}
-              onChangeText={(text) => {
-                const num = text.replace(/[^0-9.]/g, '');
-                if (parseFloat(num) <= 10 || num === '') {
-                  setRating(num);
-                }
-              }}
-              keyboardType="decimal-pad"
-              maxLength={4}
-            />
+            <Text style={styles.ratingNumber}>{rating || 0}/10</Text>
             <View style={styles.starsContainer}>
-              {renderStars()}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((starIndex) => (
+                <TouchableOpacity
+                  key={starIndex}
+                  onPress={() => setRating(starIndex.toString())}
+                  activeOpacity={0.7}
+                  style={styles.starButton}
+                >
+                  <Ionicons
+                    name="star"
+                    size={28}
+                    color={starIndex <= parseInt(rating || '0') ? '#FFD700' : '#E0E0E0'}
+                  />
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </View>
