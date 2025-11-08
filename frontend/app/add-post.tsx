@@ -372,44 +372,24 @@ export default function AddPostScreen() {
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/feed')}
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/feed')}>
+          <Ionicons name="home-outline" size={26} color="#4dd0e1" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/explore')}
-        >
-          <Ionicons name="compass-outline" size={26} color="#999" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/explore')}>
+          <Ionicons name="compass-outline" size={26} color="#4dd0e1" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-        >
-          <Ionicons name="home-outline" size={26} color="#999" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/add-post')}>
+          <Ionicons name="add-circle-outline" size={34} color="#4dd0e1" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/search')}
-        >
-          <Ionicons name="search-outline" size={26} color="#999" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/happening')}>
+          <Ionicons name="flame-outline" size={26} color="#4dd0e1" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/add-post')}
-        >
-          <Ionicons name="add-circle" size={32} color="#FF6B6B" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/happening')}
-        >
-          <Ionicons name="flame-outline" size={26} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('/profile')}
-        >
-          <Ionicons name="person-outline" size={26} color="#999" />
+
+        <TouchableOpacity style={styles.navButton} onPress={() => router.push('/profile')}>
+          <Ionicons name="person-outline" size={26} color="#4dd0e1" />
         </TouchableOpacity>
       </View>
     </View>
