@@ -178,101 +178,42 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#fff',
   },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  section: {
-    marginVertical: 16,
-    paddingHorizontal: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
+
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    padding: CARD_MARGIN,
   },
+
   gridItem: {
     width: CARD_WIDTH,
     height: CARD_WIDTH,
     margin: CARD_MARGIN,
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f2f2f2', // fallback
   },
-  gridItemImage: {
+
+  image: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
-  noImageContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F0F0F0',
-  },
-  gridItemOverlay: {
+
+  badge: {
     position: 'absolute',
     top: 4,
     right: 4,
-  },
-  gridItemBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'gold',
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 10,
-    gap: 2,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
-  gridItemRating: {
-    fontSize: 10,
+
+  badgeText: {
+    fontSize: 12,
     fontWeight: 'bold',
-    color: '#FFF',
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-  },
-  bottomSpacer: {
-    height: 100,
   },
 });
