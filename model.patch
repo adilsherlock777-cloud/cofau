@@ -1,0 +1,25 @@
+diff --git a/frontend/app/happening.tsx b/frontend/app/happening.tsx
+index c6931f4..f8801a5 100644
+--- a/frontend/app/happening.tsx
++++ b/frontend/app/happening.tsx
+@@ -98,7 +98,7 @@ export default function HappeningScreen() {
+           style={styles.navButton}
+           onPress={() => router.push('/feed')}
+         >
+-          <Ionicons name="home" size={26} color="#333" />
++          <Ionicons name="home-outline" size={26} color="#999" />
+         </TouchableOpacity>
+         <TouchableOpacity
+           style={styles.navButton}
+@@ -114,9 +114,9 @@ export default function HappeningScreen() {
+         </TouchableOpacity>
+         <TouchableOpacity
+           style={styles.navButton}
+-          onPress={() => router.push('/chat')}
++          onPress={() => router.push('/happening')}
+         >
+-          <Ionicons name="notifications-outline" size={26} color="#999" />
++          <Ionicons name="flame" size={26} color="#FF6B6B" />
+         </TouchableOpacity>
+         <TouchableOpacity
+           style={styles.navButton}
