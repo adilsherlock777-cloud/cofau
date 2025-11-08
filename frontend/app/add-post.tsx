@@ -333,6 +333,7 @@ export default function AddPostScreen() {
           style={styles.postButtonContainer}
           onPress={handlePost}
           activeOpacity={0.8}
+          disabled={loading}
         >
           <LinearGradient
             colors={['#66D9E8', '#F093FB', '#F5576C']}
@@ -340,7 +341,11 @@ export default function AddPostScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.postButton}
           >
-            <Text style={styles.postButtonText}>POST</Text>
+            {loading ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <Text style={styles.postButtonText}>POST</Text>
+            )}
           </LinearGradient>
         </TouchableOpacity>
 
