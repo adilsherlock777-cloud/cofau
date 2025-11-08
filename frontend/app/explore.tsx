@@ -140,148 +140,37 @@ export default function ExploreScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-        {/* Trending Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🔥 Trending Now</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.horizontalScroll}
-          >
-            {trendingPosts.map((post) => (
-              <TouchableOpacity
-                key={post.id}
-                style={styles.trendingCard}
-                onPress={() => router.push(`/post-details`)}
-              >
-                {post.full_image_url ? (
-                  <Image
-                    source={{ uri: post.full_image_url }}
-                    style={styles.trendingImage}
-                    resizeMode="cover"
-                    onError={(e) => console.log('❌ Failed to load trending image:', post.full_image_url)}
-                  />
-                ) : (
-                  <LinearGradient
-                    colors={['#66D9E8', '#F093FB', '#F5576C']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.trendingImage}
-                  >
-                    <View style={styles.placeholderContent}>
-                      <Text style={styles.placeholderText}>No Image</Text>
-                    </View>
-                  </LinearGradient>
-                )}
-                <View style={styles.trendingOverlay}>
-                  <View style={styles.trendingInfo}>
-                    <Text style={styles.trendingUsername}>{post.username}</Text>
-                    <View style={styles.ratingBadge}>
-                      <Ionicons name="star" size={14} color="#FFD700" />
-                      <Text style={styles.ratingText}>{post.rating}/10</Text>
-                    </View>
-                  </View>
-                  <View style={styles.engagementRow}>
-                    <View style={styles.engagementItem}>
-                      <Ionicons name="heart" size={16} color="#FF6B6B" />
-                      <Text style={styles.engagementText}>{post.likes_count}</Text>
-                    </View>
-                    <View style={styles.engagementItem}>
-                      <Ionicons name="chatbubble" size={16} color="#4dd0e1" />
-                      <Text style={styles.engagementText}>{post.comments_count}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Categories */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoriesScroll}
-          >
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category}
-                style={[
-                  styles.categoryChip,
-                  selectedCategory === category && styles.categoryChipActive,
-                ]}
-                onPress={() => handleCategoryPress(category)}
-              >
-                <Text
-                  style={[
-                    styles.categoryText,
-                    selectedCategory === category && styles.categoryTextActive,
-                  ]}
+          {/* Main Explore Grid - 3 columns */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🔥 Discover Food</Text>
+            <View style={styles.gridContainer}>
+              {allPosts.map((post) => (
+                <TouchableOpacity
+                  key={post.id}
+                  style={styles.gridItem}
+                  onPress={() => router.push('/feed')}
                 >
-                  {category}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Top Rated Grid */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>⭐ Top Rated</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.gridContainer}>
-            {topRatedPosts.map((post) => (
-              <TouchableOpacity
-                key={post.id}
-                style={styles.gridCard}
-                onPress={() => router.push(`/post-details`)}
-              >
-                {post.full_image_url ? (
-                  <Image
-                    source={{ uri: post.full_image_url }}
-                    style={styles.gridImage}
-                    resizeMode="cover"
-                    onError={(e) => console.log('❌ Failed to load grid image:', post.full_image_url)}
-                  />
-                ) : (
-                  <LinearGradient
-                    colors={['#66D9E8', '#F093FB', '#F5576C']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gridImage}
-                  >
-                    <View style={styles.placeholderContent}>
-                      <Text style={styles.placeholderText}>No Image</Text>
+                  {post.full_image_url ? (
+                    <Image
+                      source={{ uri: post.full_image_url }}
+                      style={styles.gridItemImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.gridItemPlaceholder}>
+                      <Ionicons name="image-outline" size={32} color="#CCC" />
                     </View>
-                  </LinearGradient>
-                )}
-                <View style={styles.gridOverlay}>
-                  <View style={styles.ratingBadge}>
-                    <Ionicons name="star" size={12} color="#FFD700" />
-                    <Text style={styles.gridRating}>{post.rating}</Text>
+                  )}
+                  <View style={styles.gridItemOverlay}>
+                    <View style={styles.gridItemBadge}>
+                      <Ionicons name="star" size={10} color="#FFD700" />
+                      <Text style={styles.gridItemRating}>{post.rating}</Text>
+                    </View>
                   </View>
-                  <View style={styles.likeBadge}>
-                    <Ionicons name="heart" size={12} color="#FFF" />
-                    <Text style={styles.gridLikes}>{post.likes_count}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
 
         {/* Top Reviewers */}
         <View style={styles.section}>
