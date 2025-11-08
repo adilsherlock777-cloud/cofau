@@ -448,19 +448,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bottomSpacer: {
-    height: 80,
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    backgroundColor: '#FFF',
-  },
-  navButton: {
-    padding: 8,
+    height: 100,
   },
   placeholderContent: {
     flex: 1,
