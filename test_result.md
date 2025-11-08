@@ -240,16 +240,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Like Post API"
-    - "Unlike Post API"
-    - "Explore Trending Posts API"
-    - "Explore Top Rated Posts API"
-    - "Explore Reviewers API"
     - "Explore Categories API"
-    - "Static File Serving"
-  stuck_tasks: []
-  test_all: true
-  test_priority: "high_first"
+  stuck_tasks:
+    - "Explore Categories API"
+  test_all: false
+  test_priority: "stuck_first"
 
   - task: "Like Post API"
     implemented: true
