@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the authentication flow: signup, login, and protected endpoint access"
+user_problem_statement: "Comprehensive backend testing: Validate all endpoints including Auth, Feed, Posts, Comments, Likes, and new Explore endpoints. Ensure image URLs, authentication, and data consistency work correctly."
 
 backend:
   - task: "User Signup API"
