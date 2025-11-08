@@ -51,25 +51,34 @@ export default function FeedScreen() {
       console.log('✅ Feed data received:', response.data.length, 'posts');
       
       // Transform the data to match the component expectations
-      const transformedPosts = response.data.map(post => ({
-        id: post.id,
-        user_id: post.user_id,
-        username: post.username,
-        user_profile_picture: post.user_profile_picture,
-        user_badge: post.user_badge,
-        description: post.review_text,
-        rating: post.rating / 10, // Backend uses 1-10, display as 0-1 scale
-        ratingLabel: getRatingLabel(post.rating),
-        location: extractLocationFromMapLink(post.map_link),
-        mapsUrl: post.map_link,
-        likes: post.likes_count,
-        comments: post.comments_count,
-        shares: 0, // Not implemented yet
-        media_url: post.media_url,
-        media_type: post.media_type,
-        created_at: post.created_at,
-        popularPhotos: [], // Can be populated later
-      }));
+      const transformedPosts = response.data.map(post => {
+        // Convert media_url to full URL if it's a relative path
+        let mediaUrl = post.media_url;
+        if (mediaUrl && !mediaUrl.startsWith('http')) {
+          // Remove leading slash if present and construct full URL
+          mediaUrl = `${API_BASE_URL}${mediaUrl.startsWith('/') ? mediaUrl : '/' + mediaUrl}`;
+        }
+        
+        return {
+          id: post.id,
+          user_id: post.user_id,
+          username: post.username,
+          user_profile_picture: post.user_profile_picture,
+          user_badge: post.user_badge,
+          description: post.review_text,
+          rating: post.rating / 10, // Backend uses 1-10, display as 0-1 scale
+          ratingLabel: getRatingLabel(post.rating),
+          location: extractLocationFromMapLink(post.map_link),
+          mapsUrl: post.map_link,
+          likes: post.likes_count,
+          comments: post.comments_count,
+          shares: 0, // Not implemented yet
+          media_url: mediaUrl,
+          media_type: post.media_type,
+          created_at: post.created_at,
+          popularPhotos: [], // Can be populated later
+        };
+      });
       
       setFeedPosts(transformedPosts);
       setLoading(false);
