@@ -147,7 +147,7 @@ export default function ExploreScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.horizontalScroll}
           >
-            {trendingPosts.length > 0 ? trendingPosts.map((post) => (
+            {trendingPosts.map((post) => (
               <TouchableOpacity
                 key={post.id}
                 style={styles.trendingCard}
