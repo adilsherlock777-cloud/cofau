@@ -60,9 +60,25 @@ export default function ExploreScreen() {
 
       // Transform data to add full image URLs
       const transformedPosts = exploreAll.data.map(post => {
+        // Get the image URL from backend
         const imageUrl = post.image_url || post.media_url;
-        const fullUrl = imageUrl ? `${API_BASE_URL}${imageUrl}` : null;
-        console.log(`📸 Post ${post.id}: ${imageUrl} → ${fullUrl}`);
+        
+        // Convert relative path to full URL
+        let fullUrl = null;
+        if (imageUrl) {
+          // If it's already a full URL, use it as is
+          if (imageUrl.startsWith('http')) {
+            fullUrl = imageUrl;
+          } else {
+            // If it's a relative path, prepend base URL
+            fullUrl = `${API_BASE_URL}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+          }
+        }
+        
+        console.log(`📸 Post ${post.id}:`);
+        console.log(`   - Raw image_url: ${imageUrl}`);
+        console.log(`   - Full URL: ${fullUrl}`);
+        
         return {
           ...post,
           full_image_url: fullUrl,
