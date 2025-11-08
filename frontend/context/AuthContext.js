@@ -83,11 +83,11 @@ export const AuthProvider = ({ children }) => {
 
       // Fetch user info
       console.log('👤 Fetching user info from /auth/me...');
-      console.log('📡 Request URL:', `${API_BASE_URL}/auth/me`);
+      console.log('📡 Request URL:', `${API_URL}/auth/me`);
       console.log('📡 Request headers:', axios.defaults.headers.common);
       
       try {
-        const userResponse = await axios.get(`${API_BASE_URL}/auth/me`);
+        const userResponse = await axios.get(`${API_URL}/auth/me`);
         console.log('📥 User response received:', JSON.stringify(userResponse.data));
         
         // Set user state
