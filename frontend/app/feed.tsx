@@ -77,6 +77,7 @@ export default function FeedScreen() {
           likes: post.likes_count,
           comments: post.comments_count,
           shares: 0, // Not implemented yet
+          is_liked: post.is_liked_by_user || false,
           media_url: mediaUrl,
           media_type: post.media_type,
           created_at: post.created_at,
