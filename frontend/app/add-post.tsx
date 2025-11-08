@@ -136,25 +136,6 @@ export default function AddPostScreen() {
     );
   };
 
-  // Generate star rating display
-  const renderStars = () => {
-    const ratingNum = parseFloat(rating) || 0;
-    const fullStars = Math.floor(ratingNum / 2); // 10 point scale to 5 stars
-    const stars = [];
-    
-    for (let i = 0; i < 5; i++) {
-      stars.push(
-        <Ionicons
-          key={i}
-          name={i < fullStars ? 'star' : 'star-outline'}
-          size={20}
-          color="#FFD700"
-        />
-      );
-    }
-    return stars;
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
