@@ -297,7 +297,7 @@ async def unlike_post(post_id: str, current_user: dict = Depends(get_current_use
 # ==================== COMMENTS ENDPOINTS ====================
 
 @app.post("/api/posts/{post_id}/comment")
-async def add_comment(post_id: str, comment_text: str, current_user: dict = Depends(get_current_user)):
+async def add_comment(post_id: str, comment_text: str = Form(...), current_user: dict = Depends(get_current_user)):
     """Add a comment to a post"""
     db = get_database()
     
