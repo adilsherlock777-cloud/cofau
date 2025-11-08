@@ -24,14 +24,22 @@ export default function FeedCard({ post }) {
 
       {/* Image Section */}
       <TouchableOpacity onPress={handleImagePress} activeOpacity={0.9}>
-        <LinearGradient
-          colors={['#66D9E8', '#F093FB', '#F5576C']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.imageGradient}
-        >
-          <Text style={styles.photoText}>PHOTO</Text>
-        </LinearGradient>
+        {post.media_url ? (
+          <Image 
+            source={{ uri: post.media_url }} 
+            style={styles.postImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={['#66D9E8', '#F093FB', '#F5576C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.imageGradient}
+          >
+            <Text style={styles.photoText}>PHOTO</Text>
+          </LinearGradient>
+        )}
       </TouchableOpacity>
 
       {/* Action Row */}
