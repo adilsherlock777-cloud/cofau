@@ -201,7 +201,7 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
 
 @app.get("/api/feed")
 async def get_feed(skip: int = 0, limit: int = 20):
-    """Get feed posts"""
+    """Get feed posts with full image URLs"""
     db = get_database()
     
     posts = await db.posts.find().sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
@@ -210,13 +210,20 @@ async def get_feed(skip: int = 0, limit: int = 20):
     for post in posts:
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
         
+        # Construct full image URL
+        media_url = post.get("media_url", "")
+        # If media_url is a relative path, keep it as is (already has /api/static/uploads/...)
+        # The frontend will prepend the domain
+        image_url = media_url
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "user_badge": user.get("badge") if user else None,
-            "media_url": post["media_url"],
+            "media_url": media_url,
+            "image_url": image_url,  # Add explicit image_url field
             "media_type": post["media_type"],
             "rating": post["rating"],
             "review_text": post["review_text"],
