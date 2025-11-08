@@ -1,8 +1,10 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = 'https://food-app-debug.preview.emergentagent.com/api';
+const API_BASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL || 'https://food-app-debug.preview.emergentagent.com';
+const API_URL = `${API_BASE_URL}/api`;
 
 const AuthContext = createContext({});
 
