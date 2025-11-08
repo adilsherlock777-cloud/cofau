@@ -21,8 +21,8 @@ export const AuthProvider = ({ children }) => {
 
   const loadUser = async () => {
     try {
-      // Get token from SecureStore
-      const storedToken = await SecureStore.getItemAsync('userToken');
+      // Get token from storage (SecureStore on native, localStorage on web)
+      const storedToken = await storage.getItem('userToken');
       
       if (storedToken) {
         // Set axios authorization header
