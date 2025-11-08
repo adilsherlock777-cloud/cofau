@@ -153,8 +153,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Delete token from SecureStore
-      await SecureStore.deleteItemAsync('userToken');
+      // Delete token from storage
+      await storage.deleteItem('userToken');
       
       // Clear axios authorization header
       delete axios.defaults.headers.common['Authorization'];
