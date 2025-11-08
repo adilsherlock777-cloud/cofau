@@ -110,31 +110,31 @@ export default function FeedScreen() {
           style={styles.navButton}
           onPress={() => router.push('/feed')}
         >
-          <Ionicons name="home" size={24} color="#666" />
+          <Ionicons name="home" size={26} color="#333" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => router.push('/search')}
         >
-          <Ionicons name="search" size={24} color="#666" />
+          <Ionicons name="search-outline" size={26} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => router.push('/add-post')}
         >
-          <Ionicons name="add-circle" size={24} color="#666" />
+          <Ionicons name="add-circle-outline" size={32} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => router.push('/chat')}
+          onPress={() => router.push('/happening')}
         >
-          <Ionicons name="chatbubble" size={24} color="#666" />
+          <Ionicons name="flame-outline" size={26} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => router.push('/profile')}
         >
-          <Ionicons name="person" size={24} color="#666" />
+          <Ionicons name="person-outline" size={26} color="#999" />
         </TouchableOpacity>
       </View>
     </View>
