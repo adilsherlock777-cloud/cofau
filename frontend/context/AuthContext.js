@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-const API_BASE_URL = 'https://cofau-feed-ui.preview.emergentagent.com/api';
+const API_BASE_URL = 'https://food-app-debug.preview.emergentagent.com/api';
 
 const AuthContext = createContext({});
 
