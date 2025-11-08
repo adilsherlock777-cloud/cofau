@@ -201,7 +201,7 @@ export default function FeedScreen() {
 
         {/* Feed Cards */}
         {!loading && !error && feedPosts.map((post) => (
-          <FeedCard key={post.id} post={post} />
+          <FeedCard key={post.id} post={post} onLikeUpdate={fetchFeed} />
         ))}
 
         <View style={styles.bottomSpacer} />
