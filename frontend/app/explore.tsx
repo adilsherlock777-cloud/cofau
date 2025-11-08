@@ -181,6 +181,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
 
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+
+  section: {
+    marginVertical: 16,
+  },
+
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    paddingHorizontal: 12,
+  },
+
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -196,24 +240,56 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f2f2', // fallback
   },
 
-  image: {
+  gridItemImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
 
-  badge: {
+  noImageContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+
+  gridItemOverlay: {
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: 'gold',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
   },
 
-  badgeText: {
-    fontSize: 12,
+  gridItemBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'gold',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 2,
+  },
+
+  gridItemRating: {
+    fontSize: 11,
     fontWeight: 'bold',
+    color: '#333',
+  },
+
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+  },
+
+  bottomSpacer: {
+    height: 100,
   },
 });
