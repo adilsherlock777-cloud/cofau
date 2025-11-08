@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -70,7 +69,7 @@ export default function FeedScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cofau</Text>
@@ -109,7 +108,7 @@ export default function FeedScreen() {
       <View style={styles.bottomNav}>
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => router.push('/')}
+          onPress={() => router.push('/feed')}
         >
           <Ionicons name="home" size={24} color="#666" />
         </TouchableOpacity>
@@ -138,7 +137,7 @@ export default function FeedScreen() {
           <Ionicons name="person" size={24} color="#666" />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
