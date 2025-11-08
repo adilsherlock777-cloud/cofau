@@ -272,6 +272,10 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
+  likedText: {
+    color: '#FF6B6B',
+    fontWeight: 'bold',
+  },
   descriptionSection: {
     marginBottom: 10,
   },
