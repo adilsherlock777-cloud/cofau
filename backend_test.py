@@ -272,8 +272,16 @@ def test_feed():
     print("\n7. Testing GET /api/feed")
     print("-" * 40)
     
+    # Get authentication token since feed requires auth
+    token = get_auth_token()
+    if not token:
+        print("❌ No token available for feed testing")
+        return False
+    
+    headers = {"Authorization": f"Bearer {token}"}
+    
     try:
-        response = requests.get(f"{BACKEND_URL}/feed")
+        response = requests.get(f"{BACKEND_URL}/feed", headers=headers)
         
         print(f"Status Code: {response.status_code}")
         print(f"Response length: {len(response.text)} characters")
