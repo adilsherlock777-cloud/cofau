@@ -83,16 +83,28 @@ export const AuthProvider = ({ children }) => {
       console.log('👤 Fetching user info from /auth/me...');
       console.log('📡 Request URL:', `${API_BASE_URL}/auth/me`);
       console.log('📡 Request headers:', axios.defaults.headers.common);
-      const userResponse = await axios.get(`${API_BASE_URL}/auth/me`);
-      console.log('📥 User response received:', JSON.stringify(userResponse.data));
       
-      // Set user state
-      setUser(userResponse.data);
-      console.log('✅ User state set:', userResponse.data.email);
-      console.log('✅ isAuthenticated will be:', !!access_token);
+      try {
+        const userResponse = await axios.get(`${API_BASE_URL}/auth/me`);
+        console.log('📥 User response received:', JSON.stringify(userResponse.data));
+        
+        // Set user state
+        setUser(userResponse.data);
+        console.log('✅ User state set:', userResponse.data.email);
+        console.log('✅ User object:', userResponse.data);
+        console.log('✅ isAuthenticated will be:', !!userResponse.data);
 
-      console.log('🎉 Login successful! Returning success...');
-      return { success: true, user: userResponse.data };
+        console.log('🎉 Login successful! Returning success...');
+        return { success: true, user: userResponse.data };
+      } catch (meError) {
+        console.error('❌ /auth/me failed:', meError.response?.status);
+        console.error('❌ /auth/me error:', meError.response?.data);
+        console.error('❌ /auth/me message:', meError.message);
+        return {
+          success: false,
+          error: 'Failed to fetch user profile. Please try again.',
+        };
+      }
     } catch (error) {
       console.error('❌ Login error:', error.response?.status);
       console.error('❌ Error data:', error.response?.data);
