@@ -101,19 +101,13 @@ const styles = StyleSheet.create({
   name: { fontSize: 24, fontWeight: "bold" },
   email: { fontSize: 16, color: "#666", marginTop: 4 },
 
-  bottomNav: {
-    position: "absolute",
-    width: "100%",
-    bottom: 0,
-    height: 70,
-    backgroundColor: "#fff",
+  navBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 10,
     borderTopWidth: 1,
-    borderColor: "#eee",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingBottom: 10,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
   },
-
-  navButton: { alignItems: "center" },
 });
