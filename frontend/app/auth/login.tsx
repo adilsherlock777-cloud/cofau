@@ -52,13 +52,11 @@ export default function LoginScreen() {
       console.log('📥 Login result received:', result);
 
       if (result.success) {
-        console.log('✅ Login successful! Navigating to feed...');
-        // Navigate immediately
-        router.replace('/feed');
+        console.log('✅ Login successful! Auth state updated.');
+        console.log('   _layout will handle navigation automatically.');
         // Show success message
-        setTimeout(() => {
-          Alert.alert('Login Successful! 🎉', 'Welcome back to Cofau');
-        }, 100);
+        Alert.alert('Login Successful! 🎉', 'Welcome back to Cofau');
+        // Don't manually navigate - let _layout handle it based on auth state
       } else {
         // Show error from backend
         console.log('❌ Login failed:', result.error);
