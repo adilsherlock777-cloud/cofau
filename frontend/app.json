@@ -55,6 +55,7 @@
     "assetBundlePatterns": ["**/*"],
 
     "extra": {
+      "apiUrl": "https://cofau-feed-ui.preview.emergentagent.com/api",
       "eas": {
         "projectId": "2094671e-9a3c-410d-bfcd-aa523cffdf86"
       }
