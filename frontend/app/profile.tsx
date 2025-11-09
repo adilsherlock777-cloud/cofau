@@ -106,17 +106,34 @@ export default function ProfileScreen() {
 
   const handleUpdateProfile = async () => {
     try {
-      await axios.put(
+      console.log('📝 Updating profile with:', { name: editedName, bio: editedBio });
+      
+      // Create FormData for the update
+      const formData = new FormData();
+      if (editedName) formData.append('full_name', editedName);
+      if (editedBio !== null && editedBio !== undefined) formData.append('bio', editedBio);
+      
+      const response = await axios.put(
         `${API_URL}/users/update`,
-        { full_name: editedName, bio: editedBio },
-        { headers: { Authorization: `Bearer ${token}` } }
+        formData,
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          } 
+        }
       );
       
+      console.log('✅ Profile update response:', response.data);
       Alert.alert('Success', 'Profile updated successfully!');
       setEditModalVisible(false);
-      fetchProfileData(); // Refresh profile data
+      
+      // Refresh profile data after a short delay to ensure DB is updated
+      setTimeout(() => {
+        fetchProfileData();
+      }, 500);
     } catch (err) {
-      console.error('❌ Error updating profile:', err);
+      console.error('❌ Error updating profile:', err.response?.data || err.message);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     }
   };
