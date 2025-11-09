@@ -697,8 +697,8 @@ async def get_user_profile(user_id: str):
 
 @app.put("/api/users/update")
 async def update_profile(
-    full_name: str = None,
-    bio: str = None,
+    full_name: str = Form(None),
+    bio: str = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
     """Update user profile"""
@@ -711,12 +711,13 @@ async def update_profile(
         update_data["bio"] = bio
     
     if update_data:
-        await db.users.update_one(
+        result = await db.users.update_one(
             {"_id": current_user["_id"]},
             {"$set": update_data}
         )
+        print(f"✅ Profile updated for user {current_user['_id']}: {update_data}, matched: {result.matched_count}, modified: {result.modified_count}")
     
-    return {"message": "Profile updated"}
+    return {"message": "Profile updated", "updated": update_data}
 
 @app.put("/api/users/profile-picture")
 async def update_profile_picture(
