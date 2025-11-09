@@ -1,7 +1,9 @@
-import { Slot, useRouter, useSegments } from 'expo-router';
-import { SafeAreaView } from 'react-native';
-import { AuthProvider, useAuth } from '../context/AuthContext';
-import { useEffect } from 'react';
+import { Slot, useRouter, useSegments } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context"; // ✅ changed import
+import { StatusBar } from "expo-status-bar";
+import { StyleSheet, Platform } from "react-native";
+import { AuthProvider, useAuth } from "../context/AuthContext";
+import { useEffect } from "react";
 
 function RootLayoutNav() {
   const { isAuthenticated, loading, user, token } = useAuth();
@@ -9,41 +11,49 @@ function RootLayoutNav() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('🔄 _layout: Auth state changed');
-    console.log('   - loading:', loading);
-    console.log('   - isAuthenticated:', isAuthenticated);
-    console.log('   - token:', token ? 'Present' : 'None');
-    console.log('   - user:', user?.email || 'None');
-    console.log('   - segments:', segments);
-    
+    console.log("🔄 _layout: Auth state changed");
+    console.log("   - loading:", loading);
+    console.log("   - isAuthenticated:", isAuthenticated);
+    console.log("   - token:", token ? "Present" : "None");
+    console.log("   - user:", user?.email || "None");
+    console.log("   - segments:", segments);
+
     if (loading) {
-      console.log('⏳ _layout: Still loading, skipping navigation');
+      console.log("⏳ _layout: Still loading, skipping navigation");
       return;
     }
 
-    const inAuthGroup = segments[0] === 'auth';
-    console.log('   - inAuthGroup:', inAuthGroup);
+    const inAuthGroup = segments[0] === "auth";
+    console.log("   - inAuthGroup:", inAuthGroup);
 
-    // Use setTimeout to ensure navigation happens after state updates complete
     setTimeout(() => {
       if (!isAuthenticated && !inAuthGroup) {
-        console.log('🔐 _layout: Not authenticated, redirecting to login');
-        router.replace('/auth/login');
+        console.log("🔐 Redirect → /auth/login");
+        router.replace("/auth/login");
       } else if (isAuthenticated && inAuthGroup) {
-        console.log('✅ _layout: Authenticated in auth group, redirecting to feed');
-        router.replace('/feed');
+        console.log("✅ Redirect → /feed");
+        router.replace("/feed");
       } else {
-        console.log('✅ _layout: No redirect needed, current route is correct');
+        console.log("✅ No redirect needed");
       }
     }, 100);
   }, [isAuthenticated, loading, segments, user]);
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+      <StatusBar style={Platform.OS === "ios" ? "dark" : "auto"} />
       <Slot />
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingBottom: 10, // 👈 ensures your bottom nav stays above Android bar
+  },
+});
 
 export default function RootLayout() {
   return (
