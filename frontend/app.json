@@ -4,10 +4,10 @@
     "slug": "cofau-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
     "scheme": "cofau",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+
+    "icon": "./assets/images/icon.png",
 
     "splash": {
       "image": "./assets/images/splash.png",
@@ -22,11 +22,12 @@
 
     "android": {
       "package": "com.cofau.app",
-      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "permissions": [],
+      "allowBackup": false
     },
 
     "web": {
@@ -36,7 +37,6 @@
     },
 
     "plugins": [
-      "expo-router",
       [
         "expo-splash-screen",
         {
@@ -44,15 +44,17 @@
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
 
-    "experiments": {
-      "typedRoutes": true
+    "updates": {
+      "fallbackToCacheTimeout": 0
     },
 
+    "assetBundlePatterns": ["**/*"],
+
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "2094671e-9a3c-410d-bfcd-aa523cffdf86"
       }
