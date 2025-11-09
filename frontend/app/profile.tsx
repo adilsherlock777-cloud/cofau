@@ -140,18 +140,30 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
+      console.log('🚪 Starting logout process...');
+      
       // Call logout endpoint
       await axios.post(
         `${API_URL}/auth/logout`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      
+      console.log('✅ Logout API call successful');
     } catch (err) {
-      console.error('Logout API error:', err);
+      console.error('❌ Logout API error:', err);
     } finally {
-      // Clear token from AuthContext
-      logout();
-      router.replace('/auth/login');
+      console.log('🧹 Clearing auth state...');
+      
+      // Clear token from AuthContext (this clears storage and state)
+      await logout();
+      
+      console.log('🔄 Navigating to login screen...');
+      
+      // Use push instead of replace to ensure navigation happens
+      router.push('/auth/login');
+      
+      console.log('✅ Logout complete!');
     }
   };
 
