@@ -743,3 +743,114 @@ async def update_profile_picture(
     )
     
     return {"message": "Profile picture updated", "profile_picture": f"/{file_path}"}
+
+
+# ==================== LOGOUT ENDPOINT ====================
+
+@app.post("/api/auth/logout")
+async def logout(current_user: dict = Depends(get_current_user)):
+    """Logout user (token will be handled client-side)"""
+    # In a stateless JWT system, logout is mainly handled client-side by removing the token
+    # If you want to track logged-out tokens, you'd maintain a blacklist in the database
+    return {"message": "Logged out successfully"}
+
+# ==================== USER STATS ENDPOINTS ====================
+
+@app.get("/api/users/{user_id}/stats")
+async def get_user_stats(user_id: str):
+    """Get user statistics"""
+    db = get_database()
+    
+    # Get user
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Count total posts
+    total_posts = await db.posts.count_documents({"user_id": user_id})
+    
+    # Count photos and videos
+    posts = await db.posts.find({"user_id": user_id}).to_list(None)
+    photos_count = sum(1 for post in posts if post.get("media_type") in ["image", "photo", None])
+    videos_count = sum(1 for post in posts if post.get("media_type") == "video")
+    
+    return {
+        "total_posts": total_posts,
+        "photos_count": photos_count,
+        "videos_count": videos_count,
+        "followers_count": user.get("followers_count", 0),
+        "following_count": user.get("following_count", 0),
+        "points": user.get("points", 0),
+        "level": user.get("level", 1),
+        "badge": user.get("badge")
+    }
+
+@app.get("/api/users/{user_id}/posts")
+async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, limit: int = 20):
+    """Get user's posts, optionally filtered by media type"""
+    db = get_database()
+    
+    # Build query
+    query = {"user_id": user_id}
+    if media_type == "photo":
+        query["media_type"] = {"$in": ["image", "photo", None]}
+    elif media_type == "video":
+        query["media_type"] = "video"
+    
+    # Get posts
+    posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("media_url", ""),
+            "media_type": post.get("media_type", "photo"),
+            "rating": post["rating"],
+            "review_text": post["review_text"],
+            "map_link": post.get("map_link"),
+            "likes_count": post["likes_count"],
+            "comments_count": post["comments_count"],
+            "created_at": post["created_at"]
+        })
+    
+    return result
+
+@app.get("/api/users/{user_id}/collaborations")
+async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = 20):
+    """Get user's collaborations (posts where user is tagged or mentioned)"""
+    db = get_database()
+    
+    # For now, return posts where the user has commented
+    comments = await db.comments.find({"user_id": user_id}).to_list(None)
+    post_ids = list(set([comment["post_id"] for comment in comments]))
+    
+    # Get posts
+    posts = await db.posts.find({
+        "_id": {"$in": [ObjectId(pid) for pid in post_ids if ObjectId.is_valid(pid)]},
+        "user_id": {"$ne": user_id}  # Exclude own posts
+    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("media_url", ""),
+            "rating": post["rating"],
+            "review_text": post["review_text"],
+            "likes_count": post["likes_count"],
+            "comments_count": post["comments_count"],
+            "created_at": post["created_at"]
+        })
+    
+    return result
