@@ -142,7 +142,7 @@ export default function ExploreScreen() {
     return (
       <TouchableOpacity
         style={styles.gridTile}
-        onPress={() => router.push(`/post-details?id=${item.id}`)}
+        onPress={() => router.push(`/post-details/${item.id}`)}
         activeOpacity={0.8}
       >
         {item.full_image_url ? (
