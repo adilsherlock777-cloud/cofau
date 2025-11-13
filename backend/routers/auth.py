@@ -47,7 +47,8 @@ async def signup(user: UserCreate):
         "password_hash": hashed_password,
         "profile_picture": None,
         "bio": None,
-        "points": 0,
+        "total_points": 0,  # Total accumulated points
+        "points": 0,  # For backward compatibility
         "level": 1,
         "currentPoints": 0,
         "requiredPoints": 1250,
