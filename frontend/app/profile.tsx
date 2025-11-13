@@ -368,25 +368,37 @@ export default function ProfileScreen() {
           activeOpacity={0.7}
           onPress={() => {
             console.log('🔴 Logout button pressed!');
-            Alert.alert(
-              'Logout',
-              'Are you sure you want to logout?',
-              [
-                { 
-                  text: 'Cancel', 
-                  style: 'cancel',
-                  onPress: () => console.log('❌ Logout cancelled')
-                },
-                { 
-                  text: 'Logout', 
-                  onPress: () => {
-                    console.log('✅ User confirmed logout');
-                    handleLogout();
+            
+            // Use window.confirm on web, Alert.alert on native
+            if (Platform.OS === 'web') {
+              const confirmed = window.confirm('Are you sure you want to logout?');
+              if (confirmed) {
+                console.log('✅ User confirmed logout (web)');
+                handleLogout();
+              } else {
+                console.log('❌ Logout cancelled (web)');
+              }
+            } else {
+              Alert.alert(
+                'Logout',
+                'Are you sure you want to logout?',
+                [
+                  { 
+                    text: 'Cancel', 
+                    style: 'cancel',
+                    onPress: () => console.log('❌ Logout cancelled')
                   },
-                  style: 'destructive' 
-                }
-              ]
-            );
+                  { 
+                    text: 'Logout', 
+                    onPress: () => {
+                      console.log('✅ User confirmed logout');
+                      handleLogout();
+                    },
+                    style: 'destructive' 
+                  }
+                ]
+              );
+            }
           }}
         >
           <Ionicons name="log-out-outline" size={20} color="#FF6B6B" />
