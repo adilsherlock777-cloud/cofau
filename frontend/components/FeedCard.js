@@ -214,30 +214,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 8,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#66D9E8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  avatarLetter: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
   userTextContainer: {
     flex: 1,
+    marginLeft: 8,
   },
   username: {
     fontSize: 15,
