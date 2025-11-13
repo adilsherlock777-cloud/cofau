@@ -10,12 +10,13 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import RatingBar from '../components/RatingBar';
 import ReviewerCircles from '../components/ReviewerCircles';
 import FeedCard from '../components/FeedCard';
 import UserAvatar from '../components/UserAvatar';
+import { fetchUnreadCount } from '../utils/notifications';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
