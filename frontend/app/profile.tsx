@@ -548,9 +548,19 @@ export default function ProfileScreen() {
               level={userData.level}
               showLevelBadge={true}
             />
-            <TouchableOpacity style={styles.cameraIcon}>
-              <Ionicons name="camera" size={20} color="#fff" />
-            </TouchableOpacity>
+            {isOwnProfile && (
+              <TouchableOpacity 
+                style={styles.cameraIcon}
+                onPress={handleProfilePicturePress}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="camera" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           {badge && (
