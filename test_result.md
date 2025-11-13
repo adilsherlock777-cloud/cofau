@@ -418,9 +418,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Comprehensive End-to-End Testing Complete"
+    - "Frontend UI Testing Complete"
+    - "Profile Picture System Verified"
   stuck_tasks:
     - "Explore Categories API"
+    - "End-to-End Authentication Flow"
   test_all: false
   test_priority: "high_first"
 
