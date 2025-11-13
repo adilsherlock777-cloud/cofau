@@ -411,6 +411,18 @@ test_plan:
           agent: "testing"
           comment: "Static file serving working correctly. Files are accessible at /api/static/uploads/{filename} format. Successfully tested with uploaded image from post creation. Static files are properly mounted and served with correct content-type headers."
 
+  - task: "Comprehensive End-to-End User Journey"
+    implemented: true
+    working: true
+    file: "/app/backend_test.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "COMPREHENSIVE END-TO-END TESTING COMPLETE: All 13 test scenarios passed with 100% success rate! Tested complete user journey: 1) User Registration with default level/points, 2) Post Upload with points system (25 points awarded), 3) Points verification in auth/me, 4) Post verification in feed with level badges, 5) Profile picture upload, 6) Profile picture verification in auth/me, 7) Profile picture display in feed, 8) Second user creation, 9) Follow functionality, 10) Follow status verification, 11) Follower count verification, 12) Like and comment functionality, 13) Comments verification. All backend endpoints working correctly with proper authentication, data consistency, and gamification features."
+
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
