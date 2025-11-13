@@ -315,6 +315,34 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
+        {/* Level & Progress Section - Only show on own profile */}
+        {userData.level && userData.currentPoints !== undefined && userData.requiredPoints && (
+          <View style={styles.levelSection}>
+            <View style={styles.levelHeader}>
+              <View style={styles.levelBadgeContainer}>
+                <Text style={styles.levelNumber}>Level {userData.level}</Text>
+                <Text style={styles.levelTitle}>{userData.title}</Text>
+              </View>
+              <Text style={styles.levelPoints}>
+                {userData.currentPoints} / {userData.requiredPoints} pts
+              </Text>
+            </View>
+            
+            {/* Progress Bar */}
+            <View style={styles.progressBarContainer}>
+              <View 
+                style={[
+                  styles.progressBarFill, 
+                  { width: `${(userData.currentPoints / userData.requiredPoints) * 100}%` }
+                ]} 
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {Math.round((userData.currentPoints / userData.requiredPoints) * 100)}% to next level
+            </Text>
+          </View>
+        )}
+
         {/* Tab Navigation */}
         <View style={styles.tabBar}>
           <TouchableOpacity 
