@@ -40,7 +40,7 @@ async def signup(user: UserCreate):
     # Hash password
     hashed_password = hash_password(user.password)
     
-    # Create user document
+    # Create user document with default level & points
     user_doc = {
         "full_name": user.full_name,
         "email": user.email,
@@ -49,6 +49,9 @@ async def signup(user: UserCreate):
         "bio": None,
         "points": 0,
         "level": 1,
+        "currentPoints": 0,
+        "requiredPoints": 1250,
+        "title": "Reviewer",
         "badge": None,
         "followers_count": 0,
         "following_count": 0,
