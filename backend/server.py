@@ -239,6 +239,8 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "user_badge": user.get("badge") if user else None,
+            "user_level": user.get("level", 1) if user else 1,
+            "user_title": user.get("title", "Reviewer") if user else "Reviewer",
             "media_url": media_url,
             "image_url": image_url,  # Add explicit image_url field
             "media_type": post["media_type"],
