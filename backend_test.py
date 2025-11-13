@@ -296,9 +296,17 @@ class NotificationsTestSuite:
         self.log("🧪 TEST 6: User B comments on User A's post...")
         
         headers = {"Authorization": f"Bearer {self.user_b_token}"}
+        # Use form data instead of JSON for comment endpoint
         data = {"comment_text": "Great post!"}
         
-        response = self.make_request("POST", f"/posts/{self.post_id}/comment", headers=headers, data=data)
+        # Use requests directly to send form data
+        url = f"{self.base_url}/posts/{self.post_id}/comment"
+        try:
+            response = requests.post(url, headers=headers, data=data)
+            self.log(f"POST /posts/{self.post_id}/comment -> {response.status_code}")
+        except Exception as e:
+            self.log(f"❌ Request failed: {e}")
+            response = None
         
         if response and response.status_code == 200:
             self.log("✅ Comment created successfully")
