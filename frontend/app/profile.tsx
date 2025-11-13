@@ -38,7 +38,7 @@ export default function ProfileScreen() {
     }
 
     fetchProfileData();
-  }, [token]);
+  }, [token, userId]); // Re-fetch when userId changes
 
   useEffect(() => {
     if (userData) {
@@ -48,12 +48,54 @@ export default function ProfileScreen() {
 
   const fetchProfileData = async () => {
     try {
-      console.log('📡 Fetching profile from:', `${API_URL}/auth/me`);
-      const response = await axios.get(`${API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let user;
       
-      let user = response.data.user || response.data;
+      // Check if viewing another user's profile or own profile
+      if (userId && userId !== currentUser?.id) {
+        // Viewing another user's profile
+        console.log('📡 Fetching other user profile:', userId);
+        setIsOwnProfile(false);
+        
+        // Get user data from the users endpoint (need to create this or use existing feed data)
+        // For now, fetch from /auth/me and then get the specific user data
+        const meResponse = await axios.get(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        // If the userId matches current user, show own profile
+        if (userId === (meResponse.data.user?.id || meResponse.data.id)) {
+          user = meResponse.data.user || meResponse.data;
+          setIsOwnProfile(true);
+        } else {
+          // TODO: Need to fetch other user's public profile
+          // For now, use feed data approach
+          const feedResponse = await axios.get(`${API_URL}/feed`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          
+          // Find user from feed posts
+          const userPost = feedResponse.data.find(post => post.user_id === userId);
+          if (userPost) {
+            user = {
+              id: userPost.user_id,
+              full_name: userPost.username,
+              profile_picture: userPost.user_profile_picture,
+              level: userPost.user_level,
+              title: userPost.user_title,
+            };
+          } else {
+            throw new Error('User not found');
+          }
+        }
+      } else {
+        // Viewing own profile
+        console.log('📡 Fetching own profile from:', `${API_URL}/auth/me`);
+        setIsOwnProfile(true);
+        const response = await axios.get(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        user = response.data.user || response.data;
+      }
       
       // Convert relative avatar URL to full URL
       if (user.profile_picture && user.profile_picture.startsWith('/api/static/uploads')) {
