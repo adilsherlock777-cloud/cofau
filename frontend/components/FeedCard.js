@@ -71,27 +71,33 @@ export default function FeedCard({ post, onLikeUpdate }) {
     <View style={styles.card}>
       {/* User Info */}
       <View style={styles.userHeader}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            {post.user_profile_picture ? (
-              <Image source={{ uri: post.user_profile_picture }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarLetter}>
-                {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
-              </Text>
+        <TouchableOpacity
+          style={styles.userInfoTouchable}
+          onPress={() => router.push(`/profile?userId=${post.user_id}`)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              {post.user_profile_picture ? (
+                <Image source={{ uri: post.user_profile_picture }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarLetter}>
+                  {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
+                </Text>
+              )}
+            </View>
+            {/* Level Badge on Avatar */}
+            {post.user_level && (
+              <LevelBadge level={post.user_level} size="small" />
             )}
           </View>
-          {/* Level Badge on Avatar */}
-          {post.user_level && (
-            <LevelBadge level={post.user_level} size="small" />
-          )}
-        </View>
-        <View style={styles.userTextContainer}>
-          <Text style={styles.username}>{post.username}</Text>
-          {post.created_at && (
-            <Text style={styles.timestamp}>{formatTimestamp(post.created_at)}</Text>
-          )}
-        </View>
+          <View style={styles.userTextContainer}>
+            <Text style={styles.username}>{post.username}</Text>
+            {post.created_at && (
+              <Text style={styles.timestamp}>{formatTimestamp(post.created_at)}</Text>
+            )}
+          </View>
+        </TouchableOpacity>
         {post.user_badge && (
           <View style={styles.badgeIcon}>
             <Text style={styles.badgeIconText}>🏆</Text>
