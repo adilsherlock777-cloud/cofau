@@ -217,6 +217,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  userInfoTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   avatarContainer: {
     position: 'relative',
     marginRight: 8,
