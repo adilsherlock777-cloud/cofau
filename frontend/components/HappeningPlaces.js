@@ -70,8 +70,28 @@ export default function HappeningPlaces() {
     );
   }
 
-  if (topLocations.length === 0) {
-    return null; // Don't show section if no locations
+  if (!loading && topLocations.length === 0) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.headerGradient}
+        >
+          <Text style={styles.headerTitle}>Happening Places Near You</Text>
+          <Text style={styles.headerSubtitle}>Top rated restaurants this week</Text>
+        </LinearGradient>
+        
+        <View style={styles.emptyState}>
+          <Ionicons name="location-outline" size={64} color="#CCC" />
+          <Text style={styles.emptyTitle}>No locations yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Start posting with location tags to see popular places here!
+          </Text>
+        </View>
+      </View>
+    );
   }
 
   return (
