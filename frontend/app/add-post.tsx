@@ -22,14 +22,13 @@ import { useLevelAnimation } from '../context/LevelContext';
 
 export default function AddPostScreen() {
   const router = useRouter();
+  const { showLevelUpAnimation } = useLevelAnimation();
   const [mediaUri, setMediaUri] = useState(null);
   const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
   const [rating, setRating] = useState('');
   const [review, setReview] = useState('');
   const [mapsLink, setMapsLink] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
-  const [levelUpData, setLevelUpData] = useState({ level: 1, title: 'Reviewer' });
 
   // Request permissions and pick image
   const pickImage = async () => {
