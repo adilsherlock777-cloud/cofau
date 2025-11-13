@@ -300,11 +300,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Explore Categories API"
+    - "Level & Points System Testing Complete"
   stuck_tasks:
     - "Explore Categories API"
   test_all: false
-  test_priority: "stuck_first"
+  test_priority: "high_first"
 
   - task: "Like Post API"
     implemented: true
