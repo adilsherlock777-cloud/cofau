@@ -30,7 +30,7 @@ media_url = f"/api/{file_path}"  # e.g., /api/static/uploads/xxx.jpg
 
 ### Static File Accessibility Test
 ```bash
-curl -I "https://meal-snap-4.preview.emergentagent.com/api/static/uploads/690fa2cc8a6be6239d38e7e4_2593BD87-A3E6-4A3E-BF45-90245F10EE11.jpg"
+curl -I "https://cofau-app.preview.emergentagent.com/api/static/uploads/690fa2cc8a6be6239d38e7e4_2593BD87-A3E6-4A3E-BF45-90245F10EE11.jpg"
 # Result: HTTP/2 200 ✅
 # Content-Type: image/jpeg ✅
 ```
@@ -39,7 +39,7 @@ curl -I "https://meal-snap-4.preview.emergentagent.com/api/static/uploads/690fa2
 
 ### Environment Variables (.env)
 ```
-EXPO_PUBLIC_BACKEND_URL=https://meal-snap-4.preview.emergentagent.com
+EXPO_PUBLIC_BACKEND_URL=https://cofau-app.preview.emergentagent.com
 ```
 
 ### Feed Screen (feed.tsx lines 54-86)
@@ -49,7 +49,7 @@ EXPO_PUBLIC_BACKEND_URL=https://meal-snap-4.preview.emergentagent.com
 if (mediaUrl && !mediaUrl.startsWith('http')) {
   mediaUrl = `${API_BASE_URL}${mediaUrl.startsWith('/') ? mediaUrl : '/' + mediaUrl}`;
 }
-// Result: https://meal-snap-4.preview.emergentagent.com/api/static/uploads/xxx.jpg
+// Result: https://cofau-app.preview.emergentagent.com/api/static/uploads/xxx.jpg
 ```
 
 ### Explore Screen (explore.tsx lines 57-75)
@@ -85,7 +85,7 @@ if (imageUrl && !imageUrl.startsWith('http')) {
 2. **Storage** → Saved to `/app/backend/static/uploads/{objectid}_{filename}.jpg`
 3. **Database** → Stored as `/api/static/uploads/{objectid}_{filename}.jpg`
 4. **API Response** → Returns relative path `/api/static/uploads/...`
-5. **Frontend Transform** → Converts to `https://meal-snap-4.preview.emergentagent.com/api/static/uploads/...`
+5. **Frontend Transform** → Converts to `https://cofau-app.preview.emergentagent.com/api/static/uploads/...`
 6. **Image Component** → Renders with full URL and cache control
 
 ## Fixes Applied
@@ -120,7 +120,7 @@ if (imageUrl && !imageUrl.startsWith('http')) {
 If images still don't load:
 
 1. **Check Console Logs**: Look for error messages in Expo logs
-2. **Verify Network**: Ensure device/preview can reach `https://meal-snap-4.preview.emergentagent.com`
+2. **Verify Network**: Ensure device/preview can reach `https://cofau-app.preview.emergentagent.com`
 3. **Clear App Cache**: Close and reopen Expo app completely
 4. **Check Image URLs**: Console logs will show full URL being requested
 5. **Test Direct Access**: Copy image URL from logs and test in browser

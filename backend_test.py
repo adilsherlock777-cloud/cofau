@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 # Backend URL from environment
-BACKEND_URL = "https://meal-snap-4.preview.emergentagent.com/api"
+BACKEND_URL = "https://cofau-app.preview.emergentagent.com/api"
 
 class CofauBackendTester:
     def __init__(self):
