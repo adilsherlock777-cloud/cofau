@@ -353,19 +353,15 @@ export default function PostDetailsScreen() {
             comments.map((comment) => (
               <View key={comment.id} style={styles.commentItem}>
                 <TouchableOpacity
-                  style={styles.commentAvatarContainer}
                   onPress={() => router.push(`/profile?userId=${comment.user_id}`)}
                 >
-                  <View style={styles.commentAvatar}>
-                    {comment.profile_pic ? (
-                      <Image source={{ uri: comment.profile_pic }} style={styles.commentAvatarImage} />
-                    ) : (
-                      <Text style={styles.commentAvatarLetter}>
-                        {comment.username ? comment.username.charAt(0).toUpperCase() : 'U'}
-                      </Text>
-                    )}
-                  </View>
-                  {comment.level && <LevelBadge level={comment.level} size="small" />}
+                  <UserAvatar
+                    profilePicture={comment.profile_pic}
+                    username={comment.username}
+                    size={32}
+                    level={comment.level}
+                    showLevelBadge={true}
+                  />
                 </TouchableOpacity>
                 
                 <View style={styles.commentContent}>
