@@ -9,7 +9,7 @@ from typing import List
 from database import get_database
 from routers.auth import get_current_user
 
-router = APIRouter(prefix="/stories", tags=["stories"])
+router = APIRouter(prefix="/api/stories", tags=["stories"])
 
 UPLOAD_DIR = "/app/backend/static/stories"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
