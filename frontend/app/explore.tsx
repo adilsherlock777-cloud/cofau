@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  RefreshControl,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -20,10 +20,11 @@ const API_URL = `${API_BASE_URL}/api`;
 
 // Screen dimensions and card sizing for 3-column grid
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_MARGIN = 6;
-const CARD_WIDTH = (SCREEN_WIDTH - CARD_MARGIN * 4) / 3;
+const SPACING = 2; // Spacing between grid items
+const NUM_COLUMNS = 3;
+const TILE_SIZE = (SCREEN_WIDTH - (SPACING * (NUM_COLUMNS + 1))) / NUM_COLUMNS;
 
-console.log('✅ NEW Explore.tsx loaded - This is the CLEAN version with NO gradients!');
+console.log('✅ Explore Screen - Redesigned with 3-column grid layout');
 
 export default function ExploreScreen() {
   const router = useRouter();
