@@ -18,7 +18,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload")
 async def upload_story(
     file: UploadFile = File(...),
-    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -28,6 +27,7 @@ async def upload_story(
     - Returns story object
     """
     try:
+        db = get_database()
         # Validate file type
         allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp", "video/mp4", "video/quicktime"]
         if file.content_type not in allowed_types:
