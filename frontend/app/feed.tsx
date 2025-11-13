@@ -198,7 +198,11 @@ export default function FeedScreen() {
                 <View style={styles.levelRow}>
                   <Text style={styles.levelText}>Level {user.level || 1}</Text>
                 </View>
-                <RatingBar current={user.points || 0} total={(user.level || 1) * 100} label="" />
+                <RatingBar 
+                  current={user.currentPoints || user.points || 0} 
+                  total={user.requiredPoints || 1250} 
+                  label="" 
+                />
               </View>
             </View>
           </View>
