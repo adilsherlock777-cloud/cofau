@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, 
-  ActivityIndicator, TextInput, Modal, Alert, FlatList, Dimensions 
+  ActivityIndicator, TextInput, Modal, Alert, FlatList, Dimensions, Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
