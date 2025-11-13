@@ -320,31 +320,6 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Progress Bar Section - Only show on own profile */}
-        {userData.level && userData.currentPoints !== undefined && userData.requiredPoints && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Progress to Next Level</Text>
-              <Text style={styles.progressPoints}>
-                {userData.currentPoints} / {userData.requiredPoints} pts
-              </Text>
-            </View>
-            
-            {/* Progress Bar */}
-            <View style={styles.progressBarContainer}>
-              <View 
-                style={[
-                  styles.progressBarFill, 
-                  { width: `${(userData.currentPoints / userData.requiredPoints) * 100}%` }
-                ]} 
-              />
-            </View>
-            <Text style={styles.progressText}>
-              {Math.round((userData.currentPoints / userData.requiredPoints) * 100)}% complete
-            </Text>
-          </View>
-        )}
-
         {/* Tab Navigation */}
         <View style={styles.tabBar}>
           <TouchableOpacity 
