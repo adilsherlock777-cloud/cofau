@@ -279,10 +279,11 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 32,
     paddingHorizontal: 20,
     backgroundColor: '#FFF',
     marginHorizontal: 16,
+    marginTop: 0,
     borderRadius: 12,
   },
   emptyTitle: {
