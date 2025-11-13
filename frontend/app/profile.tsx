@@ -662,6 +662,71 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  levelSection: {
+    backgroundColor: '#f8f9fa',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+
+  levelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  levelBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  levelNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#667eea',
+  },
+
+  levelTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
+  levelPoints: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#999',
+  },
+
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#667eea',
+    borderRadius: 4,
+  },
+
+  progressText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+  },
+
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
