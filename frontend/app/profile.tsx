@@ -639,55 +639,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  progressSection: {
-    backgroundColor: '#f8f9fa',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-
-  progressPoints: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#999',
-  },
-
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#667eea',
-    borderRadius: 4,
-  },
-
-  progressText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  },
-
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
