@@ -32,7 +32,6 @@ export default function UserAvatar({
               borderRadius: size / 2,
             },
           ]}
-          defaultSource={require('../assets/icon.png')} // Fallback
         />
       ) : (
         <View
