@@ -15,6 +15,7 @@ from database import connect_to_mongo, close_mongo_connection, get_database
 from routers.auth import router as auth_router, get_current_user
 from routers.notifications import router as notifications_router, create_notification
 from routers.follow import router as follow_router
+from routers.profile_picture import router as profile_picture_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
