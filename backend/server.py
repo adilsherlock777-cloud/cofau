@@ -15,7 +15,7 @@ from database import connect_to_mongo, close_mongo_connection, get_database
 from routers.auth import router as auth_router, get_current_user
 
 # Import utils
-from utils.level_system import calculate_level, add_post_points
+from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
