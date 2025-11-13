@@ -80,7 +80,6 @@ async def upload_story(
 
 @router.get("/feed")
 async def get_stories_feed(
-    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -92,6 +91,7 @@ async def get_stories_feed(
     Format: Grouped by user
     """
     try:
+        db = get_database()
         now = datetime.utcnow()
         current_user_id = str(current_user["_id"])
         
