@@ -30,13 +30,20 @@ export default function HappeningPlaces() {
   const fetchTopLocations = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching top locations from:', `${API_URL}/locations/top`);
+      
       const response = await axios.get(`${API_URL}/locations/top`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { limit: 5 },
       });
+      
+      console.log('📊 TOP LOCATIONS RESPONSE:', response.data);
+      console.log('📊 Number of locations:', response.data.length);
+      
       setTopLocations(response.data);
     } catch (error) {
       console.error('❌ Error fetching top locations:', error.response?.data || error.message);
+      console.error('❌ Full error:', error);
     } finally {
       setLoading(false);
     }
