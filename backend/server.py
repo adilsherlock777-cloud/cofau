@@ -102,20 +102,31 @@ async def create_post(
     
     result = await db.posts.insert_one(post_doc)
     
-    # Update user points and level
-    new_points = add_post_points(current_user["points"])
-    level_data = calculate_level(new_points)
+    # Calculate new level and points using the new system
+    level_update = calculateUserLevelAfterPost(current_user)
     
+    # Update user in database
     await db.users.update_one(
         {"_id": current_user["_id"]},
         {"$set": {
-            "points": new_points,
-            "level": level_data["level"],
-            "badge": level_data["badge"]
+            "level": level_update["level"],
+            "currentPoints": level_update["currentPoints"],
+            "requiredPoints": level_update["requiredPoints"],
+            "title": level_update["title"]
         }}
     )
     
-    return {"message": "Post created successfully", "post_id": str(result.inserted_id)}
+    # Return response with level-up info
+    return {
+        "message": "Post created successfully",
+        "post_id": str(result.inserted_id),
+        "leveledUp": level_update["leveledUp"],
+        "newLevel": level_update["level"],
+        "newTitle": level_update["title"],
+        "pointsEarned": level_update["pointsEarned"],
+        "currentPoints": level_update["currentPoints"],
+        "requiredPoints": level_update["requiredPoints"]
+    }
 
 @app.get("/api/posts/user/{user_id}")
 async def get_user_posts(user_id: str):
