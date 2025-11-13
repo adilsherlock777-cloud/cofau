@@ -277,6 +277,11 @@ async def like_post(post_id: str, current_user: dict = Depends(get_current_user)
     if existing_like:
         raise HTTPException(status_code=400, detail="Already liked this post")
     
+    # Get post to find owner
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
     # Add like
     await db.likes.insert_one({
         "post_id": post_id,
@@ -288,6 +293,15 @@ async def like_post(post_id: str, current_user: dict = Depends(get_current_user)
     await db.posts.update_one(
         {"_id": ObjectId(post_id)},
         {"$inc": {"likes_count": 1}}
+    )
+    
+    # Create notification for post owner
+    await create_notification(
+        db=db,
+        notification_type="like",
+        from_user_id=str(current_user["_id"]),
+        to_user_id=post["user_id"],
+        post_id=post_id
     )
     
     return {"message": "Post liked"}
