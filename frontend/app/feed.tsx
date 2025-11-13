@@ -69,6 +69,8 @@ export default function FeedScreen() {
           username: post.username,
           user_profile_picture: post.user_profile_picture,
           user_badge: post.user_badge,
+          user_level: post.user_level,
+          user_title: post.user_title,
           description: post.review_text,
           rating: post.rating, // Backend returns 1-10, display as-is
           ratingLabel: getRatingLabel(post.rating),
