@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import RatingBar from '../components/RatingBar';
 import ReviewerCircles from '../components/ReviewerCircles';
 import FeedCard from '../components/FeedCard';
+import UserAvatar from '../components/UserAvatar';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
