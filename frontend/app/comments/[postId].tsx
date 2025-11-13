@@ -100,11 +100,13 @@ export default function CommentsScreen() {
           comments.map((comment) => (
             <View key={comment.id} style={styles.commentCard}>
               <View style={styles.commentHeader}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLetter}>
-                    {comment.username ? comment.username.charAt(0).toUpperCase() : 'U'}
-                  </Text>
-                </View>
+                <UserAvatar
+                  profilePicture={comment.profile_pic}
+                  username={comment.username}
+                  size={36}
+                  level={comment.level}
+                  showLevelBadge={true}
+                />
                 <View style={styles.commentInfo}>
                   <Text style={styles.username}>{comment.username}</Text>
                   <Text style={styles.timestamp}>
