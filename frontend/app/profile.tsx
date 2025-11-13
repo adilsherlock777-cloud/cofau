@@ -164,6 +164,54 @@ export default function ProfileScreen() {
     }
   };
 
+  const fetchFollowStatus = async () => {
+    if (!userData?.id || !token) return;
+    
+    try {
+      const response = await axios.get(`${API_URL}/users/${userData.id}/follow-status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setIsFollowing(response.data.is_following);
+    } catch (err) {
+      console.error('❌ Error fetching follow status:', err);
+      setIsFollowing(false);
+    }
+  };
+
+  const handleFollowToggle = async () => {
+    if (!userData?.id || !token || followLoading) return;
+    
+    setFollowLoading(true);
+    const previousFollowState = isFollowing;
+    
+    // Optimistic UI update
+    setIsFollowing(!isFollowing);
+    
+    try {
+      if (isFollowing) {
+        // Unfollow
+        await axios.delete(`${API_URL}/users/${userData.id}/follow`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        // Follow
+        await axios.post(`${API_URL}/users/${userData.id}/follow`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      
+      // Refresh follow status to ensure consistency
+      await fetchFollowStatus();
+    } catch (err) {
+      console.error('❌ Error toggling follow:', err);
+      // Revert optimistic update on error
+      setIsFollowing(previousFollowState);
+      Alert.alert('Error', 'Failed to update follow status. Please try again.');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const handleUpdateProfile = async () => {
     try {
       console.log('📝 Updating profile with:', { name: editedName, bio: editedBio });
