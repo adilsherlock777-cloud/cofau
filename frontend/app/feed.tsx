@@ -16,6 +16,7 @@ import RatingBar from '../components/RatingBar';
 import FeedCard from '../components/FeedCard';
 import UserAvatar from '../components/UserAvatar';
 import StoriesBar from '../components/StoriesBar';
+import HappeningPlaces from '../components/HappeningPlaces';
 import { fetchUnreadCount } from '../utils/notifications';
 import axios from 'axios';
 
