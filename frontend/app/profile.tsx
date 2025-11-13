@@ -279,6 +279,172 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleProfilePicturePress = () => {
+    if (!isOwnProfile) return; // Only allow for own profile
+    
+    const options = [
+      { text: 'Take Photo', onPress: () => handleTakePhoto() },
+      { text: 'Choose from Library', onPress: () => handleChoosePhoto() },
+    ];
+    
+    // Add remove option if profile picture exists
+    if (userData?.profile_picture) {
+      options.push({ text: 'Remove Photo', onPress: () => handleRemovePhoto(), style: 'destructive' });
+    }
+    
+    options.push({ text: 'Cancel', style: 'cancel' });
+    
+    if (Platform.OS === 'web') {
+      // Web: Show simple confirm
+      const action = window.confirm('Choose from library to upload a profile picture?');
+      if (action) handleChoosePhoto();
+    } else {
+      Alert.alert('Profile Picture', 'Choose an option', options);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadProfilePicture(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('❌ Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo');
+    }
+  };
+
+  const handleChoosePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Photo library permission is required.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadProfilePicture(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('❌ Error choosing photo:', error);
+      Alert.alert('Error', 'Failed to choose photo');
+    }
+  };
+
+  const uploadProfilePicture = async (uri) => {
+    setUploadingImage(true);
+    try {
+      console.log('📤 Uploading profile picture:', uri);
+
+      const formData = new FormData();
+      
+      // Extract filename and create file object
+      const filename = uri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+      formData.append('file', {
+        uri,
+        name: filename || 'profile.jpg',
+        type,
+      });
+
+      const response = await axios.post(
+        `${API_URL}/users/upload-profile-image`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      console.log('✅ Profile picture uploaded:', response.data);
+      
+      // Update local state with new profile picture URL
+      setUserData(prev => ({
+        ...prev,
+        profile_picture: response.data.profile_picture,
+      }));
+
+      Alert.alert('Success', 'Profile picture updated successfully!');
+    } catch (error) {
+      console.error('❌ Error uploading profile picture:', error.response?.data || error.message);
+      Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    const confirmRemove = Platform.OS === 'web' 
+      ? window.confirm('Are you sure you want to remove your profile picture?')
+      : true;
+    
+    if (!confirmRemove && Platform.OS !== 'web') {
+      Alert.alert(
+        'Remove Profile Picture',
+        'Are you sure you want to remove your profile picture?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', onPress: () => removeProfilePicture(), style: 'destructive' }
+        ]
+      );
+      return;
+    }
+    
+    if (confirmRemove) {
+      await removeProfilePicture();
+    }
+  };
+
+  const removeProfilePicture = async () => {
+    setUploadingImage(true);
+    try {
+      console.log('🗑️ Removing profile picture');
+
+      await axios.delete(`${API_URL}/users/profile-image`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log('✅ Profile picture removed');
+      
+      // Update local state
+      setUserData(prev => ({
+        ...prev,
+        profile_picture: null,
+      }));
+
+      Alert.alert('Success', 'Profile picture removed successfully!');
+    } catch (error) {
+      console.error('❌ Error removing profile picture:', error.response?.data || error.message);
+      Alert.alert('Error', 'Failed to remove profile picture. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const getBadgeInfo = () => {
     if (!userData) return null;
     
