@@ -1,449 +1,706 @@
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc64b_test_image.png b/backend/static/uploads/6915c0320372b9e5275cc64b_test_image.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc64b_test_image.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc64d_test_image_0.png b/backend/static/uploads/6915c0320372b9e5275cc64d_test_image_0.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc64d_test_image_0.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc64f_test_image_1.png b/backend/static/uploads/6915c0320372b9e5275cc64f_test_image_1.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc64f_test_image_1.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc651_test_image_2.png b/backend/static/uploads/6915c0320372b9e5275cc651_test_image_2.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc651_test_image_2.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc653_test_image_3.png b/backend/static/uploads/6915c0320372b9e5275cc653_test_image_3.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc653_test_image_3.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc655_test_image_4.png b/backend/static/uploads/6915c0320372b9e5275cc655_test_image_4.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc655_test_image_4.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc657_test_image_5.png b/backend/static/uploads/6915c0320372b9e5275cc657_test_image_5.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc657_test_image_5.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc659_test_image_6.png b/backend/static/uploads/6915c0320372b9e5275cc659_test_image_6.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc659_test_image_6.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc65b_test_image_7.png b/backend/static/uploads/6915c0320372b9e5275cc65b_test_image_7.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc65b_test_image_7.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc65d_test_image_8.png b/backend/static/uploads/6915c0320372b9e5275cc65d_test_image_8.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc65d_test_image_8.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc65f_test_image_9.png b/backend/static/uploads/6915c0320372b9e5275cc65f_test_image_9.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc65f_test_image_9.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc661_test_image_10.png b/backend/static/uploads/6915c0320372b9e5275cc661_test_image_10.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc661_test_image_10.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc663_test_image_11.png b/backend/static/uploads/6915c0320372b9e5275cc663_test_image_11.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc663_test_image_11.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc665_test_image_12.png b/backend/static/uploads/6915c0320372b9e5275cc665_test_image_12.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc665_test_image_12.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc667_test_image_13.png b/backend/static/uploads/6915c0320372b9e5275cc667_test_image_13.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc667_test_image_13.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc669_test_image_14.png b/backend/static/uploads/6915c0320372b9e5275cc669_test_image_14.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc669_test_image_14.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc66b_test_image_15.png b/backend/static/uploads/6915c0320372b9e5275cc66b_test_image_15.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc66b_test_image_15.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc66d_test_image_16.png b/backend/static/uploads/6915c0320372b9e5275cc66d_test_image_16.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc66d_test_image_16.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc66f_test_image_17.png b/backend/static/uploads/6915c0320372b9e5275cc66f_test_image_17.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc66f_test_image_17.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc671_test_image_18.png b/backend/static/uploads/6915c0320372b9e5275cc671_test_image_18.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc671_test_image_18.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc673_test_image_19.png b/backend/static/uploads/6915c0320372b9e5275cc673_test_image_19.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc673_test_image_19.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc675_test_image_20.png b/backend/static/uploads/6915c0320372b9e5275cc675_test_image_20.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc675_test_image_20.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc677_test_image_21.png b/backend/static/uploads/6915c0320372b9e5275cc677_test_image_21.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc677_test_image_21.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc679_test_image_22.png b/backend/static/uploads/6915c0320372b9e5275cc679_test_image_22.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc679_test_image_22.png differ
+diff --git a/backend/static/uploads/6915c0320372b9e5275cc67b_test_image_23.png b/backend/static/uploads/6915c0320372b9e5275cc67b_test_image_23.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0320372b9e5275cc67b_test_image_23.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc67d_test_image_24.png b/backend/static/uploads/6915c0330372b9e5275cc67d_test_image_24.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc67d_test_image_24.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc67f_test_image_25.png b/backend/static/uploads/6915c0330372b9e5275cc67f_test_image_25.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc67f_test_image_25.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc681_test_image_26.png b/backend/static/uploads/6915c0330372b9e5275cc681_test_image_26.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc681_test_image_26.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc683_test_image_27.png b/backend/static/uploads/6915c0330372b9e5275cc683_test_image_27.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc683_test_image_27.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc685_test_image_28.png b/backend/static/uploads/6915c0330372b9e5275cc685_test_image_28.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc685_test_image_28.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc687_test_image_29.png b/backend/static/uploads/6915c0330372b9e5275cc687_test_image_29.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc687_test_image_29.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc689_test_image_30.png b/backend/static/uploads/6915c0330372b9e5275cc689_test_image_30.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc689_test_image_30.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc68b_test_image_31.png b/backend/static/uploads/6915c0330372b9e5275cc68b_test_image_31.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc68b_test_image_31.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc68d_test_image_32.png b/backend/static/uploads/6915c0330372b9e5275cc68d_test_image_32.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc68d_test_image_32.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc68f_test_image_33.png b/backend/static/uploads/6915c0330372b9e5275cc68f_test_image_33.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc68f_test_image_33.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc691_test_image_34.png b/backend/static/uploads/6915c0330372b9e5275cc691_test_image_34.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc691_test_image_34.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc693_test_image_35.png b/backend/static/uploads/6915c0330372b9e5275cc693_test_image_35.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc693_test_image_35.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc695_test_image_36.png b/backend/static/uploads/6915c0330372b9e5275cc695_test_image_36.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc695_test_image_36.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc697_test_image_37.png b/backend/static/uploads/6915c0330372b9e5275cc697_test_image_37.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc697_test_image_37.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc699_test_image_38.png b/backend/static/uploads/6915c0330372b9e5275cc699_test_image_38.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc699_test_image_38.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc69b_test_image_39.png b/backend/static/uploads/6915c0330372b9e5275cc69b_test_image_39.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc69b_test_image_39.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc69d_test_image_40.png b/backend/static/uploads/6915c0330372b9e5275cc69d_test_image_40.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc69d_test_image_40.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc69f_test_image_41.png b/backend/static/uploads/6915c0330372b9e5275cc69f_test_image_41.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc69f_test_image_41.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc6a1_test_image_42.png b/backend/static/uploads/6915c0330372b9e5275cc6a1_test_image_42.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc6a1_test_image_42.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc6a3_test_image_43.png b/backend/static/uploads/6915c0330372b9e5275cc6a3_test_image_43.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc6a3_test_image_43.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc6a5_test_image_44.png b/backend/static/uploads/6915c0330372b9e5275cc6a5_test_image_44.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc6a5_test_image_44.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc6a7_test_image_45.png b/backend/static/uploads/6915c0330372b9e5275cc6a7_test_image_45.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc6a7_test_image_45.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc6a9_test_image_46.png b/backend/static/uploads/6915c0330372b9e5275cc6a9_test_image_46.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc6a9_test_image_46.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc6ab_test_image_47.png b/backend/static/uploads/6915c0330372b9e5275cc6ab_test_image_47.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc6ab_test_image_47.png differ
+diff --git a/backend/static/uploads/6915c0330372b9e5275cc6ad_levelup_test.png b/backend/static/uploads/6915c0330372b9e5275cc6ad_levelup_test.png
+new file mode 100644
+index 0000000..dcf0e74
+Binary files /dev/null and b/backend/static/uploads/6915c0330372b9e5275cc6ad_levelup_test.png differ
 diff --git a/model.patch b/model.patch
-index 8e07966..e69de29 100644
+index f76c23f..6cbe413 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,742 +0,0 @@
--diff --git a/frontend/app/search.tsx b/frontend/app/search.tsx
--index efaa355..afc91b9 100644
----- a/frontend/app/search.tsx
--+++ b/frontend/app/search.tsx
--@@ -109,12 +109,11 @@ const styles = StyleSheet.create({
--   },
--   navBar: {
--     flexDirection: 'row',
---    backgroundColor: '#FFF',
---    paddingVertical: 12,
---    paddingHorizontal: 8,
---    borderTopWidth: 1,
---    borderTopColor: '#E5E5E5',
--     justifyContent: 'space-around',
--     alignItems: 'center',
--+    paddingVertical: 10,
--+    borderTopWidth: 1,
--+    borderColor: '#ccc',
--+    backgroundColor: '#fff',
--   },
-- });
--\ No newline at end of file
+@@ -1,761 +0,0 @@
 -diff --git a/model.patch b/model.patch
--index 6d05dd0..e69de29 100644
+-index 8e07966..e69de29 100644
 ---- a/model.patch
 -+++ b/model.patch
--@@ -1,715 +0,0 @@
+-@@ -1,742 +0,0 @@
 --diff --git a/frontend/app/search.tsx b/frontend/app/search.tsx
---index 789d9c4..efaa355 100644
+--index efaa355..afc91b9 100644
 ----- a/frontend/app/search.tsx
 --+++ b/frontend/app/search.tsx
---@@ -47,36 +47,25 @@ export default function SearchScreen() {
---       </ScrollView>
--- 
---       {/* Bottom Navigation */}
----      <View style={styles.bottomNav}>
----        <TouchableOpacity
----          style={styles.navButton}
----          onPress={() => router.push('/feed')}
----        >
----          <Ionicons name="home-outline" size={26} color="#999" />
---+      <View style={styles.navBar}>
---+        <TouchableOpacity onPress={() => router.push('/feed')}>
---+          <Ionicons name="home-outline" size={28} color="#000" />
---         </TouchableOpacity>
----        <TouchableOpacity
----          style={styles.navButton}
----          onPress={() => router.push('/explore')}
----        >
----          <Ionicons name="compass-outline" size={26} color="#999" />
---+
---+        <TouchableOpacity onPress={() => router.push('/explore')}>
---+          <Ionicons name="compass-outline" size={28} color="#000" />
---         </TouchableOpacity>
----        <TouchableOpacity
----          style={styles.navButton}
----          onPress={() => router.push('/search')}
----        >
----          <Ionicons name="search" size={26} color="#333" />
---+
---+        <TouchableOpacity onPress={() => router.push('/add-post')}>
---+          <Ionicons name="add-circle-outline" size={28} color="#000" />
---         </TouchableOpacity>
----        <TouchableOpacity
----          style={styles.navButton}
----          onPress={() => router.push('/add-post')}
----        >
----          <Ionicons name="add-circle-outline" size={32} color="#999" />
---+
---+        <TouchableOpacity onPress={() => router.push('/happening')}>
---+          <Ionicons name="flame-outline" size={28} color="#000" />
---         </TouchableOpacity>
----        <TouchableOpacity
----          style={styles.navButton}
----          onPress={() => router.push('/profile')}
----        >
----          <Ionicons name="person-outline" size={26} color="#999" />
---+
---+        <TouchableOpacity onPress={() => router.push('/profile')}>
---+          <Ionicons name="person-outline" size={28} color="#000" />
---         </TouchableOpacity>
---       </View>
---     </View>
---@@ -118,7 +107,7 @@ const styles = StyleSheet.create({
---   scrollContent: {
---     paddingBottom: 20,
+--@@ -109,12 +109,11 @@ const styles = StyleSheet.create({
 --   },
----  bottomNav: {
---+  navBar: {
+--   navBar: {
 --     flexDirection: 'row',
---     backgroundColor: '#FFF',
---     paddingVertical: 12,
---@@ -128,9 +117,4 @@ const styles = StyleSheet.create({
+---    backgroundColor: '#FFF',
+---    paddingVertical: 12,
+---    paddingHorizontal: 8,
+---    borderTopWidth: 1,
+---    borderTopColor: '#E5E5E5',
 --     justifyContent: 'space-around',
 --     alignItems: 'center',
+--+    paddingVertical: 10,
+--+    borderTopWidth: 1,
+--+    borderColor: '#ccc',
+--+    backgroundColor: '#fff',
 --   },
----  navButton: {
----    padding: 8,
----    alignItems: 'center',
----    justifyContent: 'center',
----  },
 -- });
 --\ No newline at end of file
 --diff --git a/model.patch b/model.patch
---index cd1986c..e69de29 100644
+--index 6d05dd0..e69de29 100644
 ----- a/model.patch
 --+++ b/model.patch
---@@ -1,634 +0,0 @@
----diff --git a/backend/static/uploads/690fb8fcb25bd57aeca585b1_test_food.jpg b/backend/static/uploads/690fb8fcb25bd57aeca585b1_test_food.jpg
----new file mode 100644
----index 0000000..89ccb99
------- /dev/null
----+++ b/backend/static/uploads/690fb8fcb25bd57aeca585b1_test_food.jpg
----@@ -0,0 +1 @@
----+fake_image_content_for_testing
+--@@ -1,715 +0,0 @@
+---diff --git a/frontend/app/search.tsx b/frontend/app/search.tsx
+---index 789d9c4..efaa355 100644
+------ a/frontend/app/search.tsx
+---+++ b/frontend/app/search.tsx
+---@@ -47,36 +47,25 @@ export default function SearchScreen() {
+---       </ScrollView>
+--- 
+---       {/* Bottom Navigation */}
+----      <View style={styles.bottomNav}>
+----        <TouchableOpacity
+----          style={styles.navButton}
+----          onPress={() => router.push('/feed')}
+----        >
+----          <Ionicons name="home-outline" size={26} color="#999" />
+---+      <View style={styles.navBar}>
+---+        <TouchableOpacity onPress={() => router.push('/feed')}>
+---+          <Ionicons name="home-outline" size={28} color="#000" />
+---         </TouchableOpacity>
+----        <TouchableOpacity
+----          style={styles.navButton}
+----          onPress={() => router.push('/explore')}
+----        >
+----          <Ionicons name="compass-outline" size={26} color="#999" />
+---+
+---+        <TouchableOpacity onPress={() => router.push('/explore')}>
+---+          <Ionicons name="compass-outline" size={28} color="#000" />
+---         </TouchableOpacity>
+----        <TouchableOpacity
+----          style={styles.navButton}
+----          onPress={() => router.push('/search')}
+----        >
+----          <Ionicons name="search" size={26} color="#333" />
+---+
+---+        <TouchableOpacity onPress={() => router.push('/add-post')}>
+---+          <Ionicons name="add-circle-outline" size={28} color="#000" />
+---         </TouchableOpacity>
+----        <TouchableOpacity
+----          style={styles.navButton}
+----          onPress={() => router.push('/add-post')}
+----        >
+----          <Ionicons name="add-circle-outline" size={32} color="#999" />
+---+
+---+        <TouchableOpacity onPress={() => router.push('/happening')}>
+---+          <Ionicons name="flame-outline" size={28} color="#000" />
+---         </TouchableOpacity>
+----        <TouchableOpacity
+----          style={styles.navButton}
+----          onPress={() => router.push('/profile')}
+----        >
+----          <Ionicons name="person-outline" size={26} color="#999" />
+---+
+---+        <TouchableOpacity onPress={() => router.push('/profile')}>
+---+          <Ionicons name="person-outline" size={28} color="#000" />
+---         </TouchableOpacity>
+---       </View>
+---     </View>
+---@@ -118,7 +107,7 @@ const styles = StyleSheet.create({
+---   scrollContent: {
+---     paddingBottom: 20,
+---   },
+----  bottomNav: {
+---+  navBar: {
+---     flexDirection: 'row',
+---     backgroundColor: '#FFF',
+---     paddingVertical: 12,
+---@@ -128,9 +117,4 @@ const styles = StyleSheet.create({
+---     justifyContent: 'space-around',
+---     alignItems: 'center',
+---   },
+----  navButton: {
+----    padding: 8,
+----    alignItems: 'center',
+----    justifyContent: 'center',
+----  },
+--- });
 ---\ No newline at end of file
 ---diff --git a/model.patch b/model.patch
----index c8ef728..e69de29 100644
+---index cd1986c..e69de29 100644
 ------ a/model.patch
 ---+++ b/model.patch
----@@ -1,459 +0,0 @@
-----diff --git a/backend/static/uploads/690fa697f0c0acc2ff537eb9_test_burger.jpg b/backend/static/uploads/690fa697f0c0acc2ff537eb9_test_burger.jpg
+---@@ -1,634 +0,0 @@
+----diff --git a/backend/static/uploads/690fb8fcb25bd57aeca585b1_test_food.jpg b/backend/static/uploads/690fb8fcb25bd57aeca585b1_test_food.jpg
 ----new file mode 100644
-----index 0000000..615bb3b
-----Binary files /dev/null and b/backend/static/uploads/690fa697f0c0acc2ff537eb9_test_burger.jpg differ
-----diff --git a/backend/static/uploads/690fa6b2f0c0acc2ff537ebd_test_burger.jpg b/backend/static/uploads/690fa6b2f0c0acc2ff537ebd_test_burger.jpg
-----new file mode 100644
-----index 0000000..615bb3b
-----Binary files /dev/null and b/backend/static/uploads/690fa6b2f0c0acc2ff537ebd_test_burger.jpg differ
-----diff --git a/frontend/utils/api.js b/frontend/utils/api.js
-----index 7e50be7..85ad514 100644
-------- a/frontend/utils/api.js
-----+++ b/frontend/utils/api.js
-----@@ -120,11 +120,8 @@ export const addComment = async (postId, commentText) => {
-----     const formData = new FormData();
-----     formData.append('comment_text', commentText);
-----     
------    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData, {
------      headers: {
------        'Content-Type': 'multipart/form-data',
------      },
------    });
-----+    // Don't set Content-Type manually - let axios handle it for FormData
-----+    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData);
-----     return response.data;
-----   } catch (error) {
-----     console.error('❌ Error adding comment:', error.response?.data || error.message);
+----index 0000000..89ccb99
+------- /dev/null
+----+++ b/backend/static/uploads/690fb8fcb25bd57aeca585b1_test_food.jpg
+----@@ -0,0 +1 @@
+----+fake_image_content_for_testing
+----\ No newline at end of file
 ----diff --git a/model.patch b/model.patch
-----index 5f9668f..e69de29 100644
+----index c8ef728..e69de29 100644
 ------- a/model.patch
 ----+++ b/model.patch
-----@@ -1,366 +0,0 @@
------diff --git a/frontend/components/FeedCard.js b/frontend/components/FeedCard.js
------index 456515d..93c049f 100644
--------- a/frontend/components/FeedCard.js
------+++ b/frontend/components/FeedCard.js
------@@ -1,9 +1,10 @@
-------import React from 'react';
------+import React, { useState } from 'react';
------ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-------import { Ionicons } from '@expo/vector-icons';
------+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
------ import { useRouter } from 'expo-router';
------ import MapButton from './MapButton';
------ import { LinearGradient } from 'expo-linear-gradient';
------+import { likePost, unlikePost } from '../utils/api';
------ 
------ const formatTimestamp = (timestamp) => {
------   const now = new Date();
------@@ -17,17 +18,54 @@ const formatTimestamp = (timestamp) => {
------   return postDate.toLocaleDateString();
------ };
------ 
-------export default function FeedCard({ post }) {
------+export default function FeedCard({ post, onLikeUpdate }) {
------   const router = useRouter();
-------  
-------  // Debug: Log the media_url to see what we're receiving
-------  console.log('🎴 FeedCard received post with media_url:', post.media_url);
-------  console.log('🎴 Post data:', JSON.stringify(post, null, 2));
------+  const [isLiked, setIsLiked] = useState(post.is_liked || false);
------+  const [likesCount, setLikesCount] = useState(post.likes || 0);
------+  const [isLiking, setIsLiking] = useState(false);
------ 
------   const handleImagePress = () => {
------     router.push('/post-details');
------   };
------ 
------+  const handleLike = async () => {
------+    if (isLiking) return; // Prevent multiple clicks
------+    
------+    // Optimistic update
------+    const previousIsLiked = isLiked;
------+    const previousLikesCount = likesCount;
------+    
------+    setIsLiked(!isLiked);
------+    setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
------+    setIsLiking(true);
------+
------+    try {
------+      if (isLiked) {
------+        await unlikePost(post.id);
------+        console.log('✅ Post unliked');
------+      } else {
------+        await likePost(post.id);
------+        console.log('✅ Post liked');
------+      }
------+      
------+      // Notify parent component to refresh feed if needed
------+      if (onLikeUpdate) {
------+        onLikeUpdate(post.id, !isLiked);
------+      }
------+    } catch (error) {
------+      console.error('❌ Error toggling like:', error);
------+      // Revert optimistic update on error
------+      setIsLiked(previousIsLiked);
------+      setLikesCount(previousLikesCount);
------+    } finally {
------+      setIsLiking(false);
------+    }
------+  };
------+
------+  const handleCommentPress = () => {
------+    router.push(`/comments/${post.id}`);
------+  };
------+
------   return (
------     <View style={styles.card}>
------       {/* User Info */}
------@@ -82,17 +120,30 @@ export default function FeedCard({ post }) {
------ 
------       {/* Action Row */}
------       <View style={styles.actionRow}>
-------        <View style={styles.actionItem}>
-------          <Ionicons name="heart-outline" size={24} color="#999" />
-------          <Text style={styles.actionText}>{post.likes}</Text>
-------        </View>
-------        <View style={styles.actionItem}>
------+        <TouchableOpacity 
------+          style={styles.actionItem} 
------+          onPress={handleLike}
------+          disabled={isLiking}
------+        >
------+          <Ionicons 
------+            name={isLiked ? "heart" : "heart-outline"} 
------+            size={24} 
------+            color={isLiked ? "#FF6B6B" : "#999"} 
------+          />
------+          <Text style={[styles.actionText, isLiked && styles.likedText]}>
------+            {likesCount}
------+          </Text>
------+        </TouchableOpacity>
------+        <TouchableOpacity 
------+          style={styles.actionItem}
------+          onPress={handleCommentPress}
------+        >
------           <Ionicons name="chatbubble-outline" size={22} color="#999" />
-------          <Text style={styles.actionText}>{post.comments}</Text>
-------        </View>
------+          <Text style={styles.actionText}>{post.comments || 0}</Text>
------+        </TouchableOpacity>
------         <View style={styles.actionItem}>
------           <Ionicons name="paper-plane-outline" size={22} color="#999" />
-------          <Text style={styles.actionText}>{post.shares}</Text>
------+          <Text style={styles.actionText}>{post.shares || 0}</Text>
------         </View>
------       </View>
------ 
------@@ -221,6 +272,10 @@ const styles = StyleSheet.create({
------     color: '#666',
------     fontWeight: '500',
------   },
------+  likedText: {
------+    color: '#FF6B6B',
------+    fontWeight: 'bold',
------+  },
------   descriptionSection: {
------     marginBottom: 10,
------   },
+----@@ -1,459 +0,0 @@
+-----diff --git a/backend/static/uploads/690fa697f0c0acc2ff537eb9_test_burger.jpg b/backend/static/uploads/690fa697f0c0acc2ff537eb9_test_burger.jpg
+-----new file mode 100644
+-----index 0000000..615bb3b
+-----Binary files /dev/null and b/backend/static/uploads/690fa697f0c0acc2ff537eb9_test_burger.jpg differ
+-----diff --git a/backend/static/uploads/690fa6b2f0c0acc2ff537ebd_test_burger.jpg b/backend/static/uploads/690fa6b2f0c0acc2ff537ebd_test_burger.jpg
+-----new file mode 100644
+-----index 0000000..615bb3b
+-----Binary files /dev/null and b/backend/static/uploads/690fa6b2f0c0acc2ff537ebd_test_burger.jpg differ
+-----diff --git a/frontend/utils/api.js b/frontend/utils/api.js
+-----index 7e50be7..85ad514 100644
+-------- a/frontend/utils/api.js
+-----+++ b/frontend/utils/api.js
+-----@@ -120,11 +120,8 @@ export const addComment = async (postId, commentText) => {
+-----     const formData = new FormData();
+-----     formData.append('comment_text', commentText);
+-----     
+------    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData, {
+------      headers: {
+------        'Content-Type': 'multipart/form-data',
+------      },
+------    });
+-----+    // Don't set Content-Type manually - let axios handle it for FormData
+-----+    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData);
+-----     return response.data;
+-----   } catch (error) {
+-----     console.error('❌ Error adding comment:', error.response?.data || error.message);
 -----diff --git a/model.patch b/model.patch
------index 1711b59..cee84e0 100644
+-----index 5f9668f..e69de29 100644
 -------- a/model.patch
 -----+++ b/model.patch
------@@ -1,234 +0,0 @@
-------diff --git a/backend/server.py b/backend/server.py
-------index 570c0be..56f31f3 100644
---------- a/backend/server.py
-------+++ b/backend/server.py
-------@@ -1,4 +1,4 @@
--------from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status
-------+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form
------- from fastapi.middleware.cors import CORSMiddleware
------- from fastapi.staticfiles import StaticFiles
------- from contextlib import asynccontextmanager
-------@@ -58,9 +58,9 @@ async def root():
+-----@@ -1,366 +0,0 @@
+------diff --git a/frontend/components/FeedCard.js b/frontend/components/FeedCard.js
+------index 456515d..93c049f 100644
+--------- a/frontend/components/FeedCard.js
+------+++ b/frontend/components/FeedCard.js
+------@@ -1,9 +1,10 @@
+-------import React from 'react';
+------+import React, { useState } from 'react';
+------ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+-------import { Ionicons } from '@expo/vector-icons';
+------+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+------ import { useRouter } from 'expo-router';
+------ import MapButton from './MapButton';
+------ import { LinearGradient } from 'expo-linear-gradient';
+------+import { likePost, unlikePost } from '../utils/api';
 ------ 
------- @app.post("/api/posts/create")
------- async def create_post(
--------    rating: int,
--------    review_text: str,
--------    map_link: str = None,
-------+    rating: int = Form(...),
-------+    review_text: str = Form(...),
-------+    map_link: str = Form(None),
-------     file: UploadFile = File(...),
-------     current_user: dict = Depends(get_current_user)
------- ):
-------diff --git a/backend/static/uploads/690f9baaa82ba09cbd612b13_test_burger.jpg b/backend/static/uploads/690f9baaa82ba09cbd612b13_test_burger.jpg
-------new file mode 100644
-------index 0000000..615bb3b
-------Binary files /dev/null and b/backend/static/uploads/690f9baaa82ba09cbd612b13_test_burger.jpg differ
+------ const formatTimestamp = (timestamp) => {
+------   const now = new Date();
+------@@ -17,17 +18,54 @@ const formatTimestamp = (timestamp) => {
+------   return postDate.toLocaleDateString();
+------ };
+------ 
+-------export default function FeedCard({ post }) {
+------+export default function FeedCard({ post, onLikeUpdate }) {
+------   const router = useRouter();
+-------  
+-------  // Debug: Log the media_url to see what we're receiving
+-------  console.log('🎴 FeedCard received post with media_url:', post.media_url);
+-------  console.log('🎴 Post data:', JSON.stringify(post, null, 2));
+------+  const [isLiked, setIsLiked] = useState(post.is_liked || false);
+------+  const [likesCount, setLikesCount] = useState(post.likes || 0);
+------+  const [isLiking, setIsLiking] = useState(false);
+------ 
+------   const handleImagePress = () => {
+------     router.push('/post-details');
+------   };
+------ 
+------+  const handleLike = async () => {
+------+    if (isLiking) return; // Prevent multiple clicks
+------+    
+------+    // Optimistic update
+------+    const previousIsLiked = isLiked;
+------+    const previousLikesCount = likesCount;
+------+    
+------+    setIsLiked(!isLiked);
+------+    setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
+------+    setIsLiking(true);
+------+
+------+    try {
+------+      if (isLiked) {
+------+        await unlikePost(post.id);
+------+        console.log('✅ Post unliked');
+------+      } else {
+------+        await likePost(post.id);
+------+        console.log('✅ Post liked');
+------+      }
+------+      
+------+      // Notify parent component to refresh feed if needed
+------+      if (onLikeUpdate) {
+------+        onLikeUpdate(post.id, !isLiked);
+------+      }
+------+    } catch (error) {
+------+      console.error('❌ Error toggling like:', error);
+------+      // Revert optimistic update on error
+------+      setIsLiked(previousIsLiked);
+------+      setLikesCount(previousLikesCount);
+------+    } finally {
+------+      setIsLiking(false);
+------+    }
+------+  };
+------+
+------+  const handleCommentPress = () => {
+------+    router.push(`/comments/${post.id}`);
+------+  };
+------+
+------   return (
+------     <View style={styles.card}>
+------       {/* User Info */}
+------@@ -82,17 +120,30 @@ export default function FeedCard({ post }) {
+------ 
+------       {/* Action Row */}
+------       <View style={styles.actionRow}>
+-------        <View style={styles.actionItem}>
+-------          <Ionicons name="heart-outline" size={24} color="#999" />
+-------          <Text style={styles.actionText}>{post.likes}</Text>
+-------        </View>
+-------        <View style={styles.actionItem}>
+------+        <TouchableOpacity 
+------+          style={styles.actionItem} 
+------+          onPress={handleLike}
+------+          disabled={isLiking}
+------+        >
+------+          <Ionicons 
+------+            name={isLiked ? "heart" : "heart-outline"} 
+------+            size={24} 
+------+            color={isLiked ? "#FF6B6B" : "#999"} 
+------+          />
+------+          <Text style={[styles.actionText, isLiked && styles.likedText]}>
+------+            {likesCount}
+------+          </Text>
+------+        </TouchableOpacity>
+------+        <TouchableOpacity 
+------+          style={styles.actionItem}
+------+          onPress={handleCommentPress}
+------+        >
+------           <Ionicons name="chatbubble-outline" size={22} color="#999" />
+-------          <Text style={styles.actionText}>{post.comments}</Text>
+-------        </View>
+------+          <Text style={styles.actionText}>{post.comments || 0}</Text>
+------+        </TouchableOpacity>
+------         <View style={styles.actionItem}>
+------           <Ionicons name="paper-plane-outline" size={22} color="#999" />
+-------          <Text style={styles.actionText}>{post.shares}</Text>
+------+          <Text style={styles.actionText}>{post.shares || 0}</Text>
+------         </View>
+------       </View>
+------ 
+------@@ -221,6 +272,10 @@ const styles = StyleSheet.create({
+------     color: '#666',
+------     fontWeight: '500',
+------   },
+------+  likedText: {
+------+    color: '#FF6B6B',
+------+    fontWeight: 'bold',
+------+  },
+------   descriptionSection: {
+------     marginBottom: 10,
+------   },
 ------diff --git a/model.patch b/model.patch
-------index ee8c670..e69de29 100644
+------index 1711b59..cee84e0 100644
 --------- a/model.patch
 ------+++ b/model.patch
-------@@ -1,146 +0,0 @@
+------@@ -1,234 +0,0 @@
+-------diff --git a/backend/server.py b/backend/server.py
+-------index 570c0be..56f31f3 100644
+---------- a/backend/server.py
+-------+++ b/backend/server.py
+-------@@ -1,4 +1,4 @@
+--------from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status
+-------+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form
+------- from fastapi.middleware.cors import CORSMiddleware
+------- from fastapi.staticfiles import StaticFiles
+------- from contextlib import asynccontextmanager
+-------@@ -58,9 +58,9 @@ async def root():
+------- 
+------- @app.post("/api/posts/create")
+------- async def create_post(
+--------    rating: int,
+--------    review_text: str,
+--------    map_link: str = None,
+-------+    rating: int = Form(...),
+-------+    review_text: str = Form(...),
+-------+    map_link: str = Form(None),
+-------     file: UploadFile = File(...),
+-------     current_user: dict = Depends(get_current_user)
+------- ):
+-------diff --git a/backend/static/uploads/690f9baaa82ba09cbd612b13_test_burger.jpg b/backend/static/uploads/690f9baaa82ba09cbd612b13_test_burger.jpg
+-------new file mode 100644
+-------index 0000000..615bb3b
+-------Binary files /dev/null and b/backend/static/uploads/690f9baaa82ba09cbd612b13_test_burger.jpg differ
 -------diff --git a/model.patch b/model.patch
--------index 80f4d04..e69de29 100644
+-------index ee8c670..e69de29 100644
 ---------- a/model.patch
 -------+++ b/model.patch
--------@@ -1,46 +0,0 @@
---------diff --git a/backend/config.py b/backend/config.py
---------index 776f22d..86643de 100644
------------ a/backend/config.py
---------+++ b/backend/config.py
---------@@ -21,5 +21,6 @@ class Settings(BaseSettings):
---------     
---------     class Config:
---------         env_file = ".env"
---------+        extra = "allow"
--------- 
--------- settings = Settings()
+-------@@ -1,146 +0,0 @@
 --------diff --git a/model.patch b/model.patch
---------index 19b7d72..e69de29 100644
+--------index 80f4d04..e69de29 100644
 ----------- a/model.patch
 --------+++ b/model.patch
---------@@ -1,30 +0,0 @@
+--------@@ -1,46 +0,0 @@
+---------diff --git a/backend/config.py b/backend/config.py
+---------index 776f22d..86643de 100644
+------------ a/backend/config.py
+---------+++ b/backend/config.py
+---------@@ -21,5 +21,6 @@ class Settings(BaseSettings):
+---------     
+---------     class Config:
+---------         env_file = ".env"
+---------+        extra = "allow"
+--------- 
+--------- settings = Settings()
 ---------diff --git a/model.patch b/model.patch
----------index e97928e..e69de29 100644
+---------index 19b7d72..e69de29 100644
 ------------ a/model.patch
 ---------+++ b/model.patch
----------@@ -1,25 +0,0 @@
-----------diff --git a/frontend/app/happening.tsx b/frontend/app/happening.tsx
-----------index c6931f4..f8801a5 100644
-------------- a/frontend/app/happening.tsx
-----------+++ b/frontend/app/happening.tsx
-----------@@ -98,7 +98,7 @@ export default function HappeningScreen() {
-----------           style={styles.navButton}
-----------           onPress={() => router.push('/feed')}
-----------         >
------------          <Ionicons name="home" size={26} color="#333" />
-----------+          <Ionicons name="home-outline" size={26} color="#999" />
-----------         </TouchableOpacity>
-----------         <TouchableOpacity
-----------           style={styles.navButton}
-----------@@ -114,9 +114,9 @@ export default function HappeningScreen() {
-----------         </TouchableOpacity>
-----------         <TouchableOpacity
-----------           style={styles.navButton}
------------          onPress={() => router.push('/chat')}
-----------+          onPress={() => router.push('/happening')}
-----------         >
------------          <Ionicons name="notifications-outline" size={26} color="#999" />
-----------+          <Ionicons name="flame" size={26} color="#FF6B6B" />
-----------         </TouchableOpacity>
-----------         <TouchableOpacity
-----------           style={styles.navButton}
+---------@@ -1,30 +0,0 @@
+----------diff --git a/model.patch b/model.patch
+----------index e97928e..e69de29 100644
+------------- a/model.patch
+----------+++ b/model.patch
+----------@@ -1,25 +0,0 @@
+-----------diff --git a/frontend/app/happening.tsx b/frontend/app/happening.tsx
+-----------index c6931f4..f8801a5 100644
+-------------- a/frontend/app/happening.tsx
+-----------+++ b/frontend/app/happening.tsx
+-----------@@ -98,7 +98,7 @@ export default function HappeningScreen() {
+-----------           style={styles.navButton}
+-----------           onPress={() => router.push('/feed')}
+-----------         >
+------------          <Ionicons name="home" size={26} color="#333" />
+-----------+          <Ionicons name="home-outline" size={26} color="#999" />
+-----------         </TouchableOpacity>
+-----------         <TouchableOpacity
+-----------           style={styles.navButton}
+-----------@@ -114,9 +114,9 @@ export default function HappeningScreen() {
+-----------         </TouchableOpacity>
+-----------         <TouchableOpacity
+-----------           style={styles.navButton}
+------------          onPress={() => router.push('/chat')}
+-----------+          onPress={() => router.push('/happening')}
+-----------         >
+------------          <Ionicons name="notifications-outline" size={26} color="#999" />
+-----------+          <Ionicons name="flame" size={26} color="#FF6B6B" />
+-----------         </TouchableOpacity>
+-----------         <TouchableOpacity
+-----------           style={styles.navButton}
+--------diff --git a/test_result.md b/test_result.md
+--------index 187cba4..3411fb9 100644
+----------- a/test_result.md
+--------+++ b/test_result.md
+--------@@ -100,4 +100,87 @@
+-------- 
+-------- #====================================================================================================
+-------- # Testing Data - Main Agent and testing sub agent both should log testing data below this section
+---------#====================================================================================================
+--------\ No newline at end of file
+--------+#====================================================================================================
+--------+
+--------+user_problem_statement: "Test the authentication flow: signup, login, and protected endpoint access"
+--------+
+--------+backend:
+--------+  - task: "User Signup API"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "/app/backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "POST /api/auth/signup working correctly. Successfully creates user with full_name, email, password. Returns access_token and token_type. Properly handles duplicate email registration with 400 error."
+--------+
+--------+  - task: "User Login API"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "/app/backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "POST /api/auth/login working correctly. Uses OAuth2PasswordRequestForm with username/password form data. Returns access_token and token_type. Properly rejects invalid credentials with 401 error."
+--------+
+--------+  - task: "Protected User Profile API"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "/app/backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "GET /api/auth/me working correctly. Requires Bearer token authentication. Returns complete user profile including id, full_name, email, points, level, etc. Properly blocks unauthorized access with 401 error."
+--------+
+--------+  - task: "JWT Token Authentication"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "/app/backend/utils/jwt.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "JWT token creation and verification working correctly. Tokens are properly signed and validated. Access tokens have appropriate expiration time."
+--------+
+--------+  - task: "Password Hashing"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "/app/backend/utils/hashing.py"
+--------+    stuck_count: 0
+--------+    priority: "medium"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "Password hashing using bcrypt working correctly. Passwords are properly hashed during signup and verified during login."
+--------+
+--------+frontend:
+--------+  # No frontend testing performed as per instructions
+--------+
+--------+metadata:
+--------+  created_by: "testing_agent"
+--------+  version: "1.0"
+--------+  test_sequence: 1
+--------+  run_ui: false
+--------+
+--------+test_plan:
+--------+  current_focus:
+--------+    - "Authentication flow complete"
+--------+  stuck_tasks: []
+--------+  test_all: false
+--------+  test_priority: "high_first"
+--------+
+--------+agent_communication:
+--------+    - agent: "testing"
+--------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+--------\ No newline at end of file
 -------diff --git a/test_result.md b/test_result.md
--------index 187cba4..3411fb9 100644
+-------index 3411fb9..23ab0fa 100644
 ---------- a/test_result.md
 -------+++ b/test_result.md
--------@@ -100,4 +100,87 @@
+-------@@ -181,6 +181,48 @@ test_plan:
+-------   test_all: false
+-------   test_priority: "high_first"
 ------- 
-------- #====================================================================================================
-------- # Testing Data - Main Agent and testing sub agent both should log testing data below this section
---------#====================================================================================================
--------\ No newline at end of file
--------+#====================================================================================================
--------+
--------+user_problem_statement: "Test the authentication flow: signup, login, and protected endpoint access"
--------+
--------+backend:
--------+  - task: "User Signup API"
+-------+  - task: "Post Creation API"
 -------+    implemented: true
 -------+    working: true
--------+    file: "/app/backend/routers/auth.py"
+-------+    file: "/app/backend/server.py"
 -------+    stuck_count: 0
 -------+    priority: "high"
 -------+    needs_retesting: false
 -------+    status_history:
 -------+        - working: true
 -------+          agent: "testing"
--------+          comment: "POST /api/auth/signup working correctly. Successfully creates user with full_name, email, password. Returns access_token and token_type. Properly handles duplicate email registration with 400 error."
+-------+          comment: "POST /api/posts/create working correctly after fixing Form parameter issue. Successfully creates posts with multipart form data including rating, review_text, map_link, and file upload. Returns post_id and updates user points/level. Authentication required and working properly."
 -------+
--------+  - task: "User Login API"
+-------+  - task: "Feed API"
 -------+    implemented: true
 -------+    working: true
--------+    file: "/app/backend/routers/auth.py"
+-------+    file: "/app/backend/server.py"
 -------+    stuck_count: 0
 -------+    priority: "high"
 -------+    needs_retesting: false
 -------+    status_history:
 -------+        - working: true
 -------+          agent: "testing"
--------+          comment: "POST /api/auth/login working correctly. Uses OAuth2PasswordRequestForm with username/password form data. Returns access_token and token_type. Properly rejects invalid credentials with 401 error."
--------+
--------+  - task: "Protected User Profile API"
--------+    implemented: true
--------+    working: true
--------+    file: "/app/backend/routers/auth.py"
--------+    stuck_count: 0
--------+    priority: "high"
--------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "GET /api/auth/me working correctly. Requires Bearer token authentication. Returns complete user profile including id, full_name, email, points, level, etc. Properly blocks unauthorized access with 401 error."
--------+
--------+  - task: "JWT Token Authentication"
--------+    implemented: true
--------+    working: true
--------+    file: "/app/backend/utils/jwt.py"
--------+    stuck_count: 0
--------+    priority: "high"
--------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "JWT token creation and verification working correctly. Tokens are properly signed and validated. Access tokens have appropriate expiration time."
--------+
--------+  - task: "Password Hashing"
--------+    implemented: true
--------+    working: true
--------+    file: "/app/backend/utils/hashing.py"
--------+    stuck_count: 0
--------+    priority: "medium"
--------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "Password hashing using bcrypt working correctly. Passwords are properly hashed during signup and verified during login."
+-------+          comment: "GET /api/feed working correctly. Successfully retrieves posts with pagination support (skip/limit). Returns complete post data including user info, media details, ratings, and timestamps. Test post created and verified in feed."
 -------+
 -------+frontend:
 -------+  # No frontend testing performed as per instructions
@@ -451,311 +708,354 @@ index 8e07966..e69de29 100644
 -------+metadata:
 -------+  created_by: "testing_agent"
 -------+  version: "1.0"
--------+  test_sequence: 1
+-------+  test_sequence: 2
 -------+  run_ui: false
 -------+
 -------+test_plan:
 -------+  current_focus:
--------+    - "Authentication flow complete"
+-------+    - "Post creation and feed functionality complete"
 -------+  stuck_tasks: []
 -------+  test_all: false
 -------+  test_priority: "high_first"
 -------+
--------+agent_communication:
--------+    - agent: "testing"
--------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+------- agent_communication:
+-------     - agent: "testing"
+--------      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
 -------\ No newline at end of file
-------diff --git a/test_result.md b/test_result.md
-------index 3411fb9..23ab0fa 100644
---------- a/test_result.md
-------+++ b/test_result.md
-------@@ -181,6 +181,48 @@ test_plan:
-------   test_all: false
-------   test_priority: "high_first"
------- 
-------+  - task: "Post Creation API"
-------+    implemented: true
-------+    working: true
-------+    file: "/app/backend/server.py"
-------+    stuck_count: 0
-------+    priority: "high"
-------+    needs_retesting: false
-------+    status_history:
-------+        - working: true
-------+          agent: "testing"
-------+          comment: "POST /api/posts/create working correctly after fixing Form parameter issue. Successfully creates posts with multipart form data including rating, review_text, map_link, and file upload. Returns post_id and updates user points/level. Authentication required and working properly."
-------+
-------+  - task: "Feed API"
-------+    implemented: true
-------+    working: true
-------+    file: "/app/backend/server.py"
-------+    stuck_count: 0
-------+    priority: "high"
-------+    needs_retesting: false
-------+    status_history:
-------+        - working: true
-------+          agent: "testing"
-------+          comment: "GET /api/feed working correctly. Successfully retrieves posts with pagination support (skip/limit). Returns complete post data including user info, media details, ratings, and timestamps. Test post created and verified in feed."
-------+
-------+frontend:
-------+  # No frontend testing performed as per instructions
-------+
-------+metadata:
-------+  created_by: "testing_agent"
-------+  version: "1.0"
-------+  test_sequence: 2
-------+  run_ui: false
-------+
-------+test_plan:
-------+  current_focus:
-------+    - "Post creation and feed functionality complete"
-------+  stuck_tasks: []
-------+  test_all: false
-------+  test_priority: "high_first"
-------+
------- agent_communication:
-------     - agent: "testing"
--------      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
-------\ No newline at end of file
-------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
-------+    - agent: "testing"
-------+      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
-------\ No newline at end of file
+-------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+-------+    - agent: "testing"
+-------+      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
+-------\ No newline at end of file
+-----diff --git a/test_result.md b/test_result.md
+-----index 23ab0fa..8e7b9c5 100644
+-------- a/test_result.md
+-----+++ b/test_result.md
+-----@@ -203,7 +203,31 @@ test_plan:
+-----     status_history:
+-----         - working: true
+-----           agent: "testing"
+------          comment: "GET /api/feed working correctly. Successfully retrieves posts with pagination support (skip/limit). Returns complete post data including user info, media details, ratings, and timestamps. Test post created and verified in feed."
+-----+          comment: "GET /api/feed working correctly. Successfully retrieves posts with pagination support (skip/limit). Returns complete post data including user info, media details, ratings, and timestamps. Test post created and verified in feed. Updated: Feed now requires authentication (Bearer token) which is working correctly."
+-----+
+-----+  - task: "Comment Creation API"
+-----+    implemented: true
+-----+    working: true
+-----+    file: "/app/backend/server.py"
+-----+    stuck_count: 0
+-----+    priority: "high"
+-----+    needs_retesting: false
+-----+    status_history:
+-----+        - working: true
+-----+          agent: "testing"
+-----+          comment: "POST /api/posts/{post_id}/comment working correctly. Successfully adds comments using multipart/form-data with comment_text parameter. Requires Bearer token authentication. Returns comment_id and updates post comments_count. Tested with post ID 690fa2cc8a6be6239d38e7e5."
+-----+
+-----+  - task: "Get Comments API"
+-----+    implemented: true
+-----+    working: true
+-----+    file: "/app/backend/server.py"
+-----+    stuck_count: 0
+-----+    priority: "high"
+-----+    needs_retesting: false
+-----+    status_history:
+-----+        - working: true
+-----+          agent: "testing"
+-----+          comment: "GET /api/posts/{post_id}/comments working correctly. Successfully retrieves all comments for a post sorted by created_at descending. No authentication required. Returns complete comment data including user info, comment text, and timestamps."
+----- 
+----- frontend:
+-----   # No frontend testing performed as per instructions
+-----@@ -211,12 +235,12 @@ frontend:
+----- metadata:
+-----   created_by: "testing_agent"
+-----   version: "1.0"
+------  test_sequence: 2
+-----+  test_sequence: 3
+-----   run_ui: false
+----- 
+----- test_plan:
+-----   current_focus:
+------    - "Post creation and feed functionality complete"
+-----+    - "Comment endpoints testing complete"
+-----   stuck_tasks: []
+-----   test_all: false
+-----   test_priority: "high_first"
+-----@@ -225,4 +249,6 @@ agent_communication:
+-----     - agent: "testing"
+-----       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+-----     - agent: "testing"
+------      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
+-----\ No newline at end of file
+-----+      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
+-----+    - agent: "testing"
+-----+      message: "Completed comment endpoints testing as requested in review. Both POST /api/posts/{post_id}/comment and GET /api/posts/{post_id}/comments are working correctly. Comment creation requires Bearer token authentication and accepts multipart/form-data with comment_text parameter. Get comments endpoint works without authentication. Successfully tested with post ID 690fa2cc8a6be6239d38e7e5. All comment functionality is working as expected."
+-----\ No newline at end of file
 ----diff --git a/test_result.md b/test_result.md
-----index 23ab0fa..8e7b9c5 100644
+----index 4f72737..a3217c5 100644
 ------- a/test_result.md
 ----+++ b/test_result.md
-----@@ -203,7 +203,31 @@ test_plan:
-----     status_history:
-----         - working: true
-----           agent: "testing"
------          comment: "GET /api/feed working correctly. Successfully retrieves posts with pagination support (skip/limit). Returns complete post data including user info, media details, ratings, and timestamps. Test post created and verified in feed."
-----+          comment: "GET /api/feed working correctly. Successfully retrieves posts with pagination support (skip/limit). Returns complete post data including user info, media details, ratings, and timestamps. Test post created and verified in feed. Updated: Feed now requires authentication (Bearer token) which is working correctly."
-----+
-----+  - task: "Comment Creation API"
-----+    implemented: true
-----+    working: true
-----+    file: "/app/backend/server.py"
-----+    stuck_count: 0
-----+    priority: "high"
-----+    needs_retesting: false
-----+    status_history:
-----+        - working: true
-----+          agent: "testing"
-----+          comment: "POST /api/posts/{post_id}/comment working correctly. Successfully adds comments using multipart/form-data with comment_text parameter. Requires Bearer token authentication. Returns comment_id and updates post comments_count. Tested with post ID 690fa2cc8a6be6239d38e7e5."
-----+
-----+  - task: "Get Comments API"
-----+    implemented: true
-----+    working: true
-----+    file: "/app/backend/server.py"
-----+    stuck_count: 0
-----+    priority: "high"
-----+    needs_retesting: false
-----+    status_history:
-----+        - working: true
-----+          agent: "testing"
-----+          comment: "GET /api/posts/{post_id}/comments working correctly. Successfully retrieves all comments for a post sorted by created_at descending. No authentication required. Returns complete comment data including user info, comment text, and timestamps."
----- 
----- frontend:
-----   # No frontend testing performed as per instructions
-----@@ -211,12 +235,12 @@ frontend:
+----@@ -235,105 +235,121 @@ frontend:
 ---- metadata:
 ----   created_by: "testing_agent"
 ----   version: "1.0"
------  test_sequence: 2
-----+  test_sequence: 3
+-----  test_sequence: 3
+----+  test_sequence: 4
 ----   run_ui: false
 ---- 
 ---- test_plan:
 ----   current_focus:
------    - "Post creation and feed functionality complete"
-----+    - "Comment endpoints testing complete"
-----   stuck_tasks: []
-----   test_all: false
-----   test_priority: "high_first"
-----@@ -225,4 +249,6 @@ agent_communication:
+-----    - "Like Post API"
+-----    - "Unlike Post API"
+-----    - "Explore Trending Posts API"
+-----    - "Explore Top Rated Posts API"
+-----    - "Explore Reviewers API"
+----     - "Explore Categories API"
+-----    - "Static File Serving"
+-----  stuck_tasks: []
+-----  test_all: true
+-----  test_priority: "high_first"
+----+  stuck_tasks:
+----+    - "Explore Categories API"
+----+  test_all: false
+----+  test_priority: "stuck_first"
+---- 
+----   - task: "Like Post API"
+----     implemented: true
+-----    working: "NA"
+----+    working: true
+----     file: "/app/backend/server.py"
+----     stuck_count: 0
+----     priority: "high"
+-----    needs_retesting: true
+----+    needs_retesting: false
+----     status_history:
+----         - working: "NA"
+----           agent: "main"
+----           comment: "POST /api/posts/{post_id}/like endpoint implemented. Needs testing to verify like toggling, authentication requirement, and response format."
+----+        - working: true
+----+          agent: "testing"
+----+          comment: "POST /api/posts/{post_id}/like working correctly. Successfully likes posts with Bearer token authentication. Returns proper success message. Handles duplicate likes appropriately with 400 error. Increments likes_count in database."
+---- 
+----   - task: "Unlike Post API"
+----     implemented: true
+-----    working: "NA"
+----+    working: true
+----     file: "/app/backend/server.py"
+----     stuck_count: 0
+----     priority: "high"
+-----    needs_retesting: true
+----+    needs_retesting: false
+----     status_history:
+----         - working: "NA"
+----           agent: "main"
+----           comment: "POST /api/posts/{post_id}/unlike endpoint implemented. Needs testing to verify unlike functionality and authentication."
+----+        - working: true
+----+          agent: "testing"
+----+          comment: "DELETE /api/posts/{post_id}/like working correctly (note: uses DELETE method, not POST). Successfully unlikes posts with Bearer token authentication. Returns proper success message. Handles missing likes appropriately with 400 error. Decrements likes_count in database."
+---- 
+----   - task: "Explore Trending Posts API"
+----     implemented: true
+-----    working: "NA"
+----+    working: true
+----     file: "/app/backend/server.py"
+----     stuck_count: 0
+----     priority: "high"
+-----    needs_retesting: true
+----+    needs_retesting: false
+----     status_history:
+----         - working: "NA"
+----           agent: "main"
+----           comment: "GET /api/explore/trending endpoint implemented. Should return posts sorted by recent activity. Needs validation for data structure and image_url consistency."
+----+        - working: true
+----+          agent: "testing"
+----+          comment: "GET /api/explore/trending working correctly. Returns posts sorted by likes_count, rating, and created_at. Requires Bearer token authentication. Returns complete post data with correct image_url format (/api/static/uploads/). Includes user info, like status, and all required fields."
+---- 
+----   - task: "Explore Top Rated Posts API"
+----     implemented: true
+-----    working: "NA"
+----+    working: true
+----     file: "/app/backend/server.py"
+----     stuck_count: 0
+----     priority: "high"
+-----    needs_retesting: true
+----+    needs_retesting: false
+----     status_history:
+----         - working: "NA"
+----           agent: "main"
+----           comment: "GET /api/explore/top-rated endpoint implemented. Should return posts sorted by rating. Needs validation for data structure and image_url consistency."
+----+        - working: true
+----+          agent: "testing"
+----+          comment: "GET /api/explore/top-rated working correctly. Returns posts with rating >= 8 sorted by rating and likes_count. Requires Bearer token authentication. Returns complete post data with correct image_url format (/api/static/uploads/). All returned posts have rating >= 8 as expected."
+---- 
+----   - task: "Explore Reviewers API"
+----     implemented: true
+-----    working: "NA"
+----+    working: true
+----     file: "/app/backend/server.py"
+----     stuck_count: 0
+----     priority: "medium"
+-----    needs_retesting: true
+----+    needs_retesting: false
+----     status_history:
+----         - working: "NA"
+----           agent: "main"
+----           comment: "GET /api/explore/reviewers endpoint implemented. Should return top users by points. Needs validation for data structure."
+----+        - working: true
+----+          agent: "testing"
+----+          comment: "GET /api/explore/reviewers working correctly. Returns users sorted by level and points. No authentication required. Returns complete user data including username, level, points, posts_count, and followers_count. Successfully retrieved 4 reviewers with proper data structure."
+---- 
+----   - task: "Explore Categories API"
+-----    implemented: true
+-----    working: "NA"
+----+    implemented: false
+----+    working: false
+----     file: "/app/backend/server.py"
+-----    stuck_count: 0
+----+    stuck_count: 1
+----     priority: "medium"
+-----    needs_retesting: true
+----+    needs_retesting: false
+----     status_history:
+----         - working: "NA"
+----           agent: "main"
+----           comment: "GET /api/explore/categories endpoint implemented. Should return categories with post counts. Needs validation."
+----+        - working: false
+----+          agent: "testing"
+----+          comment: "GET /api/explore/categories endpoint NOT IMPLEMENTED in server.py. Returns 404 error. The endpoint is missing from the backend implementation. Main agent needs to implement this endpoint to return categories with post counts."
+---- 
+----   - task: "Static File Serving"
+----     implemented: true
+-----    working: "NA"
+----+    working: true
+----     file: "/app/backend/server.py"
+----     stuck_count: 0
+----     priority: "high"
+-----    needs_retesting: true
+----+    needs_retesting: false
+----     status_history:
+----         - working: "NA"
+----           agent: "main"
+----           comment: "Static files mounted at /api/static for serving uploaded images. Image URLs should follow format /api/static/uploads/{filename}. Needs validation that images are accessible."
+----+        - working: true
+----+          agent: "testing"
+----+          comment: "Static file serving working correctly. Files are accessible at /api/static/uploads/{filename} format. Successfully tested with uploaded image from post creation. Static files are properly mounted and served with correct content-type headers."
+---- 
+---- agent_communication:
 ----     - agent: "testing"
-----       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+----@@ -343,4 +359,6 @@ agent_communication:
 ----     - agent: "testing"
------      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
+----       message: "Completed comment endpoints testing as requested in review. Both POST /api/posts/{post_id}/comment and GET /api/posts/{post_id}/comments are working correctly. Comment creation requires Bearer token authentication and accepts multipart/form-data with comment_text parameter. Get comments endpoint works without authentication. Successfully tested with post ID 690fa2cc8a6be6239d38e7e5. All comment functionality is working as expected."
+----     - agent: "main"
+-----      message: "Added new backend tasks for comprehensive testing: Like/Unlike endpoints, all Explore endpoints (trending, top-rated, reviewers, categories), and static file serving. User wants to validate all endpoints work correctly with proper image URLs, authentication, and data consistency. Focus on ensuring feed -> comments flow is stable. Testing priority: authentication > feed/posts > comments > likes > explore endpoints > static files."
 ----\ No newline at end of file
-----+      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
+----+      message: "Added new backend tasks for comprehensive testing: Like/Unlike endpoints, all Explore endpoints (trending, top-rated, reviewers, categories), and static file serving. User wants to validate all endpoints work correctly with proper image URLs, authentication, and data consistency. Focus on ensuring feed -> comments flow is stable. Testing priority: authentication > feed/posts > comments > likes > explore endpoints > static files."
 ----+    - agent: "testing"
-----+      message: "Completed comment endpoints testing as requested in review. Both POST /api/posts/{post_id}/comment and GET /api/posts/{post_id}/comments are working correctly. Comment creation requires Bearer token authentication and accepts multipart/form-data with comment_text parameter. Get comments endpoint works without authentication. Successfully tested with post ID 690fa2cc8a6be6239d38e7e5. All comment functionality is working as expected."
+----+      message: "COMPREHENSIVE BACKEND TESTING COMPLETE: Tested all requested endpoints with 92.3% success rate (12/13 tests passed). ✅ WORKING: Authentication (signup/login/me), Post Creation, Feed API, Comments (add/get), Like/Unlike Posts, Explore Trending, Explore Top-Rated, Explore Reviewers, Static File Serving. ❌ FAILED: Explore Categories API (endpoint not implemented - returns 404). All image URLs use correct /api/static/uploads/ format. Authentication tokens work consistently across all protected endpoints. Like counts update correctly. Static files are accessible. Only missing endpoint is GET /api/explore/categories which needs implementation."
 ----\ No newline at end of file
----diff --git a/test_result.md b/test_result.md
----index 4f72737..a3217c5 100644
------- a/test_result.md
----+++ b/test_result.md
----@@ -235,105 +235,121 @@ frontend:
---- metadata:
----   created_by: "testing_agent"
----   version: "1.0"
-----  test_sequence: 3
----+  test_sequence: 4
----   run_ui: false
---- 
---- test_plan:
----   current_focus:
-----    - "Like Post API"
-----    - "Unlike Post API"
-----    - "Explore Trending Posts API"
-----    - "Explore Top Rated Posts API"
-----    - "Explore Reviewers API"
----     - "Explore Categories API"
-----    - "Static File Serving"
-----  stuck_tasks: []
-----  test_all: true
-----  test_priority: "high_first"
----+  stuck_tasks:
----+    - "Explore Categories API"
----+  test_all: false
----+  test_priority: "stuck_first"
---- 
----   - task: "Like Post API"
----     implemented: true
-----    working: "NA"
----+    working: true
----     file: "/app/backend/server.py"
----     stuck_count: 0
----     priority: "high"
-----    needs_retesting: true
----+    needs_retesting: false
----     status_history:
----         - working: "NA"
----           agent: "main"
----           comment: "POST /api/posts/{post_id}/like endpoint implemented. Needs testing to verify like toggling, authentication requirement, and response format."
----+        - working: true
----+          agent: "testing"
----+          comment: "POST /api/posts/{post_id}/like working correctly. Successfully likes posts with Bearer token authentication. Returns proper success message. Handles duplicate likes appropriately with 400 error. Increments likes_count in database."
---- 
----   - task: "Unlike Post API"
----     implemented: true
-----    working: "NA"
----+    working: true
----     file: "/app/backend/server.py"
----     stuck_count: 0
----     priority: "high"
-----    needs_retesting: true
----+    needs_retesting: false
----     status_history:
----         - working: "NA"
----           agent: "main"
----           comment: "POST /api/posts/{post_id}/unlike endpoint implemented. Needs testing to verify unlike functionality and authentication."
----+        - working: true
----+          agent: "testing"
----+          comment: "DELETE /api/posts/{post_id}/like working correctly (note: uses DELETE method, not POST). Successfully unlikes posts with Bearer token authentication. Returns proper success message. Handles missing likes appropriately with 400 error. Decrements likes_count in database."
---- 
----   - task: "Explore Trending Posts API"
----     implemented: true
-----    working: "NA"
----+    working: true
----     file: "/app/backend/server.py"
----     stuck_count: 0
----     priority: "high"
-----    needs_retesting: true
----+    needs_retesting: false
----     status_history:
----         - working: "NA"
----           agent: "main"
----           comment: "GET /api/explore/trending endpoint implemented. Should return posts sorted by recent activity. Needs validation for data structure and image_url consistency."
----+        - working: true
----+          agent: "testing"
----+          comment: "GET /api/explore/trending working correctly. Returns posts sorted by likes_count, rating, and created_at. Requires Bearer token authentication. Returns complete post data with correct image_url format (/api/static/uploads/). Includes user info, like status, and all required fields."
---- 
----   - task: "Explore Top Rated Posts API"
----     implemented: true
-----    working: "NA"
----+    working: true
----     file: "/app/backend/server.py"
----     stuck_count: 0
----     priority: "high"
-----    needs_retesting: true
----+    needs_retesting: false
----     status_history:
----         - working: "NA"
----           agent: "main"
----           comment: "GET /api/explore/top-rated endpoint implemented. Should return posts sorted by rating. Needs validation for data structure and image_url consistency."
----+        - working: true
----+          agent: "testing"
----+          comment: "GET /api/explore/top-rated working correctly. Returns posts with rating >= 8 sorted by rating and likes_count. Requires Bearer token authentication. Returns complete post data with correct image_url format (/api/static/uploads/). All returned posts have rating >= 8 as expected."
---- 
----   - task: "Explore Reviewers API"
----     implemented: true
-----    working: "NA"
----+    working: true
----     file: "/app/backend/server.py"
----     stuck_count: 0
----     priority: "medium"
-----    needs_retesting: true
----+    needs_retesting: false
----     status_history:
----         - working: "NA"
----           agent: "main"
----           comment: "GET /api/explore/reviewers endpoint implemented. Should return top users by points. Needs validation for data structure."
----+        - working: true
----+          agent: "testing"
----+          comment: "GET /api/explore/reviewers working correctly. Returns users sorted by level and points. No authentication required. Returns complete user data including username, level, points, posts_count, and followers_count. Successfully retrieved 4 reviewers with proper data structure."
---- 
----   - task: "Explore Categories API"
-----    implemented: true
-----    working: "NA"
----+    implemented: false
----+    working: false
----     file: "/app/backend/server.py"
-----    stuck_count: 0
----+    stuck_count: 1
----     priority: "medium"
-----    needs_retesting: true
----+    needs_retesting: false
----     status_history:
----         - working: "NA"
----           agent: "main"
----           comment: "GET /api/explore/categories endpoint implemented. Should return categories with post counts. Needs validation."
----+        - working: false
----+          agent: "testing"
----+          comment: "GET /api/explore/categories endpoint NOT IMPLEMENTED in server.py. Returns 404 error. The endpoint is missing from the backend implementation. Main agent needs to implement this endpoint to return categories with post counts."
---- 
----   - task: "Static File Serving"
----     implemented: true
-----    working: "NA"
----+    working: true
----     file: "/app/backend/server.py"
----     stuck_count: 0
----     priority: "high"
-----    needs_retesting: true
----+    needs_retesting: false
----     status_history:
----         - working: "NA"
----           agent: "main"
----           comment: "Static files mounted at /api/static for serving uploaded images. Image URLs should follow format /api/static/uploads/{filename}. Needs validation that images are accessible."
----+        - working: true
----+          agent: "testing"
----+          comment: "Static file serving working correctly. Files are accessible at /api/static/uploads/{filename} format. Successfully tested with uploaded image from post creation. Static files are properly mounted and served with correct content-type headers."
---- 
---- agent_communication:
----     - agent: "testing"
----@@ -343,4 +359,6 @@ agent_communication:
----     - agent: "testing"
----       message: "Completed comment endpoints testing as requested in review. Both POST /api/posts/{post_id}/comment and GET /api/posts/{post_id}/comments are working correctly. Comment creation requires Bearer token authentication and accepts multipart/form-data with comment_text parameter. Get comments endpoint works without authentication. Successfully tested with post ID 690fa2cc8a6be6239d38e7e5. All comment functionality is working as expected."
----     - agent: "main"
-----      message: "Added new backend tasks for comprehensive testing: Like/Unlike endpoints, all Explore endpoints (trending, top-rated, reviewers, categories), and static file serving. User wants to validate all endpoints work correctly with proper image URLs, authentication, and data consistency. Focus on ensuring feed -> comments flow is stable. Testing priority: authentication > feed/posts > comments > likes > explore endpoints > static files."
----\ No newline at end of file
----+      message: "Added new backend tasks for comprehensive testing: Like/Unlike endpoints, all Explore endpoints (trending, top-rated, reviewers, categories), and static file serving. User wants to validate all endpoints work correctly with proper image URLs, authentication, and data consistency. Focus on ensuring feed -> comments flow is stable. Testing priority: authentication > feed/posts > comments > likes > explore endpoints > static files."
----+    - agent: "testing"
----+      message: "COMPREHENSIVE BACKEND TESTING COMPLETE: Tested all requested endpoints with 92.3% success rate (12/13 tests passed). ✅ WORKING: Authentication (signup/login/me), Post Creation, Feed API, Comments (add/get), Like/Unlike Posts, Explore Trending, Explore Top-Rated, Explore Reviewers, Static File Serving. ❌ FAILED: Explore Categories API (endpoint not implemented - returns 404). All image URLs use correct /api/static/uploads/ format. Authentication tokens work consistently across all protected endpoints. Like counts update correctly. Static files are accessible. Only missing endpoint is GET /api/explore/categories which needs implementation."
----\ No newline at end of file
+-diff --git a/test_result.md b/test_result.md
+-index 5447dd6..709e66c 100644
+---- a/test_result.md
+-+++ b/test_result.md
+-@@ -361,4 +361,6 @@ agent_communication:
+-     - agent: "main"
+-       message: "Added new backend tasks for comprehensive testing: Like/Unlike endpoints, all Explore endpoints (trending, top-rated, reviewers, categories), and static file serving. User wants to validate all endpoints work correctly with proper image URLs, authentication, and data consistency. Focus on ensuring feed -> comments flow is stable. Testing priority: authentication > feed/posts > comments > likes > explore endpoints > static files."
+-     - agent: "testing"
+--      message: "COMPREHENSIVE BACKEND TESTING COMPLETE: Tested all requested endpoints with 92.3% success rate (12/13 tests passed). ✅ WORKING: Authentication (signup/login/me), Post Creation, Feed API, Comments (add/get), Like/Unlike Posts, Explore Trending, Explore Top-Rated, Explore Reviewers, Static File Serving. ❌ FAILED: Explore Categories API (endpoint not implemented - returns 404). All image URLs use correct /api/static/uploads/ format. Authentication tokens work consistently across all protected endpoints. Like counts update correctly. Static files are accessible. Only missing endpoint is GET /api/explore/categories which needs implementation."
+-\ No newline at end of file
+-+      message: "COMPREHENSIVE BACKEND TESTING COMPLETE: Tested all requested endpoints with 92.3% success rate (12/13 tests passed). ✅ WORKING: Authentication (signup/login/me), Post Creation, Feed API, Comments (add/get), Like/Unlike Posts, Explore Trending, Explore Top-Rated, Explore Reviewers, Static File Serving. ❌ FAILED: Explore Categories API (endpoint not implemented - returns 404). All image URLs use correct /api/static/uploads/ format. Authentication tokens work consistently across all protected endpoints. Like counts update correctly. Static files are accessible. Only missing endpoint is GET /api/explore/categories which needs implementation."
+-+    - agent: "main"
+-+      message: "Implemented complete Level & Points System with dynamic level progression, level-based point awards, carry-over points, level-up modal with animations, progress bars on profile, and level/title display on feed cards. Changes: Backend: New level table (12 levels, 3 titles), updated user schema, modified post creation endpoint to calculate level-ups with carry-over, feed endpoint now returns user_level and user_title. Frontend: LevelUpModal component with confetti animation, profile page showing progress bar, FeedCard displaying level & title badges, add-post screen triggers level-up modal. Ready for backend testing."
+-\ No newline at end of file
 diff --git a/test_result.md b/test_result.md
-index 5447dd6..709e66c 100644
+index 709e66c..c0034d2 100644
 --- a/test_result.md
 +++ b/test_result.md
-@@ -361,4 +361,6 @@ agent_communication:
-     - agent: "main"
-       message: "Added new backend tasks for comprehensive testing: Like/Unlike endpoints, all Explore endpoints (trending, top-rated, reviewers, categories), and static file serving. User wants to validate all endpoints work correctly with proper image URLs, authentication, and data consistency. Focus on ensuring feed -> comments flow is stable. Testing priority: authentication > feed/posts > comments > likes > explore endpoints > static files."
+@@ -165,6 +165,66 @@ backend:
+           agent: "testing"
+           comment: "Password hashing using bcrypt working correctly. Passwords are properly hashed during signup and verified during login."
+ 
++  - task: "Level & Points System - Signup Default Values"
++    implemented: true
++    working: true
++    file: "/app/backend/routers/auth.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++        - working: true
++          agent: "testing"
++          comment: "New user signup correctly sets default level & points values: level=1, currentPoints=0, requiredPoints=1250, title='Reviewer'. All default values are properly initialized in user document."
++
++  - task: "Level & Points System - Post Creation Points Award"
++    implemented: true
++    working: true
++    file: "/app/backend/server.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++        - working: true
++          agent: "testing"
++          comment: "POST /api/posts/create correctly awards points based on user level. Level 1 users receive 25 points per post. Response includes all required fields: leveledUp, newLevel, newTitle, pointsEarned, currentPoints, requiredPoints."
++
++  - task: "Level & Points System - Level-Up Logic with Carry-Over"
++    implemented: true
++    working: true
++    file: "/app/backend/utils/level_system.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++        - working: true
++          agent: "testing"
++          comment: "Level-up logic working correctly with proper carry-over points. When user reaches required points (1250 for Level 1), they level up to Level 2 with excess points carried over. New requiredPoints correctly set to 2500 for Level 2."
++
++  - task: "Level & Points System - Auth Me Endpoint Fields"
++    implemented: true
++    working: true
++    file: "/app/backend/routers/auth.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++        - working: true
++          agent: "testing"
++          comment: "GET /api/auth/me correctly returns all new level fields: level, currentPoints, requiredPoints, title. All fields have proper data types and valid values within expected ranges."
++
++  - task: "Level & Points System - Feed Endpoint Level Fields"
++    implemented: true
++    working: true
++    file: "/app/backend/server.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++        - working: true
++          agent: "testing"
++          comment: "GET /api/feed correctly includes user_level and user_title fields for each post. Fields contain valid level numbers (≥1) and valid titles ('Reviewer', 'Top Reviewer', 'Influencer')."
++
+ frontend:
+   # No frontend testing performed as per instructions
+ 
+@@ -240,11 +300,11 @@ metadata:
+ 
+ test_plan:
+   current_focus:
+-    - "Explore Categories API"
++    - "Level & Points System Testing Complete"
+   stuck_tasks:
+     - "Explore Categories API"
+   test_all: false
+-  test_priority: "stuck_first"
++  test_priority: "high_first"
+ 
+   - task: "Like Post API"
+     implemented: true
+@@ -363,4 +423,6 @@ agent_communication:
      - agent: "testing"
--      message: "COMPREHENSIVE BACKEND TESTING COMPLETE: Tested all requested endpoints with 92.3% success rate (12/13 tests passed). ✅ WORKING: Authentication (signup/login/me), Post Creation, Feed API, Comments (add/get), Like/Unlike Posts, Explore Trending, Explore Top-Rated, Explore Reviewers, Static File Serving. ❌ FAILED: Explore Categories API (endpoint not implemented - returns 404). All image URLs use correct /api/static/uploads/ format. Authentication tokens work consistently across all protected endpoints. Like counts update correctly. Static files are accessible. Only missing endpoint is GET /api/explore/categories which needs implementation."
+       message: "COMPREHENSIVE BACKEND TESTING COMPLETE: Tested all requested endpoints with 92.3% success rate (12/13 tests passed). ✅ WORKING: Authentication (signup/login/me), Post Creation, Feed API, Comments (add/get), Like/Unlike Posts, Explore Trending, Explore Top-Rated, Explore Reviewers, Static File Serving. ❌ FAILED: Explore Categories API (endpoint not implemented - returns 404). All image URLs use correct /api/static/uploads/ format. Authentication tokens work consistently across all protected endpoints. Like counts update correctly. Static files are accessible. Only missing endpoint is GET /api/explore/categories which needs implementation."
+     - agent: "main"
+-      message: "Implemented complete Level & Points System with dynamic level progression, level-based point awards, carry-over points, level-up modal with animations, progress bars on profile, and level/title display on feed cards. Changes: Backend: New level table (12 levels, 3 titles), updated user schema, modified post creation endpoint to calculate level-ups with carry-over, feed endpoint now returns user_level and user_title. Frontend: LevelUpModal component with confetti animation, profile page showing progress bar, FeedCard displaying level & title badges, add-post screen triggers level-up modal. Ready for backend testing."
 \ No newline at end of file
-+      message: "COMPREHENSIVE BACKEND TESTING COMPLETE: Tested all requested endpoints with 92.3% success rate (12/13 tests passed). ✅ WORKING: Authentication (signup/login/me), Post Creation, Feed API, Comments (add/get), Like/Unlike Posts, Explore Trending, Explore Top-Rated, Explore Reviewers, Static File Serving. ❌ FAILED: Explore Categories API (endpoint not implemented - returns 404). All image URLs use correct /api/static/uploads/ format. Authentication tokens work consistently across all protected endpoints. Like counts update correctly. Static files are accessible. Only missing endpoint is GET /api/explore/categories which needs implementation."
-+    - agent: "main"
 +      message: "Implemented complete Level & Points System with dynamic level progression, level-based point awards, carry-over points, level-up modal with animations, progress bars on profile, and level/title display on feed cards. Changes: Backend: New level table (12 levels, 3 titles), updated user schema, modified post creation endpoint to calculate level-ups with carry-over, feed endpoint now returns user_level and user_title. Frontend: LevelUpModal component with confetti animation, profile page showing progress bar, FeedCard displaying level & title badges, add-post screen triggers level-up modal. Ready for backend testing."
++    - agent: "testing"
++      message: "LEVEL & POINTS SYSTEM TESTING COMPLETE: All 5 tests passed with 100% success rate! ✅ WORKING: Signup Default Values (level=1, currentPoints=0, requiredPoints=1250, title='Reviewer'), Post Creation Points Award (25 points for Level 1), Level-Up Logic with carry-over points (Level 1→2 with proper point carryover), Auth Me Endpoint (returns all level fields), Feed Endpoint Level Fields (includes user_level and user_title). The complete level system is functioning correctly with proper point calculations, level progression, and carry-over mechanics. Backend implementation is solid and ready for production use."
 \ No newline at end of file
