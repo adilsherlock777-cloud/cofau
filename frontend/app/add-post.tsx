@@ -181,16 +181,26 @@ export default function AddPostScreen() {
 
       setLoading(false);
 
-      // Show success message and redirect
-      if (Platform.OS === 'web') {
-        window.alert('Post Submitted Successfully! 🎉');
-        router.push('/feed');
+      // Check if user leveled up
+      if (result.leveledUp) {
+        console.log('🎉 User leveled up!', result);
+        setLevelUpData({
+          level: result.newLevel,
+          title: result.newTitle,
+        });
+        setShowLevelUpModal(true);
       } else {
-        Alert.alert(
-          'Success!',
-          'Your post has been submitted successfully! 🎉',
-          [{ text: 'OK', onPress: () => router.push('/feed') }]
-        );
+        // Show success message and redirect
+        if (Platform.OS === 'web') {
+          window.alert('Post Submitted Successfully! 🎉');
+          router.push('/feed');
+        } else {
+          Alert.alert(
+            'Success!',
+            'Your post has been submitted successfully! 🎉',
+            [{ text: 'OK', onPress: () => router.push('/feed') }]
+          );
+        }
       }
     } catch (error) {
       console.error('❌ Error creating post:', error);
