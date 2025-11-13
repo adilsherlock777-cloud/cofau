@@ -17,6 +17,7 @@ from routers.notifications import router as notifications_router, create_notific
 from routers.follow import router as follow_router
 from routers.profile_picture import router as profile_picture_router
 from routers.stories import router as stories_router
+from routers.locations import router as locations_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
