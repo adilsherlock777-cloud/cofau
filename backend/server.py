@@ -60,6 +60,7 @@ app.include_router(notifications_router)
 app.include_router(follow_router)
 app.include_router(profile_picture_router)
 app.include_router(stories_router)
+app.include_router(locations_router)
 
 @app.get("/api")
 async def root():
