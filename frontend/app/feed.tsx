@@ -24,11 +24,12 @@ const API_URL = `${API_BASE_URL}/api`;
 
 export default function FeedScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [feedPosts, setFeedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Dummy data for reviewers - can be fetched from backend later
   const reviewers = [
