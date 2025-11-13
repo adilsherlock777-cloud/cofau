@@ -24,10 +24,14 @@ async def get_top_locations(
     try:
         db = get_database()
         
+        print("🔍 Fetching top locations...")
+        
         # Fetch all posts with non-empty locations
         posts = await db.posts.find({
             "location": {"$exists": True, "$ne": None, "$ne": ""}
         }).to_list(None)
+        
+        print(f"📊 Found {len(posts)} posts with locations")
         
         # Group posts by location
         location_data = defaultdict(lambda: {"uploads": 0, "images": [], "posts": []})
@@ -50,6 +54,8 @@ async def get_top_locations(
             # Store post ID
             location_data[location]["posts"].append(str(post["_id"]))
         
+        print(f"📍 Grouped into {len(location_data)} unique locations")
+        
         # Convert to list and sort by uploads (descending)
         top_locations = [
             {
@@ -65,10 +71,17 @@ async def get_top_locations(
         top_locations.sort(key=lambda x: x["uploads"], reverse=True)
         
         # Return top N locations
-        return top_locations[:limit]
+        result = top_locations[:limit]
+        print(f"✅ Returning {len(result)} top locations")
+        for loc in result:
+            print(f"   - {loc['location']}: {loc['uploads']} uploads, {len(loc['images'])} images")
+        
+        return result
     
     except Exception as e:
         print(f"❌ Error fetching top locations: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
