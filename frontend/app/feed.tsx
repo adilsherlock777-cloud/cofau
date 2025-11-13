@@ -43,7 +43,25 @@ export default function FeedScreen() {
 
   useEffect(() => {
     fetchFeed();
+    loadUnreadCount();
   }, []);
+
+  // Reload unread count when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUnreadCount();
+    }, [token])
+  );
+
+  const loadUnreadCount = async () => {
+    if (!token) return;
+    try {
+      const count = await fetchUnreadCount(token);
+      setUnreadCount(count);
+    } catch (error) {
+      console.error('❌ Error loading unread count:', error);
+    }
+  };
 
   const fetchFeed = async () => {
     try {
