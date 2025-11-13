@@ -14,6 +14,44 @@ LEVEL_TABLE = [
     {"level": 12, "required_points": 12000, "title": "Influencer"},
 ]
 
+def get_level_from_total_points(total_points: int) -> dict:
+    """
+    Calculate user level from TOTAL points accumulated.
+    User starts at Level 1 and levels up when crossing thresholds.
+    
+    Args:
+        total_points: Total accumulated points
+        
+    Returns:
+        dict with level, required_points for next level, title
+    """
+    # Start at Level 1 by default
+    current_level = 1
+    current_title = "Reviewer"
+    required_for_next = 1250
+    
+    # Find the highest level where total_points >= required_points
+    for level_data in LEVEL_TABLE:
+        if total_points >= level_data["required_points"]:
+            current_level = level_data["level"] + 1  # They've passed this level
+            current_title = level_data["title"]
+    
+    # Cap at Level 12
+    if current_level > 12:
+        current_level = 12
+        current_title = "Influencer"
+        required_for_next = 12000  # Max
+    else:
+        # Get required points for NEXT level
+        if current_level <= 12:
+            required_for_next = LEVEL_TABLE[current_level - 1]["required_points"]
+    
+    return {
+        "level": current_level,
+        "title": current_title,
+        "requiredPoints": required_for_next,
+    }
+
 def get_level_data(level: int) -> dict:
     """
     Get level data for a specific level.
@@ -45,74 +83,59 @@ def calculateUserLevelAfterPost(user: dict) -> dict:
     Handles level-up with carry-over points.
     
     Args:
-        user: Current user dict with level, currentPoints, requiredPoints
+        user: Current user dict with level, currentPoints, total_points
         
     Returns:
         dict with:
         - level: New level
-        - currentPoints: New current points (after carry-over)
+        - currentPoints: New current points (points towards NEXT level)
         - requiredPoints: Points required for next level
         - title: New title
         - leveledUp: Boolean indicating if user leveled up
         - pointsEarned: Points earned from this post
+        - total_points: Total accumulated points
     """
     current_level = user.get("level", 1)
-    current_points = user.get("currentPoints", 0)
+    total_points = user.get("total_points", 0)
     
     # Award points based on current level
     points_earned = get_points_for_level(current_level)
-    new_total_points = current_points + points_earned
+    new_total_points = total_points + points_earned
     
-    # Check if level-up is needed
-    leveled_up = False
-    new_level = current_level
+    # Calculate level from total points
+    level_info = get_level_from_total_points(new_total_points)
+    new_level = level_info["level"]
     
-    # Get current level data
-    level_data = get_level_data(current_level)
-    required_points = level_data["required_points"]
+    # Determine if leveled up
+    leveled_up = new_level > current_level
     
-    # Handle level-up (can level up multiple times if enough points)
-    while new_total_points >= required_points and new_level < 12:
-        # Level up
-        leveled_up = True
-        new_level += 1
-        
-        # Carry over extra points
-        new_total_points = new_total_points - required_points
-        
-        # Get next level data
-        level_data = get_level_data(new_level)
-        required_points = level_data["required_points"]
-    
-    # Get final level data
-    final_level_data = get_level_data(new_level)
+    # Calculate currentPoints (progress towards NEXT level)
+    # This is: total_points - threshold_for_current_level
+    if new_level > 1:
+        threshold_for_current = LEVEL_TABLE[new_level - 2]["required_points"]
+        current_points = new_total_points - threshold_for_current
+    else:
+        current_points = new_total_points
     
     return {
         "level": new_level,
-        "currentPoints": new_total_points,
-        "requiredPoints": final_level_data["required_points"],
-        "title": final_level_data["title"],
+        "currentPoints": current_points,
+        "requiredPoints": level_info["requiredPoints"],
+        "title": level_info["title"],
         "leveledUp": leveled_up,
-        "pointsEarned": points_earned
+        "pointsEarned": points_earned,
+        "total_points": new_total_points,
     }
 
 def calculate_level(points: int) -> dict:
     """
-    DEPRECATED: Use calculateUserLevelAfterPost instead.
+    DEPRECATED: Use get_level_from_total_points instead.
     This function is kept for backward compatibility.
     """
-    # Find current level based on total points
-    current_level = 1
-    for i in range(len(LEVEL_TABLE) - 1, -1, -1):
-        if points >= LEVEL_TABLE[i]["required_points"]:
-            current_level = LEVEL_TABLE[i]["level"]
-            break
-    
-    level_data = get_level_data(current_level)
-    
+    level_info = get_level_from_total_points(points)
     return {
-        "level": current_level,
-        "badge": level_data["title"],
+        "level": level_info["level"],
+        "badge": level_info["title"],
         "points": points
     }
 

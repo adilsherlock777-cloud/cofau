@@ -3,12 +3,12 @@ import { View, Text, StyleSheet } from 'react-native';
 
 /**
  * LevelBadge Component
- * Displays a circular badge with level number
+ * Small circular badge showing level number
  * Positioned at bottom-right of profile picture
- * Color-coded by level band
+ * Matches Instagram notification badge style
  */
-export default function LevelBadge({ level, size = 'medium' }) {
-  if (!level) return null;
+export default function LevelBadge({ level, size = 'small' }) {
+  if (!level || level < 1) return null;
 
   // Determine badge color based on level band
   const getBadgeColor = (level) => {
@@ -18,26 +18,32 @@ export default function LevelBadge({ level, size = 'medium' }) {
     return '#4CAF50'; // Default
   };
 
-  // Size configurations
+  // Size configurations - kept small like Instagram badges
   const sizeConfig = {
     small: {
-      container: 18,
-      fontSize: 10,
+      container: 16,
+      fontSize: 9,
       borderWidth: 1.5,
+      bottom: 0,
+      right: 0,
     },
     medium: {
-      container: 22,
-      fontSize: 11,
+      container: 20,
+      fontSize: 10,
       borderWidth: 2,
+      bottom: 2,
+      right: 2,
     },
     large: {
-      container: 28,
-      fontSize: 13,
-      borderWidth: 2.5,
+      container: 24,
+      fontSize: 11,
+      borderWidth: 2,
+      bottom: 2,
+      right: 2,
     },
   };
 
-  const config = sizeConfig[size] || sizeConfig.medium;
+  const config = sizeConfig[size] || sizeConfig.small;
   const badgeColor = getBadgeColor(level);
 
   return (
@@ -50,6 +56,8 @@ export default function LevelBadge({ level, size = 'medium' }) {
           borderRadius: config.container / 2,
           backgroundColor: badgeColor,
           borderWidth: config.borderWidth,
+          bottom: config.bottom,
+          right: config.right,
         },
       ]}
     >
@@ -63,16 +71,14 @@ export default function LevelBadge({ level, size = 'medium' }) {
 const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
     justifyContent: 'center',
     alignItems: 'center',
     borderColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 3,
     zIndex: 10,
   },
   levelText: {
