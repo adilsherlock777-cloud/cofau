@@ -410,14 +410,37 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Edit Profile Button */}
-        <TouchableOpacity 
-          style={styles.editButton}
-          onPress={() => setEditModalVisible(true)}
-        >
-          <Ionicons name="pencil" size={20} color="#fff" />
-          <Text style={styles.editButtonText}>Edit Profile</Text>
-        </TouchableOpacity>
+        {/* Edit Profile / Follow Button */}
+        {isOwnProfile ? (
+          <TouchableOpacity 
+            style={styles.editButton}
+            onPress={() => setEditModalVisible(true)}
+          >
+            <Ionicons name="pencil" size={20} color="#fff" />
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.editButton, isFollowing ? styles.followingButton : styles.followButton]}
+            onPress={handleFollowToggle}
+            disabled={followLoading}
+          >
+            {followLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons 
+                  name={isFollowing ? "checkmark" : "person-add"} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.editButtonText}>
+                  {isFollowing ? "Following" : "Follow"}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Bio Section */}
         <View style={styles.bioSection}>
