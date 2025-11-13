@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getComments, addComment } from '../../utils/api';
+import UserAvatar from '../../components/UserAvatar';
 
 export default function CommentsScreen() {
   const router = useRouter();
