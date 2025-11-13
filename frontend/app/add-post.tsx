@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { createPost } from '../utils/api';
 import LevelUpModal from '../components/LevelUpModal';
+import { useLevelAnimation } from '../context/LevelContext';
 
 export default function AddPostScreen() {
   const router = useRouter();
