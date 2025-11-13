@@ -181,16 +181,19 @@ export default function AddPostScreen() {
 
       setLoading(false);
 
-      // Check if user leveled up
-      if (result.leveledUp) {
-        console.log('🎉 User leveled up!', result);
-        setLevelUpData({
-          level: result.newLevel,
-          title: result.newTitle,
-        });
-        setShowLevelUpModal(true);
+      // Check if user leveled up (only for levels 1-4)
+      if (result.leveledUp && result.newLevel >= 1 && result.newLevel <= 4) {
+        console.log('🎉 User leveled up to Level', result.newLevel);
+        
+        // Trigger level-up animation
+        showLevelUpAnimation(result.newLevel);
+        
+        // Navigate to feed after animation completes (2.5s + buffer)
+        setTimeout(() => {
+          router.push('/feed');
+        }, 3000);
       } else {
-        // Show success message and redirect
+        // Show success message and redirect immediately
         if (Platform.OS === 'web') {
           window.alert('Post Submitted Successfully! 🎉');
           router.push('/feed');
