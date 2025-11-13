@@ -334,11 +334,17 @@ async def add_comment(post_id: str, comment_text: str = Form(...), current_user:
     """Add a comment to a post"""
     db = get_database()
     
+    # Get post to find owner
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
     comment_doc = {
         "post_id": post_id,
         "user_id": str(current_user["_id"]),
         "username": current_user["full_name"],
         "profile_pic": current_user.get("profile_picture"),
+        "level": current_user.get("level", 1),
         "comment_text": comment_text,
         "created_at": datetime.utcnow()
     }
@@ -349,6 +355,15 @@ async def add_comment(post_id: str, comment_text: str = Form(...), current_user:
     await db.posts.update_one(
         {"_id": ObjectId(post_id)},
         {"$inc": {"comments_count": 1}}
+    )
+    
+    # Create notification for post owner
+    await create_notification(
+        db=db,
+        notification_type="comment",
+        from_user_id=str(current_user["_id"]),
+        to_user_id=post["user_id"],
+        post_id=post_id
     )
     
     return {"message": "Comment added", "comment_id": str(result.inserted_id)}
