@@ -3,6 +3,8 @@ import { SafeAreaView } from "react-native-safe-area-context"; // ✅ changed im
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Platform } from "react-native";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { LevelProvider } from "../context/LevelContext";
+import LevelUpAnimation from "../components/LevelUpAnimation";
 import { useEffect } from "react";
 
 function RootLayoutNav() {
