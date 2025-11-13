@@ -18,7 +18,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload")
 async def upload_story(
     file: UploadFile = File(...),
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -80,7 +80,7 @@ async def upload_story(
 
 @router.get("/feed")
 async def get_stories_feed(
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -157,7 +157,7 @@ async def get_stories_feed(
 @router.get("/user/{user_id}")
 async def get_user_stories(
     user_id: str,
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -206,7 +206,7 @@ async def get_user_stories(
 @router.delete("/{story_id}")
 async def delete_story(
     story_id: str,
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -243,7 +243,7 @@ async def delete_story(
 
 @router.delete("/expired/cleanup")
 async def cleanup_expired_stories(
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
