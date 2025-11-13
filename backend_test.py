@@ -16,11 +16,8 @@ BACKEND_URL = "https://cofau-app.preview.emergentagent.com/api"
 class LevelPointsSystemTester:
     def __init__(self):
         self.base_url = BACKEND_URL
-        self.auth_token = None
-        self.test_user_email = "foodie_reviewer_2024@example.com"
-        self.test_user_password = "SecurePass123!"
-        self.test_user_name = "Foodie Reviewer"
-        self.test_post_id = None
+        self.access_token = None
+        self.user_id = None
         self.test_results = []
         
     def log_result(self, test_name, success, details, response_data=None):
