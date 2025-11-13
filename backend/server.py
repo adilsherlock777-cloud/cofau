@@ -53,6 +53,8 @@ app.mount("/api/static", StaticFiles(directory=static_dir), name="static")
 
 # Include routers
 app.include_router(auth_router)
+app.include_router(notifications_router)
+app.include_router(follow_router)
 
 @app.get("/api")
 async def root():
