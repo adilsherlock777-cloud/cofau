@@ -300,7 +300,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Level & Points System Testing Complete"
+    - "Comprehensive End-to-End Testing Complete"
   stuck_tasks:
     - "Explore Categories API"
   test_all: false
