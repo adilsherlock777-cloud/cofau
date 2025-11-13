@@ -183,29 +183,30 @@ export default function ProfileScreen() {
     
     setFollowLoading(true);
     const previousFollowState = isFollowing;
+    const previousFollowerCount = userStats?.followers_count || 0;
     
     // Optimistic UI update
     setIsFollowing(!isFollowing);
+    setUserStats(prev => ({
+      ...prev,
+      followers_count: isFollowing ? previousFollowerCount - 1 : previousFollowerCount + 1
+    }));
     
     try {
-      if (isFollowing) {
-        // Unfollow
-        await axios.delete(`${API_URL}/users/${userData.id}/follow`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        // Follow
-        await axios.post(`${API_URL}/users/${userData.id}/follow`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      }
+      const endpoint = isFollowing ? 'unfollow' : 'follow';
+      await axios.post(`${API_URL}/users/${userData.id}/${endpoint}`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       
-      // Refresh follow status to ensure consistency
-      await fetchFollowStatus();
+      console.log(`✅ ${isFollowing ? 'Unfollowed' : 'Followed'} successfully`);
     } catch (err) {
       console.error('❌ Error toggling follow:', err);
       // Revert optimistic update on error
       setIsFollowing(previousFollowState);
+      setUserStats(prev => ({
+        ...prev,
+        followers_count: previousFollowerCount
+      }));
       Alert.alert('Error', 'Failed to update follow status. Please try again.');
     } finally {
       setFollowLoading(false);
