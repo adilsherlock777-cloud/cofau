@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  levelSection: {
+  progressSection: {
     backgroundColor: '#f8f9fa',
     marginHorizontal: 20,
     marginBottom: 20,
@@ -674,37 +674,21 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
 
-  levelHeader: {
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
 
-  levelBadgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  levelNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#667eea',
-  },
-
-  levelTitle: {
+  progressLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    color: '#333',
   },
 
-  levelPoints: {
-    fontSize: 14,
+  progressPoints: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#999',
   },
