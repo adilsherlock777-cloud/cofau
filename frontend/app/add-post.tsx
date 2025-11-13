@@ -382,6 +382,17 @@ export default function AddPostScreen() {
           <Ionicons name="person-outline" size={28} color="#000" />
         </TouchableOpacity>
       </View>
+
+      {/* Level Up Modal */}
+      <LevelUpModal
+        visible={showLevelUpModal}
+        level={levelUpData.level}
+        title={levelUpData.title}
+        onClose={() => {
+          setShowLevelUpModal(false);
+          router.push('/feed');
+        }}
+      />
     </View>
   );
 }
