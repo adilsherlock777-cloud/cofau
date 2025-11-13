@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import MapButton from './MapButton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { likePost, unlikePost } from '../utils/api';
+import LevelBadge from './LevelBadge';
 
 const formatTimestamp = (timestamp) => {
   const now = new Date();
