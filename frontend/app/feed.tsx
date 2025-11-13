@@ -153,11 +153,13 @@ export default function FeedScreen() {
         {user && (
           <View style={styles.userSection}>
             <View style={styles.userHeader}>
-              <View style={styles.avatarLarge}>
-                <Text style={styles.avatarLetter}>
-                  {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
-                </Text>
-              </View>
+              <UserAvatar
+                profilePicture={user.profile_picture}
+                username={user.full_name || user.username}
+                size={50}
+                level={user.level}
+                showLevelBadge={true}
+              />
               <View style={styles.userInfo}>
                 <Text style={styles.userNameText}>{user.full_name}</Text>
                 <View style={styles.levelRow}>
