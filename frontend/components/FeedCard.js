@@ -26,7 +26,7 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const [isLiking, setIsLiking] = useState(false);
 
   const handleImagePress = () => {
-    router.push('/post-details');
+    router.push(`/post-details/${post.id}`);
   };
 
   const handleLike = async () => {
