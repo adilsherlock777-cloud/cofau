@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Comprehensive End-to-End Backend Testing for Cofau App
-Tests the complete user journey as specified in the review request.
+Comprehensive Notifications System Testing
+Tests the complete notifications flow end-to-end as requested.
 """
 
 import requests
@@ -10,11 +10,10 @@ import time
 import os
 from datetime import datetime
 
-# Configuration
+# Base URL from environment
 BASE_URL = "https://foodsocial-app.preview.emergentagent.com/api"
-TIMEOUT = 30
 
-class CofauTester:
+class NotificationsTestSuite:
     def __init__(self):
         self.session = requests.Session()
         self.session.timeout = TIMEOUT
