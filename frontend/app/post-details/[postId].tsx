@@ -382,15 +382,13 @@ export default function PostDetailsScreen() {
 
       {/* Add Comment Input Bar */}
       <View style={styles.commentInputContainer}>
-        <View style={styles.currentUserAvatar}>
-          {user?.profile_picture ? (
-            <Image source={{ uri: user.profile_picture }} style={styles.currentUserAvatarImage} />
-          ) : (
-            <Text style={styles.currentUserAvatarLetter}>
-              {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
-            </Text>
-          )}
-        </View>
+        <UserAvatar
+          profilePicture={user?.profile_picture}
+          username={user?.full_name || user?.username}
+          size={32}
+          showLevelBadge={false}
+          style={{ marginRight: 12 }}
+        />
         
         <TextInput
           style={styles.commentInput}
