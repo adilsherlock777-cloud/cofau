@@ -107,6 +107,7 @@ async def create_post(
     }
     
     result = await db.posts.insert_one(post_doc)
+    post_id = str(result.inserted_id)
     
     # Calculate new level and points using the new system
     level_update = calculateUserLevelAfterPost(current_user)
@@ -124,10 +125,21 @@ async def create_post(
         }}
     )
     
+    # Notify all followers about new post
+    followers = await db.follows.find({"following_id": str(current_user["_id"])}).to_list(None)
+    for follow in followers:
+        await create_notification(
+            db=db,
+            notification_type="new_post",
+            from_user_id=str(current_user["_id"]),
+            to_user_id=follow["follower_id"],
+            post_id=post_id
+        )
+    
     # Return response with level-up info
     return {
         "message": "Post created successfully",
-        "post_id": str(result.inserted_id),
+        "post_id": post_id,
         "leveledUp": level_update["leveledUp"],
         "newLevel": level_update["level"],
         "newTitle": level_update["title"],
