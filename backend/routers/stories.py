@@ -206,13 +206,13 @@ async def get_user_stories(
 @router.delete("/{story_id}")
 async def delete_story(
     story_id: str,
-    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
     Delete a story (only owner can delete)
     """
     try:
+        db = get_database()
         # Find story
         story = await db.stories.find_one({"_id": ObjectId(story_id)})
         if not story:
