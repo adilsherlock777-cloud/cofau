@@ -105,10 +105,12 @@ async def create_post(
     # Calculate new level and points using the new system
     level_update = calculateUserLevelAfterPost(current_user)
     
-    # Update user in database
+    # Update user in database with total_points and level info
     await db.users.update_one(
         {"_id": current_user["_id"]},
         {"$set": {
+            "total_points": level_update["total_points"],
+            "points": level_update["total_points"],  # Keep in sync for backward compatibility
             "level": level_update["level"],
             "currentPoints": level_update["currentPoints"],
             "requiredPoints": level_update["requiredPoints"],
