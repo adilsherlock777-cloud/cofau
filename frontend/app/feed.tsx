@@ -212,6 +212,9 @@ export default function FeedScreen() {
         {/* Stories Bar */}
         <StoriesBar />
 
+        {/* Happening Places */}
+        <HappeningPlaces />
+
         {/* Loading State */}
         {loading && (
           <View style={styles.loadingContainer}>
