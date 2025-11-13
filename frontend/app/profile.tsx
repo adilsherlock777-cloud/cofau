@@ -542,12 +542,11 @@ export default function ProfileScreen() {
         {/* Profile Identity Section */}
         <View style={styles.identitySection}>
           <View style={styles.profilePictureContainer}>
-            <UserAvatar
+            <ProfileBadge
               profilePicture={userData.profile_picture}
               username={userData.full_name || userData.username}
-              size={100}
-              level={userData.level}
-              showLevelBadge={true}
+              level={userData.level || 1}
+              dpSize={110}
             />
             {isOwnProfile && (
               <TouchableOpacity 
