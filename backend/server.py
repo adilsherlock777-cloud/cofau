@@ -218,45 +218,76 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
 
 @app.get("/api/feed")
 async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
-    """Get feed posts with full image URLs"""
+    """Get feed posts with full image URLs and normalized fields"""
     db = get_database()
     
     posts = await db.posts.find().sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
     result = []
     for post in posts:
-        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        # Normalize post ID - handle different field names
+        post_id = str(post.get("_id", ""))
+        if not post_id:
+            print(f"⚠️ Skipping post without _id: {post}")
+            continue
+        
+        # Normalize user ID - handle different field names
+        user_id = post.get("user_id") or post.get("ownerId") or post.get("owner_id") or post.get("userId")
+        if not user_id:
+            print(f"⚠️ Skipping post {post_id} without user_id")
+            continue
+        
+        user = await db.users.find_one({"_id": ObjectId(user_id)}) if user_id else None
         
         # Check if current user liked this post
         is_liked = await db.likes.find_one({
-            "post_id": str(post["_id"]),
+            "post_id": post_id,
             "user_id": str(current_user["_id"])
         }) is not None
         
-        # Construct full image URL
-        media_url = post.get("media_url", "")
-        # If media_url is a relative path, keep it as is (already has /api/static/uploads/...)
-        # The frontend will prepend the domain
+        # Normalize image URL - handle different field names
+        media_url = (
+            post.get("media_url") or 
+            post.get("image_url") or 
+            post.get("image") or 
+            post.get("thumbnail") or 
+            ""
+        )
         image_url = media_url
         
+        # Skip posts without images
+        if not image_url:
+            print(f"⚠️ Skipping post {post_id} without image")
+            continue
+        
+        # Normalize likes and comments counts
+        likes_count = post.get("likes_count", 0)
+        if likes_count is None:
+            likes_count = 0
+            
+        comments_count = post.get("comments_count", 0)
+        if comments_count is None:
+            comments_count = 0
+        
         result.append({
-            "id": str(post["_id"]),
-            "user_id": post["user_id"],
-            "username": user["full_name"] if user else "Unknown",
+            "id": post_id,  # Always string, never None
+            "user_id": user_id,  # Always present, never None
+            "username": user["full_name"] if user else "Unknown User",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "user_badge": user.get("badge") if user else None,
             "user_level": user.get("level", 1) if user else 1,
             "user_title": user.get("title", "Reviewer") if user else "Reviewer",
             "media_url": media_url,
-            "image_url": image_url,  # Add explicit image_url field
-            "media_type": post["media_type"],
-            "rating": post["rating"],
-            "review_text": post["review_text"],
+            "image_url": image_url,  # Always present, never None
+            "media_type": post.get("media_type", "image"),
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
-            "likes_count": post["likes_count"],
-            "comments_count": post["comments_count"],
-            "is_liked_by_user": is_liked,
-            "created_at": post["created_at"]
+            "likes_count": likes_count,  # Always number, never None
+            "comments_count": comments_count,  # Always number, never None
+            "is_liked_by_user": is_liked,  # Always boolean
+            "is_liked": is_liked,  # Alias for compatibility
+            "created_at": post.get("created_at", datetime.utcnow())
         })
     
     return result
