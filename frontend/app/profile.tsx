@@ -744,6 +744,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  followButton: {
+    backgroundColor: '#4dd0e1',
+  },
+
+  followingButton: {
+    backgroundColor: '#28a745',
+  },
+
   editButtonText: {
     color: '#fff',
     fontSize: 16,
