@@ -20,636 +20,419 @@ class LevelPointsSystemTester:
         self.user_id = None
         self.test_results = []
         
-    def log_result(self, test_name, success, details, response_data=None):
+    def log_test(self, test_name, success, details=""):
         """Log test results"""
-        result = {
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        self.test_results.append({
             "test": test_name,
             "success": success,
-            "details": details,
-            "timestamp": datetime.now().isoformat()
-        }
-        if response_data:
-            result["response_sample"] = response_data
-        self.test_results.append(result)
+            "details": details
+        })
+    
+    def create_test_image(self):
+        """Create a temporary test image file"""
+        # Create a simple test image (1x1 pixel PNG)
+        png_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82'
         
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} {test_name}: {details}")
-        if response_data and not success:
-            print(f"   Response: {json.dumps(response_data, indent=2)}")
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        temp_file.write(png_data)
+        temp_file.close()
+        return temp_file.name
     
-    def test_auth_signup(self):
-        """Test user signup endpoint"""
+    def test_signup_default_values(self):
+        """Test 1: Verify new users get default level & points values"""
         try:
-            payload = {
-                "full_name": self.test_user_name,
-                "email": self.test_user_email,
-                "password": self.test_user_password
+            # Create unique test user
+            timestamp = str(int(datetime.now().timestamp()))
+            test_email = f"leveltest_{timestamp}@test.com"
+            
+            signup_data = {
+                "full_name": "Level Test User",
+                "email": test_email,
+                "password": "testpass123"
             }
             
-            response = requests.post(f"{self.base_url}/auth/signup", json=payload)
+            response = requests.post(f"{self.base_url}/auth/signup", json=signup_data)
             
             if response.status_code == 200:
                 data = response.json()
-                if "access_token" in data:
-                    self.auth_token = data["access_token"]
-                    self.log_result("User Signup API", True, 
-                                  f"Successfully created user. Token received: {data['token_type']}", 
-                                  {"status_code": 200, "has_token": True})
-                    return True
+                self.access_token = data["access_token"]
+                
+                # Get user profile to verify default values
+                headers = {"Authorization": f"Bearer {self.access_token}"}
+                me_response = requests.get(f"{self.base_url}/auth/me", headers=headers)
+                
+                if me_response.status_code == 200:
+                    user_data = me_response.json()
+                    self.user_id = user_data["id"]
+                    
+                    # Verify default values
+                    expected_defaults = {
+                        "level": 1,
+                        "currentPoints": 0,
+                        "requiredPoints": 1250,
+                        "title": "Reviewer"
+                    }
+                    
+                    all_correct = True
+                    details = []
+                    
+                    for key, expected_value in expected_defaults.items():
+                        actual_value = user_data.get(key)
+                        if actual_value != expected_value:
+                            all_correct = False
+                            details.append(f"{key}: expected {expected_value}, got {actual_value}")
+                        else:
+                            details.append(f"{key}: {actual_value} ✓")
+                    
+                    self.log_test("Signup Default Values", all_correct, "; ".join(details))
+                    return all_correct
                 else:
-                    self.log_result("User Signup API", False, 
-                                  "No access token in response", data)
+                    self.log_test("Signup Default Values", False, f"Failed to get user profile: {me_response.status_code}")
                     return False
-            elif response.status_code == 400 and "already registered" in response.text.lower():
-                # User already exists, try login instead
-                self.log_result("User Signup API", True, 
-                              "User already exists (expected for repeat tests)", 
-                              {"status_code": 400, "message": "User exists"})
-                return self.test_auth_login()
             else:
-                self.log_result("User Signup API", False, 
-                              f"Unexpected status code: {response.status_code}", 
-                              response.json() if response.content else None)
+                self.log_test("Signup Default Values", False, f"Signup failed: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
-            self.log_result("User Signup API", False, f"Exception: {str(e)}")
+            self.log_test("Signup Default Values", False, f"Exception: {str(e)}")
             return False
     
-    def test_auth_login(self):
-        """Test user login endpoint"""
+    def test_post_creation_points_award(self):
+        """Test 2: Test post creation and verify points are awarded based on level"""
         try:
-            # OAuth2PasswordRequestForm expects form data, not JSON
-            payload = {
-                "username": self.test_user_email,
-                "password": self.test_user_password
-            }
-            
-            response = requests.post(f"{self.base_url}/auth/login", data=payload)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "access_token" in data:
-                    self.auth_token = data["access_token"]
-                    self.log_result("User Login API", True, 
-                                  f"Successfully logged in. Token type: {data['token_type']}", 
-                                  {"status_code": 200, "token_type": data["token_type"]})
-                    return True
-                else:
-                    self.log_result("User Login API", False, 
-                                  "No access token in response", data)
-                    return False
-            else:
-                self.log_result("User Login API", False, 
-                              f"Login failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
+            if not self.access_token:
+                self.log_test("Post Creation Points Award", False, "No access token available")
                 return False
+            
+            headers = {"Authorization": f"Bearer {self.access_token}"}
+            
+            # Create test image
+            image_path = self.create_test_image()
+            
+            try:
+                # Create post with multipart form data
+                with open(image_path, 'rb') as img_file:
+                    files = {'file': ('test_image.png', img_file, 'image/png')}
+                    data = {
+                        'rating': 9,
+                        'review_text': 'Amazing coffee shop! Perfect atmosphere for work and great espresso.',
+                        'map_link': 'https://maps.google.com/?q=Starbucks+Times+Square'
+                    }
+                    
+                    response = requests.post(f"{self.base_url}/posts/create", 
+                                           headers=headers, files=files, data=data)
+                
+                if response.status_code == 200:
+                    post_data = response.json()
+                    
+                    # Verify response structure and values
+                    expected_fields = ["message", "post_id", "leveledUp", "newLevel", "newTitle", 
+                                     "pointsEarned", "currentPoints", "requiredPoints"]
+                    
+                    missing_fields = [field for field in expected_fields if field not in post_data]
+                    
+                    if missing_fields:
+                        self.log_test("Post Creation Points Award", False, 
+                                    f"Missing fields in response: {missing_fields}")
+                        return False
+                    
+                    # Verify Level 1 user gets 25 points
+                    if post_data["pointsEarned"] != 25:
+                        self.log_test("Post Creation Points Award", False, 
+                                    f"Expected 25 points for Level 1, got {post_data['pointsEarned']}")
+                        return False
+                    
+                    # Verify level and title
+                    if post_data["newLevel"] != 1 or post_data["newTitle"] != "Reviewer":
+                        self.log_test("Post Creation Points Award", False, 
+                                    f"Unexpected level/title: {post_data['newLevel']}/{post_data['newTitle']}")
+                        return False
+                    
+                    # Verify current points (should be 25 now)
+                    if post_data["currentPoints"] != 25:
+                        self.log_test("Post Creation Points Award", False, 
+                                    f"Expected currentPoints to be 25, got {post_data['currentPoints']}")
+                        return False
+                    
+                    details = f"Points earned: {post_data['pointsEarned']}, Current: {post_data['currentPoints']}, Level: {post_data['newLevel']}"
+                    self.log_test("Post Creation Points Award", True, details)
+                    return True
+                    
+                else:
+                    self.log_test("Post Creation Points Award", False, 
+                                f"Post creation failed: {response.status_code} - {response.text}")
+                    return False
+                    
+            finally:
+                # Clean up temp file
+                os.unlink(image_path)
                 
         except Exception as e:
-            self.log_result("User Login API", False, f"Exception: {str(e)}")
+            self.log_test("Post Creation Points Award", False, f"Exception: {str(e)}")
             return False
     
-    def test_auth_me(self):
-        """Test protected user profile endpoint"""
-        if not self.auth_token:
-            self.log_result("Protected User Profile API", False, "No auth token available")
-            return False
-            
+    def test_level_up_logic(self):
+        """Test 3: Test level-up logic with carry-over points"""
         try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            if not self.access_token or not self.user_id:
+                self.log_test("Level-Up Logic", False, "No access token or user ID available")
+                return False
+            
+            headers = {"Authorization": f"Bearer {self.access_token}"}
+            
+            # First, manually update user to have 1240 points (close to level-up at 1250)
+            # We'll do this by creating multiple posts to get close to level-up
+            
+            # Get current user state
+            me_response = requests.get(f"{self.base_url}/auth/me", headers=headers)
+            if me_response.status_code != 200:
+                self.log_test("Level-Up Logic", False, "Failed to get current user state")
+                return False
+            
+            current_user = me_response.json()
+            current_points = current_user.get("currentPoints", 0)
+            
+            # Calculate how many more posts we need to get close to level-up
+            # We want to get to 1240 points (10 points away from 1250)
+            target_points = 1240
+            points_needed = target_points - current_points
+            posts_needed = max(0, points_needed // 25)  # Each post gives 25 points at level 1
+            
+            print(f"   Current points: {current_points}, need {points_needed} more points")
+            print(f"   Creating {posts_needed} posts to reach {target_points} points")
+            
+            # Create posts to get close to level-up
+            for i in range(posts_needed):
+                image_path = self.create_test_image()
+                try:
+                    with open(image_path, 'rb') as img_file:
+                        files = {'file': (f'test_image_{i}.png', img_file, 'image/png')}
+                        data = {
+                            'rating': 8,
+                            'review_text': f'Test review {i+1} for level-up testing',
+                            'map_link': 'https://maps.google.com/?q=Test+Location'
+                        }
+                        
+                        response = requests.post(f"{self.base_url}/posts/create", 
+                                               headers=headers, files=files, data=data)
+                        
+                        if response.status_code != 200:
+                            self.log_test("Level-Up Logic", False, 
+                                        f"Failed to create setup post {i+1}: {response.status_code}")
+                            return False
+                finally:
+                    os.unlink(image_path)
+            
+            # Now create one more post to trigger level-up
+            image_path = self.create_test_image()
+            try:
+                with open(image_path, 'rb') as img_file:
+                    files = {'file': ('levelup_test.png', img_file, 'image/png')}
+                    data = {
+                        'rating': 10,
+                        'review_text': 'This post should trigger level-up with carry-over points!',
+                        'map_link': 'https://maps.google.com/?q=Level+Up+Location'
+                    }
+                    
+                    response = requests.post(f"{self.base_url}/posts/create", 
+                                           headers=headers, files=files, data=data)
+                
+                if response.status_code == 200:
+                    post_data = response.json()
+                    
+                    # Check if level-up occurred
+                    if not post_data.get("leveledUp", False):
+                        # Maybe we didn't have enough points, let's check current state
+                        me_response = requests.get(f"{self.base_url}/auth/me", headers=headers)
+                        if me_response.status_code == 200:
+                            user_data = me_response.json()
+                            details = f"No level-up occurred. Current: {user_data.get('currentPoints')}/{user_data.get('requiredPoints')} points, Level: {user_data.get('level')}"
+                            self.log_test("Level-Up Logic", False, details)
+                        else:
+                            self.log_test("Level-Up Logic", False, "No level-up occurred and couldn't get user state")
+                        return False
+                    
+                    # Verify level-up details
+                    expected_new_level = 2
+                    expected_title = "Reviewer"
+                    expected_required_points = 2500
+                    
+                    success = True
+                    details = []
+                    
+                    if post_data["newLevel"] != expected_new_level:
+                        success = False
+                        details.append(f"Expected level {expected_new_level}, got {post_data['newLevel']}")
+                    
+                    if post_data["newTitle"] != expected_title:
+                        success = False
+                        details.append(f"Expected title '{expected_title}', got '{post_data['newTitle']}'")
+                    
+                    if post_data["requiredPoints"] != expected_required_points:
+                        success = False
+                        details.append(f"Expected requiredPoints {expected_required_points}, got {post_data['requiredPoints']}")
+                    
+                    # Verify carry-over points (should be less than required points for level 2)
+                    if post_data["currentPoints"] >= post_data["requiredPoints"]:
+                        success = False
+                        details.append(f"Carry-over points issue: {post_data['currentPoints']} >= {post_data['requiredPoints']}")
+                    
+                    if success:
+                        details.append(f"Level-up successful: Level {post_data['newLevel']}, Points: {post_data['currentPoints']}/{post_data['requiredPoints']}")
+                    
+                    self.log_test("Level-Up Logic", success, "; ".join(details))
+                    return success
+                    
+                else:
+                    self.log_test("Level-Up Logic", False, 
+                                f"Level-up post creation failed: {response.status_code} - {response.text}")
+                    return False
+                    
+            finally:
+                os.unlink(image_path)
+                
+        except Exception as e:
+            self.log_test("Level-Up Logic", False, f"Exception: {str(e)}")
+            return False
+    
+    def test_auth_me_endpoint(self):
+        """Test 4: Verify /api/auth/me returns all new level fields"""
+        try:
+            if not self.access_token:
+                self.log_test("Auth Me Endpoint", False, "No access token available")
+                return False
+            
+            headers = {"Authorization": f"Bearer {self.access_token}"}
             response = requests.get(f"{self.base_url}/auth/me", headers=headers)
             
             if response.status_code == 200:
-                data = response.json()
-                required_fields = ["id", "full_name", "email", "points", "level"]
-                missing_fields = [field for field in required_fields if field not in data]
+                user_data = response.json()
                 
-                if not missing_fields:
-                    self.log_result("Protected User Profile API", True, 
-                                  f"Profile retrieved successfully. User: {data['full_name']}", 
-                                  {"user_id": data["id"], "level": data["level"], "points": data["points"]})
-                    return True
-                else:
-                    self.log_result("Protected User Profile API", False, 
-                                  f"Missing required fields: {missing_fields}", data)
+                # Check for all required level fields
+                required_fields = ["level", "currentPoints", "requiredPoints", "title"]
+                missing_fields = [field for field in required_fields if field not in user_data]
+                
+                if missing_fields:
+                    self.log_test("Auth Me Endpoint", False, f"Missing fields: {missing_fields}")
                     return False
+                
+                # Verify field types and reasonable values
+                success = True
+                details = []
+                
+                if not isinstance(user_data["level"], int) or user_data["level"] < 1:
+                    success = False
+                    details.append(f"Invalid level: {user_data['level']}")
+                
+                if not isinstance(user_data["currentPoints"], int) or user_data["currentPoints"] < 0:
+                    success = False
+                    details.append(f"Invalid currentPoints: {user_data['currentPoints']}")
+                
+                if not isinstance(user_data["requiredPoints"], int) or user_data["requiredPoints"] <= 0:
+                    success = False
+                    details.append(f"Invalid requiredPoints: {user_data['requiredPoints']}")
+                
+                if not isinstance(user_data["title"], str) or user_data["title"] not in ["Reviewer", "Top Reviewer", "Influencer"]:
+                    success = False
+                    details.append(f"Invalid title: {user_data['title']}")
+                
+                if success:
+                    details.append(f"All fields present: Level {user_data['level']}, Points {user_data['currentPoints']}/{user_data['requiredPoints']}, Title: {user_data['title']}")
+                
+                self.log_test("Auth Me Endpoint", success, "; ".join(details))
+                return success
+                
             else:
-                self.log_result("Protected User Profile API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
+                self.log_test("Auth Me Endpoint", False, f"Request failed: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
-            self.log_result("Protected User Profile API", False, f"Exception: {str(e)}")
+            self.log_test("Auth Me Endpoint", False, f"Exception: {str(e)}")
             return False
     
-    def test_create_post(self):
-        """Test post creation with file upload"""
-        if not self.auth_token:
-            self.log_result("Post Creation API", False, "No auth token available")
-            return False
-            
+    def test_feed_endpoint_level_fields(self):
+        """Test 5: Verify feed endpoint includes user_level and user_title"""
         try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
+            if not self.access_token:
+                self.log_test("Feed Endpoint Level Fields", False, "No access token available")
+                return False
             
-            # Create a test image file
-            test_image_content = b"fake_image_content_for_testing"
-            files = {
-                'file': ('test_food.jpg', test_image_content, 'image/jpeg')
-            }
-            
-            data = {
-                'rating': 9,
-                'review_text': 'Incredible sushi experience! Fresh fish, perfect rice, amazing presentation. The chef really knows their craft.',
-                'map_link': 'https://maps.google.com/?q=Sushi+Restaurant+NYC'
-            }
-            
-            response = requests.post(f"{self.base_url}/posts/create", 
-                                   headers=headers, files=files, data=data)
+            headers = {"Authorization": f"Bearer {self.access_token}"}
+            response = requests.get(f"{self.base_url}/feed", headers=headers)
             
             if response.status_code == 200:
-                result = response.json()
-                if "post_id" in result:
-                    self.test_post_id = result["post_id"]
-                    self.log_result("Post Creation API", True, 
-                                  f"Post created successfully. ID: {self.test_post_id}", 
-                                  {"post_id": self.test_post_id, "message": result["message"]})
-                    return True
-                else:
-                    self.log_result("Post Creation API", False, 
-                                  "No post_id in response", result)
+                feed_data = response.json()
+                
+                if not isinstance(feed_data, list):
+                    self.log_test("Feed Endpoint Level Fields", False, "Feed response is not a list")
                     return False
-            else:
-                self.log_result("Post Creation API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
                 
-        except Exception as e:
-            self.log_result("Post Creation API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_feed_api(self):
-        """Test feed endpoint with authentication"""
-        if not self.auth_token:
-            self.log_result("Feed API", False, "No auth token available")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
-            response = requests.get(f"{self.base_url}/feed?skip=0&limit=10", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    if len(data) > 0:
-                        post = data[0]
-                        required_fields = ["id", "username", "media_url", "image_url", "rating", "review_text"]
-                        missing_fields = [field for field in required_fields if field not in post]
-                        
-                        if not missing_fields:
-                            # Check image_url format
-                            image_url = post.get("image_url", "")
-                            correct_format = image_url.startswith("/api/static/uploads/")
-                            
-                            self.log_result("Feed API", True, 
-                                          f"Feed retrieved with {len(data)} posts. Image URL format correct: {correct_format}", 
-                                          {"posts_count": len(data), "sample_image_url": image_url, "correct_format": correct_format})
-                            return True
-                        else:
-                            self.log_result("Feed API", False, 
-                                          f"Missing required fields in post: {missing_fields}", post)
-                            return False
-                    else:
-                        self.log_result("Feed API", True, 
-                                      "Feed endpoint working but no posts available", 
-                                      {"posts_count": 0})
-                        return True
-                else:
-                    self.log_result("Feed API", False, 
-                                  "Response is not a list", data)
+                if len(feed_data) == 0:
+                    self.log_test("Feed Endpoint Level Fields", False, "Feed is empty - no posts to verify")
                     return False
-            else:
-                self.log_result("Feed API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
                 
-        except Exception as e:
-            self.log_result("Feed API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_like_post(self):
-        """Test like post endpoint"""
-        if not self.auth_token or not self.test_post_id:
-            self.log_result("Like Post API", False, "No auth token or post ID available")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
-            response = requests.post(f"{self.base_url}/posts/{self.test_post_id}/like", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log_result("Like Post API", True, 
-                              f"Post liked successfully: {data['message']}", 
-                              {"message": data["message"]})
-                return True
-            elif response.status_code == 400 and "already liked" in response.text.lower():
-                self.log_result("Like Post API", True, 
-                              "Post already liked (expected behavior for repeat tests)", 
-                              {"status_code": 400, "message": "Already liked"})
-                return True
-            else:
-                self.log_result("Like Post API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
+                # Check first post for level fields
+                first_post = feed_data[0]
+                required_fields = ["user_level", "user_title"]
+                missing_fields = [field for field in required_fields if field not in first_post]
                 
-        except Exception as e:
-            self.log_result("Like Post API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_unlike_post(self):
-        """Test unlike post endpoint"""
-        if not self.auth_token or not self.test_post_id:
-            self.log_result("Unlike Post API", False, "No auth token or post ID available")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
-            response = requests.delete(f"{self.base_url}/posts/{self.test_post_id}/like", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log_result("Unlike Post API", True, 
-                              f"Post unliked successfully: {data['message']}", 
-                              {"message": data["message"]})
-                return True
-            elif response.status_code == 400 and "not found" in response.text.lower():
-                self.log_result("Unlike Post API", True, 
-                              "Like not found (expected if not previously liked)", 
-                              {"status_code": 400, "message": "Like not found"})
-                return True
-            else:
-                self.log_result("Unlike Post API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
-                
-        except Exception as e:
-            self.log_result("Unlike Post API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_add_comment(self):
-        """Test add comment endpoint"""
-        if not self.auth_token or not self.test_post_id:
-            self.log_result("Comment Creation API", False, "No auth token or post ID available")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
-            data = {"comment_text": "This looks absolutely delicious! Where is this restaurant located?"}
-            
-            response = requests.post(f"{self.base_url}/posts/{self.test_post_id}/comment", 
-                                   headers=headers, data=data)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if "comment_id" in result:
-                    self.log_result("Comment Creation API", True, 
-                                  f"Comment added successfully. ID: {result['comment_id']}", 
-                                  {"comment_id": result["comment_id"], "message": result["message"]})
-                    return True
-                else:
-                    self.log_result("Comment Creation API", False, 
-                                  "No comment_id in response", result)
+                if missing_fields:
+                    self.log_test("Feed Endpoint Level Fields", False, f"Missing fields in feed post: {missing_fields}")
                     return False
+                
+                # Verify field values
+                success = True
+                details = []
+                
+                if not isinstance(first_post["user_level"], int) or first_post["user_level"] < 1:
+                    success = False
+                    details.append(f"Invalid user_level: {first_post['user_level']}")
+                
+                if not isinstance(first_post["user_title"], str) or first_post["user_title"] not in ["Reviewer", "Top Reviewer", "Influencer"]:
+                    success = False
+                    details.append(f"Invalid user_title: {first_post['user_title']}")
+                
+                if success:
+                    details.append(f"Feed includes level fields: user_level={first_post['user_level']}, user_title='{first_post['user_title']}'")
+                    details.append(f"Total posts in feed: {len(feed_data)}")
+                
+                self.log_test("Feed Endpoint Level Fields", success, "; ".join(details))
+                return success
+                
             else:
-                self.log_result("Comment Creation API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
+                self.log_test("Feed Endpoint Level Fields", False, f"Feed request failed: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
-            self.log_result("Comment Creation API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_get_comments(self):
-        """Test get comments endpoint"""
-        if not self.test_post_id:
-            self.log_result("Get Comments API", False, "No post ID available")
-            return False
-            
-        try:
-            response = requests.get(f"{self.base_url}/posts/{self.test_post_id}/comments")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    if len(data) > 0:
-                        comment = data[0]
-                        required_fields = ["id", "user_id", "username", "comment_text", "created_at"]
-                        missing_fields = [field for field in required_fields if field not in comment]
-                        
-                        if not missing_fields:
-                            self.log_result("Get Comments API", True, 
-                                          f"Comments retrieved successfully. Count: {len(data)}", 
-                                          {"comments_count": len(data), "sample_username": comment["username"]})
-                            return True
-                        else:
-                            self.log_result("Get Comments API", False, 
-                                          f"Missing required fields in comment: {missing_fields}", comment)
-                            return False
-                    else:
-                        self.log_result("Get Comments API", True, 
-                                      "Comments endpoint working but no comments available", 
-                                      {"comments_count": 0})
-                        return True
-                else:
-                    self.log_result("Get Comments API", False, 
-                                  "Response is not a list", data)
-                    return False
-            else:
-                self.log_result("Get Comments API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
-                
-        except Exception as e:
-            self.log_result("Get Comments API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_explore_trending(self):
-        """Test explore trending posts endpoint"""
-        if not self.auth_token:
-            self.log_result("Explore Trending Posts API", False, "No auth token available")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
-            response = requests.get(f"{self.base_url}/explore/trending?skip=0&limit=10", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    if len(data) > 0:
-                        post = data[0]
-                        required_fields = ["id", "username", "media_url", "image_url", "rating", "likes_count"]
-                        missing_fields = [field for field in required_fields if field not in post]
-                        
-                        if not missing_fields:
-                            # Check image_url format
-                            image_url = post.get("image_url", "")
-                            correct_format = image_url.startswith("/api/static/uploads/")
-                            
-                            self.log_result("Explore Trending Posts API", True, 
-                                          f"Trending posts retrieved. Count: {len(data)}, Image format correct: {correct_format}", 
-                                          {"posts_count": len(data), "sample_rating": post["rating"], "correct_format": correct_format})
-                            return True
-                        else:
-                            self.log_result("Explore Trending Posts API", False, 
-                                          f"Missing required fields: {missing_fields}", post)
-                            return False
-                    else:
-                        self.log_result("Explore Trending Posts API", True, 
-                                      "Trending endpoint working but no posts available", 
-                                      {"posts_count": 0})
-                        return True
-                else:
-                    self.log_result("Explore Trending Posts API", False, 
-                                  "Response is not a list", data)
-                    return False
-            else:
-                self.log_result("Explore Trending Posts API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
-                
-        except Exception as e:
-            self.log_result("Explore Trending Posts API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_explore_top_rated(self):
-        """Test explore top-rated posts endpoint"""
-        if not self.auth_token:
-            self.log_result("Explore Top Rated Posts API", False, "No auth token available")
-            return False
-            
-        try:
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
-            response = requests.get(f"{self.base_url}/explore/top-rated?skip=0&limit=10", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    if len(data) > 0:
-                        post = data[0]
-                        required_fields = ["id", "username", "media_url", "image_url", "rating", "likes_count"]
-                        missing_fields = [field for field in required_fields if field not in post]
-                        
-                        if not missing_fields:
-                            # Verify rating >= 8 (as per implementation)
-                            rating = post.get("rating", 0)
-                            rating_valid = rating >= 8
-                            
-                            # Check image_url format
-                            image_url = post.get("image_url", "")
-                            correct_format = image_url.startswith("/api/static/uploads/")
-                            
-                            self.log_result("Explore Top Rated Posts API", True, 
-                                          f"Top-rated posts retrieved. Count: {len(data)}, Min rating: {rating}, Format correct: {correct_format}", 
-                                          {"posts_count": len(data), "min_rating": rating, "rating_valid": rating_valid, "correct_format": correct_format})
-                            return True
-                        else:
-                            self.log_result("Explore Top Rated Posts API", False, 
-                                          f"Missing required fields: {missing_fields}", post)
-                            return False
-                    else:
-                        self.log_result("Explore Top Rated Posts API", True, 
-                                      "Top-rated endpoint working but no high-rated posts available", 
-                                      {"posts_count": 0})
-                        return True
-                else:
-                    self.log_result("Explore Top Rated Posts API", False, 
-                                  "Response is not a list", data)
-                    return False
-            else:
-                self.log_result("Explore Top Rated Posts API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
-                
-        except Exception as e:
-            self.log_result("Explore Top Rated Posts API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_explore_reviewers(self):
-        """Test explore reviewers endpoint"""
-        try:
-            response = requests.get(f"{self.base_url}/explore/reviewers?skip=0&limit=10")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    if len(data) > 0:
-                        reviewer = data[0]
-                        required_fields = ["id", "username", "level", "points", "posts_count"]
-                        missing_fields = [field for field in required_fields if field not in reviewer]
-                        
-                        if not missing_fields:
-                            self.log_result("Explore Reviewers API", True, 
-                                          f"Top reviewers retrieved. Count: {len(data)}, Top level: {reviewer['level']}", 
-                                          {"reviewers_count": len(data), "top_level": reviewer["level"], "top_points": reviewer["points"]})
-                            return True
-                        else:
-                            self.log_result("Explore Reviewers API", False, 
-                                          f"Missing required fields: {missing_fields}", reviewer)
-                            return False
-                    else:
-                        self.log_result("Explore Reviewers API", True, 
-                                      "Reviewers endpoint working but no users available", 
-                                      {"reviewers_count": 0})
-                        return True
-                else:
-                    self.log_result("Explore Reviewers API", False, 
-                                  "Response is not a list", data)
-                    return False
-            else:
-                self.log_result("Explore Reviewers API", False, 
-                              f"Failed with status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
-                
-        except Exception as e:
-            self.log_result("Explore Reviewers API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_explore_categories(self):
-        """Test explore categories endpoint - NOTE: This endpoint doesn't exist in server.py"""
-        try:
-            response = requests.get(f"{self.base_url}/explore/categories")
-            
-            if response.status_code == 404:
-                self.log_result("Explore Categories API", False, 
-                              "Endpoint not implemented in server.py - GET /api/explore/categories returns 404", 
-                              {"status_code": 404, "issue": "Endpoint missing from implementation"})
-                return False
-            elif response.status_code == 200:
-                data = response.json()
-                self.log_result("Explore Categories API", True, 
-                              "Categories endpoint working", data)
-                return True
-            else:
-                self.log_result("Explore Categories API", False, 
-                              f"Unexpected status: {response.status_code}", 
-                              response.json() if response.content else None)
-                return False
-                
-        except Exception as e:
-            self.log_result("Explore Categories API", False, f"Exception: {str(e)}")
-            return False
-    
-    def test_static_file_serving(self):
-        """Test static file serving"""
-        if not self.test_post_id:
-            self.log_result("Static File Serving", False, "No test post created to verify static files")
-            return False
-            
-        try:
-            # First get the post to find the image URL
-            headers = {"Authorization": f"Bearer {self.auth_token}"}
-            response = requests.get(f"{self.base_url}/posts/{self.test_post_id}", headers=headers)
-            
-            if response.status_code == 200:
-                post_data = response.json()
-                media_url = post_data.get("media_url", "")
-                
-                if media_url.startswith("/api/static/uploads/"):
-                    # Try to access the static file
-                    static_url = f"{self.base_url.replace('/api', '')}{media_url}"
-                    static_response = requests.get(static_url)
-                    
-                    if static_response.status_code == 200:
-                        self.log_result("Static File Serving", True, 
-                                      f"Static file accessible at: {static_url}", 
-                                      {"static_url": static_url, "content_length": len(static_response.content)})
-                        return True
-                    else:
-                        self.log_result("Static File Serving", False, 
-                                      f"Static file not accessible. Status: {static_response.status_code}", 
-                                      {"static_url": static_url, "status_code": static_response.status_code})
-                        return False
-                else:
-                    self.log_result("Static File Serving", False, 
-                                  f"Media URL format incorrect: {media_url}", 
-                                  {"media_url": media_url, "expected_prefix": "/api/static/uploads/"})
-                    return False
-            else:
-                self.log_result("Static File Serving", False, 
-                              f"Could not retrieve post data. Status: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_result("Static File Serving", False, f"Exception: {str(e)}")
+            self.log_test("Feed Endpoint Level Fields", False, f"Exception: {str(e)}")
             return False
     
     def run_all_tests(self):
-        """Run all backend tests in sequence"""
-        print(f"\n🚀 Starting Comprehensive Backend Testing for Cofau App")
-        print(f"Backend URL: {self.base_url}")
-        print("=" * 80)
+        """Run all level & points system tests"""
+        print("🚀 Starting Level & Points System Backend Tests")
+        print("=" * 60)
         
-        # Authentication Tests (High Priority)
-        print("\n📋 AUTHENTICATION TESTS")
-        print("-" * 40)
-        auth_success = self.test_auth_signup()
-        if not auth_success:
-            auth_success = self.test_auth_login()
+        # Run tests in sequence
+        tests = [
+            self.test_signup_default_values,
+            self.test_post_creation_points_award,
+            self.test_level_up_logic,
+            self.test_auth_me_endpoint,
+            self.test_feed_endpoint_level_fields
+        ]
         
-        if auth_success:
-            self.test_auth_me()
-        
-        # Posts and Feed Tests (High Priority)
-        print("\n📋 POSTS & FEED TESTS")
-        print("-" * 40)
-        if self.auth_token:
-            self.test_create_post()
-            self.test_feed_api()
-        
-        # Comments Tests (High Priority)
-        print("\n📋 COMMENTS TESTS")
-        print("-" * 40)
-        if self.auth_token and self.test_post_id:
-            self.test_add_comment()
-            self.test_get_comments()
-        
-        # Likes Tests (High Priority - NEW)
-        print("\n📋 LIKES TESTS")
-        print("-" * 40)
-        if self.auth_token and self.test_post_id:
-            self.test_like_post()
-            self.test_unlike_post()
-        
-        # Explore Tests (High Priority - NEW)
-        print("\n📋 EXPLORE TESTS")
-        print("-" * 40)
-        if self.auth_token:
-            self.test_explore_trending()
-            self.test_explore_top_rated()
-        
-        self.test_explore_reviewers()
-        self.test_explore_categories()
-        
-        # Static Files Test (Critical)
-        print("\n📋 STATIC FILES TEST")
-        print("-" * 40)
-        self.test_static_file_serving()
+        for test in tests:
+            test()
+            print()  # Add spacing between tests
         
         # Summary
-        print("\n" + "=" * 80)
+        print("=" * 60)
         print("📊 TEST SUMMARY")
-        print("=" * 80)
+        print("=" * 60)
         
         passed = sum(1 for result in self.test_results if result["success"])
         total = len(self.test_results)
@@ -659,17 +442,19 @@ class LevelPointsSystemTester:
         print(f"Failed: {total - passed}")
         print(f"Success Rate: {(passed/total)*100:.1f}%")
         
-        print("\n📋 DETAILED RESULTS:")
-        for result in self.test_results:
-            status = "✅" if result["success"] else "❌"
-            print(f"{status} {result['test']}: {result['details']}")
+        if total - passed > 0:
+            print("\n❌ FAILED TESTS:")
+            for result in self.test_results:
+                if not result["success"]:
+                    print(f"  - {result['test']}: {result['details']}")
         
-        return self.test_results
+        return passed == total
 
 if __name__ == "__main__":
-    tester = CofauBackendTester()
-    results = tester.run_all_tests()
+    tester = LevelPointsSystemTester()
+    success = tester.run_all_tests()
     
-    # Exit with appropriate code
-    failed_tests = [r for r in results if not r["success"]]
-    sys.exit(0 if len(failed_tests) == 0 else 1)
+    if success:
+        print("\n🎉 All tests passed! Level & Points System is working correctly.")
+    else:
+        print("\n⚠️  Some tests failed. Please check the details above.")
