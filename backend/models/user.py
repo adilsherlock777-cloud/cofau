@@ -35,6 +35,9 @@ class UserResponse(BaseModel):
     bio: Optional[str] = None
     points: int = 0
     level: int = 1
+    currentPoints: int = 0
+    requiredPoints: int = 1250
+    title: str = "Reviewer"
     badge: Optional[str] = None
     followers_count: int = 0
     following_count: int = 0
