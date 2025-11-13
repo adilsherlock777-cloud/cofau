@@ -243,13 +243,13 @@ async def delete_story(
 
 @router.delete("/expired/cleanup")
 async def cleanup_expired_stories(
-    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
     Remove expired stories (admin/cron endpoint)
     """
     try:
+        db = get_database()
         now = datetime.utcnow()
         
         # Find expired stories
