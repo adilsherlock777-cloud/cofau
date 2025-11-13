@@ -165,6 +165,66 @@ backend:
           agent: "testing"
           comment: "Password hashing using bcrypt working correctly. Passwords are properly hashed during signup and verified during login."
 
+  - task: "Level & Points System - Signup Default Values"
+    implemented: true
+    working: true
+    file: "/app/backend/routers/auth.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "New user signup correctly sets default level & points values: level=1, currentPoints=0, requiredPoints=1250, title='Reviewer'. All default values are properly initialized in user document."
+
+  - task: "Level & Points System - Post Creation Points Award"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/posts/create correctly awards points based on user level. Level 1 users receive 25 points per post. Response includes all required fields: leveledUp, newLevel, newTitle, pointsEarned, currentPoints, requiredPoints."
+
+  - task: "Level & Points System - Level-Up Logic with Carry-Over"
+    implemented: true
+    working: true
+    file: "/app/backend/utils/level_system.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "Level-up logic working correctly with proper carry-over points. When user reaches required points (1250 for Level 1), they level up to Level 2 with excess points carried over. New requiredPoints correctly set to 2500 for Level 2."
+
+  - task: "Level & Points System - Auth Me Endpoint Fields"
+    implemented: true
+    working: true
+    file: "/app/backend/routers/auth.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/auth/me correctly returns all new level fields: level, currentPoints, requiredPoints, title. All fields have proper data types and valid values within expected ranges."
+
+  - task: "Level & Points System - Feed Endpoint Level Fields"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/feed correctly includes user_level and user_title fields for each post. Fields contain valid level numbers (≥1) and valid titles ('Reviewer', 'Top Reviewer', 'Influencer')."
+
 frontend:
   # No frontend testing performed as per instructions
 
