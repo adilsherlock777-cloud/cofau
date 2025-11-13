@@ -157,13 +157,13 @@ async def get_stories_feed(
 @router.get("/user/{user_id}")
 async def get_user_stories(
     user_id: str,
-    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: dict = Depends(get_current_user)
 ):
     """
     Get all non-expired stories for a specific user
     """
     try:
+        db = get_database()
         now = datetime.utcnow()
         
         stories = await db.stories.find({
