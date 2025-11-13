@@ -1,74 +1,72 @@
 <analysis>
-The trajectory outlines the previous AI engineer's work on the Cofau mobile application, starting from an initial UI-only build to a full-stack Expo, FastAPI, and MongoDB integrated system. Key challenges addressed included persistent authentication flow issues (SecureStore incompatibility on web, navigation conflicts), which were eventually resolved by implementing cross-platform storage and refining navigation logic.
+The trajectory details the development of the Cofau mobile app, a full-stack project using Expo, FastAPI, and MongoDB. The work began with fixing fundamental UI and navigation issues, specifically a corrupted bottom navigation bar across multiple screens, which was resolved by systematically replacing the faulty code with a unified component.
 
-Significant features integrated include dynamic data fetching for the Feed and Profile screens, complete with image URL resolution and user-specific details. The Add Post functionality was fully wired to the backend for image upload and post creation. The development then expanded to social features like Likes and Comments, with the backend endpoints existing but requiring careful frontend integration and debugging (e.g., comment submission and display issues).
+A significant portion of the effort was dedicated to debugging and feature implementation. Key tasks included fixing broken image rendering by ensuring correct, full URL construction on the frontend and adding cache-busting headers. A major feature, a dynamic user profile screen, was built from a reference design, requiring new backend endpoints for stats, posts, and bio updates, alongside a complete frontend overhaul of the profile page. Subsequent debugging addressed non-functional logout and bio update features, tracing issues to a JSON vs. form-data mismatch on the backend and a web-incompatible  on the frontend, which was resolved using a platform-specific approach.
 
-The latter part of the trajectory focused heavily on implementing and debugging the Explore screen, which suffered from numerous issues: static placeholder images, width is not defined errors, and initially not being accessible via navigation. A crucial discovery was that the user was mistakenly viewing the Search screen, not the Explore screen, as the Explore icon was missing from the global bottom navigation. The final attempts involved adding the Explore icon to the bottom navigation across all main screens, which unfortunately introduced new JSX syntax errors due to code corruption during bulk edits.
+The most recent and critical challenge involved restoring mobile device testing via Expo Go. Attempts to enable the Expo tunnel led to persistent authentication and  errors (ERR_NGROK_334), even with a provided . This blocked the Expo service from starting, causing a 502 Bad Gateway error on the web preview. The immediate last action was to disable the tunnel to restore the web preview, leaving mobile testing non-functional.
 </analysis>
 
 <product_requirements>
-The Cofau app is a food-photo and review community, built as a React Native (Expo) mobile application integrated with a FastAPI + MongoDB backend.
+The Cofau application is a food-centric social media platform where users can share photos and reviews of their dining experiences. The product is a mobile-first application built with React Native (Expo) for the frontend and a Python (FastAPI) backend with a MongoDB database.
 
-**Key UI Screens and Features Implemented/Integrated:**
-*   **Authentication (Login, Signup, Forgot Password, OTP):** Fully functional backend integration, secure token storage (cross-platform), and correct frontend navigation after login.
-*   **Feed Screen:** Dynamically fetches and displays posts from , including real images, user info, ratings (fixed to 1-10 scale), timestamps, and like/comment counts.
-*   **Profile Screen:** Displays authenticated user data from  (username, email, avatar, level, points). Includes Update Profile and Logout buttons (functionality for Update Profile is pending).
-*   **Add Post Screen:** Complete integration for creating new posts, including photo/video upload, a 10-star rating system, review text, Google Maps link, and post submission to .
-*   **Explore Screen:** A new screen () implemented to display various types of content (Trending, Top-Rated Posts, Reviewers, Categories, Nearby). It dynamically fetches data from new backend  endpoints and renders real images in a 3-column grid.
-*   **Social Features (Likes, Comments, Follow):**
-    *   **Likes System:** Integrated with  for toggling likes with optimistic UI updates, and reflecting like counts on feed items.
-    *   **Comments System:** Backend endpoints for  and  exist. A frontend screen for comments () has been created, though full display and submission debugging was ongoing.
-    *   **Follow System:** Backend endpoints for  and  exist. Frontend integration for a Follow button and count updates is pending.
-
-**Backend Features Implemented:**
-*   Full API for user authentication, posts CRUD, feed, likes, comments, followers, and user profiles.
-*   Media file uploads are handled, with static files served correctly via .
-*   A points and level system for users is in place (+25 points per post, badges at levels 4, 8, 12).
-*   New Explore endpoints for trending, top-rated posts, reviewers, and categories have been added and are functional.
+**Core Features Implemented:**
+*   **Authentication:** A complete user authentication system with login, signup, and secure session management using JWT.
+*   **Main Feed:** A dynamic, scrollable feed that fetches and displays posts, including images, user details, ratings, and social interaction counts.
+*   **Post Creation:** A dedicated screen allowing users to upload a photo/video, add a rating, write a review, and submit it to the backend.
+*   **Explore Screen:** A discovery page featuring dynamic content like trending posts and top reviewers, displayed in a responsive 3-column grid.
+*   **Dynamic User Profile:** A comprehensive profile screen based on a specific UI design, featuring a user's avatar, bio (editable), achievement badges, and dynamic stats (posts, photos, followers). It includes tabbed views for different content types (Photos, Videos, Collabs).
+*   **Social Interactions:** Functionality for liking posts and viewing/adding comments has been implemented on the backend, with frontend integration in progress.
 </product_requirements>
 
 <key_technical_concepts>
-- **Frontend Framework**: React Native (Expo) with Expo Router (file-based routing).
-- **Backend Framework**: FastAPI with MongoDB (using Motor for async operations).
-- **Authentication**: JWT, ,  (React Context API).
-- **Data Persistence**: Cross-platform  (replacing  for web/native compatibility).
-- **API Communication**:  instance () with authenticated headers.
-- **UI/UX**:  components, , , responsive design principles.
+- **Frontend:** React Native (Expo), Expo Router for file-based routing.
+- **Backend:** FastAPI (Python), MongoDB with Motor for asynchronous database operations.
+- **Authentication:** JWT-based using  (React) and a cross-platform storage solution ().
+- **API Communication:** Centralized  instance for making authenticated requests to the backend.
+- **UI/UX:** Core  components,  for iconography, and platform-specific UI adjustments (e.g., ).
+- **Development Environment:** Supervisor for service management, Expo Tunnel (ngrok) for mobile device previewing.
 </key_technical_concepts>
 
 <code_architecture>
-server.pyserver.py/api/staticAuthProvider/feedsearch.tsxstorage.jsaxiosSecureStorelocalStorage
-**Summary of Changes:**
-*   ****: Added absolute path for  and mounted under  to resolve image loading.  endpoint enhanced to provide  and . Implemented all new  endpoints. Adjusted  to accept  fields.
-*   ****: Refactored to use  and .
-*   ****: New utility for platform-agnostic key-value storage.
-*   ****: Expanded with functions for , , , , , , , .
-*   ****: Removed redundant  and adjusted  usage.
-*   ****: Integrated with  and added UI for user details, Update Profile, and Logout.
-*   ****: Integrated with , removed unnecessary  rating division, passes  to .
-*   ****: Updated to correctly display images using  and handle like toggling.
-*   ****: Fully integrated with API calls for post creation.
-*   ****: New screen for comments, basic structure created.
-*   ****: Multiple iterations of development, fixing syntax errors, constant definitions (), and integrating with all  endpoints to display dynamic data in a 3-column grid.
-*   **, , , , , **: Updated to include the Explore icon in the global bottom navigation.
+The project is a monorepo containing distinct  and  directories.
 
+
+
+- ****
+    - **Importance:** This is the heart of the backend, defining all API logic for authentication, posts, feed, likes, comments, and the newer profile/explore features.
+    - **Recent Changes:** Endpoints were added to support the dynamic profile screen, including , , and  for bio/name changes. The update endpoint was modified to accept a JSON body instead of form data to fix a frontend integration issue.
+
+- ****
+    - **Importance:** This screen displays the user's identity and activity. It underwent a complete rewrite to match a detailed UI design.
+    - **Recent Changes:** The file was entirely replaced with a new implementation featuring dynamic data fetching for user stats and posts, tabbed navigation, and an Edit Profile modal. A critical fix was added to the logout button to use  on web and  on native, resolving a platform-specific bug.
+
+- **, , , , **
+    - **Importance:** These are the main screens of the application.
+    - **Recent Changes:** All these files had their bottom navigation JSX and styles replaced with a single, unified component to fix widespread corruption, syntax errors, and UI inconsistencies.
+
+- ****
+    - **Importance:** This configuration file controls how the Expo development server is run within the environment.
+    - **Recent Changes:** This file was the focus of the most recent debugging effort. It was modified multiple times to toggle  mode and manage the  and  environment variables. It was last edited to disable  to fix a 502 Bad Gateway error.
 </code_architecture>
 
 <pending_tasks>
-- Complete OTP and Forgot Password backend logic.
-- Fully implement the Follow system (frontend UI for button, real-time updates).
-- Implement Update Profile functionality in the Profile screen.
-- Debug and resolve the JSX syntax error in 's bottom navigation.
-- Fully implement the comments screen () to fetch and display comments, including user details.
-- Investigate and resolve the recurring login navigation issue during automated testing.
+- Re-establish a working Expo Go tunnel (ngrok) to enable QR code-based testing on real mobile devices. This is currently the highest priority blocker.
+- Implement the  backend endpoint, which was noted as missing during backend testing.
+- Fully implement the Follow system on the frontend, including UI buttons and count updates.
+- Complete the frontend implementation for the Comments screen () to fetch and display comments.
+- Implement the backend logic for OTP and Forgot Password flows.
 </pending_tasks>
 
 <current_work>
-Immediately before this summary request, the AI engineer was addressing a JSX syntax error in . This error occurred after an attempt to standardize the bottom navigation across all main screens (including , , , , ) by adding a new Explore icon.
+The most recent task was to diagnose and fix why the application was inaccessible, with both the web preview URL showing a 502 Bad Gateway error and the Expo Go QR code functionality being broken.
 
-The previous action was an attempt to replace the entire bottom navigation section of  with a clean, user-provided code block. However, this action resulted in a new JSX syntax error on line 100, indicating an issue with an unclosed  tag. This suggests that the replacement might not have been perfectly clean, or existing file corruption (potentially from prior bulk edits via  commands, as seen with ) is interfering. The file's state is likely malformed around the bottom navigation, preventing the app from compiling correctly.
+The root cause was identified as the Expo service being stuck in a  state. This was due to a persistent failure in establishing an  tunnel for the Expo Go preview, which occurred even after adding a user-provided  and attempting various subdomain configurations. The tunnel connection repeatedly failed with an  error, preventing the Expo server from launching successfully.
+
+To provide an immediate working version of the application, the last action taken was to restore the web preview. This was achieved by editing the supervisor configuration () to remove the  flag from the Expo start command.
+
+After restarting the services, the Expo server started correctly, and the web preview at  is now functional. However, as a direct consequence of this fix, the ability to test the application on a real mobile device via Expo Go (QR Code) remains disabled.
 </current_work>
 
 <optional_next_step>
-Inspect and fix the JSX syntax error in  by correcting the bottom navigation block.
+Re-enable tunnel mode and troubleshoot the persistent  connection error to restore QR code preview functionality for mobile device testing.
 </optional_next_step>

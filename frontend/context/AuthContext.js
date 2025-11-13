@@ -3,7 +3,7 @@ import axios from 'axios';
 import { storage } from '../utils/storage';
 
 // Use EXPO_PUBLIC_ prefix for environment variables accessible in Expo
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://meal-snap-4.preview.emergentagent.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://cofau-app.preview.emergentagent.com';
 const API_URL = `${API_BASE_URL}/api`;
 
 console.log('🔧 AuthContext initialized with API_URL:', API_URL);

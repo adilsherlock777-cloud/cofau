@@ -8,8 +8,8 @@ import axios from 'axios';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://meal-snap-4.preview.emergentagent.com/api';
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://meal-snap-4.preview.emergentagent.com';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://cofau-app.preview.emergentagent.com/api';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://cofau-app.preview.emergentagent.com';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function ProfileScreen() {
