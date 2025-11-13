@@ -184,7 +184,8 @@ export default function HappeningPlaces() {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
+    marginTop: 16,
+    marginBottom: 0,
   },
   loadingContainer: {
     padding: 20,
