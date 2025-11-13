@@ -413,7 +413,7 @@ test_plan:
 
 agent_communication:
     - agent: "testing"
-      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://cofau-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
     - agent: "testing"
       message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
     - agent: "testing"

@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { likePost, unlikePost } from '../utils/api';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://cofau-app.preview.emergentagent.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
 const API_URL = `${API_BASE_URL}/api`;
 
 // Screen dimensions and card sizing for 3-column grid

@@ -11,7 +11,7 @@ import tempfile
 from datetime import datetime
 
 # Get backend URL from environment
-BACKEND_URL = "https://cofau-app.preview.emergentagent.com/api"
+BACKEND_URL = "https://foodsocial-app.preview.emergentagent.com/api"
 
 class LevelPointsSystemTester:
     def __init__(self):

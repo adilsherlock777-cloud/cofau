@@ -362,12 +362,12 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 
 ### Backend
 - ✅ All new endpoints deployed
-- ✅ Running on: `https://cofau-app.preview.emergentagent.com/api`
+- ✅ Running on: `https://foodsocial-app.preview.emergentagent.com/api`
 - ✅ MongoDB connected and operational
 
 ### Frontend
 - ✅ Profile screen completely rebuilt
-- ✅ Running on: `https://cofau-app.preview.emergentagent.com`
+- ✅ Running on: `https://foodsocial-app.preview.emergentagent.com`
 - ✅ Expo bundler active
 
 ### Services Status

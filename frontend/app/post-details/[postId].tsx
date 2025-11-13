@@ -19,8 +19,8 @@ import { useAuth } from '../../context/AuthContext';
 import LevelBadge from '../../components/LevelBadge';
 import axios from 'axios';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://cofau-app.preview.emergentagent.com/api';
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://cofau-app.preview.emergentagent.com';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://foodsocial-app.preview.emergentagent.com/api';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
 
 export default function PostDetailsScreen() {
   const router = useRouter();
