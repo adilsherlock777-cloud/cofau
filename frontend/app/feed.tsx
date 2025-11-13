@@ -13,9 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import RatingBar from '../components/RatingBar';
-import ReviewerCircles from '../components/ReviewerCircles';
 import FeedCard from '../components/FeedCard';
 import UserAvatar from '../components/UserAvatar';
+import StoriesBar from '../components/StoriesBar';
 import { fetchUnreadCount } from '../utils/notifications';
 import axios from 'axios';
 
