@@ -69,25 +69,38 @@ export default function ExploreScreen() {
 
       console.log('📊 Received', response.data.length, 'posts');
 
-      // Transform data to add full image URLs
-      const transformedPosts = response.data.map(post => {
-        const imageUrl = post.image_url || post.media_url;
-        let fullUrl = null;
-        
-        if (imageUrl) {
-          if (imageUrl.startsWith('http')) {
-            fullUrl = imageUrl;
-          } else {
-            fullUrl = `${API_BASE_URL}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+      // Transform data to add full image URLs and validate required fields
+      const transformedPosts = response.data
+        .filter(post => {
+          // Filter out posts without required fields
+          if (!post.id || !post.user_id) {
+            console.warn('⚠️ Skipping post without id or user_id:', post);
+            return false;
           }
-        }
-        
-        return {
-          ...post,
-          full_image_url: fullUrl,
-          is_liked: post.is_liked_by_user || post.is_liked || false,
-        };
-      });
+          if (!post.image_url && !post.media_url) {
+            console.warn('⚠️ Skipping post without image:', post.id);
+            return false;
+          }
+          return true;
+        })
+        .map(post => {
+          const imageUrl = post.image_url || post.media_url;
+          let fullUrl = null;
+          
+          if (imageUrl) {
+            if (imageUrl.startsWith('http')) {
+              fullUrl = imageUrl;
+            } else {
+              fullUrl = `${API_BASE_URL}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+            }
+          }
+          
+          return {
+            ...post,
+            full_image_url: fullUrl,
+            is_liked: post.is_liked_by_user || post.is_liked || false,
+          };
+        });
 
       if (refresh) {
         setPosts(transformedPosts);
