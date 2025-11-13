@@ -270,6 +270,10 @@ export default function ProfileScreen() {
               }}
               style={styles.profilePicture}
             />
+            {/* Level Badge on Profile Picture */}
+            {userData.level && (
+              <LevelBadge level={userData.level} size="large" />
+            )}
             <TouchableOpacity style={styles.cameraIcon}>
               <Ionicons name="camera" size={20} color="#fff" />
             </TouchableOpacity>
