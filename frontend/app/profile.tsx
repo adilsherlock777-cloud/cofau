@@ -365,13 +365,26 @@ export default function ProfileScreen() {
         {/* Logout Button */}
         <TouchableOpacity 
           style={styles.logoutButton}
+          activeOpacity={0.7}
           onPress={() => {
+            console.log('🔴 Logout button pressed!');
             Alert.alert(
               'Logout',
               'Are you sure you want to logout?',
               [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Logout', onPress: handleLogout, style: 'destructive' }
+                { 
+                  text: 'Cancel', 
+                  style: 'cancel',
+                  onPress: () => console.log('❌ Logout cancelled')
+                },
+                { 
+                  text: 'Logout', 
+                  onPress: () => {
+                    console.log('✅ User confirmed logout');
+                    handleLogout();
+                  },
+                  style: 'destructive' 
+                }
               ]
             );
           }}
