@@ -201,22 +201,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#4dd0e1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarLetter: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
+    gap: 12,
   },
   commentInfo: {
-    marginLeft: 12,
     flex: 1,
   },
   username: {
