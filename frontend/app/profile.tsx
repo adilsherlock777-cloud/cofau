@@ -50,11 +50,17 @@ export default function ProfileScreen() {
     try {
       let user;
       
+      // Determine the final user ID and ownership
+      const finalUserId = userId ?? currentUser?.id;
+      const isOwn = !userId || (finalUserId === currentUser?.id);
+      setIsOwnProfile(isOwn);
+      
+      console.log('👤 Profile Detection:', { userId, currentUserId: currentUser?.id, finalUserId, isOwn });
+      
       // Check if viewing another user's profile or own profile
       if (userId && userId !== currentUser?.id) {
         // Viewing another user's profile
         console.log('📡 Fetching other user profile:', userId);
-        setIsOwnProfile(false);
         
         // Get user data from the users endpoint (need to create this or use existing feed data)
         // For now, fetch from /auth/me and then get the specific user data
