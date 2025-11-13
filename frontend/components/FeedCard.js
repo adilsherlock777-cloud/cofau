@@ -80,7 +80,16 @@ export default function FeedCard({ post, onLikeUpdate }) {
           )}
         </View>
         <View style={styles.userTextContainer}>
-          <Text style={styles.username}>{post.username}</Text>
+          <View style={styles.usernameRow}>
+            <Text style={styles.username}>{post.username}</Text>
+            {post.user_level && post.user_title && (
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelText}>Level {post.user_level}</Text>
+                <Text style={styles.levelDot}> • </Text>
+                <Text style={styles.titleText}>{post.user_title}</Text>
+              </View>
+            )}
+          </View>
           {post.created_at && (
             <Text style={styles.timestamp}>{formatTimestamp(post.created_at)}</Text>
           )}
