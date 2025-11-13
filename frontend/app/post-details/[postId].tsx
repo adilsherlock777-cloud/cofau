@@ -279,18 +279,14 @@ export default function PostDetailsScreen() {
             style={styles.userRow}
             onPress={() => router.push(`/profile?userId=${post.user_id}`)}
           >
-            <View style={styles.userAvatarContainer}>
-              <View style={styles.userAvatar}>
-                {post.user_profile_picture ? (
-                  <Image source={{ uri: post.user_profile_picture }} style={styles.userAvatarImage} />
-                ) : (
-                  <Text style={styles.userAvatarLetter}>
-                    {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
-                  </Text>
-                )}
-              </View>
-              {post.user_level && <LevelBadge level={post.user_level} size="small" />}
-            </View>
+            <UserAvatar
+              profilePicture={post.user_profile_picture}
+              username={post.username}
+              size={40}
+              level={post.user_level}
+              showLevelBadge={true}
+              style={{ marginRight: 12 }}
+            />
             <View style={styles.userInfo}>
               <Text style={styles.username}>{post.username}</Text>
               <Text style={styles.timestamp}>{formatTimestamp(post.created_at)}</Text>
