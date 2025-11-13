@@ -211,6 +211,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 8,
+  },
   avatar: {
     width: 32,
     height: 32,
@@ -218,7 +222,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#66D9E8',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
   avatarImage: {
     width: 32,
@@ -233,38 +236,10 @@ const styles = StyleSheet.create({
   userTextContainer: {
     flex: 1,
   },
-  usernameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
   username: {
     fontSize: 15,
     fontWeight: 'bold',
     color: '#333',
-  },
-  levelBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 12,
-  },
-  levelText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#667eea',
-  },
-  levelDot: {
-    fontSize: 11,
-    color: '#999',
-  },
-  titleText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#666',
   },
   timestamp: {
     fontSize: 12,
