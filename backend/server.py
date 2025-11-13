@@ -126,13 +126,13 @@ async def create_post(
     )
     
     # Notify all followers about new post
-    followers = await db.follows.find({"following_id": str(current_user["_id"])}).to_list(None)
+    followers = await db.follows.find({"followingId": str(current_user["_id"])}).to_list(None)
     for follow in followers:
         await create_notification(
             db=db,
             notification_type="new_post",
             from_user_id=str(current_user["_id"]),
-            to_user_id=follow["follower_id"],
+            to_user_id=follow["followerId"],
             post_id=post_id
         )
     
