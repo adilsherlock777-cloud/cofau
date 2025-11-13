@@ -273,15 +273,7 @@ const styles = StyleSheet.create({
   userHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  avatarLarge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#66D9E8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+    gap: 16,
   },
   userInfo: {
     flex: 1,
