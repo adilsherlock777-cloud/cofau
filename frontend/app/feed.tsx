@@ -204,10 +204,8 @@ export default function FeedScreen() {
           </View>
         )}
 
-        {/* Reviewer Circles */}
-        <View style={styles.reviewerSection}>
-          <ReviewerCircles reviewers={reviewers} />
-        </View>
+        {/* Stories Bar */}
+        <StoriesBar />
 
         {/* Loading State */}
         {loading && (
