@@ -372,16 +372,13 @@ export default function ProfileScreen() {
         {/* Profile Identity Section */}
         <View style={styles.identitySection}>
           <View style={styles.profilePictureContainer}>
-            <Image 
-              source={{ 
-                uri: userData.profile_picture || 'https://placehold.co/120x120/4dd0e1/white?text=' + (userData.full_name?.[0] || 'U')
-              }}
-              style={styles.profilePicture}
+            <UserAvatar
+              profilePicture={userData.profile_picture}
+              username={userData.full_name || userData.username}
+              size={100}
+              level={userData.level}
+              showLevelBadge={true}
             />
-            {/* Level Badge on Profile Picture */}
-            {userData.level && (
-              <LevelBadge level={userData.level} size="large" />
-            )}
             <TouchableOpacity style={styles.cameraIcon}>
               <Ionicons name="camera" size={20} color="#fff" />
             </TouchableOpacity>
