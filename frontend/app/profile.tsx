@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import LevelBadge from '../components/LevelBadge';
 
@@ -15,7 +15,8 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { token, logout } = useAuth();
+  const { userId } = useLocalSearchParams(); // Get userId from query params
+  const { token, logout, user: currentUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [userStats, setUserStats] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
@@ -25,6 +26,9 @@ export default function ProfileScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editedBio, setEditedBio] = useState('');
   const [editedName, setEditedName] = useState('');
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [isOwnProfile, setIsOwnProfile] = useState(true);
 
   useEffect(() => {
     if (!token) {
