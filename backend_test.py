@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Comprehensive Backend Testing for Cofau Food Review App
-Tests all backend endpoints including Auth, Feed, Posts, Comments, Likes, and Explore endpoints
+Backend Testing for Level & Points System
+Tests all endpoints related to the new level and points system implementation.
 """
 
 import requests
 import json
-import sys
+import os
+import tempfile
 from datetime import datetime
 
-# Backend URL from environment
+# Get backend URL from environment
 BACKEND_URL = "https://cofau-app.preview.emergentagent.com/api"
 
-class CofauBackendTester:
+class LevelPointsSystemTester:
     def __init__(self):
         self.base_url = BACKEND_URL
         self.auth_token = None
