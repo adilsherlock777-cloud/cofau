@@ -123,10 +123,13 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "email": current_user["email"],
         "profile_picture": current_user.get("profile_picture"),
         "bio": current_user.get("bio"),
-        "points": current_user["points"],
-        "level": current_user["level"],
+        "points": current_user.get("points", 0),
+        "level": current_user.get("level", 1),
+        "currentPoints": current_user.get("currentPoints", 0),
+        "requiredPoints": current_user.get("requiredPoints", 1250),
+        "title": current_user.get("title", "Reviewer"),
         "badge": current_user.get("badge"),
-        "followers_count": current_user["followers_count"],
-        "following_count": current_user["following_count"],
+        "followers_count": current_user.get("followers_count", 0),
+        "following_count": current_user.get("following_count", 0),
         "created_at": current_user["created_at"]
     }
