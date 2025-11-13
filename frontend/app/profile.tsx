@@ -171,7 +171,7 @@ export default function ProfileScreen() {
       const response = await axios.get(`${API_URL}/users/${userData.id}/follow-status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setIsFollowing(response.data.is_following);
+      setIsFollowing(response.data.isFollowing);
     } catch (err) {
       console.error('❌ Error fetching follow status:', err);
       setIsFollowing(false);
