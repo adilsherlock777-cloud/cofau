@@ -45,6 +45,7 @@ function RootLayoutNav() {
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <StatusBar style={Platform.OS === "ios" ? "dark" : "auto"} />
       <Slot />
+      <LevelUpAnimation />
     </SafeAreaView>
   );
 }
