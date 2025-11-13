@@ -15,702 +15,571 @@ BASE_URL = "https://foodsocial-app.preview.emergentagent.com/api"
 
 class NotificationsTestSuite:
     def __init__(self):
-        self.session = requests.Session()
-        self.session.timeout = TIMEOUT
-        self.test_results = []
-        self.user1_token = None
-        self.user2_token = None
-        self.user1_id = None
-        self.user2_id = None
+        self.base_url = BASE_URL
+        self.user_a_token = None
+        self.user_b_token = None
+        self.user_a_id = None
+        self.user_b_id = None
         self.post_id = None
+        self.timestamp = str(int(time.time()))
         
-    def log_test(self, test_name, success, details, response_data=None):
-        """Log test results"""
-        result = {
-            "test": test_name,
-            "success": success,
-            "details": details,
-            "timestamp": datetime.now().isoformat()
-        }
-        if response_data:
-            result["response"] = response_data
-        self.test_results.append(result)
+    def log(self, message):
+        """Log test messages with timestamp"""
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
         
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status}: {test_name}")
-        print(f"   Details: {details}")
-        if not success and response_data:
-            print(f"   Response: {response_data}")
-        print()
-
-    def test_1_create_new_user_account(self):
-        """TEST 1: CREATE NEW USER ACCOUNT"""
-        print("=" * 60)
-        print("TEST 1: CREATE NEW USER ACCOUNT")
-        print("=" * 60)
+    def make_request(self, method, endpoint, headers=None, data=None, files=None):
+        """Make HTTP request with error handling"""
+        url = f"{self.base_url}{endpoint}"
+        try:
+            if method == "GET":
+                response = requests.get(url, headers=headers)
+            elif method == "POST":
+                if files:
+                    response = requests.post(url, headers=headers, data=data, files=files)
+                else:
+                    response = requests.post(url, headers=headers, json=data)
+            elif method == "DELETE":
+                response = requests.delete(url, headers=headers)
+            
+            self.log(f"{method} {endpoint} -> {response.status_code}")
+            return response
+        except Exception as e:
+            self.log(f"❌ Request failed: {e}")
+            return None
+    
+    def test_1_create_test_users(self):
+        """TEST 1: CREATE TEST USERS"""
+        self.log("🧪 TEST 1: Creating test users...")
         
-        # Generate unique email with timestamp
-        timestamp = int(time.time())
-        email = f"test_dp_user_{timestamp}@test.com"
-        
-        payload = {
-            "full_name": "Test DP User",
-            "email": email,
+        # Create User A (content creator)
+        user_a_data = {
+            "full_name": "User A",
+            "email": f"notif_user_a_{self.timestamp}@test.com",
             "password": "TestPass123!"
         }
         
-        try:
-            response = self.session.post(f"{BASE_URL}/auth/signup", json=payload)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check required fields
-                if "access_token" in data:
-                    self.user1_token = data["access_token"]
-                    
-                    # Now get user profile to verify level and points
-                    headers = {"Authorization": f"Bearer {self.user1_token}"}
-                    profile_response = self.session.get(f"{BASE_URL}/auth/me", headers=headers)
-                    
-                    if profile_response.status_code == 200:
-                        profile_data = profile_response.json()
-                        self.user1_id = profile_data.get("id")
-                        
-                        # Verify default values
-                        level = profile_data.get("level")
-                        current_points = profile_data.get("currentPoints")
-                        required_points = profile_data.get("requiredPoints")
-                        profile_picture = profile_data.get("profile_picture")
-                        
-                        if (level == 1 and current_points == 0 and 
-                            required_points == 1250 and profile_picture is None):
-                            self.log_test(
-                                "User Signup", 
-                                True, 
-                                f"User created successfully with email {email}. Default values: level=1, currentPoints=0, requiredPoints=1250, profile_picture=null",
-                                {"signup": data, "profile": profile_data}
-                            )
-                        else:
-                            self.log_test(
-                                "User Signup", 
-                                False, 
-                                f"Default values incorrect. Got: level={level}, currentPoints={current_points}, requiredPoints={required_points}, profile_picture={profile_picture}",
-                                profile_data
-                            )
-                    else:
-                        self.log_test("User Signup", False, f"Failed to get user profile: {profile_response.status_code}", profile_response.text)
-                else:
-                    self.log_test("User Signup", False, "No access_token in response", data)
-            else:
-                self.log_test("User Signup", False, f"Signup failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("User Signup", False, f"Exception during signup: {str(e)}")
-
-    def test_2_upload_new_post(self):
-        """TEST 2: UPLOAD A NEW POST"""
-        print("=" * 60)
-        print("TEST 2: UPLOAD A NEW POST")
-        print("=" * 60)
-        
-        if not self.user1_token:
-            self.log_test("Post Upload", False, "No user token available from previous test")
-            return
-            
-        # Create a simple test image file
-        test_image_content = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDATx\x9cc\xf8\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00IEND\xaeB`\x82'
-        
-        files = {
-            'file': ('test_image.png', test_image_content, 'image/png')
-        }
-        
-        data = {
-            'rating': '8',
-            'review_text': 'Testing profile picture system - this is a great restaurant!',
-            'map_link': 'https://maps.google.com/?q=New+York'
-        }
-        
-        headers = {"Authorization": f"Bearer {self.user1_token}"}
-        
-        try:
-            response = self.session.post(f"{BASE_URL}/posts/create", files=files, data=data, headers=headers)
-            
-            if response.status_code == 200:
-                response_data = response.json()
-                
-                # Check required fields
-                post_id = response_data.get("post_id")
-                points_earned = response_data.get("pointsEarned")
-                current_points = response_data.get("currentPoints")
-                required_points = response_data.get("requiredPoints")
-                level = response_data.get("newLevel")
-                leveled_up = response_data.get("leveledUp")
-                
-                if (post_id and points_earned == 25 and current_points == 25 and 
-                    required_points == 1250 and level == 1 and leveled_up == False):
-                    self.post_id = post_id
-                    self.log_test(
-                        "Post Upload", 
-                        True, 
-                        f"Post created successfully. ID: {post_id}, pointsEarned: 25, currentPoints: 25, requiredPoints: 1250, level: 1, leveledUp: false",
-                        response_data
-                    )
-                else:
-                    self.log_test(
-                        "Post Upload", 
-                        False, 
-                        f"Response values incorrect. Got: post_id={post_id}, pointsEarned={points_earned}, currentPoints={current_points}, requiredPoints={required_points}, level={level}, leveledUp={leveled_up}",
-                        response_data
-                    )
-            else:
-                self.log_test("Post Upload", False, f"Post creation failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Post Upload", False, f"Exception during post upload: {str(e)}")
-
-    def test_3_verify_points_in_auth_me(self):
-        """TEST 3: VERIFY POINTS IN AUTH/ME"""
-        print("=" * 60)
-        print("TEST 3: VERIFY POINTS IN AUTH/ME")
-        print("=" * 60)
-        
-        if not self.user1_token:
-            self.log_test("Auth Me Points", False, "No user token available")
-            return
-            
-        headers = {"Authorization": f"Bearer {self.user1_token}"}
-        
-        try:
-            response = self.session.get(f"{BASE_URL}/auth/me", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                level = data.get("level")
-                current_points = data.get("currentPoints")
-                required_points = data.get("requiredPoints")
-                
-                if level == 1 and current_points == 25 and required_points == 1250:
-                    self.log_test(
-                        "Auth Me Points", 
-                        True, 
-                        f"Points verified correctly: level=1, currentPoints=25, requiredPoints=1250",
-                        data
-                    )
-                else:
-                    self.log_test(
-                        "Auth Me Points", 
-                        False, 
-                        f"Points incorrect. Got: level={level}, currentPoints={current_points}, requiredPoints={required_points}",
-                        data
-                    )
-            else:
-                self.log_test("Auth Me Points", False, f"Auth me failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Auth Me Points", False, f"Exception during auth me: {str(e)}")
-
-    def test_4_verify_post_in_feed(self):
-        """TEST 4: VERIFY POST IN FEED"""
-        print("=" * 60)
-        print("TEST 4: VERIFY POST IN FEED")
-        print("=" * 60)
-        
-        if not self.user1_token or not self.post_id:
-            self.log_test("Feed Verification", False, "No user token or post ID available")
-            return
-            
-        headers = {"Authorization": f"Bearer {self.user1_token}"}
-        
-        try:
-            response = self.session.get(f"{BASE_URL}/feed", headers=headers)
-            
-            if response.status_code == 200:
-                feed_data = response.json()
-                
-                # Find the newly created post
-                post_found = None
-                for post in feed_data:
-                    if post.get("id") == self.post_id:
-                        post_found = post
-                        break
-                
-                if post_found:
-                    # Verify post details
-                    user_profile_picture = post_found.get("user_profile_picture")
-                    review_text = post_found.get("review_text")
-                    rating = post_found.get("rating")
-                    user_level = post_found.get("user_level")
-                    user_title = post_found.get("user_title")
-                    
-                    if (user_profile_picture is None and 
-                        review_text == "Testing profile picture system - this is a great restaurant!" and
-                        rating == 8 and user_level == 1 and user_title == "Reviewer"):
-                        self.log_test(
-                            "Feed Verification", 
-                            True, 
-                            f"Post found in feed with correct details: user_profile_picture=null, rating=8, user_level=1, user_title='Reviewer'",
-                            post_found
-                        )
-                    else:
-                        self.log_test(
-                            "Feed Verification", 
-                            False, 
-                            f"Post details incorrect. Got: user_profile_picture={user_profile_picture}, review_text='{review_text}', rating={rating}, user_level={user_level}, user_title='{user_title}'",
-                            post_found
-                        )
-                else:
-                    self.log_test("Feed Verification", False, f"Post with ID {self.post_id} not found in feed", feed_data)
-            else:
-                self.log_test("Feed Verification", False, f"Feed request failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Feed Verification", False, f"Exception during feed verification: {str(e)}")
-
-    def test_5_upload_profile_picture(self):
-        """TEST 5: UPLOAD PROFILE PICTURE"""
-        print("=" * 60)
-        print("TEST 5: UPLOAD PROFILE PICTURE")
-        print("=" * 60)
-        
-        if not self.user1_token:
-            self.log_test("Profile Picture Upload", False, "No user token available")
-            return
-            
-        # Create a simple test image file
-        test_image_content = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDATx\x9cc\xf8\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00IEND\xaeB`\x82'
-        
-        files = {
-            'file': ('profile_pic.png', test_image_content, 'image/png')
-        }
-        
-        headers = {"Authorization": f"Bearer {self.user1_token}"}
-        
-        try:
-            response = self.session.post(f"{BASE_URL}/users/upload-profile-image", files=files, headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                profile_picture_url = data.get("profile_image_url")
-                
-                if profile_picture_url and profile_picture_url.startswith("/api/static/uploads/"):
-                    self.log_test(
-                        "Profile Picture Upload", 
-                        True, 
-                        f"Profile picture uploaded successfully. URL: {profile_picture_url}",
-                        data
-                    )
-                else:
-                    self.log_test(
-                        "Profile Picture Upload", 
-                        False, 
-                        f"Invalid profile picture URL: {profile_picture_url}",
-                        data
-                    )
-            else:
-                self.log_test("Profile Picture Upload", False, f"Profile picture upload failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Profile Picture Upload", False, f"Exception during profile picture upload: {str(e)}")
-
-    def test_6_verify_profile_picture_in_auth_me(self):
-        """TEST 6: VERIFY PROFILE PICTURE IN AUTH/ME"""
-        print("=" * 60)
-        print("TEST 6: VERIFY PROFILE PICTURE IN AUTH/ME")
-        print("=" * 60)
-        
-        if not self.user1_token:
-            self.log_test("Auth Me Profile Picture", False, "No user token available")
-            return
-            
-        headers = {"Authorization": f"Bearer {self.user1_token}"}
-        
-        try:
-            response = self.session.get(f"{BASE_URL}/auth/me", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                profile_picture = data.get("profile_picture")
-                
-                if profile_picture and profile_picture.startswith("/api/static/uploads/"):
-                    self.log_test(
-                        "Auth Me Profile Picture", 
-                        True, 
-                        f"Profile picture URL verified in auth/me: {profile_picture}",
-                        data
-                    )
-                else:
-                    self.log_test(
-                        "Auth Me Profile Picture", 
-                        False, 
-                        f"Profile picture URL not found or invalid: {profile_picture}",
-                        data
-                    )
-            else:
-                self.log_test("Auth Me Profile Picture", False, f"Auth me failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Auth Me Profile Picture", False, f"Exception during auth me profile picture check: {str(e)}")
-
-    def test_7_verify_dp_in_feed(self):
-        """TEST 7: VERIFY DP IN FEED"""
-        print("=" * 60)
-        print("TEST 7: VERIFY DP IN FEED")
-        print("=" * 60)
-        
-        if not self.user1_token or not self.post_id:
-            self.log_test("Feed DP Verification", False, "No user token or post ID available")
-            return
-            
-        headers = {"Authorization": f"Bearer {self.user1_token}"}
-        
-        try:
-            response = self.session.get(f"{BASE_URL}/feed", headers=headers)
-            
-            if response.status_code == 200:
-                feed_data = response.json()
-                
-                # Find the user's post
-                post_found = None
-                for post in feed_data:
-                    if post.get("id") == self.post_id:
-                        post_found = post
-                        break
-                
-                if post_found:
-                    user_profile_picture = post_found.get("user_profile_picture")
-                    
-                    if user_profile_picture and user_profile_picture.startswith("/api/static/uploads/"):
-                        self.log_test(
-                            "Feed DP Verification", 
-                            True, 
-                            f"Profile picture now visible in feed: {user_profile_picture}",
-                            post_found
-                        )
-                    else:
-                        self.log_test(
-                            "Feed DP Verification", 
-                            False, 
-                            f"Profile picture not found or invalid in feed: {user_profile_picture}",
-                            post_found
-                        )
-                else:
-                    self.log_test("Feed DP Verification", False, f"Post with ID {self.post_id} not found in feed", feed_data)
-            else:
-                self.log_test("Feed DP Verification", False, f"Feed request failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Feed DP Verification", False, f"Exception during feed DP verification: {str(e)}")
-
-    def test_8_create_second_user(self):
-        """TEST 8: CREATE SECOND USER FOR FOLLOW TEST"""
-        print("=" * 60)
-        print("TEST 8: CREATE SECOND USER FOR FOLLOW TEST")
-        print("=" * 60)
-        
-        # Generate unique email with timestamp
-        timestamp = int(time.time())
-        email = f"second_user_{timestamp}@test.com"
-        
-        payload = {
-            "full_name": "Second User",
-            "email": email,
-            "password": "TestPass123!"
-        }
-        
-        try:
-            response = self.session.post(f"{BASE_URL}/auth/signup", json=payload)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if "access_token" in data:
-                    self.user2_token = data["access_token"]
-                    
-                    # Get user profile to get user ID
-                    headers = {"Authorization": f"Bearer {self.user2_token}"}
-                    profile_response = self.session.get(f"{BASE_URL}/auth/me", headers=headers)
-                    
-                    if profile_response.status_code == 200:
-                        profile_data = profile_response.json()
-                        self.user2_id = profile_data.get("id")
-                        
-                        self.log_test(
-                            "Second User Creation", 
-                            True, 
-                            f"Second user created successfully with email {email}",
-                            {"signup": data, "profile": profile_data}
-                        )
-                    else:
-                        self.log_test("Second User Creation", False, f"Failed to get second user profile: {profile_response.status_code}", profile_response.text)
-                else:
-                    self.log_test("Second User Creation", False, "No access_token in response", data)
-            else:
-                self.log_test("Second User Creation", False, f"Second user signup failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Second User Creation", False, f"Exception during second user signup: {str(e)}")
-
-    def test_9_follow_first_user(self):
-        """TEST 9: FOLLOW FIRST USER"""
-        print("=" * 60)
-        print("TEST 9: FOLLOW FIRST USER")
-        print("=" * 60)
-        
-        if not self.user2_token or not self.user1_id:
-            self.log_test("Follow User", False, "No second user token or first user ID available")
-            return
-            
-        headers = {"Authorization": f"Bearer {self.user2_token}"}
-        
-        try:
-            response = self.session.post(f"{BASE_URL}/users/{self.user1_id}/follow", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if "message" in data and ("followed" in data["message"].lower() or "following" in data["message"].lower()):
-                    self.log_test(
-                        "Follow User", 
-                        True, 
-                        f"Successfully followed user {self.user1_id}",
-                        data
-                    )
-                else:
-                    self.log_test("Follow User", False, f"Unexpected response format", data)
-            else:
-                self.log_test("Follow User", False, f"Follow request failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Follow User", False, f"Exception during follow: {str(e)}")
-
-    def test_10_verify_follow_status(self):
-        """TEST 10: VERIFY FOLLOW STATUS"""
-        print("=" * 60)
-        print("TEST 10: VERIFY FOLLOW STATUS")
-        print("=" * 60)
-        
-        if not self.user2_token or not self.user1_id:
-            self.log_test("Follow Status", False, "No second user token or first user ID available")
-            return
-            
-        headers = {"Authorization": f"Bearer {self.user2_token}"}
-        
-        try:
-            response = self.session.get(f"{BASE_URL}/users/{self.user1_id}/follow-status", headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                is_following = data.get("isFollowing")
-                
-                if is_following == True:
-                    self.log_test(
-                        "Follow Status", 
-                        True, 
-                        f"Follow status verified: isFollowing=true",
-                        data
-                    )
-                else:
-                    self.log_test("Follow Status", False, f"Follow status incorrect: isFollowing={is_following}", data)
-            else:
-                self.log_test("Follow Status", False, f"Follow status request failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Follow Status", False, f"Exception during follow status check: {str(e)}")
-
-    def test_11_verify_follower_count(self):
-        """TEST 11: VERIFY FOLLOWER COUNT"""
-        print("=" * 60)
-        print("TEST 11: VERIFY FOLLOWER COUNT")
-        print("=" * 60)
-        
-        if not self.user1_id:
-            self.log_test("Follower Count", False, "No first user ID available")
-            return
-            
-        try:
-            response = self.session.get(f"{BASE_URL}/users/{self.user1_id}/stats")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                followers_count = data.get("followers_count")
-                
-                if followers_count >= 1:
-                    self.log_test(
-                        "Follower Count", 
-                        True, 
-                        f"Follower count verified: {followers_count} (should be >= 1)",
-                        data
-                    )
-                else:
-                    self.log_test("Follower Count", False, f"Follower count incorrect: {followers_count}", data)
-            else:
-                self.log_test("Follower Count", False, f"User stats request failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Follower Count", False, f"Exception during follower count check: {str(e)}")
-
-    def test_12_like_and_comment_on_post(self):
-        """TEST 12: LIKE AND COMMENT ON POST"""
-        print("=" * 60)
-        print("TEST 12: LIKE AND COMMENT ON POST")
-        print("=" * 60)
-        
-        if not self.user2_token or not self.post_id:
-            self.log_test("Like and Comment", False, "No second user token or post ID available")
-            return
-            
-        headers = {"Authorization": f"Bearer {self.user2_token}"}
-        
-        # Test like
-        try:
-            like_response = self.session.post(f"{BASE_URL}/posts/{self.post_id}/like", headers=headers)
-            
-            like_success = False
-            if like_response.status_code == 200:
-                like_data = like_response.json()
-                if "message" in like_data and "liked" in like_data["message"].lower():
-                    like_success = True
-            
-            # Test comment
-            comment_data = {
-                'comment_text': 'Great post!'
-            }
-            
-            comment_response = self.session.post(f"{BASE_URL}/posts/{self.post_id}/comment", data=comment_data, headers=headers)
-            
-            comment_success = False
-            comment_id = None
-            if comment_response.status_code == 200:
-                comment_response_data = comment_response.json()
-                comment_id = comment_response_data.get("comment_id")
-                if comment_id:
-                    comment_success = True
-            
-            if like_success and comment_success:
-                self.log_test(
-                    "Like and Comment", 
-                    True, 
-                    f"Successfully liked post and added comment. Comment ID: {comment_id}",
-                    {"like": like_data, "comment": comment_response_data}
-                )
-            else:
-                self.log_test(
-                    "Like and Comment", 
-                    False, 
-                    f"Like success: {like_success}, Comment success: {comment_success}",
-                    {"like_response": like_response.text, "comment_response": comment_response.text}
-                )
-                
-        except Exception as e:
-            self.log_test("Like and Comment", False, f"Exception during like and comment: {str(e)}")
-
-    def test_13_verify_comments(self):
-        """TEST 13: VERIFY COMMENTS"""
-        print("=" * 60)
-        print("TEST 13: VERIFY COMMENTS")
-        print("=" * 60)
-        
-        if not self.post_id:
-            self.log_test("Comments Verification", False, "No post ID available")
-            return
-            
-        try:
-            response = self.session.get(f"{BASE_URL}/posts/{self.post_id}/comments")
-            
-            if response.status_code == 200:
-                comments_data = response.json()
-                
-                # Find the comment from Second User
-                comment_found = None
-                for comment in comments_data:
-                    if (comment.get("username") == "Second User" and 
-                        comment.get("comment_text") == "Great post!"):
-                        comment_found = comment
-                        break
-                
-                if comment_found:
-                    profile_pic = comment_found.get("profile_pic")
-                    
-                    # Profile pic should be null for second user (no DP uploaded)
-                    if profile_pic is None:
-                        self.log_test(
-                            "Comments Verification", 
-                            True, 
-                            f"Comment found with correct details: username='Second User', comment_text='Great post!', profile_pic=null",
-                            comment_found
-                        )
-                    else:
-                        self.log_test(
-                            "Comments Verification", 
-                            False, 
-                            f"Comment profile_pic should be null but got: {profile_pic}",
-                            comment_found
-                        )
-                else:
-                    self.log_test("Comments Verification", False, "Comment from 'Second User' with text 'Great post!' not found", comments_data)
-            else:
-                self.log_test("Comments Verification", False, f"Comments request failed with status {response.status_code}", response.text)
-                
-        except Exception as e:
-            self.log_test("Comments Verification", False, f"Exception during comments verification: {str(e)}")
-
-    def run_all_tests(self):
-        """Run all tests in sequence"""
-        print("🚀 Starting Comprehensive End-to-End Backend Testing")
-        print(f"🌐 Base URL: {BASE_URL}")
-        print()
-        
-        # Run tests in sequence
-        self.test_1_create_new_user_account()
-        self.test_2_upload_new_post()
-        self.test_3_verify_points_in_auth_me()
-        self.test_4_verify_post_in_feed()
-        self.test_5_upload_profile_picture()
-        self.test_6_verify_profile_picture_in_auth_me()
-        self.test_7_verify_dp_in_feed()
-        self.test_8_create_second_user()
-        self.test_9_follow_first_user()
-        self.test_10_verify_follow_status()
-        self.test_11_verify_follower_count()
-        self.test_12_like_and_comment_on_post()
-        self.test_13_verify_comments()
-        
-        # Print summary
-        self.print_summary()
-
-    def print_summary(self):
-        """Print test summary"""
-        print("=" * 80)
-        print("🏁 TEST SUMMARY")
-        print("=" * 80)
-        
-        passed = sum(1 for result in self.test_results if result["success"])
-        total = len(self.test_results)
-        
-        print(f"Total Tests: {total}")
-        print(f"Passed: {passed}")
-        print(f"Failed: {total - passed}")
-        print(f"Success Rate: {(passed/total)*100:.1f}%")
-        print()
-        
-        # List failed tests
-        failed_tests = [result for result in self.test_results if not result["success"]]
-        if failed_tests:
-            print("❌ FAILED TESTS:")
-            for test in failed_tests:
-                print(f"   - {test['test']}: {test['details']}")
+        response = self.make_request("POST", "/auth/signup", data=user_a_data)
+        if response and response.status_code == 200:
+            self.user_a_token = response.json()["access_token"]
+            self.log("✅ User A created successfully")
         else:
-            print("✅ ALL TESTS PASSED!")
+            self.log(f"❌ User A creation failed: {response.text if response else 'No response'}")
+            return False
         
-        print()
-        print("=" * 80)
+        # Get User A profile to get ID
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        response = self.make_request("GET", "/auth/me", headers=headers)
+        if response and response.status_code == 200:
+            self.user_a_id = response.json()["id"]
+            self.log(f"✅ User A ID: {self.user_a_id}")
+        else:
+            self.log("❌ Failed to get User A profile")
+            return False
+        
+        # Create User B (follower)
+        user_b_data = {
+            "full_name": "User B",
+            "email": f"notif_user_b_{self.timestamp}@test.com",
+            "password": "TestPass123!"
+        }
+        
+        response = self.make_request("POST", "/auth/signup", data=user_b_data)
+        if response and response.status_code == 200:
+            self.user_b_token = response.json()["access_token"]
+            self.log("✅ User B created successfully")
+        else:
+            self.log(f"❌ User B creation failed: {response.text if response else 'No response'}")
+            return False
+        
+        # Get User B profile to get ID
+        headers = {"Authorization": f"Bearer {self.user_b_token}"}
+        response = self.make_request("GET", "/auth/me", headers=headers)
+        if response and response.status_code == 200:
+            self.user_b_id = response.json()["id"]
+            self.log(f"✅ User B ID: {self.user_b_id}")
+        else:
+            self.log("❌ Failed to get User B profile")
+            return False
+        
+        return True
+    
+    def test_2_user_b_follows_user_a(self):
+        """TEST 2: USER B FOLLOWS USER A"""
+        self.log("🧪 TEST 2: User B follows User A...")
+        
+        headers = {"Authorization": f"Bearer {self.user_b_token}"}
+        response = self.make_request("POST", f"/users/{self.user_a_id}/follow", headers=headers)
+        
+        if response and response.status_code == 200:
+            self.log("✅ Follow request successful")
+            
+            # Verify notification created for User A
+            headers_a = {"Authorization": f"Bearer {self.user_a_token}"}
+            response = self.make_request("GET", "/notifications", headers=headers_a)
+            
+            if response and response.status_code == 200:
+                notifications = response.json()
+                self.log(f"📋 User A has {len(notifications)} notifications")
+                
+                if len(notifications) >= 1:
+                    follow_notif = notifications[0]  # Latest notification
+                    self.log(f"📋 Notification details: {json.dumps(follow_notif, indent=2)}")
+                    
+                    # Verify notification fields
+                    checks = [
+                        (follow_notif.get("type") == "follow", "type: follow"),
+                        (follow_notif.get("fromUserName") == "User B", "fromUserName: User B"),
+                        ("started following you" in follow_notif.get("message", ""), "message contains 'started following you'"),
+                        (follow_notif.get("isRead") == False, "isRead: false"),
+                        (follow_notif.get("fromUserLevel") == 1, "fromUserLevel: 1")
+                    ]
+                    
+                    all_passed = True
+                    for check, desc in checks:
+                        if check:
+                            self.log(f"✅ {desc}")
+                        else:
+                            self.log(f"❌ {desc}")
+                            all_passed = False
+                    
+                    return all_passed
+                else:
+                    self.log("❌ No follow notification found")
+                    return False
+            else:
+                self.log(f"❌ Failed to get notifications: {response.text if response else 'No response'}")
+                return False
+        else:
+            self.log(f"❌ Follow request failed: {response.text if response else 'No response'}")
+            return False
+    
+    def test_3_get_unread_count_user_a(self):
+        """TEST 3: GET UNREAD COUNT FOR USER A"""
+        self.log("🧪 TEST 3: Getting unread count for User A...")
+        
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        response = self.make_request("GET", "/notifications/unread-count", headers=headers)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            unread_count = data.get("unreadCount", 0)
+            self.log(f"📋 Unread count: {unread_count}")
+            
+            if unread_count == 1:
+                self.log("✅ Unread count is correct (1)")
+                return True
+            else:
+                self.log(f"❌ Expected unread count 1, got {unread_count}")
+                return False
+        else:
+            self.log(f"❌ Failed to get unread count: {response.text if response else 'No response'}")
+            return False
+    
+    def test_4_user_a_creates_post(self):
+        """TEST 4: USER A CREATES A POST"""
+        self.log("🧪 TEST 4: User A creates a post...")
+        
+        # Create a test image file
+        test_image_content = b"fake_image_data_for_testing"
+        
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        data = {
+            "rating": "9",
+            "review_text": "Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!",
+            "map_link": "https://maps.google.com/?q=Times+Square,New+York"
+        }
+        files = {
+            "file": ("test_image.jpg", test_image_content, "image/jpeg")
+        }
+        
+        response = self.make_request("POST", "/posts/create", headers=headers, data=data, files=files)
+        
+        if response and response.status_code == 200:
+            result = response.json()
+            self.post_id = result.get("post_id")
+            self.log(f"✅ Post created successfully, ID: {self.post_id}")
+            
+            # Verify new_post notification for User B
+            headers_b = {"Authorization": f"Bearer {self.user_b_token}"}
+            response = self.make_request("GET", "/notifications", headers=headers_b)
+            
+            if response and response.status_code == 200:
+                notifications = response.json()
+                self.log(f"📋 User B has {len(notifications)} notifications")
+                
+                if len(notifications) >= 1:
+                    new_post_notif = notifications[0]  # Latest notification
+                    self.log(f"📋 Notification details: {json.dumps(new_post_notif, indent=2)}")
+                    
+                    # Verify notification fields
+                    checks = [
+                        (new_post_notif.get("type") == "new_post", "type: new_post"),
+                        (new_post_notif.get("fromUserName") == "User A", "fromUserName: User A"),
+                        (new_post_notif.get("postId") == self.post_id, f"postId: {self.post_id}"),
+                        (new_post_notif.get("postThumbnail") is not None, "postThumbnail exists"),
+                        ("uploaded a new post" in new_post_notif.get("message", ""), "message contains 'uploaded a new post'"),
+                        (new_post_notif.get("isRead") == False, "isRead: false")
+                    ]
+                    
+                    all_passed = True
+                    for check, desc in checks:
+                        if check:
+                            self.log(f"✅ {desc}")
+                        else:
+                            self.log(f"❌ {desc}")
+                            all_passed = False
+                    
+                    return all_passed
+                else:
+                    self.log("❌ No new_post notification found")
+                    return False
+            else:
+                self.log(f"❌ Failed to get User B notifications: {response.text if response else 'No response'}")
+                return False
+        else:
+            self.log(f"❌ Post creation failed: {response.text if response else 'No response'}")
+            return False
+    
+    def test_5_user_b_likes_post(self):
+        """TEST 5: USER B LIKES USER A'S POST"""
+        self.log("🧪 TEST 5: User B likes User A's post...")
+        
+        headers = {"Authorization": f"Bearer {self.user_b_token}"}
+        response = self.make_request("POST", f"/posts/{self.post_id}/like", headers=headers)
+        
+        if response and response.status_code == 200:
+            self.log("✅ Like successful")
+            
+            # Verify like notification for User A
+            headers_a = {"Authorization": f"Bearer {self.user_a_token}"}
+            response = self.make_request("GET", "/notifications", headers=headers_a)
+            
+            if response and response.status_code == 200:
+                notifications = response.json()
+                self.log(f"📋 User A has {len(notifications)} notifications")
+                
+                if len(notifications) >= 2:
+                    like_notif = notifications[0]  # Latest notification
+                    self.log(f"📋 Latest notification details: {json.dumps(like_notif, indent=2)}")
+                    
+                    # Verify notification fields
+                    checks = [
+                        (like_notif.get("type") == "like", "type: like"),
+                        (like_notif.get("fromUserName") == "User B", "fromUserName: User B"),
+                        (like_notif.get("postId") == self.post_id, f"postId: {self.post_id}"),
+                        (like_notif.get("postThumbnail") is not None, "postThumbnail exists"),
+                        ("liked your post" in like_notif.get("message", ""), "message contains 'liked your post'"),
+                        (like_notif.get("isRead") == False, "isRead: false")
+                    ]
+                    
+                    all_passed = True
+                    for check, desc in checks:
+                        if check:
+                            self.log(f"✅ {desc}")
+                        else:
+                            self.log(f"❌ {desc}")
+                            all_passed = False
+                    
+                    return all_passed
+                else:
+                    self.log("❌ Expected at least 2 notifications (follow + like)")
+                    return False
+            else:
+                self.log(f"❌ Failed to get User A notifications: {response.text if response else 'No response'}")
+                return False
+        else:
+            self.log(f"❌ Like request failed: {response.text if response else 'No response'}")
+            return False
+    
+    def test_6_user_b_comments_on_post(self):
+        """TEST 6: USER B COMMENTS ON USER A'S POST"""
+        self.log("🧪 TEST 6: User B comments on User A's post...")
+        
+        headers = {"Authorization": f"Bearer {self.user_b_token}"}
+        data = {"comment_text": "Great post!"}
+        
+        response = self.make_request("POST", f"/posts/{self.post_id}/comment", headers=headers, data=data)
+        
+        if response and response.status_code == 200:
+            self.log("✅ Comment created successfully")
+            
+            # Verify comment notification for User A
+            headers_a = {"Authorization": f"Bearer {self.user_a_token}"}
+            response = self.make_request("GET", "/notifications", headers=headers_a)
+            
+            if response and response.status_code == 200:
+                notifications = response.json()
+                self.log(f"📋 User A has {len(notifications)} notifications")
+                
+                if len(notifications) >= 3:
+                    comment_notif = notifications[0]  # Latest notification
+                    self.log(f"📋 Latest notification details: {json.dumps(comment_notif, indent=2)}")
+                    
+                    # Verify notification fields
+                    checks = [
+                        (comment_notif.get("type") == "comment", "type: comment"),
+                        (comment_notif.get("fromUserName") == "User B", "fromUserName: User B"),
+                        (comment_notif.get("postId") == self.post_id, f"postId: {self.post_id}"),
+                        (comment_notif.get("postThumbnail") is not None, "postThumbnail exists"),
+                        ("commented on your post" in comment_notif.get("message", ""), "message contains 'commented on your post'"),
+                        (comment_notif.get("isRead") == False, "isRead: false")
+                    ]
+                    
+                    all_passed = True
+                    for check, desc in checks:
+                        if check:
+                            self.log(f"✅ {desc}")
+                        else:
+                            self.log(f"❌ {desc}")
+                            all_passed = False
+                    
+                    return all_passed
+                else:
+                    self.log("❌ Expected at least 3 notifications (follow + like + comment)")
+                    return False
+            else:
+                self.log(f"❌ Failed to get User A notifications: {response.text if response else 'No response'}")
+                return False
+        else:
+            self.log(f"❌ Comment creation failed: {response.text if response else 'No response'}")
+            return False
+    
+    def test_7_check_user_a_unread_count(self):
+        """TEST 7: CHECK USER A'S UNREAD COUNT"""
+        self.log("🧪 TEST 7: Checking User A's unread count...")
+        
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        response = self.make_request("GET", "/notifications/unread-count", headers=headers)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            unread_count = data.get("unreadCount", 0)
+            self.log(f"📋 Unread count: {unread_count}")
+            
+            if unread_count == 3:
+                self.log("✅ Unread count is correct (3: follow + like + comment)")
+                return True
+            else:
+                self.log(f"❌ Expected unread count 3, got {unread_count}")
+                return False
+        else:
+            self.log(f"❌ Failed to get unread count: {response.text if response else 'No response'}")
+            return False
+    
+    def test_8_mark_specific_notification_read(self):
+        """TEST 8: MARK SPECIFIC NOTIFICATION AS READ"""
+        self.log("🧪 TEST 8: Marking specific notification as read...")
+        
+        # Get notifications to find first notification ID
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        response = self.make_request("GET", "/notifications", headers=headers)
+        
+        if response and response.status_code == 200:
+            notifications = response.json()
+            if len(notifications) >= 1:
+                first_notif_id = notifications[-1]["id"]  # Get oldest notification (follow)
+                self.log(f"📋 Marking notification {first_notif_id} as read")
+                
+                # Mark as read
+                response = self.make_request("POST", f"/notifications/{first_notif_id}/mark-read", headers=headers)
+                
+                if response and response.status_code == 200:
+                    self.log("✅ Notification marked as read")
+                    
+                    # Verify it's marked as read
+                    response = self.make_request("GET", "/notifications", headers=headers)
+                    if response and response.status_code == 200:
+                        notifications = response.json()
+                        marked_notif = next((n for n in notifications if n["id"] == first_notif_id), None)
+                        
+                        if marked_notif and marked_notif.get("isRead") == True:
+                            self.log("✅ Notification is marked as read")
+                            return True
+                        else:
+                            self.log("❌ Notification is not marked as read")
+                            return False
+                    else:
+                        self.log("❌ Failed to verify notification status")
+                        return False
+                else:
+                    self.log(f"❌ Failed to mark notification as read: {response.text if response else 'No response'}")
+                    return False
+            else:
+                self.log("❌ No notifications found")
+                return False
+        else:
+            self.log(f"❌ Failed to get notifications: {response.text if response else 'No response'}")
+            return False
+    
+    def test_9_mark_all_notifications_read(self):
+        """TEST 9: MARK ALL NOTIFICATIONS AS READ"""
+        self.log("🧪 TEST 9: Marking all notifications as read...")
+        
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        response = self.make_request("POST", "/notifications/mark-read", headers=headers)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            modified_count = data.get("modifiedCount", 0)
+            self.log(f"📋 Modified count: {modified_count}")
+            
+            if modified_count == 2:  # Should be 2 remaining unread (like + comment)
+                self.log("✅ Correct number of notifications marked as read")
+                
+                # Verify unread count is now 0
+                response = self.make_request("GET", "/notifications/unread-count", headers=headers)
+                if response and response.status_code == 200:
+                    data = response.json()
+                    unread_count = data.get("unreadCount", 0)
+                    
+                    if unread_count == 0:
+                        self.log("✅ Unread count is now 0")
+                        return True
+                    else:
+                        self.log(f"❌ Expected unread count 0, got {unread_count}")
+                        return False
+                else:
+                    self.log("❌ Failed to verify unread count")
+                    return False
+            else:
+                self.log(f"❌ Expected modified count 2, got {modified_count}")
+                return False
+        else:
+            self.log(f"❌ Failed to mark all as read: {response.text if response else 'No response'}")
+            return False
+    
+    def test_10_verify_no_self_notification(self):
+        """TEST 10: VERIFY NO SELF-NOTIFICATION"""
+        self.log("🧪 TEST 10: Verifying no self-notification...")
+        
+        # User A likes their own post
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        response = self.make_request("POST", f"/posts/{self.post_id}/like", headers=headers)
+        
+        # This should fail because User B already liked it, but let's check notifications anyway
+        self.log(f"📋 Self-like response: {response.status_code}")
+        
+        # Check User A's notifications - should not have any new ones
+        response = self.make_request("GET", "/notifications", headers=headers)
+        
+        if response and response.status_code == 200:
+            notifications = response.json()
+            self.log(f"📋 User A has {len(notifications)} notifications")
+            
+            # All notifications should still be read (from previous test)
+            unread_notifications = [n for n in notifications if not n.get("isRead", True)]
+            
+            if len(unread_notifications) == 0:
+                self.log("✅ No new notifications created (no self-notification)")
+                return True
+            else:
+                self.log(f"❌ Found {len(unread_notifications)} unread notifications")
+                return False
+        else:
+            self.log(f"❌ Failed to get notifications: {response.text if response else 'No response'}")
+            return False
+    
+    def test_11_user_a_creates_another_post(self):
+        """TEST 11: USER A CREATES ANOTHER POST"""
+        self.log("🧪 TEST 11: User A creates another post...")
+        
+        # Create another test image file
+        test_image_content = b"another_fake_image_data_for_testing"
+        
+        headers = {"Authorization": f"Bearer {self.user_a_token}"}
+        data = {
+            "rating": "8",
+            "review_text": "Delicious pizza! Great atmosphere and friendly staff.",
+            "map_link": "https://maps.google.com/?q=Central+Park,New+York"
+        }
+        files = {
+            "file": ("test_image2.jpg", test_image_content, "image/jpeg")
+        }
+        
+        response = self.make_request("POST", "/posts/create", headers=headers, data=data, files=files)
+        
+        if response and response.status_code == 200:
+            result = response.json()
+            second_post_id = result.get("post_id")
+            self.log(f"✅ Second post created successfully, ID: {second_post_id}")
+            
+            # Verify User B gets new_post notification
+            headers_b = {"Authorization": f"Bearer {self.user_b_token}"}
+            response = self.make_request("GET", "/notifications/unread-count", headers=headers_b)
+            
+            if response and response.status_code == 200:
+                data = response.json()
+                unread_count = data.get("unreadCount", 0)
+                self.log(f"📋 User B unread count: {unread_count}")
+                
+                if unread_count == 2:  # Should have 2 new_post notifications now
+                    self.log("✅ User B has correct unread count (2 new_post notifications)")
+                    return True
+                else:
+                    self.log(f"❌ Expected unread count 2, got {unread_count}")
+                    return False
+            else:
+                self.log(f"❌ Failed to get User B unread count: {response.text if response else 'No response'}")
+                return False
+        else:
+            self.log(f"❌ Second post creation failed: {response.text if response else 'No response'}")
+            return False
+    
+    def run_all_tests(self):
+        """Run all notification tests"""
+        self.log("🚀 Starting Comprehensive Notifications System Testing")
+        self.log(f"📍 Base URL: {self.base_url}")
+        
+        tests = [
+            ("CREATE TEST USERS", self.test_1_create_test_users),
+            ("USER B FOLLOWS USER A", self.test_2_user_b_follows_user_a),
+            ("GET UNREAD COUNT FOR USER A", self.test_3_get_unread_count_user_a),
+            ("USER A CREATES A POST", self.test_4_user_a_creates_post),
+            ("USER B LIKES USER A'S POST", self.test_5_user_b_likes_post),
+            ("USER B COMMENTS ON USER A'S POST", self.test_6_user_b_comments_on_post),
+            ("CHECK USER A'S UNREAD COUNT", self.test_7_check_user_a_unread_count),
+            ("MARK SPECIFIC NOTIFICATION AS READ", self.test_8_mark_specific_notification_read),
+            ("MARK ALL NOTIFICATIONS AS READ", self.test_9_mark_all_notifications_read),
+            ("VERIFY NO SELF-NOTIFICATION", self.test_10_verify_no_self_notification),
+            ("USER A CREATES ANOTHER POST", self.test_11_user_a_creates_another_post)
+        ]
+        
+        results = []
+        
+        for test_name, test_func in tests:
+            self.log(f"\n{'='*60}")
+            try:
+                result = test_func()
+                results.append((test_name, result))
+                status = "✅ PASS" if result else "❌ FAIL"
+                self.log(f"{status}: {test_name}")
+            except Exception as e:
+                self.log(f"❌ FAIL: {test_name} - Exception: {e}")
+                results.append((test_name, False))
+        
+        # Summary
+        self.log(f"\n{'='*60}")
+        self.log("📊 TEST SUMMARY")
+        self.log(f"{'='*60}")
+        
+        passed = sum(1 for _, result in results if result)
+        total = len(results)
+        
+        for test_name, result in results:
+            status = "✅ PASS" if result else "❌ FAIL"
+            self.log(f"{status} {test_name}")
+        
+        self.log(f"\n🎯 OVERALL RESULT: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
+        
+        if passed == total:
+            self.log("🎉 ALL TESTS PASSED! Notifications system is working correctly.")
+        else:
+            self.log(f"⚠️  {total-passed} tests failed. Please review the failures above.")
+        
+        return passed == total
+
 
 if __name__ == "__main__":
-    tester = CofauTester()
-    tester.run_all_tests()
+    test_suite = NotificationsTestSuite()
+    success = test_suite.run_all_tests()
+    exit(0 if success else 1)
