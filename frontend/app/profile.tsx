@@ -41,6 +41,13 @@ export default function ProfileScreen() {
   }, [token, userId]); // Re-fetch when userId changes
 
   useEffect(() => {
+    // Fetch follow status when viewing another user's profile
+    if (!isOwnProfile && userData?.id && token) {
+      fetchFollowStatus();
+    }
+  }, [isOwnProfile, userData?.id, token]);
+
+  useEffect(() => {
     if (userData) {
       fetchUserPosts();
     }
