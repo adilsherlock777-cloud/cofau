@@ -4,6 +4,7 @@ import {
   ActivityIndicator, TextInput, Modal, Alert, FlatList, Dimensions, Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
