@@ -311,11 +311,6 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     backgroundColor: '#fff',
   },
-  avatarLetter: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
   userNameText: {
     fontSize: 18,
     fontWeight: 'bold',
