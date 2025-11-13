@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { createPost } from '../utils/api';
+import LevelUpModal from '../components/LevelUpModal';
 
 export default function AddPostScreen() {
   const router = useRouter();
@@ -26,6 +27,8 @@ export default function AddPostScreen() {
   const [review, setReview] = useState('');
   const [mapsLink, setMapsLink] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [levelUpData, setLevelUpData] = useState({ level: 1, title: 'Reviewer' });
 
   // Request permissions and pick image
   const pickImage = async () => {
