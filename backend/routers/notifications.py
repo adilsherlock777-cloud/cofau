@@ -71,10 +71,17 @@ async def get_notifications(
     
     notifications = await cursor.to_list(length=limit)
     
-    # Enrich with user details
+    # Enrich with user details and post thumbnail
     result = []
     for notif in notifications:
         from_user = await db.users.find_one({"_id": ObjectId(notif["fromUserId"])})
+        
+        # Get post thumbnail if notification is related to a post
+        post_thumbnail = None
+        if notif.get("postId"):
+            post = await db.posts.find_one({"_id": ObjectId(notif["postId"])})
+            if post:
+                post_thumbnail = post.get("media_url")
         
         notif_data = {
             "id": str(notif["_id"]),
@@ -84,6 +91,7 @@ async def get_notifications(
             "fromUserProfilePicture": from_user.get("profile_picture") if from_user else None,
             "fromUserLevel": from_user.get("level", 1) if from_user else 1,
             "postId": notif.get("postId"),
+            "postThumbnail": post_thumbnail,
             "message": notif["message"],
             "isRead": notif["isRead"],
             "createdAt": notif["createdAt"],
