@@ -61,7 +61,9 @@ const styles = StyleSheet.create({
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <LevelProvider>
+        <RootLayoutNav />
+      </LevelProvider>
     </AuthProvider>
   );
 }
