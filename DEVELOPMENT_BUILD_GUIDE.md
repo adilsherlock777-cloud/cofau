@@ -112,7 +112,7 @@ If you just want to test quickly without building:
    - Android: https://play.google.com/store/apps/details?id=host.exp.exponent
 
 2. **Get QR Code from your preview**
-   - Your app: https://cofau-app.preview.emergentagent.com
+   - Your app: https://foodsocial-app.preview.emergentagent.com
    - Scan QR code with Expo Go app
 
 3. **Instant Testing**
@@ -149,7 +149,7 @@ We've configured three build profiles in `eas.json`:
 
 ### Backend Connection
 Your app is configured to connect to:
-- **Backend URL**: `https://cofau-app.preview.emergentagent.com/api`
+- **Backend URL**: `https://foodsocial-app.preview.emergentagent.com/api`
 
 **For Production Builds**, you'll need to:
 1. Deploy your backend to a permanent server (not the preview URL)
@@ -159,8 +159,8 @@ Your app is configured to connect to:
 ### Environment Variables
 Current configuration in `.env`:
 ```
-EXPO_PUBLIC_BACKEND_URL=https://cofau-app.preview.emergentagent.com
-EXPO_PUBLIC_API_URL=https://cofau-app.preview.emergentagent.com/api
+EXPO_PUBLIC_BACKEND_URL=https://foodsocial-app.preview.emergentagent.com
+EXPO_PUBLIC_API_URL=https://foodsocial-app.preview.emergentagent.com/api
 ```
 
 ---
