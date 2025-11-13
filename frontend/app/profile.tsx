@@ -10,6 +10,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import LevelBadge from '../components/LevelBadge';
 import UserAvatar from '../components/UserAvatar';
+import ProfileBadge from '../components/ProfileBadge';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://foodsocial-app.preview.emergentagent.com/api';
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
