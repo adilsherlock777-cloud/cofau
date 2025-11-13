@@ -76,21 +76,13 @@ export default function FeedCard({ post, onLikeUpdate }) {
           onPress={() => router.push(`/profile?userId=${post.user_id}`)}
           activeOpacity={0.7}
         >
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              {post.user_profile_picture ? (
-                <Image source={{ uri: post.user_profile_picture }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.avatarLetter}>
-                  {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
-                </Text>
-              )}
-            </View>
-            {/* Level Badge on Avatar */}
-            {post.user_level && (
-              <LevelBadge level={post.user_level} size="small" />
-            )}
-          </View>
+          <UserAvatar
+            profilePicture={post.user_profile_picture}
+            username={post.username}
+            size={32}
+            level={post.user_level}
+            showLevelBadge={true}
+          />
           <View style={styles.userTextContainer}>
             <Text style={styles.username}>{post.username}</Text>
             {post.created_at && (
