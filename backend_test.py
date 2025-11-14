@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 # Base URL from environment
-BASE_URL = "https://foodsocial-app.preview.emergentagent.com/api"
+BASE_URL = "https://backend.cofau.com/api"
 
 class NotificationsTestSuite:
     def __init__(self):
