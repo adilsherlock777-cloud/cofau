@@ -6,6 +6,14 @@ import MapButton from './MapButton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { likePost, unlikePost } from '../utils/api';
 import UserAvatar from './UserAvatar';
+import { Video } from 'expo-av';
+
+// Image or video URL normalizer
+const fixUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${process.env.EXPO_PUBLIC_BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
+};
 
 const formatTimestamp = (timestamp) => {
   const now = new Date();
@@ -23,65 +31,45 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(post.is_liked || false);
   const [likesCount, setLikesCount] = useState(post.likes || 0);
-  const [isLiking, setIsLiking] = useState(false);
+
+  const mediaUrl = fixUrl(post.media_url);
+  const isVideo = mediaUrl?.endsWith(".mp4");
 
   const handleImagePress = () => {
     router.push(`/post-details/${post.id}`);
   };
 
   const handleLike = async () => {
-    if (isLiking) return; // Prevent multiple clicks
-    
-    // Optimistic update
-    const previousIsLiked = isLiked;
-    const previousLikesCount = likesCount;
-    
-    setIsLiked(!isLiked);
-    setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
-    setIsLiking(true);
+    const prevLiked = isLiked;
+    const prevLikes = likesCount;
+
+    setIsLiked(!prevLiked);
+    setLikesCount(prevLiked ? prevLikes - 1 : prevLikes + 1);
 
     try {
-      if (isLiked) {
-        await unlikePost(post.id);
-        console.log('✅ Post unliked');
-      } else {
-        await likePost(post.id);
-        console.log('✅ Post liked');
-      }
-      
-      // Notify parent component to refresh feed if needed
-      if (onLikeUpdate) {
-        onLikeUpdate(post.id, !isLiked);
-      }
-    } catch (error) {
-      console.error('❌ Error toggling like:', error);
-      // Revert optimistic update on error
-      setIsLiked(previousIsLiked);
-      setLikesCount(previousLikesCount);
-    } finally {
-      setIsLiking(false);
+      if (prevLiked) await unlikePost(post.id);
+      else await likePost(post.id);
+    } catch (err) {
+      console.log("❌ Like error:", err);
+      setIsLiked(prevLiked);
+      setLikesCount(prevLikes);
     }
-  };
-
-  const handleCommentPress = () => {
-    router.push(`/comments/${post.id}`);
   };
 
   return (
     <View style={styles.card}>
-      {/* User Info */}
+      {/* USER INFO */}
       <View style={styles.userHeader}>
         <TouchableOpacity
           style={styles.userInfoTouchable}
           onPress={() => router.push(`/profile?userId=${post.user_id}`)}
-          activeOpacity={0.7}
         >
           <UserAvatar
-            profilePicture={post.user_profile_picture}
+            profilePicture={fixUrl(post.user_profile_picture)}
             username={post.username}
             size={32}
             level={post.user_level}
-            showLevelBadge={true}
+            showLevelBadge
           />
           <View style={styles.userTextContainer}>
             <Text style={styles.username}>{post.username}</Text>
@@ -90,222 +78,97 @@ export default function FeedCard({ post, onLikeUpdate }) {
             )}
           </View>
         </TouchableOpacity>
-        {post.user_badge && (
-          <View style={styles.badgeIcon}>
-            <Text style={styles.badgeIconText}>🏆</Text>
-          </View>
-        )}
       </View>
 
-      {/* Image Section */}
-      <TouchableOpacity onPress={handleImagePress} activeOpacity={0.9}>
-        {post.media_url ? (
-          <Image 
-            source={{ 
-              uri: post.media_url,
-              cache: 'reload' // Force fresh load to bypass any caching issues
-            }} 
-            style={styles.postImage}
+      {/* MEDIA DISPLAY */}
+      <TouchableOpacity onPress={handleImagePress}>
+        {isVideo ? (
+          <Video
+            source={{ uri: mediaUrl }}
+            style={styles.video}
             resizeMode="cover"
-            onError={(error) => {
-              console.error('❌ Image failed to load:', post.media_url, error.nativeEvent);
-            }}
-            onLoad={() => {
-              console.log('✅ Image loaded successfully:', post.media_url);
-            }}
+            useNativeControls
+            isLooping
           />
         ) : (
-          <LinearGradient
-            colors={['#66D9E8', '#F093FB', '#F5576C']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.imageGradient}
-          >
-            <Text style={styles.photoText}>PHOTO</Text>
-          </LinearGradient>
+          <Image
+            source={{ uri: mediaUrl }}
+            style={styles.postImage}
+            resizeMode="cover"
+            onError={(e) => console.log("❌ Image error:", mediaUrl, e.nativeEvent)}
+          />
         )}
       </TouchableOpacity>
 
-      {/* Action Row */}
+      {/* ACTION ROW */}
       <View style={styles.actionRow}>
-        <TouchableOpacity 
-          style={styles.actionItem} 
-          onPress={handleLike}
-          disabled={isLiking}
-        >
-          <Ionicons 
-            name={isLiked ? "heart" : "heart-outline"} 
-            size={24} 
-            color={isLiked ? "#FF6B6B" : "#999"} 
+        <TouchableOpacity onPress={handleLike} style={styles.actionItem}>
+          <Ionicons
+            name={isLiked ? "heart" : "heart-outline"}
+            size={24}
+            color={isLiked ? "#FF6B6B" : "#999"}
           />
           <Text style={[styles.actionText, isLiked && styles.likedText]}>
             {likesCount}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.actionItem}
-          onPress={handleCommentPress}
+          onPress={() => router.push(`/comments/${post.id}`)}
         >
           <Ionicons name="chatbubble-outline" size={22} color="#999" />
           <Text style={styles.actionText}>{post.comments || 0}</Text>
         </TouchableOpacity>
-        <View style={styles.actionItem}>
-          <Ionicons name="paper-plane-outline" size={22} color="#999" />
-          <Text style={styles.actionText}>{post.shares || 0}</Text>
-        </View>
       </View>
 
-      {/* Description */}
+      {/* DESCRIPTION */}
       <View style={styles.descriptionSection}>
         <Text style={styles.descriptionText}>
           <Text style={styles.boldUsername}>{post.username}</Text> {post.description}
         </Text>
+
         <View style={styles.ratingRow}>
           <Ionicons name="star" size={16} color="#FFD700" />
           <Text style={styles.ratingText}>{post.rating}/10</Text>
-          <Text style={styles.ratingLabel}>- {post.ratingLabel}</Text>
         </View>
       </View>
 
-      {/* Map Button */}
-      <MapButton
-        restaurantName={post.location}
-        mapsUrl={post.mapsUrl}
-      />
-
-      {/* Popular Photos */}
-      {post.popularPhotos && (
-        <View style={styles.popularPhotos}>
-          {post.popularPhotos.map((photo, index) => (
-            <LinearGradient
-              key={index}
-              colors={['#66D9E8', '#F093FB', '#F5576C']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.thumbnail}
-            />
-          ))}
-        </View>
-      )}
+      <MapButton restaurantName={post.location} mapsUrl={post.mapsUrl} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 16,
     padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
   userHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
   },
-  userInfoTouchable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  userTextContainer: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  username: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
-  },
-  badgeIcon: {
-    marginLeft: 8,
-  },
-  badgeIconText: {
-    fontSize: 16,
-  },
-  postImage: {
-    width: '100%',
-    height: 240,
-    borderRadius: 12,
-  },
-  imageGradient: {
-    width: '100%',
-    height: 240,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#FFF',
-    letterSpacing: 4,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    gap: 20,
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  actionText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  likedText: {
-    color: '#FF6B6B',
-    fontWeight: 'bold',
-  },
-  descriptionSection: {
-    marginBottom: 10,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 6,
-  },
-  boldUsername: {
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  ratingLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  popularPhotos: {
-    flexDirection: 'row',
-    marginTop: 12,
-    gap: 8,
-  },
-  thumbnail: {
-    width: 80,
-    height: 60,
-    borderRadius: 8,
-  },
+  userInfoTouchable: { flexDirection: "row", alignItems: "center", flex: 1 },
+  userTextContainer: { marginLeft: 8 },
+  username: { fontWeight: "bold", fontSize: 15, color: "#333" },
+  timestamp: { fontSize: 12, color: "#999" },
+
+  /* Media */
+  postImage: { width: "100%", height: 260, borderRadius: 12 },
+  video: { width: "100%", height: 260, borderRadius: 12, backgroundColor: "#000" },
+
+  /* Action Row */
+  actionRow: { flexDirection: "row", paddingVertical: 12, gap: 20 },
+  actionItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  actionText: { fontSize: 14, color: "#666" },
+  likedText: { color: "#FF6B6B" },
+
+  descriptionSection: { marginTop: 6 },
+  descriptionText: { fontSize: 14, color: "#444" },
+  boldUsername: { fontWeight: "bold" },
+  ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
 });
