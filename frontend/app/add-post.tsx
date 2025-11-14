@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,18 +22,18 @@ import { useLevelAnimation } from '../context/LevelContext';
 export default function AddPostScreen() {
   const router = useRouter();
   const { showLevelUpAnimation } = useLevelAnimation();
-  const [mediaUri, setMediaUri] = useState(null);
-  const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
+  const [mediaUri, setMediaUri] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [rating, setRating] = useState('');
   const [review, setReview] = useState('');
   const [mapsLink, setMapsLink] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Request permissions and pick image
+  // Pick image from gallery
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
-    if (permissionResult.granted === false) {
+    if (!permissionResult.granted) {
       Alert.alert('Permission Required', 'Permission to access gallery is required!');
       return;
     }
@@ -44,37 +44,38 @@ export default function AddPostScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets[0]) {
       setMediaUri(result.assets[0].uri);
       setMediaType('image');
     }
   };
 
-  // Request permissions and take photo
+  // Take photo with camera
   const takePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     
-    if (permissionResult.granted === false) {
+    if (!permissionResult.granted) {
       Alert.alert('Permission Required', 'Permission to access camera is required!');
       return;
     }
 
     const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 0.8,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets[0]) {
       setMediaUri(result.assets[0].uri);
       setMediaType('image');
     }
   };
 
-  // Pick video
+  // Pick video from gallery
   const pickVideo = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
-    if (permissionResult.granted === false) {
+    if (!permissionResult.granted) {
       Alert.alert('Permission Required', 'Permission to access gallery is required!');
       return;
     }
@@ -86,7 +87,7 @@ export default function AddPostScreen() {
       videoMaxDuration: 15, // Max 15 seconds
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets[0]) {
       setMediaUri(result.assets[0].uri);
       setMediaType('video');
     }
@@ -94,16 +95,12 @@ export default function AddPostScreen() {
 
   // Show media upload options
   const showMediaOptions = () => {
-    Alert.alert(
-      'Add Media',
-      'Choose an option',
-      [
-        { text: 'Take Photo', onPress: takePhoto },
-        { text: 'Choose Photo', onPress: pickImage },
-        { text: 'Choose Video (max 15s)', onPress: pickVideo },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Add Media', 'Choose an option', [
+      { text: 'Take Photo', onPress: takePhoto },
+      { text: 'Choose Photo', onPress: pickImage },
+      { text: 'Choose Video (max 15s)', onPress: pickVideo },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   // Open Google Maps link
@@ -117,29 +114,25 @@ export default function AddPostScreen() {
 
   // Handle post submission
   const handlePost = async () => {
-    // Validation
-    if (!mediaUri) {
-      if (Platform.OS === 'web') {
-        window.alert('Please add a photo or video');
-      } else {
-        Alert.alert('Media Required', 'Please add a photo or video');
-      }
+    if (!mediaUri || !mediaType) {
+      Platform.OS === 'web'
+        ? window.alert('Please add a photo or video')
+        : Alert.alert('Media Required', 'Please add a photo or video');
       return;
     }
-    if (!rating || rating < 1 || rating > 10) {
-      if (Platform.OS === 'web') {
-        window.alert('Please add a rating between 1-10');
-      } else {
-        Alert.alert('Rating Required', 'Please add a rating between 1-10');
-      }
+
+    const numericRating = parseInt(rating, 10);
+    if (!numericRating || numericRating < 1 || numericRating > 10) {
+      Platform.OS === 'web'
+        ? window.alert('Please add a rating between 1-10')
+        : Alert.alert('Rating Required', 'Please add a rating between 1-10');
       return;
     }
+
     if (!review.trim()) {
-      if (Platform.OS === 'web') {
-        window.alert('Please write a review');
-      } else {
-        Alert.alert('Review Required', 'Please write a review');
-      }
+      Platform.OS === 'web'
+        ? window.alert('Please write a review')
+        : Alert.alert('Review Required', 'Please write a review');
       return;
     }
 
@@ -147,31 +140,34 @@ export default function AddPostScreen() {
 
     try {
       console.log('📝 Preparing to create post...');
-      
-      // Prepare file object for upload
-      let fileToUpload;
-      
+
+      let fileToUpload: any;
+
       if (Platform.OS === 'web') {
-        // On web, we need to fetch the image and convert to blob
+        // Web: convert the URL to a File
         const response = await fetch(mediaUri);
         const blob = await response.blob();
-        const filename = `image_${Date.now()}.jpg`;
-        fileToUpload = new File([blob], filename, { type: blob.type });
+        const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+        const filename = `${mediaType}_${Date.now()}.${ext}`;
+        fileToUpload = new File([blob], filename, {
+          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+        });
       } else {
-        // On native, pass the URI with metadata
-        const filename = mediaUri.split('/').pop() || `image_${Date.now()}.jpg`;
+        // Native
+        const filename = mediaUri.split('/').pop() || `${mediaType}_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`;
         fileToUpload = {
           uri: mediaUri,
           name: filename,
-          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',  // 👈 force MP4 for videos
         };
       }
 
       const postData = {
-        rating: parseInt(rating),
+        rating: numericRating,
         review_text: review,
         map_link: mapsLink || null,
         file: fileToUpload,
+        media_type: mediaType, // 👈 tell backend if it's image or video
       };
 
       console.log('📤 Submitting post to backend...');
@@ -180,36 +176,32 @@ export default function AddPostScreen() {
 
       setLoading(false);
 
-      // Check if user leveled up (only for levels 1-4)
+      // Level up animation logic
       if (result.leveledUp && result.newLevel >= 1 && result.newLevel <= 4) {
         console.log('🎉 User leveled up to Level', result.newLevel);
-        
-        // Trigger level-up animation
+
         showLevelUpAnimation(result.newLevel);
-        
-        // Navigate to feed after animation completes (2.5s + buffer)
+
         setTimeout(() => {
           router.push('/feed');
         }, 3000);
       } else {
-        // Show success message and redirect immediately
         if (Platform.OS === 'web') {
           window.alert('Post Submitted Successfully! 🎉');
           router.push('/feed');
         } else {
-          Alert.alert(
-            'Success!',
-            'Your post has been submitted successfully! 🎉',
-            [{ text: 'OK', onPress: () => router.push('/feed') }]
-          );
+          Alert.alert('Success!', 'Your post has been submitted successfully! 🎉', [
+            { text: 'OK', onPress: () => router.push('/feed') },
+          ]);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error creating post:', error);
       setLoading(false);
-      
-      const errorMessage = error.response?.data?.detail || error.message || 'Failed to create post';
-      
+
+      const errorMessage =
+        error?.response?.data?.detail || error?.message || 'Failed to create post';
+
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMessage}`);
       } else {
@@ -229,16 +221,16 @@ export default function AddPostScreen() {
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Media Upload Section */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Photo / Video</Text>
-          <TouchableOpacity 
-            style={styles.mediaBox} 
+          <TouchableOpacity
+            style={styles.mediaBox}
             onPress={showMediaOptions}
             activeOpacity={0.8}
           >
@@ -257,7 +249,7 @@ export default function AddPostScreen() {
                     </LinearGradient>
                   </View>
                 )}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.changeMediaButton}
                   onPress={showMediaOptions}
                 >
@@ -290,7 +282,11 @@ export default function AddPostScreen() {
                   <Ionicons
                     name="star"
                     size={28}
-                    color={starIndex <= parseInt(rating || '0') ? '#FFD700' : '#E0E0E0'}
+                    color={
+                      starIndex <= parseInt(rating || '0', 10)
+                        ? '#FFD700'
+                        : '#E0E0E0'
+                    }
                   />
                 </TouchableOpacity>
               ))}
@@ -325,21 +321,34 @@ export default function AddPostScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.mapsButton}
             onPress={openMapsLink}
             disabled={!mapsLink}
           >
-            <Ionicons name="location" size={20} color={mapsLink ? '#4ECDC4' : '#CCC'} />
-            <Text style={[styles.mapsButtonText, !mapsLink && styles.mapsButtonTextDisabled]}>
+            <Ionicons
+              name="location"
+              size={20}
+              color={mapsLink ? '#4ECDC4' : '#CCC'}
+            />
+            <Text
+              style={[
+                styles.mapsButtonText,
+                !mapsLink && styles.mapsButtonTextDisabled,
+              ]}
+            >
               Open in Maps
             </Text>
-            <Ionicons name="chevron-forward" size={20} color={mapsLink ? '#4ECDC4' : '#CCC'} />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={mapsLink ? '#4ECDC4' : '#CCC'}
+            />
           </TouchableOpacity>
         </View>
 
         {/* POST Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.postButtonContainer}
           onPress={handlePost}
           activeOpacity={0.8}
@@ -367,19 +376,15 @@ export default function AddPostScreen() {
         <TouchableOpacity onPress={() => router.push('/feed')}>
           <Ionicons name="home-outline" size={28} color="#000" />
         </TouchableOpacity>
-
         <TouchableOpacity onPress={() => router.push('/explore')}>
           <Ionicons name="compass-outline" size={28} color="#000" />
         </TouchableOpacity>
-
         <TouchableOpacity onPress={() => router.push('/add-post')}>
           <Ionicons name="add-circle-outline" size={28} color="#000" />
         </TouchableOpacity>
-
         <TouchableOpacity onPress={() => router.push('/happening')}>
           <Ionicons name="flame-outline" size={28} color="#000" />
         </TouchableOpacity>
-
         <TouchableOpacity onPress={() => router.push('/profile')}>
           <Ionicons name="person-outline" size={28} color="#000" />
         </TouchableOpacity>
@@ -389,10 +394,7 @@ export default function AddPostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
     backgroundColor: '#FFF',
     paddingVertical: 16,
@@ -403,28 +405,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  headerRight: {
-    width: 32,
-  },
-  scrollView: {
-    flex: 1,
-  },
+  backButton: { padding: 4 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  headerRight: { width: 32 },
+  scrollView: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 20,
   },
-  section: {
-    marginBottom: 24,
-  },
+  section: { marginBottom: 24 },
   sectionLabel: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -457,23 +447,10 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 4,
   },
-  mediaPreview: {
-    flex: 1,
-    position: 'relative',
-  },
-  mediaImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  videoPreview: {
-    flex: 1,
-  },
-  videoGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  mediaPreview: { flex: 1, position: 'relative' },
+  mediaImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  videoPreview: { flex: 1 },
+  videoGradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   videoText: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -489,11 +466,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
-  changeMediaText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  changeMediaText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
   ratingContainer: {
     backgroundColor: '#FFF',
     borderRadius: 12,
@@ -507,14 +480,8 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 12,
   },
-  starsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  starButton: {
-    padding: 2,
-  },
+  starsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  starButton: { padding: 2 },
   reviewInput: {
     backgroundColor: '#FFF',
     borderRadius: 12,
@@ -551,12 +518,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4ECDC4',
   },
-  mapsButtonTextDisabled: {
-    color: '#CCC',
-  },
-  postButtonContainer: {
-    marginTop: 12,
-  },
+  mapsButtonTextDisabled: { color: '#CCC' },
+  postButtonContainer: { marginTop: 12 },
   postButton: {
     paddingVertical: 18,
     borderRadius: 12,
@@ -574,9 +537,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     letterSpacing: 1,
   },
-  bottomSpacer: {
-    height: 20,
-  },
+  bottomSpacer: { height: 20 },
   navBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
