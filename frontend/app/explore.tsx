@@ -1,406 +1,269 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Dimensions,
   TextInput,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
-import { likePost, unlikePost } from '../utils/api';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useAuth } from "../context/AuthContext";
+import axios from "axios";
+import { Image } from "expo-image"; // ⭐ FIX: Expo Image for caching + stable reloads
+import { likePost, unlikePost } from "../utils/api";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
+// 🟦 API CONFIG
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_BACKEND_URL ||
+  "https://foodsocial-app.preview.emergentagent.com";
+
 const API_URL = `${API_BASE_URL}/api`;
 
-// Screen dimensions and card sizing for 3-column grid
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SPACING = 2; // Minimal spacing between grid items
+// GRID CONFIG
+const SCREEN_WIDTH = Dimensions.get("window").width;
 const NUM_COLUMNS = 3;
-const TILE_SIZE = (SCREEN_WIDTH - (SPACING * (NUM_COLUMNS + 1))) / NUM_COLUMNS;
+const SPACING = 2;
+const TILE_SIZE = (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 
-console.log('✅ Explore Screen - Redesigned with 3-column grid layout');
+// Placeholder BlurHash loading effect
+const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
 export default function ExploreScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
+
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
+  // 🔄 Refresh posts whenever screen becomes active
   useFocusEffect(
     useCallback(() => {
-      if (user && token) {
-        fetchPosts(true);
-      }
+      if (user && token) fetchPosts(true);
     }, [user, token])
   );
 
+  // 📌 Fetch Explore posts
   const fetchPosts = async (refresh = false) => {
-    if (!hasMore && !refresh) return;
-    if (loadingMore) return;
-
     try {
       if (refresh) {
         setLoading(true);
         setPage(1);
-        setPosts([]);
       } else {
         setLoadingMore(true);
       }
 
-      const currentPage = refresh ? 1 : page;
-      console.log('🔍 Fetching explore posts, page:', currentPage);
+      const skip = refresh ? 0 : (page - 1) * 30;
 
-      const response = await axios.get(`${API_URL}/feed?limit=30&skip=${(currentPage - 1) * 30}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await axios.get(`${API_URL}/feed?limit=30&skip=${skip}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log('📊 Received', response.data.length, 'posts');
+      const newPosts = res.data.map((post) => {
+        const raw = post.media_url || post.image_url;
 
-      // Transform data to add full image URLs and validate required fields
-      const transformedPosts = response.data
-        .filter(post => {
-          // Filter out posts without required fields
-          if (!post.id || !post.user_id) {
-            console.warn('⚠️ Skipping post without id or user_id:', post);
-            return false;
-          }
-          if (!post.image_url && !post.media_url) {
-            console.warn('⚠️ Skipping post without image:', post.id);
-            return false;
-          }
-          return true;
-        })
-        .map(post => {
-          const imageUrl = post.image_url || post.media_url;
-          let fullUrl = null;
-          
-          if (imageUrl) {
-            if (imageUrl.startsWith('http')) {
-              fullUrl = imageUrl;
-            } else {
-              fullUrl = `${API_BASE_URL}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
-            }
-          }
-          
-          return {
-            ...post,
-            full_image_url: fullUrl,
-            is_liked: post.is_liked_by_user || post.is_liked || false,
-          };
-        });
+        const fullUrl =
+          raw && raw.startsWith("http")
+            ? raw
+            : `${API_BASE_URL}${raw.startsWith("/") ? raw : "/" + raw}`;
 
-      if (refresh) {
-        setPosts(transformedPosts);
-      } else {
-        setPosts(prev => [...prev, ...transformedPosts]);
-      }
+        return {
+          ...post,
+          full_image_url: fullUrl,
+          is_liked: post.is_liked_by_user || false,
+        };
+      });
 
-      setHasMore(transformedPosts.length >= 30);
-      setPage(currentPage + 1);
-      setLoading(false);
-      setLoadingMore(false);
-    } catch (error) {
-      console.error('❌ Error fetching explore data:', error);
+      refresh ? setPosts(newPosts) : setPosts((p) => [...p, ...newPosts]);
+
+      setHasMore(newPosts.length >= 30);
+      setPage((prev) => prev + 1);
+    } catch (err) {
+      console.error("❌ Explore fetch error:", err);
+    } finally {
       setLoading(false);
       setLoadingMore(false);
     }
   };
 
-  const handleLikeToggle = async (postId, isCurrentlyLiked) => {
-    try {
-      // Optimistic update
-      setPosts(prev =>
-        prev.map(post =>
-          post.id === postId
-            ? { ...post, is_liked: !isCurrentlyLiked, likes_count: post.likes_count + (isCurrentlyLiked ? -1 : 1) }
-            : post
-        )
-      );
+  // 🔍 SEARCH FILTER
+  const filteredPosts = useMemo(() => {
+    if (!searchQuery.trim()) return posts;
 
-      // API call
-      if (isCurrentlyLiked) {
-        await unlikePost(postId);
-      } else {
-        await likePost(postId);
-      }
-    } catch (error) {
-      console.error('❌ Error toggling like:', error);
-      // Revert on error
-      setPosts(prev =>
-        prev.map(post =>
-          post.id === postId
-            ? { ...post, is_liked: isCurrentlyLiked, likes_count: post.likes_count + (isCurrentlyLiked ? 1 : -1) }
-            : post
-        )
-      );
-    }
-  };
-
-  const renderGridItem = ({ item }) => {
-    const isVideo = item.media_type === 'video';
-    
-    return (
-      <TouchableOpacity
-        style={styles.gridTile}
-        onPress={() => router.push(`/post-details/${item.id}`)}
-        activeOpacity={0.8}
-      >
-        {item.full_image_url ? (
-          <Image
-            source={{ uri: item.full_image_url }}
-            style={styles.gridImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.noImageContainer}>
-            <Ionicons name="image-outline" size={40} color="#CCC" />
-          </View>
-        )}
-
-        {/* Play icon for videos - bottom left */}
-        {isVideo && (
-          <View style={styles.playIconContainer}>
-            <Ionicons name="play" size={16} color="#fff" />
-          </View>
-        )}
-
-        {/* Heart icon for like - top right */}
-        <TouchableOpacity
-          style={styles.heartIconContainer}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleLikeToggle(item.id, item.is_liked);
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={item.is_liked ? 'heart' : 'heart-outline'}
-            size={20}
-            color={item.is_liked ? '#FF6B6B' : '#fff'}
-          />
-        </TouchableOpacity>
-      </TouchableOpacity>
+    return posts.filter((p) =>
+      (p.caption || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
+  }, [searchQuery, posts]);
+
+  // ❤️ LIKE/UNLIKE
+  const handleLike = async (id, liked) => {
+    try {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                is_liked: !liked,
+                likes_count: p.likes_count + (liked ? -1 : 1),
+              }
+            : p
+        )
+      );
+
+      liked ? await unlikePost(id) : await likePost(id);
+    } catch (err) {
+      console.log("❌ Like error:", err);
+    }
   };
 
-  const renderHeader = () => (
-    <View style={styles.searchContainer}>
-      <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="SEARCH"
-          placeholderTextColor="#999"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
+  // 🖼️ RENDER GRID ITEM
+  const renderGridItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.tile}
+      activeOpacity={0.85}
+      onPress={() => router.push(`/post-details/${item.id}`)}
+    >
+      <Image
+        source={item.full_image_url}
+        style={styles.gridImage}
+        cachePolicy="memory-disk"
+        placeholder={{ blurhash: BLUR_HASH }}
+        contentFit="cover"
+        transition={300}
+      />
+
+      {/* ❤️ Like Button */}
+      <TouchableOpacity
+        style={styles.likeBtn}
+        onPress={(e) => {
+          e.stopPropagation();
+          handleLike(item.id, item.is_liked);
+        }}
+      >
+        <Ionicons
+          name={item.is_liked ? "heart" : "heart-outline"}
+          size={20}
+          color={item.is_liked ? "#FF4D4D" : "#ffffff"}
         />
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-      </View>
-    </View>
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
 
-  const renderFooter = () => {
-    if (!loadingMore) return null;
+  // 🔄 LOADING STATES
+  if (!user || !token)
     return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#666" />
-      </View>
-    );
-  };
-
-  // Show loading if not authenticated yet
-  if (!user || !token) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
+      <View style={styles.center}>
         <ActivityIndicator size="large" color="#4dd0e1" />
-        <Text style={styles.loadingText}>Authenticating...</Text>
+        <Text style={{ marginTop: 8 }}>Authenticating...</Text>
       </View>
     );
-  }
 
-  if (loading) {
+  if (loading)
     return (
-      <View style={[styles.container, styles.centerContent]}>
+      <View style={styles.center}>
         <ActivityIndicator size="large" color="#4dd0e1" />
-        <Text style={styles.loadingText}>Loading explore...</Text>
+        <Text style={{ marginTop: 8 }}>Loading explore...</Text>
       </View>
     );
-  }
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={posts}
-        renderItem={renderGridItem}
-        keyExtractor={(item, index) => `${item.id}_${index}`}
-        numColumns={NUM_COLUMNS}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
-        onEndReached={() => fetchPosts(false)}
-        onEndReachedThreshold={0.5}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.gridContainer}
-        columnWrapperStyle={styles.columnWrapper}
-      />
-
-      {/* Bottom Navigation */}
-      <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={28} color="#000" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/explore')}>
-          <Ionicons name="compass" size={28} color="#000" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/add-post')}>
-          <Ionicons name="add-circle-outline" size={28} color="#000" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/happening')}>
-          <Ionicons name="flame-outline" size={28} color="#000" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/profile')}>
-          <Ionicons name="person-outline" size={28} color="#000" />
-        </TouchableOpacity>
+      {/* 🔍 SEARCH BAR */}
+      <View style={styles.searchBox}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search posts..."
+          placeholderTextColor="#999"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        <Ionicons name="search" size={20} color="#777" />
       </View>
+
+      {/* 🔳 GRID */}
+      <FlatList
+        data={filteredPosts}
+        renderItem={renderGridItem}
+        keyExtractor={(item) => item.id}
+        numColumns={NUM_COLUMNS}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 80 }}
+        columnWrapperStyle={{
+          gap: SPACING,
+          paddingHorizontal: SPACING,
+        }}
+        onEndReached={() => fetchPosts(false)}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ padding: 20 }}>
+              <ActivityIndicator size="small" />
+            </View>
+          ) : null
+        }
+      />
     </View>
   );
 }
 
+// 🎨 STYLES
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: "#fff" },
+
+  center: {
     flex: 1,
-    backgroundColor: '#fff',
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-  },
-
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 25,
+  searchBox: {
+    margin: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "#f2f2f2",
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    color: '#333',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    color: "#333",
+    marginRight: 10,
   },
 
-  searchIcon: {
-    marginLeft: 8,
-  },
-
-  gridContainer: {
-    paddingBottom: 100,
-  },
-
-  columnWrapper: {
-    gap: SPACING,
-    paddingHorizontal: SPACING,
-  },
-
-  gridTile: {
+  tile: {
     width: TILE_SIZE,
     height: TILE_SIZE,
+    borderRadius: 6,
+    overflow: "hidden",
+    backgroundColor: "#eaeaea",
+    position: "relative",
     marginBottom: SPACING,
-    position: 'relative',
-    backgroundColor: '#F0F0F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
 
   gridImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
 
-  noImageContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F0F0F0',
-  },
-
-  playIconContainer: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  heartIconContainer: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  footerLoader: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  likeBtn: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    padding: 4,
+    borderRadius: 20,
   },
 });
+

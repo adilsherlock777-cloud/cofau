@@ -16,7 +16,7 @@ import Constants from 'expo-constants';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from './UserAvatar';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com/api';
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com/api';
 
 export default function StoriesBar() {
   const router = useRouter();

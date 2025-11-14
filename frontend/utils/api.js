@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
 const API_URL = `${API_BASE_URL}/api`;
 
 // Create axios instance
