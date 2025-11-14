@@ -20,8 +20,8 @@ import LevelBadge from '../../components/LevelBadge';
 import UserAvatar from '../../components/UserAvatar';
 import axios from 'axios';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://foodsocial-app.preview.emergentagent.com/api';
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://backend.cofau.com/api';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 
 export default function PostDetailsScreen() {
   const router = useRouter();

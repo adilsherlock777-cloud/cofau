@@ -3,7 +3,7 @@ import { View, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LevelBadge from './LevelBadge';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 
 export default function UserAvatar({
   profilePicture,
