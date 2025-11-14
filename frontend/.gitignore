@@ -1,0 +1,18 @@
+# Expo / React Native cache
+.expo
+.expo-shared
+.metro-cache
+node_modules
+web-build
+dist
+build
+
+# FastAPI / Python (backend) cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+*.log

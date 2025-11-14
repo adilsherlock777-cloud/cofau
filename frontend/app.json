@@ -1,0 +1,77 @@
+{
+  "expo": {
+    "name": "Cofau",
+    "slug": "cofau-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "cofau",
+    "userInterfaceStyle": "automatic",
+
+    "icon": "./assets/images/icon.png",
+
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cofau.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow Cofau to access your photo library for uploading posts.",
+        "NSCameraUsageDescription": "Allow Cofau to access your camera for taking pictures."
+      }
+    },
+
+    "android": {
+      "package": "com.cofau.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET"
+      ],
+      "allowBackup": false
+    },
+
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      "expo-secure-store"
+    ],
+
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+
+    "assetBundlePatterns": ["**/*"],
+
+    "extra": {
+      "apiUrl": "https://backend.cofau.com/api",
+      "eas": {
+        "projectId": "2094671e-9a3c-410d-bfcd-aa523cffdf86"
+      }
+    },
+
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
+  }
+}
