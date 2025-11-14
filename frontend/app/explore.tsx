@@ -19,7 +19,7 @@ import { likePost, unlikePost } from "../utils/api";
 // 🟦 API CONFIG
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL ||
-  "https://foodsocial-app.preview.emergentagent.com";
+  "https://backend.cofau.com";
 
 const API_URL = `${API_BASE_URL}/api`;
 
