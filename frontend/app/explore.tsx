@@ -13,24 +13,21 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
-import { Image } from "expo-image";
+import { Image } from "expo-image"; // Better caching
 import { likePost, unlikePost } from "../utils/api";
 
 // API CONFIG
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
-
 const API_URL = `${API_BASE_URL}/api`;
 
-// GRID CONFIG
+// Grid
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const NUM_COLUMNS = 3;
 const SPACING = 2;
-const TILE_SIZE =
-  (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
+const TILE_SIZE = (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 
-// BlurHash
-const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
+const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I"; // Placeholder blur
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -43,14 +40,14 @@ export default function ExploreScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // REFRESH on screen focus
+  // Refresh on screen focus
   useFocusEffect(
     useCallback(() => {
       if (user && token) fetchPosts(true);
     }, [user, token])
   );
 
-  // FETCH POSTS
+  // Fetch explore posts
   const fetchPosts = async (refresh = false) => {
     try {
       if (refresh) {
@@ -74,9 +71,19 @@ export default function ExploreScreen() {
             ? raw
             : `${API_BASE_URL}${raw.startsWith("/") ? raw : "/" + raw}`;
 
+        const thumb =
+          post.thumbnail_url && !post.thumbnail_url.startsWith("http")
+            ? `${API_BASE_URL}${
+                post.thumbnail_url.startsWith("/")
+                  ? post.thumbnail_url
+                  : "/" + post.thumbnail_url
+              }`
+            : post.thumbnail_url;
+
         return {
           ...post,
           full_image_url: fullUrl,
+          full_thumbnail_url: thumb || null,
           is_liked: post.is_liked_by_user || false,
         };
       });
@@ -93,7 +100,7 @@ export default function ExploreScreen() {
     }
   };
 
-  // SEARCH FILTER
+  // Search filter
   const filteredPosts = useMemo(() => {
     if (!searchQuery.trim()) return posts;
 
@@ -102,7 +109,7 @@ export default function ExploreScreen() {
     );
   }, [searchQuery, posts]);
 
-  // LIKE / UNLIKE
+  // Like/unlike
   const handleLike = async (id, liked) => {
     try {
       setPosts((prev) =>
@@ -123,11 +130,13 @@ export default function ExploreScreen() {
     }
   };
 
-  // RENDER GRID TILE
+  // Render grid tile
   const renderGridItem = ({ item }) => {
-    const isVideo = item.full_image_url
-      ?.toLowerCase()
-      ?.endsWith(".mp4");
+    // For videos → show thumbnail
+    const displayImage =
+      item.media_type === "video"
+        ? item.full_thumbnail_url
+        : item.full_image_url;
 
     return (
       <TouchableOpacity
@@ -135,23 +144,23 @@ export default function ExploreScreen() {
         activeOpacity={0.85}
         onPress={() => router.push(`/post-details/${item.id}`)}
       >
-        {/* VIDEO PLACEHOLDER */}
-        {isVideo ? (
-          <View style={styles.videoPlaceholder}>
-            <Ionicons name="play-circle-outline" size={42} color="#fff" />
+        <Image
+          source={displayImage}
+          style={styles.gridImage}
+          cachePolicy="memory-disk"
+          placeholder={{ blurhash: BLUR_HASH }}
+          contentFit="cover"
+          transition={300}
+        />
+
+        {/* Play Icon for videos */}
+        {item.media_type === "video" && (
+          <View style={styles.playIcon}>
+            <Ionicons name="play-circle" size={26} color="#fff" />
           </View>
-        ) : (
-          <Image
-            source={{ uri: item.full_image_url }}
-            style={styles.gridImage}
-            cachePolicy="memory-disk"
-            placeholder={{ blurhash: BLUR_HASH }}
-            contentFit="cover"
-            transition={300}
-          />
         )}
 
-        {/* ❤️ Like Button */}
+        {/* Like button */}
         <TouchableOpacity
           style={styles.likeBtn}
           onPress={(e) => {
@@ -169,31 +178,30 @@ export default function ExploreScreen() {
     );
   };
 
-  // AUTH LOADING
+  // Loading states
   if (!user || !token)
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#4dd0e1" />
-        <Text style={{ marginTop: 8 }}>Authenticating...</Text>
+        <Text>Authenticating...</Text>
       </View>
     );
 
-  // PAGE LOADING
   if (loading)
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#4dd0e1" />
-        <Text style={{ marginTop: 8 }}>Loading explore...</Text>
+        <Text>Loading explore…</Text>
       </View>
     );
 
   return (
     <View style={styles.container}>
-      {/* SEARCH */}
+      {/* Search bar */}
       <View style={styles.searchBox}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search posts..."
+          placeholder="Search posts…"
           placeholderTextColor="#999"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -203,7 +211,7 @@ export default function ExploreScreen() {
         <Ionicons name="search" size={20} color="#777" />
       </View>
 
-      {/* GRID */}
+      {/* Grid */}
       <FlatList
         data={filteredPosts}
         renderItem={renderGridItem}
@@ -229,7 +237,7 @@ export default function ExploreScreen() {
   );
 }
 
-// STYLES
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
 
@@ -271,12 +279,13 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  videoPlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#0008",
-    justifyContent: "center",
-    alignItems: "center",
+  playIcon: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 4,
+    borderRadius: 20,
   },
 
   likeBtn: {
@@ -288,5 +297,3 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
 });
-
-export default ExploreScreen;
