@@ -12,20 +12,28 @@ import LevelBadge from '../components/LevelBadge';
 import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://backend.cofau.com/api';
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
+const API_URL = `${BACKEND_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get('window').width;
+
+// ✅ Global URL fixer for ALL media (DP, photos, videos, thumbnails)
+const fixUrl = (url?: string | null) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/')) return `${BACKEND_URL}${url}`;
+  return `${BACKEND_URL}/${url}`;
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams(); // Get userId from query params
   const { token, logout, user: currentUser } = useAuth();
-  const [userData, setUserData] = useState(null);
-  const [userStats, setUserStats] = useState(null);
-  const [userPosts, setUserPosts] = useState([]);
+  const [userData, setUserData] = useState<any>(null);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState('photo'); // 'photo', 'video', 'collabs'
+  const [activeTab, setActiveTab] = useState<'photo' | 'video' | 'collabs'>('photo');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editedBio, setEditedBio] = useState('');
   const [editedName, setEditedName] = useState('');
@@ -40,7 +48,6 @@ export default function ProfileScreen() {
       setError(true);
       return;
     }
-
     fetchProfileData();
   }, [token, userId]); // Re-fetch when userId changes
 
@@ -59,39 +66,32 @@ export default function ProfileScreen() {
 
   const fetchProfileData = async () => {
     try {
-      let user;
-      
+      let user: any;
+
       // Determine the final user ID and ownership
       const finalUserId = userId ?? currentUser?.id;
       const isOwn = !userId || (finalUserId === currentUser?.id);
       setIsOwnProfile(isOwn);
-      
+
       console.log('👤 Profile Detection:', { userId, currentUserId: currentUser?.id, finalUserId, isOwn });
-      
-      // Check if viewing another user's profile or own profile
+
       if (userId && userId !== currentUser?.id) {
         // Viewing another user's profile
         console.log('📡 Fetching other user profile:', userId);
-        
-        // Get user data from the users endpoint (need to create this or use existing feed data)
-        // For now, fetch from /auth/me and then get the specific user data
+
         const meResponse = await axios.get(`${API_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        
-        // If the userId matches current user, show own profile
+
         if (userId === (meResponse.data.user?.id || meResponse.data.id)) {
           user = meResponse.data.user || meResponse.data;
           setIsOwnProfile(true);
         } else {
-          // TODO: Need to fetch other user's public profile
-          // For now, use feed data approach
           const feedResponse = await axios.get(`${API_URL}/feed`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          
-          // Find user from feed posts
-          const userPost = feedResponse.data.find(post => post.user_id === userId);
+
+          const userPost = feedResponse.data.find((post: any) => post.user_id === userId);
           if (userPost) {
             user = {
               id: userPost.user_id,
@@ -113,22 +113,20 @@ export default function ProfileScreen() {
         });
         user = response.data.user || response.data;
       }
-      
-      // Convert relative avatar URL to full URL
-      if (user.profile_picture && user.profile_picture.startsWith('/api/static/uploads')) {
-        user.profile_picture = `${BACKEND_URL}${user.profile_picture}`;
-      }
-      
+
+      // ✅ Always fix profile picture URL
+      user.profile_picture = fixUrl(user.profile_picture);
+
       setUserData(user);
       setEditedBio(user.bio || '');
       setEditedName(user.full_name || user.username || '');
-      
+
       // Fetch user stats
       const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
       setUserStats(statsResponse.data);
-      
+
       setError(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Profile fetch error:', err.response?.data || err.message);
       setError(true);
     } finally {
@@ -138,10 +136,10 @@ export default function ProfileScreen() {
 
   const fetchUserPosts = async () => {
     if (!userData) return;
-    
+
     try {
       let endpoint = `${API_URL}/users/${userData.id}/posts?limit=50`;
-      
+
       if (activeTab === 'photo') {
         endpoint += '&media_type=photo';
       } else if (activeTab === 'video') {
@@ -149,18 +147,18 @@ export default function ProfileScreen() {
       } else if (activeTab === 'collabs') {
         endpoint = `${API_URL}/users/${userData.id}/collaborations?limit=50`;
       }
-      
-      const response = await axios.get(endpoint);
+
+      const response = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const posts = response.data || [];
-      
-      // Convert relative URLs to full URLs
-      const postsWithFullUrls = posts.map(post => ({
+
+      // ✅ Normalize URLs for all posts
+      const postsWithFullUrls = posts.map((post: any) => ({
         ...post,
-        full_image_url: post.media_url && !post.media_url.startsWith('http') 
-          ? `${BACKEND_URL}${post.media_url}` 
-          : post.media_url
+        full_image_url: fixUrl(post.media_url || post.full_image_url),
       }));
-      
+
       setUserPosts(postsWithFullUrls);
     } catch (err) {
       console.error('❌ Error fetching user posts:', err);
@@ -170,7 +168,7 @@ export default function ProfileScreen() {
 
   const fetchFollowStatus = async () => {
     if (!userData?.id || !token) return;
-    
+
     try {
       const response = await axios.get(`${API_URL}/users/${userData.id}/follow-status`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -184,32 +182,36 @@ export default function ProfileScreen() {
 
   const handleFollowToggle = async () => {
     if (!userData?.id || !token || followLoading) return;
-    
+
     setFollowLoading(true);
     const previousFollowState = isFollowing;
     const previousFollowerCount = userStats?.followers_count || 0;
-    
+
     // Optimistic UI update
     setIsFollowing(!isFollowing);
-    setUserStats(prev => ({
+    setUserStats((prev: any) => ({
       ...prev,
-      followers_count: isFollowing ? previousFollowerCount - 1 : previousFollowerCount + 1
+      followers_count: isFollowing ? previousFollowerCount - 1 : previousFollowerCount + 1,
     }));
-    
+
     try {
       const endpoint = isFollowing ? 'unfollow' : 'follow';
-      await axios.post(`${API_URL}/users/${userData.id}/${endpoint}`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
+      await axios.post(
+        `${API_URL}/users/${userData.id}/${endpoint}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
       console.log(`✅ ${isFollowing ? 'Unfollowed' : 'Followed'} successfully`);
     } catch (err) {
       console.error('❌ Error toggling follow:', err);
       // Revert optimistic update on error
       setIsFollowing(previousFollowState);
-      setUserStats(prev => ({
+      setUserStats((prev: any) => ({
         ...prev,
-        followers_count: previousFollowerCount
+        followers_count: previousFollowerCount,
       }));
       Alert.alert('Error', 'Failed to update follow status. Please try again.');
     } finally {
@@ -220,32 +222,26 @@ export default function ProfileScreen() {
   const handleUpdateProfile = async () => {
     try {
       console.log('📝 Updating profile with:', { name: editedName, bio: editedBio });
-      
-      // Create FormData for the update
+
       const formData = new FormData();
       if (editedName) formData.append('full_name', editedName);
       if (editedBio !== null && editedBio !== undefined) formData.append('bio', editedBio);
-      
-      const response = await axios.put(
-        `${API_URL}/users/update`,
-        formData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          } 
-        }
-      );
-      
+
+      const response = await axios.put(`${API_URL}/users/update`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
       console.log('✅ Profile update response:', response.data);
       Alert.alert('Success', 'Profile updated successfully!');
       setEditModalVisible(false);
-      
-      // Refresh profile data after a short delay to ensure DB is updated
+
       setTimeout(() => {
         fetchProfileData();
       }, 500);
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Error updating profile:', err.response?.data || err.message);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     }
@@ -254,49 +250,42 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       console.log('🚪 Starting logout process...');
-      
-      // Call logout endpoint
       await axios.post(
         `${API_URL}/auth/logout`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
       console.log('✅ Logout API call successful');
     } catch (err) {
       console.error('❌ Logout API error:', err);
     } finally {
       console.log('🧹 Clearing auth state...');
-      
-      // Clear token from AuthContext (this clears storage and state)
       await logout();
-      
       console.log('🔄 Navigating to login screen...');
-      
-      // Use push instead of replace to ensure navigation happens
       router.push('/auth/login');
-      
       console.log('✅ Logout complete!');
     }
   };
 
   const handleProfilePicturePress = () => {
-    if (!isOwnProfile) return; // Only allow for own profile
-    
-    const options = [
+    if (!isOwnProfile) return;
+
+    const options: any[] = [
       { text: 'Take Photo', onPress: () => handleTakePhoto() },
       { text: 'Choose from Library', onPress: () => handleChoosePhoto() },
     ];
-    
-    // Add remove option if profile picture exists
+
     if (userData?.profile_picture) {
-      options.push({ text: 'Remove Photo', onPress: () => handleRemovePhoto(), style: 'destructive' });
+      options.push({
+        text: 'Remove Photo',
+        onPress: () => handleRemovePhoto(),
+        style: 'destructive',
+      });
     }
-    
+
     options.push({ text: 'Cancel', style: 'cancel' });
-    
+
     if (Platform.OS === 'web') {
-      // Web: Show simple confirm
       const action = window.confirm('Choose from library to upload a profile picture?');
       if (action) handleChoosePhoto();
     } else {
@@ -313,7 +302,7 @@ export default function ProfileScreen() {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -337,7 +326,7 @@ export default function ProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -352,45 +341,39 @@ export default function ProfileScreen() {
     }
   };
 
-  const uploadProfilePicture = async (uri) => {
+  const uploadProfilePicture = async (uri: string) => {
     setUploadingImage(true);
     try {
       console.log('📤 Uploading profile picture:', uri);
 
       const formData = new FormData();
-      
-      // Extract filename and create file object
-      const filename = uri.split('/').pop();
+      const filename = uri.split('/').pop() || 'profile.jpg';
       const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : `image/jpeg`;
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
 
       formData.append('file', {
         uri,
-        name: filename || 'profile.jpg',
+        name: filename,
         type,
+      } as any);
+
+      const response = await axios.post(`${API_URL}/users/upload-profile-image`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      const response = await axios.post(
-        `${API_URL}/users/upload-profile-image`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
-
       console.log('✅ Profile picture uploaded:', response.data);
-      
-      // Update local state with new profile picture URL
-      setUserData(prev => ({
+
+      // ✅ Ensure URL is absolute when saving to state
+      setUserData((prev: any) => ({
         ...prev,
-        profile_picture: response.data.profile_picture,
+        profile_picture: fixUrl(response.data.profile_picture),
       }));
 
       Alert.alert('Success', 'Profile picture updated successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error uploading profile picture:', error.response?.data || error.message);
       Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
     } finally {
@@ -399,25 +382,21 @@ export default function ProfileScreen() {
   };
 
   const handleRemovePhoto = async () => {
-    const confirmRemove = Platform.OS === 'web' 
-      ? window.confirm('Are you sure you want to remove your profile picture?')
-      : true;
-    
-    if (!confirmRemove && Platform.OS !== 'web') {
-      Alert.alert(
-        'Remove Profile Picture',
-        'Are you sure you want to remove your profile picture?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Remove', onPress: () => removeProfilePicture(), style: 'destructive' }
-        ]
-      );
+    if (Platform.OS === 'web') {
+      const confirmRemove = window.confirm('Are you sure you want to remove your profile picture?');
+      if (!confirmRemove) return;
+      await removeProfilePicture();
       return;
     }
-    
-    if (confirmRemove) {
-      await removeProfilePicture();
-    }
+
+    Alert.alert('Remove Profile Picture', 'Are you sure you want to remove your profile picture?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        onPress: () => removeProfilePicture(),
+        style: 'destructive',
+      },
+    ]);
   };
 
   const removeProfilePicture = async () => {
@@ -430,15 +409,14 @@ export default function ProfileScreen() {
       });
 
       console.log('✅ Profile picture removed');
-      
-      // Update local state
-      setUserData(prev => ({
+
+      setUserData((prev: any) => ({
         ...prev,
         profile_picture: null,
       }));
 
       Alert.alert('Success', 'Profile picture removed successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error removing profile picture:', error.response?.data || error.message);
       Alert.alert('Error', 'Failed to remove profile picture. Please try again.');
     } finally {
@@ -448,8 +426,7 @@ export default function ProfileScreen() {
 
   const getBadgeInfo = () => {
     if (!userData) return null;
-    
-    // Determine badge based on level or points
+
     if (userData.points >= 100) {
       return { name: 'TOP REVIEWER', icon: '🔥', color: '#FF6B6B' };
     } else if (userData.level >= 5) {
@@ -460,32 +437,38 @@ export default function ProfileScreen() {
     return null;
   };
 
-  const renderGridItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.gridItem}
-      onPress={() => {
-        // Navigate to post detail if needed
-        console.log('Post clicked:', item.id);
-      }}
-    >
-      {item.full_image_url ? (
-        <Image 
-          source={{ uri: item.full_image_url }}
-          style={styles.gridImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.gridPlaceholder}>
-          <Ionicons name="image-outline" size={40} color="#ccc" />
-        </View>
-      )}
-      {item.rating && (
-        <View style={styles.ratingBadge}>
-          <Text style={styles.ratingText}>{item.rating}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+  // ✅ Grid item for PHOTO tab only; videos show a placeholder (no crash)
+  const renderGridItem = ({ item }: { item: any }) => {
+    const mediaUrl = fixUrl(item.full_image_url || item.media_url);
+    const isVideo = mediaUrl?.toLowerCase().endsWith('.mp4');
+
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        onPress={() => {
+          if (!isVideo) {
+            console.log('Photo clicked:', item.id);
+            // You can navigate to post details here if needed
+            // router.push(`/post-details/${item.id}`);
+          }
+        }}
+        activeOpacity={0.8}
+      >
+        {mediaUrl && !isVideo ? (
+          <Image source={{ uri: mediaUrl }} style={styles.gridImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.gridPlaceholder}>
+            <Ionicons name={isVideo ? 'play-circle-outline' : 'image-outline'} size={40} color="#ccc" />
+          </View>
+        )}
+        {item.rating && (
+          <View style={styles.ratingBadge}>
+            <Text style={styles.ratingText}>{item.rating}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -543,13 +526,13 @@ export default function ProfileScreen() {
         <View style={styles.identitySection}>
           <View style={styles.profilePictureContainer}>
             <ProfileBadge
-              profilePicture={userData.profile_picture}
+              profilePicture={fixUrl(userData.profile_picture)}
               username={userData.full_name || userData.username}
               level={userData.level || 1}
               dpSize={110}
             />
             {isOwnProfile && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.cameraIcon}
                 onPress={handleProfilePicturePress}
                 disabled={uploadingImage}
@@ -589,15 +572,12 @@ export default function ProfileScreen() {
 
         {/* Edit Profile / Follow Button */}
         {isOwnProfile ? (
-          <TouchableOpacity 
-            style={styles.editButton}
-            onPress={() => setEditModalVisible(true)}
-          >
+          <TouchableOpacity style={styles.editButton} onPress={() => setEditModalVisible(true)}>
             <Ionicons name="pencil" size={20} color="#fff" />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.editButton, isFollowing ? styles.followingButton : styles.followButton]}
             onPress={handleFollowToggle}
             disabled={followLoading}
@@ -606,14 +586,8 @@ export default function ProfileScreen() {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Ionicons 
-                  name={isFollowing ? "checkmark" : "person-add"} 
-                  size={20} 
-                  color="#fff" 
-                />
-                <Text style={styles.editButtonText}>
-                  {isFollowing ? "Following" : "Follow"}
-                </Text>
+                <Ionicons name={isFollowing ? 'checkmark' : 'person-add'} size={20} color="#fff" />
+                <Text style={styles.editButtonText}>{isFollowing ? 'Following' : 'Follow'}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -629,29 +603,23 @@ export default function ProfileScreen() {
 
         {/* Tab Navigation */}
         <View style={styles.tabBar}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'photo' && styles.activeTab]}
             onPress={() => setActiveTab('photo')}
           >
-            <Text style={[styles.tabText, activeTab === 'photo' && styles.activeTabText]}>
-              Photo
-            </Text>
+            <Text style={[styles.tabText, activeTab === 'photo' && styles.activeTabText]}>Photo</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'video' && styles.activeTab]}
             onPress={() => setActiveTab('video')}
           >
-            <Text style={[styles.tabText, activeTab === 'video' && styles.activeTabText]}>
-              Video
-            </Text>
+            <Text style={[styles.tabText, activeTab === 'video' && styles.activeTabText]}>Video</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'collabs' && styles.activeTab]}
             onPress={() => setActiveTab('collabs')}
           >
-            <Text style={[styles.tabText, activeTab === 'collabs' && styles.activeTabText]}>
-              Collabs
-            </Text>
+            <Text style={[styles.tabText, activeTab === 'collabs' && styles.activeTabText]}>Collabs</Text>
           </TouchableOpacity>
         </View>
 
@@ -659,7 +627,7 @@ export default function ProfileScreen() {
         <FlatList
           data={userPosts}
           renderItem={renderGridItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: any) => item.id}
           numColumns={3}
           scrollEnabled={false}
           ListEmptyComponent={() => (
@@ -675,13 +643,11 @@ export default function ProfileScreen() {
         />
 
         {/* Logout Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.logoutButton}
           activeOpacity={0.7}
           onPress={() => {
             console.log('🔴 Logout button pressed!');
-            
-            // Use window.confirm on web, Alert.alert on native
             if (Platform.OS === 'web') {
               const confirmed = window.confirm('Are you sure you want to logout?');
               if (confirmed) {
@@ -691,25 +657,21 @@ export default function ProfileScreen() {
                 console.log('❌ Logout cancelled (web)');
               }
             } else {
-              Alert.alert(
-                'Logout',
-                'Are you sure you want to logout?',
-                [
-                  { 
-                    text: 'Cancel', 
-                    style: 'cancel',
-                    onPress: () => console.log('❌ Logout cancelled')
+              Alert.alert('Logout', 'Are you sure you want to logout?', [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => console.log('❌ Logout cancelled'),
+                },
+                {
+                  text: 'Logout',
+                  onPress: () => {
+                    console.log('✅ User confirmed logout');
+                    handleLogout();
                   },
-                  { 
-                    text: 'Logout', 
-                    onPress: () => {
-                      console.log('✅ User confirmed logout');
-                      handleLogout();
-                    },
-                    style: 'destructive' 
-                  }
-                ]
-              );
+                  style: 'destructive',
+                },
+              ]);
             }
           }}
         >
@@ -773,10 +735,7 @@ export default function ProfileScreen() {
               numberOfLines={4}
             />
 
-            <TouchableOpacity 
-              style={styles.saveButton}
-              onPress={handleUpdateProfile}
-            >
+            <TouchableOpacity style={styles.saveButton} onPress={handleUpdateProfile}>
               <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
           </View>
@@ -791,31 +750,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-
   scrollContent: {
     paddingBottom: 100,
   },
-
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-
   loadingText: {
     marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
-
   errorText: {
     marginTop: 16,
     fontSize: 16,
     color: '#999',
     textAlign: 'center',
   },
-
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -824,37 +778,24 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 20,
   },
-
   username: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
-
   infoButton: {
     padding: 5,
   },
-
   identitySection: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 20,
   },
-
   profilePictureContainer: {
     position: 'relative',
     marginRight: 20,
   },
-
-  profilePicture: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#4dd0e1',
-  },
-
   cameraIcon: {
     position: 'absolute',
     right: 0,
@@ -866,29 +807,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   badgeContainer: {
     alignItems: 'center',
   },
-
   badgeIcon: {
     fontSize: 40,
     marginBottom: 5,
   },
-
   badgeLabel: {
     fontSize: 12,
     color: '#666',
     fontWeight: '600',
   },
-
   statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 20,
     marginBottom: 20,
   },
-
   statBox: {
     backgroundColor: '#f5f5f5',
     paddingVertical: 15,
@@ -897,19 +833,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minWidth: 90,
   },
-
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 5,
   },
-
   statLabel: {
     fontSize: 12,
     color: '#666',
   },
-
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -920,80 +853,66 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginBottom: 20,
   },
-
   followButton: {
     backgroundColor: '#4dd0e1',
   },
-
   followingButton: {
     backgroundColor: '#28a745',
   },
-
   editButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },
-
   bioSection: {
     paddingHorizontal: 20,
     marginBottom: 20,
   },
-
   bioLabel: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 5,
   },
-
   bioText: {
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
   },
-
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     marginBottom: 10,
   },
-
   tab: {
     flex: 1,
     paddingVertical: 15,
     alignItems: 'center',
   },
-
   activeTab: {
     borderBottomWidth: 2,
     borderBottomColor: '#4dd0e1',
   },
-
   tabText: {
     fontSize: 16,
     color: '#999',
   },
-
   activeTabText: {
     color: '#333',
     fontWeight: 'bold',
   },
-
   gridItem: {
     width: (SCREEN_WIDTH - 6) / 3,
     height: (SCREEN_WIDTH - 6) / 3,
     margin: 1,
     position: 'relative',
   },
-
   gridImage: {
     width: '100%',
     height: '100%',
   },
-
   gridPlaceholder: {
     width: '100%',
     height: '100%',
@@ -1001,7 +920,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   ratingBadge: {
     position: 'absolute',
     top: 5,
@@ -1011,25 +929,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-
   ratingText: {
     fontSize: 10,
     fontWeight: 'bold',
     color: '#333',
   },
-
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
   },
-
   emptyText: {
     marginTop: 16,
     fontSize: 16,
     color: '#999',
   },
-
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1041,18 +955,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FF6B6B',
   },
-
   logoutText: {
     color: '#FF6B6B',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },
-
   bottomSpacer: {
     height: 40,
   },
-
   navBar: {
     position: 'absolute',
     bottom: 0,
@@ -1066,14 +977,11 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     backgroundColor: '#fff',
   },
-
-  // Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
@@ -1081,20 +989,17 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '80%',
   },
-
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
-
   inputLabel: {
     fontSize: 14,
     fontWeight: 'bold',
@@ -1102,7 +1007,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 15,
   },
-
   input: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
@@ -1111,12 +1015,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#f9f9f9',
   },
-
   bioInput: {
     height: 100,
     textAlignVertical: 'top',
   },
-
   saveButton: {
     backgroundColor: '#4dd0e1',
     paddingVertical: 15,
@@ -1124,7 +1026,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
   },
-
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
