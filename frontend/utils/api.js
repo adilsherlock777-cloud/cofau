@@ -15,8 +15,8 @@ const api = axios.create({
 // via axios.defaults.headers.common['Authorization']
 
 /**
- * Create a new post with image upload
- * @param {Object} postData - Post data (rating, review_text, map_link, file)
+ * Create a new post with image/video upload
+ * @param {Object} postData - Post data (rating, review_text, map_link, file, media_type)
  * @returns {Promise} - API response
  */
 export const createPost = async (postData) => {
@@ -29,11 +29,12 @@ export const createPost = async (postData) => {
     if (postData.map_link) {
       formData.append('map_link', postData.map_link);
     }
+    if (postData.media_type) {
+      formData.append('media_type', postData.media_type);   // 👈 NEW
+    }
     
     // Append file - handle both web and native
     if (postData.file) {
-      // For web: postData.file is a File object
-      // For native: postData.file is an object with uri, name, type
       if (postData.file.uri) {
         // React Native
         const fileUri = postData.file.uri;
@@ -55,6 +56,7 @@ export const createPost = async (postData) => {
       rating: postData.rating,
       review_text: postData.review_text,
       map_link: postData.map_link,
+      media_type: postData.media_type,
       file: postData.file?.name || postData.file?.uri || 'unknown'
     });
     
@@ -120,7 +122,6 @@ export const addComment = async (postId, commentText) => {
     const formData = new FormData();
     formData.append('comment_text', commentText);
     
-    // Don't set Content-Type manually - let axios handle it for FormData
     const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData);
     return response.data;
   } catch (error) {
