@@ -1,8 +1,12 @@
 from pydantic_settings import BaseSettings
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Settings(BaseSettings):
     # MongoDB
-    MONGO_URL: str = "mongodb+srv://moinmisba92:quickSell%40121@quicksellify.mdhrm.mongodb.net/quickSellify?retryWrites=true&w=majority&appName=quickSellify"
+    MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
     DATABASE_NAME: str = "cofau_db"
     
     # JWT

@@ -222,7 +222,7 @@ index 2c8bb82..e69de29 100644
 ---+import requests
 ---+import json
 ---+
----+BASE_URL = "https://backend.cofau.com/api"
+---+BASE_URL = "https://foodsocial-app.preview.emergentagent.com/api"
 ---+
 ---+def test_comment_endpoint():
 ---+    # Create a test user first
@@ -1198,7 +1198,7 @@ index 2c8bb82..e69de29 100644
 ------------------+
 ------------------+agent_communication:
 ------------------+    - agent: "testing"
-------------------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://backend.cofau.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+------------------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
 ------------------\ No newline at end of file
 -----------------diff --git a/test_result.md b/test_result.md
 -----------------index 3411fb9..23ab0fa 100644
@@ -1250,9 +1250,9 @@ index 2c8bb82..e69de29 100644
 -----------------+
 ----------------- agent_communication:
 -----------------     - agent: "testing"
-------------------      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://backend.cofau.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+------------------      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
 -----------------\ No newline at end of file
------------------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://backend.cofau.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+-----------------+      message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
 -----------------+    - agent: "testing"
 -----------------+      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
 -----------------\ No newline at end of file
@@ -1310,7 +1310,7 @@ index 2c8bb82..e69de29 100644
 ---------------   test_priority: "high_first"
 ---------------@@ -225,4 +249,6 @@ agent_communication:
 ---------------     - agent: "testing"
----------------       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://backend.cofau.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+---------------       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
 ---------------     - agent: "testing"
 ----------------      message: "Completed post creation and feed testing as requested. Fixed backend Form parameter issue in /api/posts/create endpoint. Successfully created test post with rating=8, review_text='Amazing burger! The patty was juicy and perfectly cooked. Highly recommend!', map_link to Times Square, and test image. Feed now populated with test data and working correctly. All backend APIs tested and functional."
 ---------------\ No newline at end of file
@@ -1634,7 +1634,7 @@ index 2c8bb82..e69de29 100644
 -----+
 ----- agent_communication:
 -----     - agent: "testing"
------       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://backend.cofau.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+-----       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
 -----@@ -427,4 +439,6 @@ agent_communication:
 -----     - agent: "testing"
 -----       message: "LEVEL & POINTS SYSTEM TESTING COMPLETE: All 5 tests passed with 100% success rate! ✅ WORKING: Signup Default Values (level=1, currentPoints=0, requiredPoints=1250, title='Reviewer'), Post Creation Points Award (25 points for Level 1), Level-Up Logic with carry-over points (Level 1→2 with proper point carryover), Auth Me Endpoint (returns all level fields), Feed Endpoint Level Fields (includes user_level and user_title). The complete level system is functioning correctly with proper point calculations, level progression, and carry-over mechanics. Backend implementation is solid and ready for production use."
@@ -1772,7 +1772,7 @@ index 2c8bb82..e69de29 100644
 ----+    status_history:
 ----+        - working: "NA"
 ----+          agent: "testing"
-----+          comment: "API integration properly configured with correct backend URL (https://backend.cofau.com/api). AuthContext handles token management and authentication state. However, full end-to-end testing blocked by authentication flow issues in test environment. App correctly handles 401 responses and redirects appropriately."
+----+          comment: "API integration properly configured with correct backend URL (https://foodsocial-app.preview.emergentagent.com/api). AuthContext handles token management and authentication state. However, full end-to-end testing blocked by authentication flow issues in test environment. App correctly handles 401 responses and redirects appropriately."
 ---- 
 ---- metadata:
 ----   created_by: "testing_agent"
@@ -1825,7 +1825,7 @@ index 2c8bb82..e69de29 100644
 ---+
 --- agent_communication:
 ---     - agent: "testing"
----       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://backend.cofau.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
+---       message: "Completed comprehensive authentication testing. All core auth endpoints (signup, login, protected access) are working correctly. Backend URL https://foodsocial-app.preview.emergentagent.com/api is accessible and responding properly. Authentication flow is fully functional with proper error handling for edge cases."
 ---@@ -563,4 +575,6 @@ agent_communication:
 ---     - agent: "testing"
 ---       message: "COMPREHENSIVE END-TO-END TESTING COMPLETE: Executed all 13 requested test scenarios with 100% success rate! ✅ WORKING: User Registration (with default level/points), Post Upload (with points system), Profile Picture Upload, Feed Verification (with level badges), Follow System, Like/Comment System, Points Verification. All endpoints tested: /api/auth/signup, /api/auth/me, /api/posts/create, /api/feed, /api/users/upload-profile-image, /api/users/{id}/follow, /api/users/{id}/follow-status, /api/users/{id}/stats, /api/posts/{id}/like, /api/posts/{id}/comment, /api/posts/{id}/comments. Complete user journey validated from registration to social interactions. Backend is production-ready."

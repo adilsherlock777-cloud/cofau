@@ -9,13 +9,11 @@ A comprehensive, dynamic User Profile module has been built and integrated into 
 ## 🎯 Features Implemented
 
 ### 1. **Profile Header**
-
 - ✅ Username display (top center)
 - ✅ Information icon (top right) for additional settings
 - ✅ Dynamic data from `/api/auth/me`
 
 ### 2. **Profile Identity Section**
-
 - ✅ Circular profile picture with gradient border
 - ✅ Camera icon overlay for future profile picture updates
 - ✅ Dynamic achievement badges (TOP REVIEWER, EXPERT, RISING STAR)
@@ -25,7 +23,6 @@ A comprehensive, dynamic User Profile module has been built and integrated into 
   - **RISING STAR** 🌟: Level 3+
 
 ### 3. **Stats Section**
-
 - ✅ Three stat boxes displaying:
   - **Posts**: Total number of user posts
   - **Photos**: Count of photo posts
@@ -34,7 +31,6 @@ A comprehensive, dynamic User Profile module has been built and integrated into 
 - ✅ Clean, rounded stat boxes with gray backgrounds
 
 ### 4. **Edit Profile**
-
 - ✅ Orange button with pencil icon
 - ✅ Modal popup for editing profile
 - ✅ Editable fields:
@@ -43,20 +39,17 @@ A comprehensive, dynamic User Profile module has been built and integrated into 
 - ✅ Updates via `PUT /api/users/update`
 
 ### 5. **Bio Section**
-
 - ✅ "Bio:" label with user description
 - ✅ Placeholder text if bio is empty
 - ✅ Editable through Edit Profile modal
 
 ### 6. **Tab Navigation**
-
 - ✅ Three tabs: **Photo**, **Video**, **Collabs**
 - ✅ Active tab highlighted with bottom border
 - ✅ Dynamic content loading based on selected tab
 - ✅ Each tab fetches different data from backend
 
 ### 7. **Content Grid**
-
 - ✅ 3-column grid layout for posts
 - ✅ Square image thumbnails
 - ✅ Rating badges on top-right of each image
@@ -65,7 +58,6 @@ A comprehensive, dynamic User Profile module has been built and integrated into 
 - ✅ Infinite scroll capability
 
 ### 8. **Logout Functionality**
-
 - ✅ Red outlined button with logout icon
 - ✅ Confirmation dialog before logout
 - ✅ Calls `/api/auth/logout` endpoint
@@ -73,7 +65,6 @@ A comprehensive, dynamic User Profile module has been built and integrated into 
 - ✅ Redirects to login screen
 
 ### 9. **Bottom Navigation**
-
 - ✅ Consistent across all screens
 - ✅ Profile icon highlighted when active
 - ✅ 5 navigation buttons: Feed, Explore, Add Post, Happening, Profile
@@ -85,7 +76,6 @@ A comprehensive, dynamic User Profile module has been built and integrated into 
 ### Authentication
 
 #### 1. **Logout**
-
 ```
 POST /api/auth/logout
 Authorization: Bearer {token}
@@ -99,7 +89,6 @@ Response:
 ### User Profile
 
 #### 2. **Get User Stats**
-
 ```
 GET /api/users/{user_id}/stats
 
@@ -117,7 +106,6 @@ Response:
 ```
 
 #### 3. **Update Profile**
-
 ```
 PUT /api/users/update
 Authorization: Bearer {token}
@@ -136,7 +124,6 @@ Response:
 ```
 
 #### 4. **Get User Posts**
-
 ```
 GET /api/users/{user_id}/posts?media_type={type}&skip=0&limit=20
 
@@ -165,7 +152,6 @@ Response:
 ```
 
 #### 5. **Get User Collaborations**
-
 ```
 GET /api/users/{user_id}/collaborations?skip=0&limit=20
 
@@ -179,7 +165,6 @@ Response: Same format as Get User Posts
 ## 📂 Frontend Implementation
 
 ### File Location
-
 ```
 /app/frontend/app/profile.tsx
 ```
@@ -187,37 +172,32 @@ Response: Same format as Get User Posts
 ### Key Components
 
 #### State Management
-
 ```javascript
 const [userData, setUserData] = useState(null);
 const [userStats, setUserStats] = useState(null);
 const [userPosts, setUserPosts] = useState([]);
-const [activeTab, setActiveTab] = useState("photo");
+const [activeTab, setActiveTab] = useState('photo');
 const [editModalVisible, setEditModalVisible] = useState(false);
 ```
 
 #### Functions
 
 1. **fetchProfileData()**
-
    - Fetches user profile from `/api/auth/me`
    - Fetches user stats from `/api/users/{id}/stats`
    - Converts relative image URLs to full URLs
 
 2. **fetchUserPosts()**
-
    - Dynamically fetches posts based on active tab
    - Filters by media type (photo/video)
    - Handles collaborations separately
 
 3. **handleUpdateProfile()**
-
    - Updates user name and bio
    - Shows success/error alerts
    - Refreshes profile data after update
 
 4. **handleLogout()**
-
    - Confirms logout with user
    - Calls logout endpoint
    - Clears auth token
@@ -232,9 +212,7 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ## 🎨 UI/UX Features
 
 ### Design Elements
-
 - **Color Scheme**:
-
   - Primary: #4dd0e1 (Cyan/Turquoise)
   - Accent: #FF6B6B (Coral Red)
   - Background: #fff (White)
@@ -242,7 +220,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
   - Secondary Text: #666, #999
 
 - **Typography**:
-
   - Username: 20px, bold
   - Stats Value: 20px, bold
   - Stats Label: 12px
@@ -255,14 +232,12 @@ const [editModalVisible, setEditModalVisible] = useState(false);
   - Grid Items: (screen width - 6) / 3
 
 ### Responsive Design
-
 - Grid auto-adjusts to screen width
 - Modal slides up from bottom
 - Proper scroll behavior with FlatList
 - Bottom navigation fixed at bottom
 
 ### Interactive Elements
-
 - Tab switching with visual feedback
 - Modal for editing profile
 - Confirmation dialog for logout
@@ -274,7 +249,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ## 🔄 Data Flow
 
 ### Profile Loading Flow
-
 ```
 1. User navigates to Profile screen
 2. Check if token exists (useAuth)
@@ -286,7 +260,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ```
 
 ### Tab Switching Flow
-
 ```
 1. User taps on Photo/Video/Collabs tab
 2. Update activeTab state
@@ -300,7 +273,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ```
 
 ### Edit Profile Flow
-
 ```
 1. User taps "Edit Profile" button
 2. Modal opens with current name and bio
@@ -312,7 +284,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ```
 
 ### Logout Flow
-
 ```
 1. User taps "Logout" button
 2. Confirmation alert appears
@@ -352,7 +323,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ## 📊 Database Schema
 
 ### Users Collection
-
 ```javascript
 {
   _id: ObjectId,
@@ -371,7 +341,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ```
 
 ### Posts Collection
-
 ```javascript
 {
   _id: ObjectId,
@@ -392,19 +361,16 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ## 🚀 Deployment Status
 
 ### Backend
-
 - ✅ All new endpoints deployed
-- ✅ Running on: `https://backend.cofau.com/api`
+- ✅ Running on: `https://foodsocial-app.preview.emergentagent.com/api`
 - ✅ MongoDB connected and operational
 
 ### Frontend
-
 - ✅ Profile screen completely rebuilt
-- ✅ Running on: `https://backend.cofau.com`
+- ✅ Running on: `https://foodsocial-app.preview.emergentagent.com`
 - ✅ Expo bundler active
 
 ### Services Status
-
 - ✅ Backend: RUNNING (pid 1367)
 - ✅ Frontend (Expo): RUNNING (pid 1371)
 - ✅ MongoDB: RUNNING (pid 81)
@@ -413,26 +379,24 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 
 ## 🔗 API Endpoint Summary
 
-| Endpoint                         | Method | Purpose                    |
-| -------------------------------- | ------ | -------------------------- |
-| `/api/auth/me`                   | GET    | Get current user profile   |
-| `/api/auth/logout`               | POST   | Logout user                |
-| `/api/users/update`              | PUT    | Update profile (name, bio) |
-| `/api/users/{id}/stats`          | GET    | Get user statistics        |
-| `/api/users/{id}/posts`          | GET    | Get user posts (filtered)  |
-| `/api/users/{id}/collaborations` | GET    | Get user collaborations    |
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/auth/me` | GET | Get current user profile |
+| `/api/auth/logout` | POST | Logout user |
+| `/api/users/update` | PUT | Update profile (name, bio) |
+| `/api/users/{id}/stats` | GET | Get user statistics |
+| `/api/users/{id}/posts` | GET | Get user posts (filtered) |
+| `/api/users/{id}/collaborations` | GET | Get user collaborations |
 
 ---
 
 ## 🎉 Next Steps / Enhancements
 
 ### Immediate
-
 - ✅ **Complete**: Profile module fully functional
 - ⏳ **Test on device**: Use Expo Go for real device testing
 
 ### Future Enhancements
-
 1. **Profile Picture Upload**: Implement camera/gallery selection
 2. **Follow/Unfollow**: Add follow button for other users' profiles
 3. **Achievement Details**: Tap badge to see achievement criteria
@@ -446,7 +410,6 @@ const [editModalVisible, setEditModalVisible] = useState(false);
 ## 📱 Screenshots Guide
 
 To verify implementation, check:
-
 1. **Profile Header**: Username centered, info icon visible
 2. **Identity Section**: Profile pic with camera icon, badge displayed
 3. **Stats**: Three boxes with real numbers
@@ -462,25 +425,21 @@ To verify implementation, check:
 ## 🐛 Troubleshooting
 
 ### Issue: Profile data not loading
-
 - Check if token is valid
 - Verify `/api/auth/me` endpoint is accessible
 - Check console for error messages
 
 ### Issue: Stats show 0
-
 - Ensure posts exist in database
 - Check `/api/users/{id}/stats` endpoint
 - Verify user_id is correct
 
 ### Issue: Images not displaying
-
 - Check image URLs are full paths
 - Verify static files are accessible
 - Check BACKEND_URL environment variable
 
 ### Issue: Logout not working
-
 - Verify logout function is called from AuthContext
 - Check token is cleared from storage
 - Ensure navigation to login screen occurs
@@ -490,7 +449,6 @@ To verify implementation, check:
 ## 📞 Support
 
 For issues or questions:
-
 1. Check backend logs: `sudo supervisorctl tail -f backend`
 2. Check frontend logs: `sudo supervisorctl tail -f expo`
 3. Review console logs in Expo app

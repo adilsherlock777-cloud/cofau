@@ -6,7 +6,7 @@ Debug test for comment endpoint
 import requests
 import json
 
-BASE_URL = "https://backend.cofau.com/api"
+BASE_URL = "https://foodsocial-app.preview.emergentagent.com/api"
 
 def test_comment_endpoint():
     # Create a test user first
