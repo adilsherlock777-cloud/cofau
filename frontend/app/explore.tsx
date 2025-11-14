@@ -13,13 +13,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
-import { Image } from "expo-image"; // ⭐ FIX: Expo Image for caching + stable reloads
+import { Image } from "expo-image";
 import { likePost, unlikePost } from "../utils/api";
 
-// 🟦 API CONFIG
+// API CONFIG
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_BACKEND_URL ||
-  "https://backend.cofau.com";
+  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
 const API_URL = `${API_BASE_URL}/api`;
 
@@ -27,9 +26,10 @@ const API_URL = `${API_BASE_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const NUM_COLUMNS = 3;
 const SPACING = 2;
-const TILE_SIZE = (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
+const TILE_SIZE =
+  (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 
-// Placeholder BlurHash loading effect
+// BlurHash
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
 export default function ExploreScreen() {
@@ -43,14 +43,14 @@ export default function ExploreScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 🔄 Refresh posts whenever screen becomes active
+  // REFRESH on screen focus
   useFocusEffect(
     useCallback(() => {
       if (user && token) fetchPosts(true);
     }, [user, token])
   );
 
-  // 📌 Fetch Explore posts
+  // FETCH POSTS
   const fetchPosts = async (refresh = false) => {
     try {
       if (refresh) {
@@ -93,7 +93,7 @@ export default function ExploreScreen() {
     }
   };
 
-  // 🔍 SEARCH FILTER
+  // SEARCH FILTER
   const filteredPosts = useMemo(() => {
     if (!searchQuery.trim()) return posts;
 
@@ -102,7 +102,7 @@ export default function ExploreScreen() {
     );
   }, [searchQuery, posts]);
 
-  // ❤️ LIKE/UNLIKE
+  // LIKE / UNLIKE
   const handleLike = async (id, liked) => {
     try {
       setPosts((prev) =>
@@ -123,40 +123,53 @@ export default function ExploreScreen() {
     }
   };
 
-  // 🖼️ RENDER GRID ITEM
-  const renderGridItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.tile}
-      activeOpacity={0.85}
-      onPress={() => router.push(`/post-details/${item.id}`)}
-    >
-      <Image
-        source={item.full_image_url}
-        style={styles.gridImage}
-        cachePolicy="memory-disk"
-        placeholder={{ blurhash: BLUR_HASH }}
-        contentFit="cover"
-        transition={300}
-      />
+  // RENDER GRID TILE
+  const renderGridItem = ({ item }) => {
+    const isVideo = item.full_image_url
+      ?.toLowerCase()
+      ?.endsWith(".mp4");
 
-      {/* ❤️ Like Button */}
+    return (
       <TouchableOpacity
-        style={styles.likeBtn}
-        onPress={(e) => {
-          e.stopPropagation();
-          handleLike(item.id, item.is_liked);
-        }}
+        style={styles.tile}
+        activeOpacity={0.85}
+        onPress={() => router.push(`/post-details/${item.id}`)}
       >
-        <Ionicons
-          name={item.is_liked ? "heart" : "heart-outline"}
-          size={20}
-          color={item.is_liked ? "#FF4D4D" : "#ffffff"}
-        />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
+        {/* VIDEO PLACEHOLDER */}
+        {isVideo ? (
+          <View style={styles.videoPlaceholder}>
+            <Ionicons name="play-circle-outline" size={42} color="#fff" />
+          </View>
+        ) : (
+          <Image
+            source={{ uri: item.full_image_url }}
+            style={styles.gridImage}
+            cachePolicy="memory-disk"
+            placeholder={{ blurhash: BLUR_HASH }}
+            contentFit="cover"
+            transition={300}
+          />
+        )}
 
-  // 🔄 LOADING STATES
+        {/* ❤️ Like Button */}
+        <TouchableOpacity
+          style={styles.likeBtn}
+          onPress={(e) => {
+            e.stopPropagation();
+            handleLike(item.id, item.is_liked);
+          }}
+        >
+          <Ionicons
+            name={item.is_liked ? "heart" : "heart-outline"}
+            size={20}
+            color={item.is_liked ? "#FF4D4D" : "#ffffff"}
+          />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
+  // AUTH LOADING
   if (!user || !token)
     return (
       <View style={styles.center}>
@@ -165,6 +178,7 @@ export default function ExploreScreen() {
       </View>
     );
 
+  // PAGE LOADING
   if (loading)
     return (
       <View style={styles.center}>
@@ -175,7 +189,7 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 🔍 SEARCH BAR */}
+      {/* SEARCH */}
       <View style={styles.searchBox}>
         <TextInput
           style={styles.searchInput}
@@ -189,7 +203,7 @@ export default function ExploreScreen() {
         <Ionicons name="search" size={20} color="#777" />
       </View>
 
-      {/* 🔳 GRID */}
+      {/* GRID */}
       <FlatList
         data={filteredPosts}
         renderItem={renderGridItem}
@@ -215,7 +229,7 @@ export default function ExploreScreen() {
   );
 }
 
-// 🎨 STYLES
+// STYLES
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
 
@@ -257,6 +271,14 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
+  videoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#0008",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   likeBtn: {
     position: "absolute",
     top: 6,
@@ -267,3 +289,4 @@ const styles = StyleSheet.create({
   },
 });
 
+export default ExploreScreen;
