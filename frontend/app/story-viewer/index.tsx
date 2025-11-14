@@ -19,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com/api';
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com/api';
 
 export default function StoryViewerScreen() {
   const router = useRouter();
