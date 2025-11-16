@@ -1,29 +1,53 @@
-import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Image, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LevelBadge from './LevelBadge';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
+const BACKEND_URL =
+  process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
+
+// Helper to build full media URLs
+const buildUrl = (path) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  // backend returns: static/uploads/...  (WITHOUT slash)
+  if (!path.startsWith('/')) return `${BACKEND_URL}/${path}`;
+  return `${BACKEND_URL}${path}`;
+};
 
 export default function UserAvatar({
   profilePicture,
-  username,
+  username = '',
   size = 40,
   showLevelBadge = true,
   level,
   style,
 }) {
-  // Construct full URL if needed
-  let imageUrl = profilePicture;
-  if (imageUrl && !imageUrl.startsWith('http')) {
-    imageUrl = `${BACKEND_URL}${imageUrl}`;
-  }
+  // Full DP URL
+  const fullUrl = buildUrl(profilePicture);
+
+  // Handle image loading errors
+  const [imageError, setImageError] = useState(false);
+
+  // Compute initials fallback: "Iron Man" → "IM"
+  const getInitials = () => {
+    if (!username) return null;
+    const parts = username.trim().split(' ');
+    if (parts.length === 1) return parts[0][0]?.toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  };
+
+  const initials = getInitials();
+
+  const showFallback =
+    !fullUrl || imageError || fullUrl === `${BACKEND_URL}/null`;
 
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
-      {imageUrl ? (
+      {/* PROFILE PICTURE */}
+      {!showFallback ? (
         <Image
-          source={{ uri: imageUrl }}
+          source={{ uri: fullUrl }}
           style={[
             styles.image,
             {
@@ -32,11 +56,12 @@ export default function UserAvatar({
               borderRadius: size / 2,
             },
           ]}
+          onError={() => setImageError(true)}
         />
       ) : (
         <View
           style={[
-            styles.defaultAvatar,
+            styles.fallbackContainer,
             {
               width: size,
               height: size,
@@ -44,10 +69,23 @@ export default function UserAvatar({
             },
           ]}
         >
-          <Ionicons name="person" size={size * 0.6} color="#999" />
+          {initials ? (
+            <Text
+              style={{
+                fontSize: size * 0.4,
+                fontWeight: '600',
+                color: '#555',
+              }}
+            >
+              {initials}
+            </Text>
+          ) : (
+            <Ionicons name="person" size={size * 0.6} color="#777" />
+          )}
         </View>
       )}
 
+      {/* LEVEL BADGE */}
       {showLevelBadge && level && (
         <View style={styles.badgeContainer}>
           <LevelBadge level={level} size="small" />
@@ -64,7 +102,7 @@ const styles = StyleSheet.create({
   image: {
     backgroundColor: '#E0E0E0',
   },
-  defaultAvatar: {
+  fallbackContainer: {
     backgroundColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',
