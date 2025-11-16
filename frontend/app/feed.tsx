@@ -11,42 +11,51 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import axios from 'axios';
+
 import { useAuth } from '../context/AuthContext';
 import RatingBar from '../components/RatingBar';
 import FeedCard from '../components/FeedCard';
 import UserAvatar from '../components/UserAvatar';
 import StoriesBar from '../components/StoriesBar';
 import { fetchUnreadCount } from '../utils/notifications';
-import axios from 'axios';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
-const API_URL = `${API_BASE_URL}/api`;
+// Base backend URL (already includes /api)
+const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com/api";
+
+/** Fixes media & image URLs across the app */
+const fixUrl = (url) => {
+  if (!url) return null;
+
+  if (url.startsWith("http")) return url; // already complete URL
+
+  // Normalize slashes
+  let cleaned = url.replace(/\/+/g, "/");
+
+  // If backend returned `/api/static/...` remove the first `/api`
+  if (cleaned.startsWith("/api/")) {
+    cleaned = cleaned.replace("/api", "");
+  }
+
+  // Ensure final URL is correct
+  return `${BASE}${cleaned.startsWith("/") ? cleaned : "/" + cleaned}`;
+};
 
 export default function FeedScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
+
   const [feedPosts, setFeedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Dummy data for reviewers - can be fetched from backend later
-  const reviewers = [
-    { letter: 'H', count: 5 },
-    { letter: 'B', count: 2 },
-    { letter: 'T', count: 7 },
-    { letter: 'M', count: 3 },
-    { letter: 'G', count: 1 },
-    { letter: 'S', count: 4 },
-  ];
-
   useEffect(() => {
     fetchFeed();
     loadUnreadCount();
   }, []);
 
-  // Reload unread count when screen is focused
   useFocusEffect(
     React.useCallback(() => {
       loadUnreadCount();
@@ -58,70 +67,59 @@ export default function FeedScreen() {
     try {
       const count = await fetchUnreadCount(token);
       setUnreadCount(count);
-    } catch (error) {
-      console.error('❌ Error loading unread count:', error);
+    } catch (err) {
+      console.log("❌ Error loading unread count:", err);
     }
   };
 
   const fetchFeed = async () => {
     try {
       setError(null);
-      console.log('📡 Fetching feed from:', `${API_URL}/feed`);
-      
-      const response = await axios.get(`${API_URL}/feed`);
-      console.log('✅ Feed data received:', response.data.length, 'posts');
-      
-      // Transform the data to match the component expectations
-      const transformedPosts = response.data.map(post => {
-        // Use image_url if provided, otherwise fall back to media_url
-        let mediaUrl = post.image_url || post.media_url;
-        console.log('📸 Original image_url/media_url:', mediaUrl);
-        
-        // Convert to full URL if it's a relative path
-        if (mediaUrl && !mediaUrl.startsWith('http')) {
-          // Remove leading slash if present and construct full URL
-          mediaUrl = `${API_BASE_URL}${mediaUrl.startsWith('/') ? mediaUrl : '/' + mediaUrl}`;
-          console.log('📸 Converted to full URL:', mediaUrl);
-        }
-        
+      const url = `${BASE}/feed`;
+      console.log("📡 Fetching feed:", url);
+
+      const response = await axios.get(url);
+      const data = response.data;
+
+      console.log(`📸 Received ${data.length} posts`);
+
+      const transformed = data.map(post => {
+        const mediaUrl = fixUrl(post.image_url || post.media_url);
+
         return {
           id: post.id,
           user_id: post.user_id,
           username: post.username,
-          user_profile_picture: post.user_profile_picture,
+          user_profile_picture: fixUrl(post.user_profile_picture),
           user_badge: post.user_badge,
           user_level: post.user_level,
           user_title: post.user_title,
+
           description: post.review_text,
-          rating: post.rating, // Backend returns 1-10, display as-is
+          rating: post.rating,
           ratingLabel: getRatingLabel(post.rating),
-          location: extractLocationFromMapLink(post.map_link),
+
+          location: extractLocation(post.map_link),
           mapsUrl: post.map_link,
+
           likes: post.likes_count,
           comments: post.comments_count,
-          shares: 0, // Not implemented yet
-          is_liked: post.is_liked_by_user || false,
+          is_liked: post.is_liked_by_user,
+
           media_url: mediaUrl,
           media_type: post.media_type,
           created_at: post.created_at,
-          popularPhotos: [], // Can be populated later
         };
       });
-      
-      setFeedPosts(transformedPosts);
+
+      setFeedPosts(transformed);
       setLoading(false);
       setRefreshing(false);
-    } catch (error) {
-      console.error('❌ Error fetching feed:', error);
-      setError('Failed to load feed');
+    } catch (err) {
+      console.log("❌ Feed fetch error:", err);
+      setError("Failed to load feed.");
       setLoading(false);
       setRefreshing(false);
-      
-      // Show alert on web
-      if (Platform.OS === 'web') {
-        // Don't block the UI with alerts in case of errors
-        console.error('Feed fetch error:', error.message);
-      }
     }
   };
 
@@ -131,87 +129,88 @@ export default function FeedScreen() {
   };
 
   const getRatingLabel = (rating) => {
-    if (rating >= 9) return 'Excellent Food';
-    if (rating >= 7) return 'Very Good Food';
-    if (rating >= 5) return 'Good Food';
-    if (rating >= 3) return 'Average Food';
-    return 'Below Average';
+    if (rating >= 9) return "Excellent Food";
+    if (rating >= 7) return "Very Good Food";
+    if (rating >= 5) return "Good Food";
+    if (rating >= 3) return "Average Food";
+    return "Below Average";
   };
 
-  const extractLocationFromMapLink = (mapLink) => {
-    if (!mapLink) return 'No location';
-    
-    // Try to extract location from Google Maps URL
+  const extractLocation = (mapLink) => {
+    if (!mapLink) return "No location";
+
     try {
-      const url = new URL(mapLink);
-      const query = url.searchParams.get('q');
-      if (query) return query;
-      
-      // Fallback to basic parsing
+      const u = new URL(mapLink);
+      const q = u.searchParams.get("q");
+      if (q) return q;
       const match = mapLink.match(/q=([^&]+)/);
-      return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : 'Location';
+      return match ? decodeURIComponent(match[1]) : "Location";
     } catch {
-      return 'Location';
+      return "Location";
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      
+      {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cofau</Text>
+
         <TouchableOpacity 
           style={styles.notificationButton}
           onPress={() => router.push('/notifications')}
         >
-          <Ionicons name="notifications-outline" size={26} color="#333" />
+          <Ionicons name="notifications-outline" size={26} color="#fff" />
+          
           {unreadCount > 0 && (
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationBadgeText}>
-                {unreadCount > 99 ? '99+' : unreadCount}
+                {unreadCount > 99 ? "99+" : unreadCount}
               </Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
+      <ScrollView
+        style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        showsVerticalScrollIndicator={false}
       >
-        {/* User Header Section */}
+
+        {/* USER HEADER CARD */}
         {user && (
-          <View style={styles.userSection}>
-            <View style={styles.userHeader}>
+          <View style={styles.userCard}>
+            <View style={styles.userRow}>
               <UserAvatar
-                profilePicture={user.profile_picture}
+                profilePicture={fixUrl(user.profile_picture)}
                 username={user.full_name || user.username}
                 size={50}
                 level={user.level}
-                showLevelBadge={true}
+                showLevelBadge
               />
+
               <View style={styles.userInfo}>
-                <Text style={styles.userNameText}>{user.full_name}</Text>
-                <View style={styles.levelRow}>
-                  <Text style={styles.levelText}>Level {user.level || 1}</Text>
-                </View>
-                <RatingBar 
-                  current={user.currentPoints || user.points || 0} 
-                  total={user.requiredPoints || 1250} 
-                  label="" 
+                <Text style={styles.userName}>{user.full_name}</Text>
+                <Text style={styles.levelText}>Level {user.level}</Text>
+
+                <RatingBar
+                  current={user.currentPoints || 0}
+                  total={user.requiredPoints || 1250}
+                  label=""
                 />
               </View>
             </View>
           </View>
         )}
 
-        {/* Stories Bar */}
+        {/* STORIES BAR */}
         <StoriesBar />
 
-        {/* Loading State */}
+        {/* LOADING */}
         {loading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4dd0e1" />
@@ -219,38 +218,29 @@ export default function FeedScreen() {
           </View>
         )}
 
-        {/* Error State */}
+        {/* ERROR */}
         {error && !loading && (
-          <View style={styles.errorContainer}>
+          <View style={styles.errorBox}>
             <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchFeed}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={fetchFeed}>
+              <Text style={styles.retryBtnText}>Retry</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Empty State */}
-        {!loading && !error && feedPosts.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="restaurant-outline" size={64} color="#CCC" />
-            <Text style={styles.emptyText}>No posts yet</Text>
-            <Text style={styles.emptySubtext}>Be the first to share a food experience!</Text>
-          </View>
-        )}
-
-        {/* Feed Cards */}
-        {!loading && !error && feedPosts.map((post) => (
+        {/* FEED POSTS */}
+        {!loading && !error && feedPosts.map(post => (
           <FeedCard key={post.id} post={post} onLikeUpdate={fetchFeed} />
         ))}
 
-        <View style={styles.bottomSpacer} />
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
+      {/* NAVIGATION BAR */}
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={28} color="#000" />
+          <Ionicons name="home" size={28} color="#000" />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push('/explore')}>
@@ -269,32 +259,27 @@ export default function FeedScreen() {
           <Ionicons name="person-outline" size={28} color="#000" />
         </TouchableOpacity>
       </View>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+
   header: {
     backgroundColor: '#3B5998',
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  notificationButton: {
-    padding: 8,
-    position: 'relative',
-  },
+
+  headerTitle: { color: '#fff', fontWeight: 'bold', fontSize: 20 },
+
+  notificationButton: { padding: 8, position: 'relative' },
+
   notificationBadge: {
     position: 'absolute',
     top: 4,
@@ -306,122 +291,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notificationBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  userSection: {
-    backgroundColor: '#FFF',
+
+  notificationBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+
+  scrollView: { flex: 1 },
+
+  userCard: {
+    backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
     borderRadius: 16,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  userHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+
+  userRow: { flexDirection: 'row', alignItems: 'center' },
+
+  userInfo: { marginLeft: 16, flex: 1 },
+
+  userName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+
+  levelText: { marginTop: 4, fontSize: 14, fontWeight: '600', color: '#333' },
+
+  loadingContainer: { padding: 40, alignItems: 'center' },
+  loadingText: { marginTop: 12, color: '#666' },
+
+  errorBox: { padding: 40, alignItems: 'center' },
+  errorText: { marginTop: 12, color: '#FF6B6B', fontSize: 16 },
+
+  retryBtn: {
+    marginTop: 16,
+    backgroundColor: '#4dd0e1',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
-  userInfo: {
-    flex: 1,
-  },
-  levelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  levelText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  reviewerSection: {
-    backgroundColor: '#FFFEF0',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  bottomSpacer: {
-    height: 20,
-  },
+
+  retryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+
   navBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderColor: '#ccc',
     backgroundColor: '#fff',
-  },
-  userNameText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  errorText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#FF6B6B',
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#4dd0e1',
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-  },
-  emptySubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
   },
 });
