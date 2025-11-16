@@ -1,7 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, 
-  ActivityIndicator, TextInput, Modal, Alert, FlatList, Dimensions, Platform 
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  TextInput,
+  Modal,
+  Alert,
+  FlatList,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -28,6 +39,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams(); // Get userId from query params
   const { token, logout, user: currentUser } = useAuth();
+
   const [userData, setUserData] = useState<any>(null);
   const [userStats, setUserStats] = useState<any>(null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
@@ -70,10 +82,15 @@ export default function ProfileScreen() {
 
       // Determine the final user ID and ownership
       const finalUserId = userId ?? currentUser?.id;
-      const isOwn = !userId || (finalUserId === currentUser?.id);
+      const isOwn = !userId || finalUserId === currentUser?.id;
       setIsOwnProfile(isOwn);
 
-      console.log('👤 Profile Detection:', { userId, currentUserId: currentUser?.id, finalUserId, isOwn });
+      console.log('👤 Profile Detection:', {
+        userId,
+        currentUserId: currentUser?.id,
+        finalUserId,
+        isOwn,
+      });
 
       if (userId && userId !== currentUser?.id) {
         // Viewing another user's profile
@@ -91,12 +108,18 @@ export default function ProfileScreen() {
             headers: { Authorization: `Bearer ${token}` },
           });
 
-          const userPost = feedResponse.data.find((post: any) => post.user_id === userId);
+          const userPost = feedResponse.data.find(
+            (post: any) => post.user_id === userId
+          );
           if (userPost) {
             user = {
               id: userPost.user_id,
               full_name: userPost.username,
-              profile_picture: userPost.user_profile_picture,
+              // some feeds may send user_profile_picture or profile_picture_url
+              profile_picture:
+                userPost.user_profile_picture ||
+                userPost.profile_picture ||
+                userPost.profile_picture_url,
               level: userPost.user_level,
               title: userPost.user_title,
             };
@@ -114,8 +137,12 @@ export default function ProfileScreen() {
         user = response.data.user || response.data;
       }
 
-      // ✅ Always fix profile picture URL
-      user.profile_picture = fixUrl(user.profile_picture);
+      // ✅ Always normalize profile picture URL from any possible backend field
+      const rawProfilePicture =
+        user.profile_picture ||
+        user.profile_picture_url ||
+        user.user_profile_picture;
+      user.profile_picture = fixUrl(rawProfilePicture);
 
       setUserData(user);
       setEditedBio(user.bio || '');
@@ -170,9 +197,12 @@ export default function ProfileScreen() {
     if (!userData?.id || !token) return;
 
     try {
-      const response = await axios.get(`${API_URL}/users/${userData.id}/follow-status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        `${API_URL}/users/${userData.id}/follow-status`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setIsFollowing(response.data.isFollowing);
     } catch (err) {
       console.error('❌ Error fetching follow status:', err);
@@ -191,7 +221,9 @@ export default function ProfileScreen() {
     setIsFollowing(!isFollowing);
     setUserStats((prev: any) => ({
       ...prev,
-      followers_count: isFollowing ? previousFollowerCount - 1 : previousFollowerCount + 1,
+      followers_count: isFollowing
+        ? previousFollowerCount - 1
+        : previousFollowerCount + 1,
     }));
 
     try {
@@ -225,7 +257,8 @@ export default function ProfileScreen() {
 
       const formData = new FormData();
       if (editedName) formData.append('full_name', editedName);
-      if (editedBio !== null && editedBio !== undefined) formData.append('bio', editedBio);
+      if (editedBio !== null && editedBio !== undefined)
+        formData.append('bio', editedBio);
 
       const response = await axios.put(`${API_URL}/users/update`, formData, {
         headers: {
@@ -242,7 +275,10 @@ export default function ProfileScreen() {
         fetchProfileData();
       }, 500);
     } catch (err: any) {
-      console.error('❌ Error updating profile:', err.response?.data || err.message);
+      console.error(
+        '❌ Error updating profile:',
+        err.response?.data || err.message
+      );
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     }
   };
@@ -286,7 +322,9 @@ export default function ProfileScreen() {
     options.push({ text: 'Cancel', style: 'cancel' });
 
     if (Platform.OS === 'web') {
-      const action = window.confirm('Choose from library to upload a profile picture?');
+      const action = window.confirm(
+        'Choose from library to upload a profile picture?'
+      );
       if (action) handleChoosePhoto();
     } else {
       Alert.alert('Profile Picture', 'Choose an option', options);
@@ -297,7 +335,10 @@ export default function ProfileScreen() {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+        Alert.alert(
+          'Permission Denied',
+          'Camera permission is required to take photos.'
+        );
         return;
       }
 
@@ -319,9 +360,13 @@ export default function ProfileScreen() {
 
   const handleChoosePhoto = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Photo library permission is required.');
+        Alert.alert(
+          'Permission Denied',
+          'Photo library permission is required.'
+        );
         return;
       }
 
@@ -357,24 +402,39 @@ export default function ProfileScreen() {
         type,
       } as any);
 
-      const response = await axios.post(`${API_URL}/users/upload-profile-image`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await axios.post(
+        `${API_URL}/users/upload-profile-image`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
 
       console.log('✅ Profile picture uploaded:', response.data);
+
+      const apiProfilePicture =
+        response.data.profile_picture ||
+        response.data.profile_picture_url ||
+        response.data.user_profile_picture;
+
+      const normalizedProfilePicture = fixUrl(apiProfilePicture);
 
       // ✅ Ensure URL is absolute when saving to state
       setUserData((prev: any) => ({
         ...prev,
-        profile_picture: fixUrl(response.data.profile_picture),
+        profile_picture: normalizedProfilePicture,
+        profile_picture_url: normalizedProfilePicture,
       }));
 
       Alert.alert('Success', 'Profile picture updated successfully!');
     } catch (error: any) {
-      console.error('❌ Error uploading profile picture:', error.response?.data || error.message);
+      console.error(
+        '❌ Error uploading profile picture:',
+        error.response?.data || error.message
+      );
       Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
     } finally {
       setUploadingImage(false);
@@ -383,20 +443,26 @@ export default function ProfileScreen() {
 
   const handleRemovePhoto = async () => {
     if (Platform.OS === 'web') {
-      const confirmRemove = window.confirm('Are you sure you want to remove your profile picture?');
+      const confirmRemove = window.confirm(
+        'Are you sure you want to remove your profile picture?'
+      );
       if (!confirmRemove) return;
       await removeProfilePicture();
       return;
     }
 
-    Alert.alert('Remove Profile Picture', 'Are you sure you want to remove your profile picture?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        onPress: () => removeProfilePicture(),
-        style: 'destructive',
-      },
-    ]);
+    Alert.alert(
+      'Remove Profile Picture',
+      'Are you sure you want to remove your profile picture?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          onPress: () => removeProfilePicture(),
+          style: 'destructive',
+        },
+      ]
+    );
   };
 
   const removeProfilePicture = async () => {
@@ -413,11 +479,15 @@ export default function ProfileScreen() {
       setUserData((prev: any) => ({
         ...prev,
         profile_picture: null,
+        profile_picture_url: null,
       }));
 
       Alert.alert('Success', 'Profile picture removed successfully!');
     } catch (error: any) {
-      console.error('❌ Error removing profile picture:', error.response?.data || error.message);
+      console.error(
+        '❌ Error removing profile picture:',
+        error.response?.data || error.message
+      );
       Alert.alert('Error', 'Failed to remove profile picture. Please try again.');
     } finally {
       setUploadingImage(false);
@@ -448,7 +518,6 @@ export default function ProfileScreen() {
         onPress={() => {
           if (!isVideo) {
             console.log('Photo clicked:', item.id);
-            // You can navigate to post details here if needed
             // router.push(`/post-details/${item.id}`);
           }
         }}
@@ -458,7 +527,11 @@ export default function ProfileScreen() {
           <Image source={{ uri: mediaUrl }} style={styles.gridImage} resizeMode="cover" />
         ) : (
           <View style={styles.gridPlaceholder}>
-            <Ionicons name={isVideo ? 'play-circle-outline' : 'image-outline'} size={40} color="#ccc" />
+            <Ionicons
+              name={isVideo ? 'play-circle-outline' : 'image-outline'}
+              size={40}
+              color="#ccc"
+            />
           </View>
         )}
         {item.rating && (
@@ -516,9 +589,15 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.username}>{userData.full_name || userData.username || 'User'}</Text>
+          <Text style={styles.username}>
+            {userData.full_name || userData.username || 'User'}
+          </Text>
           <TouchableOpacity style={styles.infoButton}>
-            <Ionicons name="information-circle-outline" size={24} color="#FF6B6B" />
+            <Ionicons
+              name="information-circle-outline"
+              size={24}
+              color="#FF6B6B"
+            />
           </TouchableOpacity>
         </View>
 
@@ -526,7 +605,7 @@ export default function ProfileScreen() {
         <View style={styles.identitySection}>
           <View style={styles.profilePictureContainer}>
             <ProfileBadge
-              profilePicture={fixUrl(userData.profile_picture)}
+              profilePicture={userData.profile_picture}
               username={userData.full_name || userData.username}
               level={userData.level || 1}
               dpSize={110}
@@ -557,28 +636,40 @@ export default function ProfileScreen() {
         {/* Stats Section */}
         <View style={styles.statsSection}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{userStats?.total_posts || 0}</Text>
+            <Text style={styles.statValue}>
+              {userStats?.total_posts || 0}
+            </Text>
             <Text style={styles.statLabel}>Posts</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{userStats?.photos_count || 0}</Text>
+            <Text style={styles.statValue}>
+              {userStats?.photos_count || 0}
+            </Text>
             <Text style={styles.statLabel}>Photos</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
+            <Text style={styles.statValue}>
+              {userStats?.followers_count || 0}
+            </Text>
             <Text style={styles.statLabel}>People</Text>
           </View>
         </View>
 
         {/* Edit Profile / Follow Button */}
         {isOwnProfile ? (
-          <TouchableOpacity style={styles.editButton} onPress={() => setEditModalVisible(true)}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => setEditModalVisible(true)}
+          >
             <Ionicons name="pencil" size={20} color="#fff" />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.editButton, isFollowing ? styles.followingButton : styles.followButton]}
+            style={[
+              styles.editButton,
+              isFollowing ? styles.followingButton : styles.followButton,
+            ]}
             onPress={handleFollowToggle}
             disabled={followLoading}
           >
@@ -586,8 +677,14 @@ export default function ProfileScreen() {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Ionicons name={isFollowing ? 'checkmark' : 'person-add'} size={20} color="#fff" />
-                <Text style={styles.editButtonText}>{isFollowing ? 'Following' : 'Follow'}</Text>
+                <Ionicons
+                  name={isFollowing ? 'checkmark' : 'person-add'}
+                  size={20}
+                  color="#fff"
+                />
+                <Text style={styles.editButtonText}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -607,19 +704,40 @@ export default function ProfileScreen() {
             style={[styles.tab, activeTab === 'photo' && styles.activeTab]}
             onPress={() => setActiveTab('photo')}
           >
-            <Text style={[styles.tabText, activeTab === 'photo' && styles.activeTabText]}>Photo</Text>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'photo' && styles.activeTabText,
+              ]}
+            >
+              Photo
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'video' && styles.activeTab]}
             onPress={() => setActiveTab('video')}
           >
-            <Text style={[styles.tabText, activeTab === 'video' && styles.activeTabText]}>Video</Text>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'video' && styles.activeTabText,
+              ]}
+            >
+              Video
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'collabs' && styles.activeTab]}
             onPress={() => setActiveTab('collabs')}
           >
-            <Text style={[styles.tabText, activeTab === 'collabs' && styles.activeTabText]}>Collabs</Text>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'collabs' && styles.activeTabText,
+              ]}
+            >
+              Collabs
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -649,7 +767,9 @@ export default function ProfileScreen() {
           onPress={() => {
             console.log('🔴 Logout button pressed!');
             if (Platform.OS === 'web') {
-              const confirmed = window.confirm('Are you sure you want to logout?');
+              const confirmed = window.confirm(
+                'Are you sure you want to logout?'
+              );
               if (confirmed) {
                 console.log('✅ User confirmed logout (web)');
                 handleLogout();
@@ -735,7 +855,10 @@ export default function ProfileScreen() {
               numberOfLines={4}
             />
 
-            <TouchableOpacity style={styles.saveButton} onPress={handleUpdateProfile}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleUpdateProfile}
+            >
               <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
           </View>
