@@ -19,7 +19,17 @@ import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com/api';
+
+// ✔ Correct backend URL from app.json
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://backend.cofau.com/api';
+
+// ✔ Fix absolute media URLs (stories & DPs)
+const fixUrl = (url?: string | null) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/')) return `${API_URL}${url}`;
+  return `${API_URL}/${url}`;
+};
 
 export default function StoryViewerScreen() {
   const router = useRouter();
@@ -30,28 +40,47 @@ export default function StoryViewerScreen() {
   const [stories, setStories] = useState([]);
   const [storyUser, setStoryUser] = useState(null);
   const [paused, setPaused] = useState(false);
-  
+
   const progressAnims = useRef([]).current;
   const autoAdvanceTimer = useRef(null);
 
+  // -------------------------------------------------------
+  // LOAD STORIES FROM PARAMS
+  // -------------------------------------------------------
   useEffect(() => {
-    // Parse params
     try {
       const parsedStories = JSON.parse(params.stories);
       const parsedUser = JSON.parse(params.user);
-      setStories(parsedStories);
-      setStoryUser(parsedUser);
 
-      // Initialize progress animations
-      parsedStories.forEach(() => {
+      // ✔ FIX MEDIA URLs for stories
+      const fixedStories = parsedStories.map((s: any) => ({
+        ...s,
+        media_url: fixUrl(s.media_url),
+      }));
+
+      // ✔ FIX USER PROFILE PICTURE URL
+      const fixedUser = {
+        ...parsedUser,
+        profile_picture: fixUrl(parsedUser.profile_picture),
+      };
+
+      setStories(fixedStories);
+      setStoryUser(fixedUser);
+
+      // Init animation refs
+      fixedStories.forEach(() => {
         progressAnims.push(new Animated.Value(0));
       });
+
     } catch (error) {
       console.error('❌ Error parsing story data:', error);
       router.back();
     }
   }, []);
 
+  // -------------------------------------------------------
+  // AUTO ADVANCE WITH TIMER
+  // -------------------------------------------------------
   useEffect(() => {
     if (stories.length > 0 && !paused) {
       startProgress();
@@ -68,16 +97,17 @@ export default function StoryViewerScreen() {
     const currentStory = stories[currentIndex];
     if (!currentStory) return;
 
-    const duration = currentStory.media_type === 'video' ? 30000 : 5000; // 30s for video, 5s for image
+    const duration =
+      currentStory.media_type === 'video'
+        ? 30000 // 30 sec videos
+        : 5000;  // 5 sec images
 
-    // Animate progress bar
     Animated.timing(progressAnims[currentIndex], {
       toValue: 1,
       duration,
       useNativeDriver: false,
     }).start();
 
-    // Auto-advance timer
     autoAdvanceTimer.current = setTimeout(() => {
       handleNext();
     }, duration);
@@ -89,11 +119,9 @@ export default function StoryViewerScreen() {
     }
 
     if (currentIndex < stories.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      // Reset current progress
       progressAnims[currentIndex].setValue(1);
+      setCurrentIndex(currentIndex + 1);
     } else {
-      // End of stories
       router.back();
     }
   };
@@ -104,19 +132,20 @@ export default function StoryViewerScreen() {
     }
 
     if (currentIndex > 0) {
-      // Reset current progress
       progressAnims[currentIndex].setValue(0);
       setCurrentIndex(currentIndex - 1);
-      // Reset previous progress
       progressAnims[currentIndex - 1].setValue(0);
     } else {
       router.back();
     }
   };
 
+  // -------------------------------------------------------
+  // DELETE STORY (OWNER ONLY)
+  // -------------------------------------------------------
   const handleDelete = async () => {
     const currentStory = stories[currentIndex];
-    
+
     Alert.alert(
       'Delete Story',
       'Are you sure you want to delete this story?',
@@ -131,14 +160,15 @@ export default function StoryViewerScreen() {
                 headers: { Authorization: `Bearer ${token}` },
               });
 
-              // Remove from local array
               const updatedStories = stories.filter((_, idx) => idx !== currentIndex);
-              
+
               if (updatedStories.length === 0) {
-                // No more stories, go back
-                Alert.alert('Success', 'Story deleted', [{ text: 'OK', onPress: () => router.back() }]);
+                Alert.alert('Deleted', 'Story deleted', [
+                  { text: 'OK', onPress: () => router.back() },
+                ]);
               } else {
                 setStories(updatedStories);
+
                 if (currentIndex >= updatedStories.length) {
                   setCurrentIndex(updatedStories.length - 1);
                 }
@@ -153,20 +183,13 @@ export default function StoryViewerScreen() {
     );
   };
 
-  const handleTapLeft = () => {
-    handlePrevious();
-  };
+  const handleTapLeft = () => handlePrevious();
+  const handleTapRight = () => handleNext();
 
-  const handleTapRight = () => {
-    handleNext();
-  };
-
-  if (!stories.length || !storyUser) {
-    return null;
-  }
+  if (!stories.length || !storyUser) return null;
 
   const currentStory = stories[currentIndex];
-  const isOwner = storyUser.id === user?._id;
+  const isOwner = storyUser?.id === user?._id;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -175,15 +198,13 @@ export default function StoryViewerScreen() {
         {stories.map((story, index) => (
           <View key={story.id} style={styles.progressBarBackground}>
             <Animated.View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: progressAnims[index]?.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
+              style={{
+                ...styles.progressBarFill,
+                width: progressAnims[index]?.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              }}
             />
           </View>
         ))}
@@ -207,13 +228,14 @@ export default function StoryViewerScreen() {
               <Ionicons name="trash-outline" size={24} color="#FFF" />
             </TouchableOpacity>
           )}
+
           <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
             <Ionicons name="close" size={28} color="#FFF" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Story Content */}
+      {/* MAIN STORY MEDIA */}
       <View style={styles.contentContainer}>
         {currentStory.media_type === 'image' ? (
           <Image
@@ -225,8 +247,8 @@ export default function StoryViewerScreen() {
           <Video
             source={{ uri: currentStory.media_url }}
             style={styles.storyVideo}
-            resizeMode="contain"
             shouldPlay={!paused}
+            resizeMode="contain"
             isLooping={false}
             onPlaybackStatusUpdate={(status) => {
               if (status.didJustFinish) {
@@ -238,20 +260,15 @@ export default function StoryViewerScreen() {
       </View>
 
       {/* Tap Areas */}
-      <TouchableOpacity
-        style={styles.tapAreaLeft}
-        activeOpacity={1}
-        onPress={handleTapLeft}
-      />
-      <TouchableOpacity
-        style={styles.tapAreaRight}
-        activeOpacity={1}
-        onPress={handleTapRight}
-      />
+      <TouchableOpacity style={styles.tapAreaLeft} activeOpacity={1} onPress={handleTapLeft} />
+      <TouchableOpacity style={styles.tapAreaRight} activeOpacity={1} onPress={handleTapRight} />
     </SafeAreaView>
   );
 }
 
+// -------------------------------------------------------
+// STYLES
+// -------------------------------------------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
