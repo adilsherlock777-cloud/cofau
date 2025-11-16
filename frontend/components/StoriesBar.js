@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +15,20 @@ import Constants from 'expo-constants';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from './UserAvatar';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com/api';
+// Correct backend base URL (no /api at end)
+const BACKEND_URL =
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
+  'https://backend.cofau.com';
+
+const API_URL = `${BACKEND_URL}/api`;
+
+// Normalize any DP path to absolute URL
+const fixUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  if (!url.startsWith('/')) return `${BACKEND_URL}/${url}`;
+  return `${BACKEND_URL}${url}`;
+};
 
 export default function StoriesBar() {
   const router = useRouter();
@@ -25,18 +37,27 @@ export default function StoriesBar() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      fetchStories();
-    }
+    if (token) fetchStories();
   }, [token]);
 
   const fetchStories = async () => {
     try {
       setLoading(true);
+
       const response = await axios.get(`${API_URL}/stories/feed`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setStories(response.data);
+
+      // Fix DP URLs for ALL returned users
+      const fixed = response.data.map((u) => ({
+        ...u,
+        user: {
+          ...u.user,
+          profile_picture: fixUrl(u.user.profile_picture),
+        },
+      }));
+
+      setStories(fixed);
     } catch (error) {
       console.error('❌ Error fetching stories:', error.response?.data || error.message);
     } finally {
@@ -45,7 +66,6 @@ export default function StoriesBar() {
   };
 
   const handleStoryPress = (userStories) => {
-    // Navigate to story viewer with user stories data
     router.push({
       pathname: '/story-viewer',
       params: {
@@ -57,7 +77,6 @@ export default function StoriesBar() {
   };
 
   const handleAddStory = () => {
-    // Navigate to story upload
     router.push('/story-upload');
   };
 
@@ -81,7 +100,7 @@ export default function StoriesBar() {
         <TouchableOpacity style={styles.storyItem} onPress={handleAddStory}>
           <View style={styles.yourStoryContainer}>
             <UserAvatar
-              profilePicture={user.profile_picture}
+              profilePicture={fixUrl(user.profile_picture)}
               username={user.full_name || user.username}
               size={60}
               showLevelBadge={false}
@@ -90,6 +109,7 @@ export default function StoriesBar() {
               <Ionicons name="add" size={20} color="#fff" />
             </View>
           </View>
+
           <Text style={styles.storyUsername} numberOfLines={1}>
             Your Story
           </Text>
@@ -98,9 +118,11 @@ export default function StoriesBar() {
 
       {/* Other Users' Stories */}
       {stories.map((userStories) => {
-        const isOwnStory = userStories.user.id === user?._id;
-        if (isOwnStory && userStories.stories.length === 0) return null; // Skip if own story but no stories
-        
+        const isOwnStory = userStories.user.id === user?.id;
+
+        // Skip if it's our own story and empty
+        if (isOwnStory && userStories.stories.length === 0) return null;
+
         return (
           <TouchableOpacity
             key={userStories.user.id}
@@ -115,13 +137,14 @@ export default function StoriesBar() {
             >
               <View style={styles.storyInnerWhiteRing}>
                 <UserAvatar
-                  profilePicture={userStories.user.profile_picture}
+                  profilePicture={fixUrl(userStories.user.profile_picture)}
                   username={userStories.user.username}
                   size={58}
                   showLevelBadge={false}
                 />
               </View>
             </LinearGradient>
+
             <Text style={styles.storyUsername} numberOfLines={1}>
               {userStories.user.username}
             </Text>
