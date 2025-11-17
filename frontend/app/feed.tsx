@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -25,28 +24,35 @@ const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
 /* -----------------------------------------------------
-   🔥 UNIVERSAL MEDIA URL NORMALIZER (Safe for all)
+   ✅ UNIVERSAL MEDIA/DP URL NORMALIZER (SAFE)
+   (same pattern as FeedCard, StoryViewer, StoriesBar)
 ----------------------------------------------------- */
-const normalizeUrl = (url) => {
+const normalizeUrl = (url: string | null | undefined) => {
   if (!url) return null;
 
+  // Already absolute
   if (url.startsWith("http")) return url;
 
-  let cleaned = url.replace(/\/+/g, "/");
+  let cleaned = url.trim();
 
-  if (cleaned.startsWith("/api/static/")) {
-    cleaned = cleaned.replace("/api", ""); // fix duplication
-  }
+  // Remove duplicated slashes, but keep http(s):// intact
+  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
 
+  // Handle paths like backend/static/uploads/...
+  cleaned = cleaned.replace("backend/", "/");
+
+  // Ensure leading slash
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
-  return `${BACKEND}${cleaned}`;
+  const finalUrl = `${BACKEND}${cleaned}`;
+  // console.log("FEED normalizeUrl:", url, "➡", finalUrl);
+  return finalUrl;
 };
 
 /* -----------------------------------------------------
-   🔥 FIX DP FOR FEED POSTS (all possible fields)
+   ✅ FIX DP FOR FEED POSTS (all possible fields)
 ----------------------------------------------------- */
-const getPostDP = (post) => {
+const getPostDP = (post: any) => {
   return normalizeUrl(
     post.user_profile_picture ||
       post.profile_picture ||
@@ -62,10 +68,10 @@ export default function FeedScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
 
-  const [feedPosts, setFeedPosts] = useState([]);
+  const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -91,21 +97,22 @@ export default function FeedScreen() {
   };
 
   /* -----------------------------------------------------
-      🔥 FETCH FEED & FIX ALL DP/MEDIA URLS
+      ✅ FETCH FEED & NORMALIZE DP / MEDIA
   ----------------------------------------------------- */
   const fetchFeed = async () => {
     try {
       setError(null);
+      setLoading(true);
 
       const response = await axios.get(`${BACKEND}/api/feed`);
       const data = response.data;
 
-      const transformed = data.map((post) => ({
+      const transformed = data.map((post: any) => ({
         id: post.id,
         user_id: post.user_id,
         username: post.username,
 
-        // FIXED DP
+        // DP (already normalized)
         user_profile_picture: getPostDP(post),
 
         user_badge: post.user_badge,
@@ -123,17 +130,19 @@ export default function FeedScreen() {
         comments: post.comments_count,
         is_liked: post.is_liked_by_user,
 
+        // ✅ media URL normalized safely
         media_url: normalizeUrl(post.image_url || post.media_url),
         media_type: post.media_type,
+
+        // ✅ keep raw timestamp; FeedCard formats as "2h ago"
         created_at: post.created_at,
       }));
 
       setFeedPosts(transformed);
-      setLoading(false);
-      setRefreshing(false);
-    } catch (err) {
-      console.log("❌ Feed fetch error:", err);
+    } catch (err: any) {
+      console.log("❌ Feed fetch error:", err?.response?.data || err.message);
       setError("Failed to load feed.");
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -144,7 +153,7 @@ export default function FeedScreen() {
     fetchFeed();
   };
 
-  const getRatingLabel = (rating) => {
+  const getRatingLabel = (rating: number) => {
     if (rating >= 9) return "Excellent Food";
     if (rating >= 7) return "Very Good Food";
     if (rating >= 5) return "Good Food";
@@ -152,7 +161,7 @@ export default function FeedScreen() {
     return "Below Average";
   };
 
-  const extractLocation = (mapLink) => {
+  const extractLocation = (mapLink: string | null) => {
     if (!mapLink) return "No location";
 
     try {
@@ -200,13 +209,13 @@ export default function FeedScreen() {
         {user && (
           <View style={styles.userCard}>
             <View style={styles.userRow}>
-             <UserAvatar
+              <UserAvatar
                 profilePicture={normalizeUrl(user.profile_picture)}
                 username={user.full_name || user.username}
                 size={50}
                 level={user.level}
                 showLevelBadge
-                 />
+              />
 
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{user.full_name}</Text>
