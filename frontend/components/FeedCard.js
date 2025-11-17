@@ -1,35 +1,48 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 import moment from "moment";
 
 import UserAvatar from "./UserAvatar";
-import MapButton from "./MapButton";
 import { likePost, unlikePost } from "../utils/api";
 
 const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
 /* ----------------------------------------------------------
-   ✅ UNIVERSAL URL NORMALIZER (Correct version)
+   ✅ UNIVERSAL URL NORMALIZER
 -----------------------------------------------------------*/
 const normalizeUrl = (url) => {
   if (!url) return null;
-
   if (url.startsWith("http")) return url;
 
   let cleaned = url.trim();
+  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1"); // remove duplicate slashes
 
-  // Remove duplicate slashes (but keep "https://")
-  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
-
-  // Ensure leading slash
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
-  // Final absolute URL
   return `${BACKEND}${cleaned}`;
+};
+
+/* ----------------------------------------------------------
+   ✅ EXTRACT CLEAN LOCATION FROM GOOGLE MAPS LINK
+-----------------------------------------------------------*/
+const extractLocationName = (mapLink) => {
+  if (!mapLink) return null;
+
+  try {
+    const url = new URL(mapLink);
+    const q = url.searchParams.get("q");
+    if (q) return decodeURIComponent(q);
+  } catch (e) {
+    // fallback for malformed links
+    const match = mapLink.match(/q=([^&]+)/);
+    if (match) return decodeURIComponent(match[1]);
+  }
+
+  return "View Location";
 };
 
 export default function FeedCard({ post, onLikeUpdate }) {
@@ -41,21 +54,19 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const mediaUrl = normalizeUrl(post.media_url);
   const isVideo = mediaUrl?.toLowerCase().endsWith(".mp4");
 
-  console.log("FEED MEDIA URL:", post.media_url, "→Final:", mediaUrl);
-
-  /* -----------------------------------------------------
-     RAW DP → UserAvatar fixes the URL
-  ----------------------------------------------------- */
   const dpRaw =
     post.user_profile_picture ||
     post.profile_picture ||
-    post.profile_picture_url ||
     post.user_profile_pic ||
     post.profile_pic ||
-    post.userProfilePicture ||
-    post.profilePicture;
+    post.userProfilePicture;
 
   const openPost = () => router.push(`/post-details/${post.id}`);
+
+  const handleOpenMap = () => {
+    if (!post.map_link) return;
+    Linking.openURL(post.map_link);
+  };
 
   const handleLike = async () => {
     const prev = isLiked;
@@ -93,7 +104,6 @@ export default function FeedCard({ post, onLikeUpdate }) {
           <View style={styles.userMeta}>
             <Text style={styles.username}>{post.username}</Text>
 
-            {/* 🕒 FIXED TIMESTAMP */}
             <Text style={styles.timestamp}>
               {moment(post.created_at).fromNow()}
             </Text>
@@ -145,17 +155,27 @@ export default function FeedCard({ post, onLikeUpdate }) {
       {/* Description */}
       <View style={styles.desc}>
         <Text style={styles.descText}>
-          <Text style={styles.descBold}>{post.username}</Text>{" "}
-          {post.description}
+          <Text style={styles.descBold}>{post.username}</Text> {post.description}
         </Text>
 
         <View style={styles.ratingRow}>
           <Ionicons name="star" size={16} color="#FFD700" />
           <Text style={styles.ratingText}>{post.rating}/10</Text>
         </View>
-      </View>
 
-      <MapButton restaurantName={post.location} mapsUrl={post.mapsUrl} />
+        {/* ------------------------------------------
+            📍 LOCATION BUTTON (FREE GOOGLE MAPS LINK)
+        ------------------------------------------- */}
+        {post.map_link && (
+          <TouchableOpacity style={styles.locationButton} onPress={handleOpenMap}>
+            <Ionicons name="location" size={18} color="#4ECDC4" />
+            <Text style={styles.locationText}>
+              {extractLocationName(post.map_link)}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color="#4ECDC4" />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -195,4 +215,23 @@ const styles = StyleSheet.create({
 
   ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   ratingText: { marginLeft: 4, fontWeight: "600", color: "#333" },
+
+  /* LOCATION BUTTON */
+  locationButton: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3FFFD",
+    padding: 10,
+    borderRadius: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#CFFAF0",
+  },
+  locationText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+  },
 });
