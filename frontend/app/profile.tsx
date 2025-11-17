@@ -27,12 +27,21 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofa
 const API_URL = `${BACKEND_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// ✅ Global URL fixer for ALL media (DP, photos, videos, thumbnails)
 const fixUrl = (url?: string | null) => {
   if (!url) return null;
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/')) return `${BACKEND_URL}${url}`;
-  return `${BACKEND_URL}/${url}`;
+
+  // Already absolute
+  if (url.startsWith("http")) return url;
+
+  // Normalize slashes
+  url = url.replace(/\/+/g, "/");
+
+  // ⚠️ Remove wrong `/api` prefix if it appears before `/static`
+  if (url.startsWith("/api/static/")) {
+    url = url.replace("/api", ""); // becomes /static/...
+  }
+
+  return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
 };
 
 export default function ProfileScreen() {
