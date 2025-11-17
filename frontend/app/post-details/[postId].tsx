@@ -1,3 +1,5 @@
+// app/post-details/[postId].tsx
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -20,14 +22,36 @@ import axios from "axios";
 import { Image } from "expo-image";
 import { Video } from "expo-av";
 
-const API_BASE_URL =
+const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
-const API_URL = `${API_BASE_URL}/api`;
+const API_URL = `${BACKEND}/api`;
+
+/* ---------------------------------------------------------
+   🔥 UNIVERSAL URL NORMALIZER (FINAL VERSION)
+----------------------------------------------------------*/
+const normalizeUrl = (url) => {
+  if (!url) return null;
+
+  if (url.startsWith("http")) return url;
+
+  let cleaned = url.trim();
+
+  // remove duplicate slashes
+  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
+
+  // ensure leading slash
+  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
+
+  const finalUrl = `${BACKEND}${cleaned}`;
+  // console.log("PostDetails URL:", url, "→", finalUrl);
+  return finalUrl;
+};
 
 export default function PostDetailsScreen() {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
   const { token, user } = useAuth();
+
   const scrollViewRef = useRef(null);
   const videoRef = useRef(null);
 
@@ -39,6 +63,9 @@ export default function PostDetailsScreen() {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
 
+  /* ---------------------------------------------------------
+     LOAD POST DETAILS
+  ----------------------------------------------------------*/
   useEffect(() => {
     if (postId && token) {
       fetchPostDetails();
@@ -46,17 +73,11 @@ export default function PostDetailsScreen() {
     }
   }, [postId, token]);
 
-  const buildURL = (url) => {
-    if (!url) return null;
-    return url.startsWith("http")
-      ? url
-      : `${API_BASE_URL}${url.startsWith("/") ? url : "/" + url}`;
-  };
-
   const fetchPostDetails = async () => {
     try {
       setLoading(true);
 
+      // Fetch fresh feed list and find the matching post
       const res = await axios.get(`${API_URL}/feed`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -69,32 +90,44 @@ export default function PostDetailsScreen() {
         return;
       }
 
-      setPost({
+      const normalized = {
         ...found,
-        full_media_url: buildURL(found.media_url),
-        full_image_url: buildURL(found.image_url),
-        full_thumbnail_url: buildURL(found.thumbnail_url),
-      });
+        media_url: normalizeUrl(found.media_url),
+        image_url: normalizeUrl(found.image_url || found.media_url),
+        thumbnail_url: normalizeUrl(found.thumbnail_url),
+        user_profile_picture: normalizeUrl(found.user_profile_picture),
+      };
 
-      setIsLiked(found.is_liked_by_user || false);
-      setLikesCount(found.likes_count || 0);
-      setLoading(false);
+      setPost(normalized);
+      setIsLiked(normalized.is_liked_by_user || false);
+      setLikesCount(normalized.likes_count || 0);
     } catch (e) {
       console.log("❌ Post fetch error", e);
       Alert.alert("Error", "Unable to load post");
+    } finally {
       setLoading(false);
     }
   };
 
+  /* ---------------------------------------------------------
+     LOAD COMMENTS
+  ----------------------------------------------------------*/
   const fetchComments = async () => {
     try {
       const res = await axios.get(`${API_URL}/posts/${postId}/comments`);
-      setComments(res.data);
+      const normalized = res.data.map((c) => ({
+        ...c,
+        profile_pic: normalizeUrl(c.profile_pic),
+      }));
+      setComments(normalized);
     } catch (e) {
       console.log("❌ Comment fetch error", e);
     }
   };
 
+  /* ---------------------------------------------------------
+     LIKE TOGGLE
+  ----------------------------------------------------------*/
   const handleLikeToggle = async () => {
     const prevLiked = isLiked;
     const prevCount = likesCount;
@@ -115,14 +148,20 @@ export default function PostDetailsScreen() {
         );
       }
     } catch (e) {
+      // revert on failure
       setIsLiked(prevLiked);
       setLikesCount(prevCount);
     }
   };
 
+  /* ---------------------------------------------------------
+     ADD COMMENT
+  ----------------------------------------------------------*/
   const handleSubmitComment = async () => {
     if (!commentText.trim()) return;
+
     setSubmittingComment(true);
+
     try {
       const formData = new FormData();
       formData.append("comment_text", commentText.trim());
@@ -143,21 +182,29 @@ export default function PostDetailsScreen() {
     }
   };
 
+  /* ---------------------------------------------------------
+     TIME FORMAT
+  ----------------------------------------------------------*/
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now - date;
-    const mins = Math.floor(diffMs / 60000);
-    const hrs = Math.floor(diffMs / 3600000);
-    const days = Math.floor(diffMs / 86400000);
+    const diff = now - date;
 
+    const mins = Math.floor(diff / 60000);
+    const hrs = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (mins < 1) return "Just now";
     if (mins < 60) return `${mins}m ago`;
     if (hrs < 24) return `${hrs}h ago`;
     if (days < 7) return `${days}d ago`;
     return date.toLocaleDateString();
   };
 
+  /* ---------------------------------------------------------
+     LOADING UI
+  ----------------------------------------------------------*/
   if (loading)
     return (
       <View style={styles.loadingContainer}>
@@ -173,13 +220,15 @@ export default function PostDetailsScreen() {
       </View>
     );
 
+  const isVideo = (post.media_type || "").toLowerCase() === "video";
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={90}
     >
-      {/* Header */}
+      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={26} color="#000" />
@@ -201,29 +250,28 @@ export default function PostDetailsScreen() {
       </View>
 
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
-        {/* MEDIA SECTION */}
+        {/* MEDIA */}
         <View style={styles.mediaContainer}>
-          {post.media_type === "video" ? (
+          {isVideo ? (
             <Video
               ref={videoRef}
-              source={{ uri: post.full_media_url }}
+              source={{ uri: post.media_url }}
               style={styles.video}
-              useNativeControls
               resizeMode="cover"
+              useNativeControls
               isLooping
             />
           ) : (
             <Image
-              source={{ uri: post.full_image_url }}
+              source={{ uri: post.image_url }}
               style={styles.postImage}
               contentFit="cover"
             />
           )}
         </View>
 
-        {/* POST INFO */}
+        {/* POST DETAILS */}
         <View style={styles.postInfo}>
-          {/* User Row */}
           <TouchableOpacity
             style={styles.userRow}
             onPress={() => router.push(`/profile?userId=${post.user_id}`)}
@@ -231,8 +279,8 @@ export default function PostDetailsScreen() {
             <UserAvatar
               profilePicture={post.user_profile_picture}
               username={post.username}
-              level={post.user_level}
               size={40}
+              level={post.user_level}
               showLevelBadge
             />
             <View style={{ marginLeft: 10 }}>
@@ -241,26 +289,23 @@ export default function PostDetailsScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Review Text */}
           {post.review_text ? (
             <Text style={styles.caption}>{post.review_text}</Text>
           ) : null}
 
-          {/* Rating */}
-          {post.rating && (
+          {post.rating ? (
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={20} color="#FFD700" />
               <Text style={styles.ratingText}>{post.rating}/10</Text>
             </View>
-          )}
+          ) : null}
 
-          {/* Location */}
-          {post.map_link && (
+          {post.map_link ? (
             <View style={styles.locationRow}>
               <Ionicons name="location" size={20} color="#666" />
               <Text style={styles.locationText}>{post.map_link}</Text>
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* ACTIONS */}
@@ -276,20 +321,24 @@ export default function PostDetailsScreen() {
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            onPress={() =>
+              scrollViewRef.current?.scrollToEnd({ animated: true })
+            }
           >
             <Ionicons name="chatbubble-outline" size={26} color="#000" />
             <Text style={styles.actionText}>{comments.length}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
+          <TouchableOpacity style={styles.actionButton}>
             <Ionicons name="share-outline" size={26} color="#000" />
           </TouchableOpacity>
         </View>
 
         {/* COMMENTS */}
         <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>Comments ({comments.length})</Text>
+          <Text style={styles.commentsTitle}>
+            Comments ({comments.length})
+          </Text>
 
           {comments.length === 0 ? (
             <Text style={styles.noComments}>No comments yet</Text>
@@ -300,19 +349,20 @@ export default function PostDetailsScreen() {
                   profilePicture={c.profile_pic}
                   username={c.username}
                   size={32}
-                  showLevelBadge
                 />
                 <View style={styles.commentContent}>
                   <Text style={styles.commentUsername}>{c.username}</Text>
                   <Text style={styles.commentText}>{c.comment_text}</Text>
-                  <Text style={styles.commentTime}>{formatTime(c.created_at)}</Text>
+                  <Text style={styles.commentTime}>
+                    {formatTime(c.created_at)}
+                  </Text>
                 </View>
               </View>
             ))
           )}
         </View>
 
-        <View style={{ height: 60 }} />
+        <View style={{ height: 70 }} />
       </ScrollView>
 
       {/* COMMENT INPUT */}
@@ -326,7 +376,7 @@ export default function PostDetailsScreen() {
         <TextInput
           value={commentText}
           onChangeText={setCommentText}
-          placeholder="Add a comment..."
+          placeholder="Add a comment…"
           style={styles.commentInput}
         />
 
@@ -349,6 +399,9 @@ export default function PostDetailsScreen() {
   );
 }
 
+/* ---------------------------------------------------------
+   STYLES
+----------------------------------------------------------*/
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
 
@@ -424,6 +477,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderTopWidth: 1,
     borderColor: "#eee",
+    backgroundColor: "#fff",
   },
 
   commentInput: {
@@ -444,3 +498,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
+
