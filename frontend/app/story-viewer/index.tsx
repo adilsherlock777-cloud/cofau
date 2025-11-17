@@ -20,15 +20,28 @@ import UserAvatar from '../../components/UserAvatar';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ✔ Correct backend URL from app.json
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://backend.cofau.com/api';
+// Backend root (NO /api)
+const BACKEND_URL =
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
+  'https://backend.cofau.com';
 
-// ✔ Fix absolute media URLs (stories & DPs)
+// For API calls
+const API_URL = `${BACKEND_URL}/api`;
+
+// ✅ UNIVERSAL URL FIXER (same as StoriesBar)
 const fixUrl = (url?: string | null) => {
   if (!url) return null;
+
   if (url.startsWith('http')) return url;
-  if (url.startsWith('/')) return `${API_URL}${url}`;
-  return `${API_URL}/${url}`;
+
+  // Remove duplicate /api
+  if (url.startsWith('/api/')) {
+    return `${BACKEND_URL}${url.replace('/api', '')}`;
+  }
+
+  if (!url.startsWith('/')) return `${BACKEND_URL}/${url}`;
+
+  return `${BACKEND_URL}${url}`;
 };
 
 export default function StoryViewerScreen() {
@@ -37,28 +50,25 @@ export default function StoryViewerScreen() {
   const { user, token } = useAuth();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [stories, setStories] = useState([]);
-  const [storyUser, setStoryUser] = useState(null);
+  const [stories, setStories] = useState<any[]>([]);
+  const [storyUser, setStoryUser] = useState<any>(null);
   const [paused, setPaused] = useState(false);
 
-  const progressAnims = useRef([]).current;
-  const autoAdvanceTimer = useRef(null);
+  const progressAnims = useRef<Animated.Value[]>([]);
+  const autoAdvanceTimer = useRef<any>(null);
 
-  // -------------------------------------------------------
-  // LOAD STORIES FROM PARAMS
-  // -------------------------------------------------------
   useEffect(() => {
     try {
-      const parsedStories = JSON.parse(params.stories);
-      const parsedUser = JSON.parse(params.user);
+      const parsedStories = JSON.parse(params.stories as string);
+      const parsedUser = JSON.parse(params.user as string);
 
-      // ✔ FIX MEDIA URLs for stories
+      // ⭐ FIX ALL STORY MEDIA URLS
       const fixedStories = parsedStories.map((s: any) => ({
         ...s,
         media_url: fixUrl(s.media_url),
       }));
 
-      // ✔ FIX USER PROFILE PICTURE URL
+      // ⭐ FIX STORY USER DP
       const fixedUser = {
         ...parsedUser,
         profile_picture: fixUrl(parsedUser.profile_picture),
@@ -67,9 +77,9 @@ export default function StoryViewerScreen() {
       setStories(fixedStories);
       setStoryUser(fixedUser);
 
-      // Init animation refs
+      // Init progress animations
       fixedStories.forEach(() => {
-        progressAnims.push(new Animated.Value(0));
+        progressAnims.current.push(new Animated.Value(0));
       });
 
     } catch (error) {
@@ -78,18 +88,12 @@ export default function StoryViewerScreen() {
     }
   }, []);
 
-  // -------------------------------------------------------
-  // AUTO ADVANCE WITH TIMER
-  // -------------------------------------------------------
+  // Auto-advance logic
   useEffect(() => {
-    if (stories.length > 0 && !paused) {
-      startProgress();
-    }
+    if (stories.length > 0 && !paused) startProgress();
 
     return () => {
-      if (autoAdvanceTimer.current) {
-        clearTimeout(autoAdvanceTimer.current);
-      }
+      if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     };
   }, [currentIndex, stories, paused]);
 
@@ -99,27 +103,23 @@ export default function StoryViewerScreen() {
 
     const duration =
       currentStory.media_type === 'video'
-        ? 30000 // 30 sec videos
-        : 5000;  // 5 sec images
+        ? 30000 // 30 sec for videos
+        : 5000;  // 5 sec for images
 
-    Animated.timing(progressAnims[currentIndex], {
+    Animated.timing(progressAnims.current[currentIndex], {
       toValue: 1,
       duration,
       useNativeDriver: false,
     }).start();
 
-    autoAdvanceTimer.current = setTimeout(() => {
-      handleNext();
-    }, duration);
+    autoAdvanceTimer.current = setTimeout(() => handleNext(), duration);
   };
 
   const handleNext = () => {
-    if (autoAdvanceTimer.current) {
-      clearTimeout(autoAdvanceTimer.current);
-    }
+    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
 
     if (currentIndex < stories.length - 1) {
-      progressAnims[currentIndex].setValue(1);
+      progressAnims.current[currentIndex].setValue(1);
       setCurrentIndex(currentIndex + 1);
     } else {
       router.back();
@@ -127,64 +127,51 @@ export default function StoryViewerScreen() {
   };
 
   const handlePrevious = () => {
-    if (autoAdvanceTimer.current) {
-      clearTimeout(autoAdvanceTimer.current);
-    }
+    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
 
     if (currentIndex > 0) {
-      progressAnims[currentIndex].setValue(0);
+      progressAnims.current[currentIndex].setValue(0);
       setCurrentIndex(currentIndex - 1);
-      progressAnims[currentIndex - 1].setValue(0);
     } else {
       router.back();
     }
   };
 
-  // -------------------------------------------------------
-  // DELETE STORY (OWNER ONLY)
-  // -------------------------------------------------------
+  // Delete story
   const handleDelete = async () => {
     const currentStory = stories[currentIndex];
 
-    Alert.alert(
-      'Delete Story',
-      'Are you sure you want to delete this story?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await axios.delete(`${API_URL}/stories/${currentStory.id}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
+    Alert.alert('Delete Story', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await axios.delete(`${API_URL}/stories/${currentStory.id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
 
-              const updatedStories = stories.filter((_, idx) => idx !== currentIndex);
+            const updatedStories = stories.filter((_, idx) => idx !== currentIndex);
 
-              if (updatedStories.length === 0) {
-                Alert.alert('Deleted', 'Story deleted', [
-                  { text: 'OK', onPress: () => router.back() },
-                ]);
-              } else {
-                setStories(updatedStories);
-
-                if (currentIndex >= updatedStories.length) {
-                  setCurrentIndex(updatedStories.length - 1);
-                }
+            if (updatedStories.length === 0) {
+              Alert.alert('Deleted', 'Story removed', [
+                { text: 'OK', onPress: () => router.back() },
+              ]);
+            } else {
+              setStories(updatedStories);
+              if (currentIndex >= updatedStories.length) {
+                setCurrentIndex(updatedStories.length - 1);
               }
-            } catch (error) {
-              console.error('❌ Error deleting story:', error);
-              Alert.alert('Error', 'Failed to delete story');
             }
-          },
+          } catch (err) {
+            console.error('❌ Delete story error:', err);
+            Alert.alert('Error', 'Failed to delete');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
-
-  const handleTapLeft = () => handlePrevious();
-  const handleTapRight = () => handleNext();
 
   if (!stories.length || !storyUser) return null;
 
@@ -193,14 +180,14 @@ export default function StoryViewerScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Progress Bars */}
+      {/* Progress bars */}
       <View style={styles.progressContainer}>
-        {stories.map((story, index) => (
-          <View key={story.id} style={styles.progressBarBackground}>
+        {stories.map((_, index) => (
+          <View key={index} style={styles.progressBarBackground}>
             <Animated.View
               style={{
                 ...styles.progressBarFill,
-                width: progressAnims[index]?.interpolate({
+                width: progressAnims.current[index]?.interpolate({
                   inputRange: [0, 1],
                   outputRange: ['0%', '100%'],
                 }),
@@ -224,18 +211,17 @@ export default function StoryViewerScreen() {
 
         <View style={styles.headerActions}>
           {isOwner && (
-            <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
+            <TouchableOpacity onPress={handleDelete}>
               <Ionicons name="trash-outline" size={24} color="#FFF" />
             </TouchableOpacity>
           )}
-
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+          <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="close" size={28} color="#FFF" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* MAIN STORY MEDIA */}
+      {/* Story Media */}
       <View style={styles.contentContainer}>
         {currentStory.media_type === 'image' ? (
           <Image
@@ -251,29 +237,22 @@ export default function StoryViewerScreen() {
             resizeMode="contain"
             isLooping={false}
             onPlaybackStatusUpdate={(status) => {
-              if (status.didJustFinish) {
-                handleNext();
-              }
+              if (status.didJustFinish) handleNext();
             }}
           />
         )}
       </View>
 
-      {/* Tap Areas */}
-      <TouchableOpacity style={styles.tapAreaLeft} activeOpacity={1} onPress={handleTapLeft} />
-      <TouchableOpacity style={styles.tapAreaRight} activeOpacity={1} onPress={handleTapRight} />
+      {/* Tap areas */}
+      <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
+      <TouchableOpacity style={styles.tapRight} onPress={handleNext} />
     </SafeAreaView>
   );
 }
 
-// -------------------------------------------------------
-// STYLES
-// -------------------------------------------------------
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
+  container: { flex: 1, backgroundColor: '#000' },
   progressContainer: {
     flexDirection: 'row',
     paddingHorizontal: 8,
@@ -283,8 +262,8 @@ const styles = StyleSheet.create({
   progressBarBackground: {
     flex: 1,
     height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 2,
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -293,52 +272,25 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  username: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
   },
-  storyImage: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT - 150,
-  },
-  storyVideo: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT - 150,
-  },
-  tapAreaLeft: {
+  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  username: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  headerActions: { flexDirection: 'row', gap: 16 },
+  contentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  storyImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
+  storyVideo: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
+  tapLeft: {
     position: 'absolute',
     left: 0,
     top: 150,
     bottom: 0,
     width: SCREEN_WIDTH * 0.3,
   },
-  tapAreaRight: {
+  tapRight: {
     position: 'absolute',
     right: 0,
     top: 150,
