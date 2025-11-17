@@ -25,30 +25,30 @@ const BACKEND_URL =
   Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
   'https://backend.cofau.com';
 
-// For API calls
 const API_URL = `${BACKEND_URL}/api`;
 
 /* ----------------------------------------------------------
-   ✅ FINAL URL NORMALIZER — SAME AS FEED + STORIESBAR
+   ✅ FINAL UNIVERSAL URL NORMALIZER — FIXES ALL STORY URL PROBLEMS
 -----------------------------------------------------------*/
 const fixUrl = (url) => {
   if (!url) return null;
 
-  // Already full URL
-  if (url.startsWith("http")) return url;
-
   let cleaned = url.trim();
 
-  // Remove duplicate slashes except http:// https://
-  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
+  // REMOVE accidental /api/api/ duplication
+  cleaned = cleaned.replace(/\/api\/api\//g, "/api/");
 
-  // Ensure starting slash  
+  // FIX missing /api/ prefix if server returns static/uploads/...
+  if (cleaned.startsWith("static/") || cleaned.startsWith("/static/")) {
+    cleaned = "/api/" + cleaned.replace(/^\//, "");
+  }
+
+  // Add leading slash
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
-  // FINAL absolute path
   const finalUrl = `${BACKEND_URL}${cleaned}`;
+  console.log("🟦 FINAL STORY URL:", url, "➡️", finalUrl);
 
-  console.log("STORY MEDIA FINAL URL →", url, " → ", finalUrl);
   return finalUrl;
 };
 
@@ -66,20 +66,20 @@ export default function StoryViewerScreen() {
   const autoAdvanceTimer = useRef(null);
 
   /* ----------------------------------------------------------
-     LOAD STORIES
+     LOAD STORIES FROM PARAMS
   -----------------------------------------------------------*/
   useEffect(() => {
     try {
       const parsedStories = JSON.parse(params.stories);
       const parsedUser = JSON.parse(params.user);
 
-      // Normalize ALL story media URLs
+      // Normalize media URLs
       const fixedStories = parsedStories.map((s) => ({
         ...s,
-        media_url: fixUrl(s.media_url)
+        media_url: fixUrl(s.media_url),
       }));
 
-      // Fix DP URL
+      // Fix DP
       const fixedUser = {
         ...parsedUser,
         profile_picture: fixUrl(parsedUser.profile_picture),
@@ -88,10 +88,10 @@ export default function StoryViewerScreen() {
       setStories(fixedStories);
       setStoryUser(fixedUser);
 
+      // Create progress bars
       fixedStories.forEach(() => {
         progressAnims.current.push(new Animated.Value(0));
       });
-
     } catch (error) {
       console.error("❌ STORY PARSE ERROR:", error);
       router.back();
@@ -102,7 +102,9 @@ export default function StoryViewerScreen() {
      AUTO ADVANCE STORY
   -----------------------------------------------------------*/
   useEffect(() => {
-    if (stories.length > 0 && !paused) startProgress();
+    if (stories.length > 0 && !paused) {
+      startProgress();
+    }
 
     return () => {
       if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
@@ -114,9 +116,7 @@ export default function StoryViewerScreen() {
     if (!currentStory) return;
 
     const duration =
-      currentStory.media_type === "video"
-        ? 30000
-        : 5000;
+      currentStory.media_type === "video" ? 30000 : 5000;
 
     Animated.timing(progressAnims.current[currentIndex], {
       toValue: 1,
@@ -194,8 +194,8 @@ export default function StoryViewerScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      
-      {/* Progress Indicators */}
+
+      {/* Progress bars */}
       <View style={styles.progressContainer}>
         {stories.map((_, index) => (
           <View key={index} style={styles.progressBarBackground}>
@@ -236,20 +236,20 @@ export default function StoryViewerScreen() {
         </View>
       </View>
 
-      {/* Content */}
+      {/* Story Media */}
       <View style={styles.contentContainer}>
         {currentStory.media_type === "image" ? (
           <Image
             source={{ uri: currentStory.media_url }}
             style={styles.storyImage}
-            resizeMode="cover"  // ★ FIX BLACK SCREEN
+            resizeMode="cover"
           />
         ) : (
           <Video
             source={{ uri: currentStory.media_url }}
             style={styles.storyVideo}
             shouldPlay={!paused}
-            resizeMode="cover" // ★ FIX VIDEO LETTERBOXING
+            resizeMode="cover"
             isLooping={false}
             onPlaybackStatusUpdate={(status) => {
               if (status.didJustFinish) handleNext();
@@ -258,7 +258,7 @@ export default function StoryViewerScreen() {
         )}
       </View>
 
-      {/* Tap Areas */}
+      {/* Tap zones */}
       <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
       <TouchableOpacity style={styles.tapRight} onPress={handleNext} />
     </SafeAreaView>
