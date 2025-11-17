@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Video } from "expo-av";
+import moment from "moment";
+
 import UserAvatar from "./UserAvatar";
 import MapButton from "./MapButton";
 import { likePost, unlikePost } from "../utils/api";
@@ -11,23 +13,22 @@ const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
 /* ----------------------------------------------------------
-   🔥 UNIVERSAL FIX — NORMALIZE MEDIA URL ONLY
+   ✅ UNIVERSAL URL NORMALIZER (Correct version)
 -----------------------------------------------------------*/
 const normalizeUrl = (url) => {
   if (!url) return null;
 
-  // already valid
   if (url.startsWith("http")) return url;
 
-  let cleaned = url.replace(/\/+/g, "/");
+  let cleaned = url.trim();
 
-  // fix `/api/static/...`
-  if (cleaned.startsWith("/api/static/")) {
-    cleaned = cleaned.replace("/api", "");
-  }
+  // Remove duplicate slashes (but keep "https://")
+  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
 
+  // Ensure leading slash
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
+  // Final absolute URL
   return `${BACKEND}${cleaned}`;
 };
 
@@ -40,15 +41,17 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const mediaUrl = normalizeUrl(post.media_url);
   const isVideo = mediaUrl?.toLowerCase().endsWith(".mp4");
 
+  console.log("FEED MEDIA URL:", post.media_url, "→Final:", mediaUrl);
+
   /* -----------------------------------------------------
-     🔥 SEND RAW DP VALUE → UserAvatar handles the rest
+     RAW DP → UserAvatar fixes the URL
   ----------------------------------------------------- */
   const dpRaw =
     post.user_profile_picture ||
     post.profile_picture ||
     post.profile_picture_url ||
-    post.profile_pic ||
     post.user_profile_pic ||
+    post.profile_pic ||
     post.userProfilePicture ||
     post.profilePicture;
 
@@ -89,7 +92,11 @@ export default function FeedCard({ post, onLikeUpdate }) {
 
           <View style={styles.userMeta}>
             <Text style={styles.username}>{post.username}</Text>
-            <Text style={styles.timestamp}>{post.created_at}</Text>
+
+            {/* 🕒 FIXED TIMESTAMP */}
+            <Text style={styles.timestamp}>
+              {moment(post.created_at).fromNow()}
+            </Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -138,7 +145,8 @@ export default function FeedCard({ post, onLikeUpdate }) {
       {/* Description */}
       <View style={styles.desc}>
         <Text style={styles.descText}>
-          <Text style={styles.descBold}>{post.username}</Text> {post.description}
+          <Text style={styles.descBold}>{post.username}</Text>{" "}
+          {post.description}
         </Text>
 
         <View style={styles.ratingRow}>
@@ -169,7 +177,12 @@ const styles = StyleSheet.create({
   timestamp: { fontSize: 12, color: "#888" },
 
   image: { width: "100%", height: 260, borderRadius: 12 },
-  video: { width: "100%", height: 260, borderRadius: 12, backgroundColor: "#000" },
+  video: {
+    width: "100%",
+    height: 260,
+    borderRadius: 12,
+    backgroundColor: "#000",
+  },
 
   actions: { flexDirection: "row", paddingVertical: 12, gap: 20 },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
