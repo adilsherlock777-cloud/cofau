@@ -11,7 +11,7 @@ const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
 /* ----------------------------------------------------------
-   🔥 UNIVERSAL FIX — NORMALIZE ALL MEDIA URLs
+   🔥 UNIVERSAL FIX — NORMALIZE MEDIA URL ONLY
 -----------------------------------------------------------*/
 const normalizeUrl = (url) => {
   if (!url) return null;
@@ -19,7 +19,6 @@ const normalizeUrl = (url) => {
   // already valid
   if (url.startsWith("http")) return url;
 
-  // clean paths
   let cleaned = url.replace(/\/+/g, "/");
 
   // fix `/api/static/...`
@@ -27,25 +26,9 @@ const normalizeUrl = (url) => {
     cleaned = cleaned.replace("/api", "");
   }
 
-  // ensure leading slash
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
   return `${BACKEND}${cleaned}`;
-};
-
-/* ----------------------------------------------------------
-   🔥 FIX DP URL (Supports all backend field names)
------------------------------------------------------------*/
-const getDP = (post) => {
-  return normalizeUrl(
-    post.user_profile_picture ||
-      post.profile_picture ||
-      post.profile_picture_url ||
-      post.profile_pic ||
-      post.user_profile_pic ||
-      post.userProfilePicture ||
-      post.profilePicture
-  );
 };
 
 export default function FeedCard({ post, onLikeUpdate }) {
@@ -57,11 +40,19 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const mediaUrl = normalizeUrl(post.media_url);
   const isVideo = mediaUrl?.toLowerCase().endsWith(".mp4");
 
-  const dpUrl = getDP(post);
+  /* -----------------------------------------------------
+     🔥 SEND RAW DP VALUE → UserAvatar handles the rest
+  ----------------------------------------------------- */
+  const dpRaw =
+    post.user_profile_picture ||
+    post.profile_picture ||
+    post.profile_picture_url ||
+    post.profile_pic ||
+    post.user_profile_pic ||
+    post.userProfilePicture ||
+    post.profilePicture;
 
-  const openPost = () => {
-    router.push(`/post-details/${post.id}`);
-  };
+  const openPost = () => router.push(`/post-details/${post.id}`);
 
   const handleLike = async () => {
     const prev = isLiked;
@@ -88,13 +79,13 @@ export default function FeedCard({ post, onLikeUpdate }) {
           style={styles.userInfo}
           onPress={() => router.push(`/profile?userId=${post.user_id}`)}
         >
-          <UserAvatar 
-             profilePicture={dpUrl}
-              username={post.username}
-                size={32}
-                 level={post.user_level}
-                  showLevelBadge
-                />
+          <UserAvatar
+            profilePicture={dpRaw}
+            username={post.username}
+            size={32}
+            level={post.user_level}
+            showLevelBadge
+          />
 
           <View style={styles.userMeta}>
             <Text style={styles.username}>{post.username}</Text>
