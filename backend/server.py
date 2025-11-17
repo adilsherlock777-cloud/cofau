@@ -90,51 +90,63 @@ async def create_post(
         raise HTTPException(status_code=400, detail="Invalid file type")
     
     # Save file
-    file_path = f"{settings.UPLOAD_DIR}/{str(ObjectId())}_{file.filename}"
+    unique_id = str(ObjectId())
+    file_path = f"{settings.UPLOAD_DIR}/{unique_id}_{file.filename}"
+    
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
     # Determine media type
     media_type = "video" if file_ext in ["mp4", "mov"] else "image"
-    
+
+    # ---- SANITIZE MAP LINK ----
+    clean_map_link = None
+    if map_link:
+        map_link = map_link.strip()
+        
+        if not map_link.startswith("http"):
+            map_link = "https://" + map_link
+        
+        if "google.com/maps" in map_link or "goo.gl/maps" in map_link:
+            clean_map_link = map_link
+
+    # ---- FIX MEDIA URL ----
+    relative_path = file_path.replace(settings.UPLOAD_DIR + "/", "")
+    media_url = f"/api/static/{relative_path}"
+
     # Create post document
-    # Convert file path to URL format - files are accessible at /api/static/...
-    # file_path is like "static/uploads/xxx.jpg", we need "/api/static/uploads/xxx.jpg"
-    media_url = f"/api/{file_path}"
-    
     post_doc = {
         "user_id": str(current_user["_id"]),
         "media_url": media_url,
         "media_type": media_type,
         "rating": rating,
         "review_text": review_text,
-        "map_link": map_link,
+        "map_link": clean_map_link,
         "likes_count": 0,
         "comments_count": 0,
         "popular_photos": [],
         "created_at": datetime.utcnow()
     }
-    
+
     result = await db.posts.insert_one(post_doc)
     post_id = str(result.inserted_id)
-    
-    # Calculate new level and points using the new system
+
+    # Level system update
     level_update = calculateUserLevelAfterPost(current_user)
-    
-    # Update user in database with total_points and level info
+
     await db.users.update_one(
         {"_id": current_user["_id"]},
         {"$set": {
             "total_points": level_update["total_points"],
-            "points": level_update["total_points"],  # Keep in sync for backward compatibility
+            "points": level_update["total_points"],
             "level": level_update["level"],
             "currentPoints": level_update["currentPoints"],
             "requiredPoints": level_update["requiredPoints"],
             "title": level_update["title"]
         }}
     )
-    
-    # Notify all followers about new post
+
+    # Notify followers
     followers = await db.follows.find({"followingId": str(current_user["_id"])}).to_list(None)
     for follow in followers:
         await create_notification(
@@ -144,8 +156,7 @@ async def create_post(
             to_user_id=follow["followerId"],
             post_id=post_id
         )
-    
-    # Return response with level-up info
+
     return {
         "message": "Post created successfully",
         "post_id": post_id,
