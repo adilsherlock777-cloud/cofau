@@ -1,53 +1,51 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { Video } from 'expo-av';
-import UserAvatar from './UserAvatar';
-import MapButton from './MapButton';
-import { likePost, unlikePost } from '../utils/api';
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { Video } from "expo-av";
+import UserAvatar from "./UserAvatar";
+import MapButton from "./MapButton";
+import { likePost, unlikePost } from "../utils/api";
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com/api";
+const BACKEND =
+  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
-/** 
- * Normalizes any backend URL
- * - Prevents double slashes
- * - Prevents api/api duplication
- * - Supports absolute URLs
- */
-const fixUrl = (url) => {
+/* ----------------------------------------------------------
+   🔥 UNIVERSAL FIX — NORMALIZE ALL MEDIA URLs
+-----------------------------------------------------------*/
+const normalizeUrl = (url) => {
   if (!url) return null;
 
-  // Already absolute (http/https)
+  // already valid
   if (url.startsWith("http")) return url;
 
-  // Remove any accidental double slashes
-  const cleaned = url.replace(/\/+/g, "/");
+  // clean paths
+  let cleaned = url.replace(/\/+/g, "/");
 
-  // Make sure we don't create /api/api
-  if (cleaned.startsWith("/api")) {
-    return `${BASE}${cleaned.substring(4)}`; // remove "/api" because BASE already has /api
+  // fix `/api/static/...`
+  if (cleaned.startsWith("/api/static/")) {
+    cleaned = cleaned.replace("/api", "");
   }
 
-  // If starts with "/", just append to BASE
-  if (cleaned.startsWith("/")) {
-    return `${BASE}${cleaned}`;
-  }
+  // ensure leading slash
+  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
-  // Otherwise just join normally
-  return `${BASE}/${cleaned}`;
+  return `${BACKEND}${cleaned}`;
 };
 
-const formatTime = (timestamp) => {
-  const now = new Date();
-  const d = new Date(timestamp);
-  const diff = (now - d) / 1000;
-
-  if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return d.toLocaleDateString();
+/* ----------------------------------------------------------
+   🔥 FIX DP URL (Supports all backend field names)
+-----------------------------------------------------------*/
+const getDP = (post) => {
+  return normalizeUrl(
+    post.user_profile_picture ||
+      post.profile_picture ||
+      post.profile_picture_url ||
+      post.profile_pic ||
+      post.user_profile_pic ||
+      post.userProfilePicture ||
+      post.profilePicture
+  );
 };
 
 export default function FeedCard({ post, onLikeUpdate }) {
@@ -56,18 +54,10 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const [isLiked, setIsLiked] = useState(post.is_liked || false);
   const [likesCount, setLikes] = useState(post.likes || 0);
 
-  const mediaUrl = fixUrl(post.media_url);
+  const mediaUrl = normalizeUrl(post.media_url);
   const isVideo = mediaUrl?.toLowerCase().endsWith(".mp4");
 
-  const dpUrl = fixUrl(
-  post.user_profile_picture ||
-  post.profile_picture ||
-  post.profile_picture_url ||
-  post.profile_pic ||
-  post.user_profile_pic ||
-  post.userProfilePicture ||
-  post.profilePicture
-);
+  const dpUrl = getDP(post);
 
   const openPost = () => {
     router.push(`/post-details/${post.id}`);
@@ -84,7 +74,6 @@ export default function FeedCard({ post, onLikeUpdate }) {
       if (prev) await unlikePost(post.id);
       else await likePost(post.id);
     } catch (e) {
-      // revert on error
       setIsLiked(prev);
       setLikes(prevLikes);
       console.log("❌ Like toggle failed:", e);
@@ -109,7 +98,7 @@ export default function FeedCard({ post, onLikeUpdate }) {
 
           <View style={styles.userMeta}>
             <Text style={styles.username}>{post.username}</Text>
-            <Text style={styles.timestamp}>{formatTime(post.created_at)}</Text>
+            <Text style={styles.timestamp}>{post.created_at}</Text>
           </View>
         </TouchableOpacity>
       </View>
