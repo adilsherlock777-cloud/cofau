@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,33 +6,58 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import axios from 'axios';
-import Constants from 'expo-constants';
-import { useAuth } from '../context/AuthContext';
-import UserAvatar from './UserAvatar';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import axios from "axios";
+import Constants from "expo-constants";
+import { useAuth } from "../context/AuthContext";
+import UserAvatar from "./UserAvatar";
 
-// Correct backend base URL (no /api at end)
+/* --------------------------------------------------
+   🔥 BACKEND URL
+-------------------------------------------------- */
 const BACKEND_URL =
   Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
-  'https://backend.cofau.com';
+  "https://backend.cofau.com";
 
-const API_URL = `${BACKEND_URL}/api`;
-
-// Normalize any DP path to absolute URL
-const fixUrl = (url) => {
+/* --------------------------------------------------
+   🔥 UNIVERSAL URL NORMALIZER (same as Feed & Avatar)
+-------------------------------------------------- */
+const normalizeUrl = (url) => {
   if (!url) return null;
-  if (url.startsWith('http')) return url;
-  if (!url.startsWith('/')) return `${BACKEND_URL}/${url}`;
+  if (typeof url === "object")
+    url =
+      url.profile_picture ||
+      url.profile_pic ||
+      url.user_profile_picture ||
+      url.profilePicture ||
+      null;
+
+  if (!url) return null;
+
+  if (url.startsWith("http")) return url;
+
+  url = url.replace(/\/+/g, "/");
+
+  if (url.startsWith("backend/static/")) {
+    url = "/" + url.replace("backend", "");
+  }
+
+  if (url.startsWith("/api/static/")) {
+    url = url.replace("/api", "");
+  }
+
+  if (!url.startsWith("/")) url = "/" + url;
+
   return `${BACKEND_URL}${url}`;
 };
 
 export default function StoriesBar() {
   const router = useRouter();
   const { user, token } = useAuth();
+
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,26 +65,33 @@ export default function StoriesBar() {
     if (token) fetchStories();
   }, [token]);
 
+  /* --------------------------------------------------
+     🔥 FETCH & FIX ALL STORIES
+  -------------------------------------------------- */
   const fetchStories = async () => {
     try {
       setLoading(true);
 
-      const response = await axios.get(`${API_URL}/stories/feed`, {
+      const response = await axios.get(`${BACKEND_URL}/api/stories/feed`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Fix DP URLs for ALL returned users
       const fixed = response.data.map((u) => ({
         ...u,
         user: {
           ...u.user,
-          profile_picture: fixUrl(u.user.profile_picture),
+          id: u.user.id || u.user._id, // fix id mismatch
+          profile_picture: normalizeUrl(u.user.profile_picture),
         },
+        stories: u.stories.map((s) => ({
+          ...s,
+          media_url: normalizeUrl(s.media_url),
+        })),
       }));
 
       setStories(fixed);
-    } catch (error) {
-      console.error('❌ Error fetching stories:', error.response?.data || error.message);
+    } catch (err) {
+      console.log("❌ Story fetch error:", err?.response?.data || err.message);
     } finally {
       setLoading(false);
     }
@@ -67,7 +99,7 @@ export default function StoriesBar() {
 
   const handleStoryPress = (userStories) => {
     router.push({
-      pathname: '/story-viewer',
+      pathname: "/story-viewer",
       params: {
         userId: userStories.user.id,
         stories: JSON.stringify(userStories.stories),
@@ -76,9 +108,7 @@ export default function StoriesBar() {
     });
   };
 
-  const handleAddStory = () => {
-    router.push('/story-upload');
-  };
+  const handleAddStory = () => router.push("/story-upload");
 
   if (loading) {
     return (
@@ -95,13 +125,15 @@ export default function StoriesBar() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-      {/* Your Story - Always First */}
+      {/* -------------------------
+         ⭐ YOUR STORY (always 1st)
+      --------------------------- */}
       {user && (
         <TouchableOpacity style={styles.storyItem} onPress={handleAddStory}>
           <View style={styles.yourStoryContainer}>
             <UserAvatar
-              profilePicture={fixUrl(user.profile_picture)}
-              username={user.full_name || user.username}
+              profilePicture={normalizeUrl(user.profile_picture)}
+              username={user.full_name}
               size={60}
               showLevelBadge={false}
             />
@@ -116,29 +148,26 @@ export default function StoriesBar() {
         </TouchableOpacity>
       )}
 
-      {/* Other Users' Stories */}
-      {stories.map((userStories) => {
-        const isOwnStory = userStories.user.id === user?.id;
-
-        // Skip if it's our own story and empty
-        if (isOwnStory && userStories.stories.length === 0) return null;
+      {/* -------------------------
+         ⭐ OTHER USERS STORIES
+      --------------------------- */}
+      {stories.map((u) => {
+        if (!u.user || !u.user.id) return null;
 
         return (
           <TouchableOpacity
-            key={userStories.user.id}
+            key={u.user.id}
             style={styles.storyItem}
-            onPress={() => handleStoryPress(userStories)}
+            onPress={() => handleStoryPress(u)}
           >
             <LinearGradient
-              colors={['#feda75', '#fa7e1e', '#d62976', '#962fbf', '#4f5bd5']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              colors={["#feda75", "#fa7e1e", "#d62976", "#962fbf", "#4f5bd5"]}
               style={styles.gradientRing}
             >
               <View style={styles.storyInnerWhiteRing}>
                 <UserAvatar
-                  profilePicture={fixUrl(userStories.user.profile_picture)}
-                  username={userStories.user.username}
+                  profilePicture={normalizeUrl(u.user.profile_picture)}
+                  username={u.user.username}
                   size={58}
                   showLevelBadge={false}
                 />
@@ -146,7 +175,7 @@ export default function StoriesBar() {
             </LinearGradient>
 
             <Text style={styles.storyUsername} numberOfLines={1}>
-              {userStories.user.username}
+              {u.user.username}
             </Text>
           </TouchableOpacity>
         );
@@ -157,60 +186,47 @@ export default function StoriesBar() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#EEE",
   },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  contentContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-  },
-  storyItem: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 70,
-  },
-  yourStoryContainer: {
-    position: 'relative',
-  },
+  loadingContainer: { padding: 20, alignItems: "center" },
+  contentContainer: { paddingHorizontal: 12, paddingVertical: 16 },
+  storyItem: { alignItems: "center", marginRight: 16, width: 70 },
+  yourStoryContainer: { position: "relative" },
   addIconContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: '#4dd0e1',
+    backgroundColor: "#4dd0e1",
     borderRadius: 12,
     width: 24,
     height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: "#FFF",
   },
   gradientRing: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 3,
+    justifyContent: "center",
+    alignItems: "center",
   },
   storyInnerWhiteRing: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 3,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
   },
   storyUsername: {
     marginTop: 6,
     fontSize: 12,
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
+    textAlign: "center",
   },
 });
