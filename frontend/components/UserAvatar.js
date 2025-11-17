@@ -7,34 +7,44 @@ const BACKEND_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 
 /* 
-  🔥 UNIVERSAL URL FIXER
-  Handles:
-  - profile_picture
-  - profile_picture_url
-  - user_profile_picture
-  - profile_pic (comments)
-  - null / empty
+  🔥 UNIVERSAL URL FIXER FOR ALL USER DP FIELDS
+  Fixes:
+  - `/api/static/...` → `/static/...`
+  - missing leading slash
+  - nested objects from backend
+  - null / undefined
 */
 const normalizeDP = (input) => {
   if (!input) return null;
 
-  // sometimes backend sends nested objects => { profile_picture: "xxx" }
+  // Backend sometimes sends object: { profile_picture: "..." }
   if (typeof input === "object") {
     input =
       input.profile_picture ||
+      input.profile_picture_url ||
       input.user_profile_picture ||
       input.profile_pic ||
-      input.profile_picture_url ||
       null;
   }
 
   if (!input) return null;
 
+  // Full URL already
   if (input.startsWith("http")) return input;
 
-  if (!input.startsWith("/")) return `${BACKEND_URL}/${input}`;
+  // Clean extra slashes
+  let url = input.replace(/\/+/g, "/");
 
-  return `${BACKEND_URL}${input}`;
+  // 💥 Main Bug Fix: backend incorrectly returns `/api/static/...`
+  if (url.startsWith("/api/static/")) {
+    url = url.replace("/api", ""); // becomes `/static/...`
+  }
+
+  // Ensure starts with /
+  if (!url.startsWith("/")) url = "/" + url;
+
+  // Build final absolute URL
+  return `${BACKEND_URL}${url}`;
 };
 
 export default function UserAvatar({
@@ -45,26 +55,28 @@ export default function UserAvatar({
   level,
   style,
 }) {
-  // 💥 FIX: normalize all incoming DP values
+
+  // 💥 FIX: normalize ALL DP values
   const fullUrl = normalizeDP(profilePicture);
 
   const [imageError, setImageError] = useState(false);
 
   const getInitials = () => {
     if (!username) return null;
-    const parts = username.trim().split(' ');
+    const parts = username.trim().split(" ");
     if (parts.length === 1) return parts[0][0]?.toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
   };
 
   const initials = getInitials();
 
+  // Show fallback in all broken DP cases
   const showFallback =
-  !fullUrl ||
-  fullUrl.endsWith("/null") ||
-  fullUrl.endsWith("/undefined") ||
-  fullUrl.endsWith("/profile_pictures/") ||
-  imageError;
+    !fullUrl ||
+    fullUrl.includes("null") ||
+    fullUrl.includes("undefined") ||
+    fullUrl.endsWith("/profile_pictures/") ||
+    imageError;
 
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
@@ -108,7 +120,7 @@ export default function UserAvatar({
         </View>
       )}
 
-      {/* LEVEL BADGE */}
+      {/* Level Badge */}
       {showLevelBadge && level && (
         <View style={styles.badgeContainer}>
           <LevelBadge level={level} size="small" />
