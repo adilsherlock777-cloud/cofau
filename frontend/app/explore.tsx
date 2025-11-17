@@ -13,41 +13,77 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
-import { Image } from "expo-image"; // Better caching
+import { Image } from "expo-image";
 import { likePost, unlikePost } from "../utils/api";
 
-// API CONFIG
+// =======================
+//  CONFIG
+// =======================
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 const API_URL = `${API_BASE_URL}/api`;
 
-// Grid
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const NUM_COLUMNS = 3;
 const SPACING = 2;
 const TILE_SIZE = (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 
-const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I"; // Placeholder blur
+const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
+// ------------------------------------------------------------
+// 🔥 UNIVERSAL URL FIXER (same as FeedCard & Stories)
+// ------------------------------------------------------------
+const fixUrl = (url: string | null) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+
+  let cleaned = url.trim();
+  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
+  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
+
+  return `${API_BASE_URL}${cleaned}`;
+};
+
+// ------------------------------------------------------------
+// 🔥 UNIVERSAL VIDEO CHECKER
+// Backend may store MOV, MP4, MKV, no extension, etc.
+// ------------------------------------------------------------
+const isVideoFile = (url: string, media_type: string) => {
+  if (media_type === "video") return true;
+
+  if (!url) return false;
+  const lower = url.toLowerCase();
+
+  return (
+    lower.includes(".mp4") ||
+    lower.includes(".mov") ||
+    lower.includes(".mkv") ||
+    lower.includes(".webm")
+  );
+};
+
+// =======================
+//  MAIN COMPONENT
+// =======================
 export default function ExploreScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Refresh on screen focus
   useFocusEffect(
     useCallback(() => {
       if (user && token) fetchPosts(true);
     }, [user, token])
   );
 
-  // Fetch explore posts
+  // ================================
+  // 🔥 Fetch Explore Posts
+  // ================================
   const fetchPosts = async (refresh = false) => {
     try {
       if (refresh) {
@@ -63,34 +99,23 @@ export default function ExploreScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const newPosts = res.data.map((post) => {
-        const raw = post.media_url || post.image_url;
+      const newPosts = res.data.map((post: any) => {
+        const rawUrl = post.media_url || post.image_url;
 
-        const fullUrl =
-          raw && raw.startsWith("http")
-            ? raw
-            : `${API_BASE_URL}${raw.startsWith("/") ? raw : "/" + raw}`;
-
-        const thumb =
-          post.thumbnail_url && !post.thumbnail_url.startsWith("http")
-            ? `${API_BASE_URL}${
-                post.thumbnail_url.startsWith("/")
-                  ? post.thumbnail_url
-                  : "/" + post.thumbnail_url
-              }`
-            : post.thumbnail_url;
+        const fullUrl = fixUrl(rawUrl);
+        const thumb = fixUrl(post.thumbnail_url);
 
         return {
           ...post,
           full_image_url: fullUrl,
-          full_thumbnail_url: thumb || null,
+          full_thumbnail_url: thumb,
           is_liked: post.is_liked_by_user || false,
+          _isVideo: isVideoFile(fullUrl, post.media_type),
         };
       });
 
       refresh ? setPosts(newPosts) : setPosts((p) => [...p, ...newPosts]);
 
-      setHasMore(newPosts.length >= 30);
       setPage((prev) => prev + 1);
     } catch (err) {
       console.error("❌ Explore fetch error:", err);
@@ -100,7 +125,9 @@ export default function ExploreScreen() {
     }
   };
 
-  // Search filter
+  // ==================================
+  // 🔍 Search Logic
+  // ==================================
   const filteredPosts = useMemo(() => {
     if (!searchQuery.trim()) return posts;
 
@@ -109,8 +136,10 @@ export default function ExploreScreen() {
     );
   }, [searchQuery, posts]);
 
-  // Like/unlike
-  const handleLike = async (id, liked) => {
+  // ==================================
+  // ❤️ Like/Unlike Handler
+  // ==================================
+  const handleLike = async (id: string, liked: boolean) => {
     try {
       setPosts((prev) =>
         prev.map((p) =>
@@ -130,13 +159,13 @@ export default function ExploreScreen() {
     }
   };
 
-  // Render grid tile
-  const renderGridItem = ({ item }) => {
-    // For videos → show thumbnail
-    const displayImage =
-      item.media_type === "video"
-        ? item.full_thumbnail_url
-        : item.full_image_url;
+  // ==================================
+  // 🔳 Render Grid Tile
+  // ==================================
+  const renderGridItem = ({ item }: any) => {
+    const displayImg = item._isVideo
+      ? item.full_thumbnail_url || item.full_image_url
+      : item.full_image_url;
 
     return (
       <TouchableOpacity
@@ -145,22 +174,20 @@ export default function ExploreScreen() {
         onPress={() => router.push(`/post-details/${item.id}`)}
       >
         <Image
-          source={displayImage}
+          source={displayImg}
           style={styles.gridImage}
-          cachePolicy="memory-disk"
           placeholder={{ blurhash: BLUR_HASH }}
+          cachePolicy="memory-disk"
           contentFit="cover"
           transition={300}
         />
 
-        {/* Play Icon for videos */}
-        {item.media_type === "video" && (
+        {item._isVideo && (
           <View style={styles.playIcon}>
-            <Ionicons name="play-circle" size={26} color="#fff" />
+            <Ionicons name="play-circle" size={28} color="#fff" />
           </View>
         )}
 
-        {/* Like button */}
         <TouchableOpacity
           style={styles.likeBtn}
           onPress={(e) => {
@@ -178,12 +205,14 @@ export default function ExploreScreen() {
     );
   };
 
-  // Loading states
+  // ==================================
+  // ⏳ Loading States
+  // ==================================
   if (!user || !token)
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#4dd0e1" />
-        <Text>Authenticating...</Text>
+        <Text>Authenticating…</Text>
       </View>
     );
 
@@ -195,6 +224,9 @@ export default function ExploreScreen() {
       </View>
     );
 
+  // ==================================
+  // MAIN UI
+  // ==================================
   return (
     <View style={styles.container}>
       {/* Search bar */}
@@ -205,8 +237,6 @@ export default function ExploreScreen() {
           placeholderTextColor="#999"
           value={searchQuery}
           onChangeText={setSearchQuery}
-          autoCorrect={false}
-          autoCapitalize="none"
         />
         <Ionicons name="search" size={20} color="#777" />
       </View>
@@ -237,15 +267,12 @@ export default function ExploreScreen() {
   );
 }
 
-// Styles
+// =======================
+//  STYLES
+// =======================
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   searchBox: {
     margin: 12,
@@ -283,7 +310,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 6,
     left: 6,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.45)",
     padding: 4,
     borderRadius: 20,
   },
@@ -292,7 +319,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 6,
     right: 6,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     padding: 4,
     borderRadius: 20,
   },
