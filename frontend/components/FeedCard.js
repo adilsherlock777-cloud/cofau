@@ -88,13 +88,13 @@ export default function FeedCard({ post, onLikeUpdate }) {
           style={styles.userInfo}
           onPress={() => router.push(`/profile?userId=${post.user_id}`)}
         >
-          <UserAvatar
-            profilePicture={dpUrl}
-            username={post.username}
-            size={32}
-            level={post.user_level}
-            showLevelBadge
-          />
+          <UserAvatar 
+             profilePicture={dpUrl}
+              username={post.username}
+                size={32}
+                 level={post.user_level}
+                  showLevelBadge
+                />
 
           <View style={styles.userMeta}>
             <Text style={styles.username}>{post.username}</Text>
