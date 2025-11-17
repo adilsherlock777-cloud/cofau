@@ -6,13 +6,35 @@ import LevelBadge from './LevelBadge';
 const BACKEND_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 
-// Helper to build full media URLs
-const buildUrl = (path) => {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  // backend returns: static/uploads/...  (WITHOUT slash)
-  if (!path.startsWith('/')) return `${BACKEND_URL}/${path}`;
-  return `${BACKEND_URL}${path}`;
+/* 
+  🔥 UNIVERSAL URL FIXER
+  Handles:
+  - profile_picture
+  - profile_picture_url
+  - user_profile_picture
+  - profile_pic (comments)
+  - null / empty
+*/
+const normalizeDP = (input) => {
+  if (!input) return null;
+
+  // sometimes backend sends nested objects => { profile_picture: "xxx" }
+  if (typeof input === "object") {
+    input =
+      input.profile_picture ||
+      input.user_profile_picture ||
+      input.profile_pic ||
+      input.profile_picture_url ||
+      null;
+  }
+
+  if (!input) return null;
+
+  if (input.startsWith("http")) return input;
+
+  if (!input.startsWith("/")) return `${BACKEND_URL}/${input}`;
+
+  return `${BACKEND_URL}${input}`;
 };
 
 export default function UserAvatar({
@@ -23,13 +45,11 @@ export default function UserAvatar({
   level,
   style,
 }) {
-  // Full DP URL
-  const fullUrl = buildUrl(profilePicture);
+  // 💥 FIX: normalize all incoming DP values
+  const fullUrl = normalizeDP(profilePicture);
 
-  // Handle image loading errors
   const [imageError, setImageError] = useState(false);
 
-  // Compute initials fallback: "Iron Man" → "IM"
   const getInitials = () => {
     if (!username) return null;
     const parts = username.trim().split(' ');
@@ -39,12 +59,10 @@ export default function UserAvatar({
 
   const initials = getInitials();
 
-  const showFallback =
-    !fullUrl || imageError || fullUrl === `${BACKEND_URL}/null`;
+  const showFallback = !fullUrl || imageError;
 
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
-      {/* PROFILE PICTURE */}
       {!showFallback ? (
         <Image
           source={{ uri: fullUrl }}
