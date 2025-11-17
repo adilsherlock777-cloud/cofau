@@ -16,42 +16,45 @@ import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
 
 /* --------------------------------------------------
-   🔥 BACKEND URL
+   BACKEND URL
 -------------------------------------------------- */
 const BACKEND_URL =
   Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
   "https://backend.cofau.com";
 
 /* --------------------------------------------------
-   🔥 UNIVERSAL URL NORMALIZER (same as Feed & Avatar)
+   🔥 FIXED — UNIVERSAL URL NORMALIZER
+   (same as Feed + StoryViewer)
 -------------------------------------------------- */
 const normalizeUrl = (url) => {
   if (!url) return null;
-  if (typeof url === "object")
+
+  if (typeof url === "object") {
     url =
       url.profile_picture ||
       url.profile_pic ||
       url.user_profile_picture ||
       url.profilePicture ||
       null;
+  }
 
   if (!url) return null;
 
   if (url.startsWith("http")) return url;
 
-  url = url.replace(/\/+/g, "/");
+  // clean repeated slashes except in https://
+  let cleaned = url.replace(/([^:]\/)\/+/g, "$1");
 
-  if (url.startsWith("backend/static/")) {
-    url = "/" + url.replace("backend", "");
-  }
+  // fix paths like backend/static/uploads
+  cleaned = cleaned.replace("backend/", "/");
 
-  if (url.startsWith("/api/static/")) {
-    url = url.replace("/api", "");
-  }
+  // ensure starting slash
+  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
-  if (!url.startsWith("/")) url = "/" + url;
+  const finalUrl = `${BACKEND_URL}${cleaned}`;
+  console.log("STORY_BAR →", url, "→", finalUrl);
 
-  return `${BACKEND_URL}${url}`;
+  return finalUrl;
 };
 
 export default function StoriesBar() {
@@ -66,7 +69,7 @@ export default function StoriesBar() {
   }, [token]);
 
   /* --------------------------------------------------
-     🔥 FETCH & FIX ALL STORIES
+     FETCH STORIES + FIX URLs
   -------------------------------------------------- */
   const fetchStories = async () => {
     try {
@@ -80,7 +83,7 @@ export default function StoriesBar() {
         ...u,
         user: {
           ...u.user,
-          id: u.user.id || u.user._id, // fix id mismatch
+          id: u.user.id || u.user._id,
           profile_picture: normalizeUrl(u.user.profile_picture),
         },
         stories: u.stories.map((s) => ({
@@ -97,6 +100,9 @@ export default function StoriesBar() {
     }
   };
 
+  /* --------------------------------------------------
+      OPEN STORY
+  -------------------------------------------------- */
   const handleStoryPress = (userStories) => {
     router.push({
       pathname: "/story-viewer",
@@ -125,9 +131,7 @@ export default function StoriesBar() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-      {/* -------------------------
-         ⭐ YOUR STORY (always 1st)
-      --------------------------- */}
+      {/* ⭐ Your Story */}
       {user && (
         <TouchableOpacity style={styles.storyItem} onPress={handleAddStory}>
           <View style={styles.yourStoryContainer}>
@@ -148,9 +152,7 @@ export default function StoriesBar() {
         </TouchableOpacity>
       )}
 
-      {/* -------------------------
-         ⭐ OTHER USERS STORIES
-      --------------------------- */}
+      {/* ⭐ Other Users */}
       {stories.map((u) => {
         if (!u.user || !u.user.id) return null;
 
@@ -169,7 +171,6 @@ export default function StoriesBar() {
                   profilePicture={normalizeUrl(u.user.profile_picture)}
                   username={u.user.username}
                   size={58}
-                  showLevelBadge={false}
                 />
               </View>
             </LinearGradient>
@@ -184,6 +185,9 @@ export default function StoriesBar() {
   );
 }
 
+/* --------------------------------------------------
+   STYLES
+-------------------------------------------------- */
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#FFF",
