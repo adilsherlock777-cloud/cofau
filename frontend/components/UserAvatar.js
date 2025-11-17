@@ -6,18 +6,21 @@ import LevelBadge from './LevelBadge';
 const BACKEND_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 
-/* 
-  🔥 UNIVERSAL URL FIXER FOR ALL USER DP FIELDS
-  Fixes:
-  - `/api/static/...` → `/static/...`
-  - missing leading slash
-  - nested objects from backend
+/*
+  🔥 UNIVERSAL URL FIXER (FINAL VERSION)
+  Handles:
+  - backend/static/uploads/...
+  - /api/static/... → /static/...
+  - static/... (missing slash)
+  - uploads/... (missing slash)
+  - nested objects
   - null / undefined
+  - absolute URLs
 */
 const normalizeDP = (input) => {
   if (!input) return null;
 
-  // Backend sometimes sends object: { profile_picture: "..." }
+  // If backend returns object structure
   if (typeof input === "object") {
     input =
       input.profile_picture ||
@@ -29,21 +32,25 @@ const normalizeDP = (input) => {
 
   if (!input) return null;
 
-  // Full URL already
+  // If already absolute
   if (input.startsWith("http")) return input;
 
-  // Clean extra slashes
   let url = input.replace(/\/+/g, "/");
 
-  // 💥 Main Bug Fix: backend incorrectly returns `/api/static/...`
-  if (url.startsWith("/api/static/")) {
-    url = url.replace("/api", ""); // becomes `/static/...`
+  // 💥 Fix: backend/static/...  (your API log showed this)
+  if (url.startsWith("backend/static/")) {
+    url = "/" + url.replace("backend", "");   // → /static/uploads/xxx
   }
 
-  // Ensure starts with /
+  // Fix incorrect /api/static/ → /static/
+  if (url.startsWith("/api/static/")) {
+    url = url.replace("/api", "");            // → /static/uploads/xxx
+  }
+
+  // Ensure leading slash always exists
   if (!url.startsWith("/")) url = "/" + url;
 
-  // Build final absolute URL
+  // FINAL absolute URL
   return `${BACKEND_URL}${url}`;
 };
 
@@ -55,10 +62,7 @@ export default function UserAvatar({
   level,
   style,
 }) {
-
-  // 💥 FIX: normalize ALL DP values
   const fullUrl = normalizeDP(profilePicture);
-
   const [imageError, setImageError] = useState(false);
 
   const getInitials = () => {
@@ -70,7 +74,6 @@ export default function UserAvatar({
 
   const initials = getInitials();
 
-  // Show fallback in all broken DP cases
   const showFallback =
     !fullUrl ||
     fullUrl.includes("null") ||
@@ -148,3 +151,4 @@ const styles = StyleSheet.create({
     right: 0,
   },
 });
+
