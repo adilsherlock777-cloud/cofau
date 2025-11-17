@@ -90,7 +90,15 @@ export default function FeedScreen() {
           id: post.id,
           user_id: post.user_id,
           username: post.username,
-          user_profile_picture: fixUrl(post.user_profile_picture),
+          user_profile_picture: fixUrl(
+  post.user_profile_picture ||
+  post.profile_picture ||
+  post.profile_picture_url ||
+  post.profile_pic ||
+  post.user_profile_pic ||
+  post.userProfilePicture ||
+  post.profilePicture
+),
           user_badge: post.user_badge,
           user_level: post.user_level,
           user_title: post.user_title,
