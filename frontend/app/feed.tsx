@@ -200,17 +200,13 @@ export default function FeedScreen() {
         {user && (
           <View style={styles.userCard}>
             <View style={styles.userRow}>
-              <UserAvatar
-                profilePicture={normalizeUrl(
-                  user.profile_picture ||
-                    user.profile_picture_url ||
-                    user.user_profile_picture
-                )}
+             <UserAvatar
+                profilePicture={normalizeUrl(user.profile_picture)}
                 username={user.full_name || user.username}
                 size={50}
                 level={user.level}
                 showLevelBadge
-              />
+                 />
 
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{user.full_name}</Text>
