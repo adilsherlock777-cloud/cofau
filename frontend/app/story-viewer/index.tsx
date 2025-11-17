@@ -20,7 +20,7 @@ import UserAvatar from '../../components/UserAvatar';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Backend root (NO /api)
+// Backend root
 const BACKEND_URL =
   Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
   'https://backend.cofau.com';
@@ -28,20 +28,28 @@ const BACKEND_URL =
 // For API calls
 const API_URL = `${BACKEND_URL}/api`;
 
-// ✅ UNIVERSAL URL FIXER (same as StoriesBar)
-const fixUrl = (url?: string | null) => {
+/* ----------------------------------------------------------
+   ✅ FINAL URL NORMALIZER — SAME AS FEED + STORIESBAR
+-----------------------------------------------------------*/
+const fixUrl = (url) => {
   if (!url) return null;
 
-  if (url.startsWith('http')) return url;
+  // Already full URL
+  if (url.startsWith("http")) return url;
 
-  // Remove duplicate /api
-  if (url.startsWith('/api/')) {
-    return `${BACKEND_URL}${url.replace('/api', '')}`;
-  }
+  let cleaned = url.trim();
 
-  if (!url.startsWith('/')) return `${BACKEND_URL}/${url}`;
+  // Remove duplicate slashes except http:// https://
+  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
 
-  return `${BACKEND_URL}${url}`;
+  // Ensure starting slash  
+  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
+
+  // FINAL absolute path
+  const finalUrl = `${BACKEND_URL}${cleaned}`;
+
+  console.log("STORY MEDIA FINAL URL →", url, " → ", finalUrl);
+  return finalUrl;
 };
 
 export default function StoryViewerScreen() {
@@ -50,25 +58,28 @@ export default function StoryViewerScreen() {
   const { user, token } = useAuth();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [stories, setStories] = useState<any[]>([]);
-  const [storyUser, setStoryUser] = useState<any>(null);
+  const [stories, setStories] = useState([]);
+  const [storyUser, setStoryUser] = useState(null);
   const [paused, setPaused] = useState(false);
 
-  const progressAnims = useRef<Animated.Value[]>([]);
-  const autoAdvanceTimer = useRef<any>(null);
+  const progressAnims = useRef([]);
+  const autoAdvanceTimer = useRef(null);
 
+  /* ----------------------------------------------------------
+     LOAD STORIES
+  -----------------------------------------------------------*/
   useEffect(() => {
     try {
-      const parsedStories = JSON.parse(params.stories as string);
-      const parsedUser = JSON.parse(params.user as string);
+      const parsedStories = JSON.parse(params.stories);
+      const parsedUser = JSON.parse(params.user);
 
-      // ⭐ FIX ALL STORY MEDIA URLS
-      const fixedStories = parsedStories.map((s: any) => ({
+      // Normalize ALL story media URLs
+      const fixedStories = parsedStories.map((s) => ({
         ...s,
-        media_url: fixUrl(s.media_url),
+        media_url: fixUrl(s.media_url)
       }));
 
-      // ⭐ FIX STORY USER DP
+      // Fix DP URL
       const fixedUser = {
         ...parsedUser,
         profile_picture: fixUrl(parsedUser.profile_picture),
@@ -77,18 +88,19 @@ export default function StoryViewerScreen() {
       setStories(fixedStories);
       setStoryUser(fixedUser);
 
-      // Init progress animations
       fixedStories.forEach(() => {
         progressAnims.current.push(new Animated.Value(0));
       });
 
     } catch (error) {
-      console.error('❌ Error parsing story data:', error);
+      console.error("❌ STORY PARSE ERROR:", error);
       router.back();
     }
   }, []);
 
-  // Auto-advance logic
+  /* ----------------------------------------------------------
+     AUTO ADVANCE STORY
+  -----------------------------------------------------------*/
   useEffect(() => {
     if (stories.length > 0 && !paused) startProgress();
 
@@ -102,9 +114,9 @@ export default function StoryViewerScreen() {
     if (!currentStory) return;
 
     const duration =
-      currentStory.media_type === 'video'
-        ? 30000 // 30 sec for videos
-        : 5000;  // 5 sec for images
+      currentStory.media_type === "video"
+        ? 30000
+        : 5000;
 
     Animated.timing(progressAnims.current[currentIndex], {
       toValue: 1,
@@ -137,36 +149,38 @@ export default function StoryViewerScreen() {
     }
   };
 
-  // Delete story
+  /* ----------------------------------------------------------
+     DELETE STORY
+  -----------------------------------------------------------*/
   const handleDelete = async () => {
     const currentStory = stories[currentIndex];
 
-    Alert.alert('Delete Story', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Delete Story", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Delete',
-        style: 'destructive',
+        text: "Delete",
+        style: "destructive",
         onPress: async () => {
           try {
             await axios.delete(`${API_URL}/stories/${currentStory.id}`, {
               headers: { Authorization: `Bearer ${token}` },
             });
 
-            const updatedStories = stories.filter((_, idx) => idx !== currentIndex);
+            const updated = stories.filter((_, idx) => idx !== currentIndex);
 
-            if (updatedStories.length === 0) {
-              Alert.alert('Deleted', 'Story removed', [
-                { text: 'OK', onPress: () => router.back() },
+            if (updated.length === 0) {
+              Alert.alert("Deleted", "Story removed", [
+                { text: "OK", onPress: () => router.back() },
               ]);
             } else {
-              setStories(updatedStories);
-              if (currentIndex >= updatedStories.length) {
-                setCurrentIndex(updatedStories.length - 1);
+              setStories(updated);
+              if (currentIndex >= updated.length) {
+                setCurrentIndex(updated.length - 1);
               }
             }
           } catch (err) {
-            console.error('❌ Delete story error:', err);
-            Alert.alert('Error', 'Failed to delete');
+            console.error("❌ DELETE STORY ERROR:", err);
+            Alert.alert("Error", "Failed to delete");
           }
         },
       },
@@ -180,7 +194,8 @@ export default function StoryViewerScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Progress bars */}
+      
+      {/* Progress Indicators */}
       <View style={styles.progressContainer}>
         {stories.map((_, index) => (
           <View key={index} style={styles.progressBarBackground}>
@@ -189,7 +204,7 @@ export default function StoryViewerScreen() {
                 ...styles.progressBarFill,
                 width: progressAnims.current[index]?.interpolate({
                   inputRange: [0, 1],
-                  outputRange: ['0%', '100%'],
+                  outputRange: ["0%", "100%"],
                 }),
               }}
             />
@@ -221,20 +236,20 @@ export default function StoryViewerScreen() {
         </View>
       </View>
 
-      {/* Story Media */}
+      {/* Content */}
       <View style={styles.contentContainer}>
-        {currentStory.media_type === 'image' ? (
+        {currentStory.media_type === "image" ? (
           <Image
             source={{ uri: currentStory.media_url }}
             style={styles.storyImage}
-            resizeMode="contain"
+            resizeMode="cover"  // ★ FIX BLACK SCREEN
           />
         ) : (
           <Video
             source={{ uri: currentStory.media_url }}
             style={styles.storyVideo}
             shouldPlay={!paused}
-            resizeMode="contain"
+            resizeMode="cover" // ★ FIX VIDEO LETTERBOXING
             isLooping={false}
             onPlaybackStatusUpdate={(status) => {
               if (status.didJustFinish) handleNext();
@@ -243,7 +258,7 @@ export default function StoryViewerScreen() {
         )}
       </View>
 
-      {/* Tap areas */}
+      {/* Tap Areas */}
       <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
       <TouchableOpacity style={styles.tapRight} onPress={handleNext} />
     </SafeAreaView>
@@ -252,9 +267,9 @@ export default function StoryViewerScreen() {
 
 /* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: "#000" },
   progressContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 8,
     paddingTop: 8,
     gap: 4,
@@ -262,36 +277,36 @@ const styles = StyleSheet.create({
   progressBarBackground: {
     flex: 1,
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: "rgba(255,255,255,0.3)",
     borderRadius: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressBarFill: {
-    height: '100%',
-    backgroundColor: '#FFF',
+    height: "100%",
+    backgroundColor: "#FFF",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  username: { color: '#FFF', fontSize: 16, fontWeight: '600' },
-  headerActions: { flexDirection: 'row', gap: 16 },
-  contentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  userInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
+  username: { color: "#FFF", fontSize: 16, fontWeight: "600" },
+  headerActions: { flexDirection: "row", gap: 16 },
+  contentContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   storyImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
   storyVideo: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
   tapLeft: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     top: 150,
     bottom: 0,
     width: SCREEN_WIDTH * 0.3,
   },
   tapRight: {
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     top: 150,
     bottom: 0,
