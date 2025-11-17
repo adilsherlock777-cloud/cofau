@@ -22,19 +22,23 @@ import { useLevelAnimation } from '../context/LevelContext';
 export default function AddPostScreen() {
   const router = useRouter();
   const { showLevelUpAnimation } = useLevelAnimation();
+
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [rating, setRating] = useState('');
   const [review, setReview] = useState('');
-  const [mapsLink, setMapsLink] = useState('');
+
+  const [locationName, setLocationName] = useState('');  // NEW
+  const [mapsLink, setMapsLink] = useState('');          // UPDATED
+
   const [loading, setLoading] = useState(false);
 
-  // Pick image from gallery
+  // ------------------------------ MEDIA PICKERS ------------------------------
+
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Permission to access gallery is required!');
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Required', 'Enable gallery permissions to continue.');
       return;
     }
 
@@ -50,12 +54,10 @@ export default function AddPostScreen() {
     }
   };
 
-  // Take photo with camera
   const takePhoto = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Permission to access camera is required!');
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Required', 'Enable camera permissions to continue.');
       return;
     }
 
@@ -71,12 +73,10 @@ export default function AddPostScreen() {
     }
   };
 
-  // Pick video from gallery
   const pickVideo = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Permission to access gallery is required!');
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Required', 'Enable gallery permissions to continue.');
       return;
     }
 
@@ -84,7 +84,7 @@ export default function AddPostScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: true,
       quality: 0.8,
-      videoMaxDuration: 15, // Max 15 seconds
+      videoMaxDuration: 15,
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -93,9 +93,8 @@ export default function AddPostScreen() {
     }
   };
 
-  // Show media upload options
   const showMediaOptions = () => {
-    Alert.alert('Add Media', 'Choose an option', [
+    Alert.alert('Add Media', 'Choose an option:', [
       { text: 'Take Photo', onPress: takePhoto },
       { text: 'Choose Photo', onPress: pickImage },
       { text: 'Choose Video (max 15s)', onPress: pickVideo },
@@ -103,112 +102,108 @@ export default function AddPostScreen() {
     ]);
   };
 
-  // Open Google Maps link
-  const openMapsLink = () => {
-    if (mapsLink) {
-      Linking.openURL(mapsLink);
-    } else {
-      Alert.alert('No Link', 'Please paste a Google Maps link first');
+  // ------------------------------ GOOGLE MAPS (FREE) ------------------------------
+
+  const generateMapsLink = () => {
+    if (!locationName.trim()) {
+      Alert.alert('Location Required', 'Please type a location name.');
+      return;
     }
+
+    const url =
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        locationName.trim()
+      )}`;
+
+    setMapsLink(url);
+    Alert.alert('Location Added', 'Google Maps link generated!');
   };
 
-  // Handle post submission
+  const openMaps = () => {
+    if (!mapsLink) {
+      Alert.alert('No Link', 'Please generate or paste a Google Maps link first.');
+      return;
+    }
+    Linking.openURL(mapsLink);
+  };
+
+  // ------------------------------ POST SUBMISSION ------------------------------
+
   const handlePost = async () => {
     if (!mediaUri || !mediaType) {
-      Platform.OS === 'web'
-        ? window.alert('Please add a photo or video')
-        : Alert.alert('Media Required', 'Please add a photo or video');
+      Alert.alert('Media Required', 'Please add a photo or video.');
       return;
     }
 
     const numericRating = parseInt(rating, 10);
     if (!numericRating || numericRating < 1 || numericRating > 10) {
-      Platform.OS === 'web'
-        ? window.alert('Please add a rating between 1-10')
-        : Alert.alert('Rating Required', 'Please add a rating between 1-10');
+      Alert.alert('Rating Required', 'Please add a rating between 1-10.');
       return;
     }
 
     if (!review.trim()) {
-      Platform.OS === 'web'
-        ? window.alert('Please write a review')
-        : Alert.alert('Review Required', 'Please write a review');
+      Alert.alert('Review Required', 'Please write a review.');
+      return;
+    }
+
+    if (!mapsLink.trim()) {
+      Alert.alert('Location Required', 'Please generate or paste a Google Maps link.');
       return;
     }
 
     setLoading(true);
 
     try {
-      console.log('📝 Preparing to create post...');
-
-      let fileToUpload: any;
+      let fileToUpload;
 
       if (Platform.OS === 'web') {
-        // Web: convert the URL to a File
         const response = await fetch(mediaUri);
         const blob = await response.blob();
         const ext = mediaType === 'video' ? 'mp4' : 'jpg';
         const filename = `${mediaType}_${Date.now()}.${ext}`;
+
         fileToUpload = new File([blob], filename, {
           type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
         });
       } else {
-        // Native
-        const filename = mediaUri.split('/').pop() || `${mediaType}_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`;
+        const name = mediaUri.split('/').pop() || `media_${Date.now()}`;
         fileToUpload = {
           uri: mediaUri,
-          name: filename,
-          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',  // 👈 force MP4 for videos
+          name,
+          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
         };
       }
 
       const postData = {
         rating: numericRating,
-        review_text: review,
-        map_link: mapsLink || null,
+        review_text: review.trim(),
+        map_link: mapsLink.trim(),         // FINAL MAP LINK
         file: fileToUpload,
-        media_type: mediaType, // 👈 tell backend if it's image or video
+        media_type: mediaType,
       };
 
-      console.log('📤 Submitting post to backend...');
       const result = await createPost(postData);
-      console.log('✅ Post created successfully!', result);
 
       setLoading(false);
 
-      // Level up animation logic
-      if (result.leveledUp && result.newLevel >= 1 && result.newLevel <= 4) {
-        console.log('🎉 User leveled up to Level', result.newLevel);
-
+      if (result.leveledUp) {
         showLevelUpAnimation(result.newLevel);
-
-        setTimeout(() => {
-          router.push('/feed');
-        }, 3000);
-      } else {
-        if (Platform.OS === 'web') {
-          window.alert('Post Submitted Successfully! 🎉');
-          router.push('/feed');
-        } else {
-          Alert.alert('Success!', 'Your post has been submitted successfully! 🎉', [
-            { text: 'OK', onPress: () => router.push('/feed') },
-          ]);
-        }
+        setTimeout(() => router.push('/feed'), 3000);
+        return;
       }
+
+      Alert.alert('Success!', 'Post submitted successfully!', [
+        { text: 'OK', onPress: () => router.push('/feed') },
+      ]);
+
     } catch (error: any) {
       console.error('❌ Error creating post:', error);
       setLoading(false);
-
-      const errorMessage =
-        error?.response?.data?.detail || error?.message || 'Failed to create post';
-
-      if (Platform.OS === 'web') {
-        window.alert(`Error: ${errorMessage}`);
-      } else {
-        Alert.alert('Error', errorMessage);
-      }
+      Alert.alert('Error', error?.response?.data?.detail || 'Failed to create post.');
     }
   };
+
+  // ------------------------------ UI ------------------------------
 
   return (
     <View style={styles.container}>
@@ -221,19 +216,12 @@ export default function AddPostScreen() {
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Media Upload Section */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+
+        {/* Media Upload */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Photo / Video</Text>
-          <TouchableOpacity
-            style={styles.mediaBox}
-            onPress={showMediaOptions}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.mediaBox} onPress={showMediaOptions}>
             {mediaUri ? (
               <View style={styles.mediaPreview}>
                 {mediaType === 'image' ? (
@@ -249,10 +237,8 @@ export default function AddPostScreen() {
                     </LinearGradient>
                   </View>
                 )}
-                <TouchableOpacity
-                  style={styles.changeMediaButton}
-                  onPress={showMediaOptions}
-                >
+
+                <TouchableOpacity style={styles.changeMediaButton} onPress={showMediaOptions}>
                   <Text style={styles.changeMediaText}>Change</Text>
                 </TouchableOpacity>
               </View>
@@ -266,27 +252,18 @@ export default function AddPostScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Rating Section */}
+        {/* Rating */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Rating</Text>
           <View style={styles.ratingContainer}>
             <Text style={styles.ratingNumber}>{rating || 0}/10</Text>
             <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((starIndex) => (
-                <TouchableOpacity
-                  key={starIndex}
-                  onPress={() => setRating(starIndex.toString())}
-                  activeOpacity={0.7}
-                  style={styles.starButton}
-                >
+              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                <TouchableOpacity key={n} onPress={() => setRating(n.toString())}>
                   <Ionicons
                     name="star"
                     size={28}
-                    color={
-                      starIndex <= parseInt(rating || '0', 10)
-                        ? '#FFD700'
-                        : '#E0E0E0'
-                    }
+                    color={n <= Number(rating) ? '#FFD700' : '#E0E0E0'}
                   />
                 </TouchableOpacity>
               ))}
@@ -294,107 +271,87 @@ export default function AddPostScreen() {
           </View>
         </View>
 
-        {/* Review Section */}
+        {/* Review */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Review</Text>
           <TextInput
             style={styles.reviewInput}
-            placeholder="Write your review here..."
+            placeholder="Write your review..."
             placeholderTextColor="#999"
             value={review}
             onChangeText={setReview}
             multiline
-            numberOfLines={4}
-            textAlignVertical="top"
           />
         </View>
 
-        {/* Google Maps Link Section */}
+        {/* FREE GOOGLE MAPS LOCATION */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
+
           <TextInput
             style={styles.linkInput}
-            placeholder="Paste Google Maps link here"
+            placeholder="Type place name (e.g., Starbucks MG Road)"
+            placeholderTextColor="#999"
+            value={locationName}
+            onChangeText={(t) => {
+              setLocationName(t);
+              setMapsLink('');
+            }}
+          />
+
+          <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
+            <Ionicons name="map" size={20} color="#4ECDC4" />
+            <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
+          </TouchableOpacity>
+
+          <TextInput
+            style={styles.linkInput}
+            placeholder="Or paste existing Google Maps link"
             placeholderTextColor="#999"
             value={mapsLink}
-            onChangeText={setMapsLink}
+            onChangeText={(t) => {
+              setMapsLink(t);
+              setLocationName('');
+            }}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TouchableOpacity
-            style={styles.mapsButton}
-            onPress={openMapsLink}
-            disabled={!mapsLink}
-          >
-            <Ionicons
-              name="location"
-              size={20}
-              color={mapsLink ? '#4ECDC4' : '#CCC'}
-            />
-            <Text
-              style={[
-                styles.mapsButtonText,
-                !mapsLink && styles.mapsButtonTextDisabled,
-              ]}
-            >
-              Open in Maps
-            </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={mapsLink ? '#4ECDC4' : '#CCC'}
-            />
+
+          <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
+            <Ionicons name="location" size={20} color="#4ECDC4" />
+            <Text style={styles.mapsButtonText}>Open Location in Maps</Text>
+            <Ionicons name="chevron-forward" size={20} color="#4ECDC4" />
           </TouchableOpacity>
         </View>
 
-        {/* POST Button */}
+        {/* POST BUTTON */}
         <TouchableOpacity
           style={styles.postButtonContainer}
           onPress={handlePost}
-          activeOpacity={0.8}
           disabled={loading}
         >
           <LinearGradient
             colors={['#66D9E8', '#F093FB', '#F5576C']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
             style={styles.postButton}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF" size="small" />
+              <ActivityIndicator size="small" color="#FFF" />
             ) : (
               <Text style={styles.postButtonText}>POST</Text>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+        <View style={{ height: 20 }} />
 
-      {/* Bottom Navigation */}
-      <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={28} color="#000" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/explore')}>
-          <Ionicons name="compass-outline" size={28} color="#000" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/add-post')}>
-          <Ionicons name="add-circle-outline" size={28} color="#000" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/happening')}>
-          <Ionicons name="flame-outline" size={28} color="#000" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/profile')}>
-          <Ionicons name="person-outline" size={28} color="#000" />
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
+
   header: {
     backgroundColor: '#FFF',
     paddingVertical: 16,
@@ -405,58 +362,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
+
   backButton: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   headerRight: { width: 32 },
+
   scrollView: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  section: { marginBottom: 24 },
-  sectionLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
+  scrollContent: { paddingHorizontal: 16, paddingVertical: 20 },
+
+  section: { marginBottom: 22 },
+  sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
+
   mediaBox: {
-    width: '100%',
     height: 280,
     backgroundColor: '#FFF',
     borderRadius: 16,
-    overflow: 'hidden',
     borderWidth: 2,
-    borderColor: '#E5E5E5',
     borderStyle: 'dashed',
+    borderColor: '#E5E5E5',
+    overflow: 'hidden',
   },
-  uploadPrompt: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 12,
-    fontWeight: '500',
-  },
-  uploadSubText: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 4,
-  },
-  mediaPreview: { flex: 1, position: 'relative' },
+
+  uploadPrompt: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  uploadText: { fontSize: 16, color: '#666', marginTop: 12 },
+  uploadSubText: { fontSize: 13, color: '#999', marginTop: 4 },
+
+  mediaPreview: { flex: 1 },
   mediaImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  videoPreview: { flex: 1 },
-  videoGradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  videoText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginTop: 8,
-  },
+
   changeMediaButton: {
     position: 'absolute',
     top: 12,
@@ -466,7 +399,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
-  changeMediaText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
+  changeMediaText: { color: '#FFF', fontSize: 14 },
+
   ratingContainer: {
     backgroundColor: '#FFF',
     borderRadius: 12,
@@ -474,77 +408,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
-  ratingNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  starsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  starButton: { padding: 2 },
+
+  ratingNumber: { fontSize: 22, fontWeight: 'bold', marginBottom: 12 },
+  starsContainer: { flexDirection: 'row', flexWrap: 'wrap' },
+
   reviewInput: {
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
-    fontSize: 15,
-    color: '#333',
     minHeight: 120,
+    textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
+
   linkInput: {
     backgroundColor: '#FFF',
     borderRadius: 12,
-    padding: 16,
-    fontSize: 15,
-    color: '#333',
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E5E5E5',
-    marginBottom: 12,
   },
+
   mapsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
     borderColor: '#E5E5E5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
+    marginBottom: 10,
   },
+
   mapsButtonText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#4ECDC4',
   },
-  mapsButtonTextDisabled: { color: '#CCC' },
-  postButtonContainer: { marginTop: 12 },
+
+  postButtonContainer: { marginTop: 10 },
   postButton: {
     paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
-  postButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    letterSpacing: 1,
-  },
-  bottomSpacer: { height: 20 },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
-  },
+  postButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
 });
