@@ -23,8 +23,7 @@ const BACKEND_URL =
   "https://backend.cofau.com";
 
 /* --------------------------------------------------
-   🔥 FIXED — UNIVERSAL URL NORMALIZER
-   (same as Feed + StoryViewer)
+   FIXED UNIVERSAL URL NORMALIZER
 -------------------------------------------------- */
 const normalizeUrl = (url) => {
   if (!url) return null;
@@ -42,19 +41,15 @@ const normalizeUrl = (url) => {
 
   if (url.startsWith("http")) return url;
 
-  // clean repeated slashes except in https://
   let cleaned = url.replace(/([^:]\/)\/+/g, "$1");
 
-  // fix paths like backend/static/uploads
-  cleaned = cleaned.replace("backend/", "/");
+  if (cleaned.startsWith("backend/")) {
+    cleaned = cleaned.replace("backend/", "/");
+  }
 
-  // ensure starting slash
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
-  const finalUrl = `${BACKEND_URL}${cleaned}`;
-  console.log("STORY_BAR →", url, "→", finalUrl);
-
-  return finalUrl;
+  return `${BACKEND_URL}${cleaned}`;
 };
 
 export default function StoriesBar() {
@@ -69,7 +64,7 @@ export default function StoriesBar() {
   }, [token]);
 
   /* --------------------------------------------------
-     FETCH STORIES + FIX URLs
+     FETCH STORIES + FIX ALL URLS + FIX media_type
   -------------------------------------------------- */
   const fetchStories = async () => {
     try {
@@ -84,11 +79,13 @@ export default function StoriesBar() {
         user: {
           ...u.user,
           id: u.user.id || u.user._id,
+          username: u.user.username || u.user.full_name || "User",
           profile_picture: normalizeUrl(u.user.profile_picture),
         },
         stories: u.stories.map((s) => ({
           ...s,
           media_url: normalizeUrl(s.media_url),
+          media_type: s.media_type || s.type || "image", // ★ FIX 1 — Needed for StoryViewer
         })),
       }));
 
@@ -101,14 +98,14 @@ export default function StoriesBar() {
   };
 
   /* --------------------------------------------------
-      OPEN STORY
+      OPEN STORY VIEWER
   -------------------------------------------------- */
   const handleStoryPress = (userStories) => {
     router.push({
       pathname: "/story-viewer",
       params: {
         userId: userStories.user.id,
-        stories: JSON.stringify(userStories.stories),
+        stories: JSON.stringify(userStories.stories), // includes media_type now 👍
         user: JSON.stringify(userStories.user),
       },
     });
@@ -131,7 +128,7 @@ export default function StoriesBar() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-      {/* ⭐ Your Story */}
+      {/* Your Story */}
       {user && (
         <TouchableOpacity style={styles.storyItem} onPress={handleAddStory}>
           <View style={styles.yourStoryContainer}>
@@ -152,7 +149,7 @@ export default function StoriesBar() {
         </TouchableOpacity>
       )}
 
-      {/* ⭐ Other Users */}
+      {/* Other Users */}
       {stories.map((u) => {
         if (!u.user || !u.user.id) return null;
 
