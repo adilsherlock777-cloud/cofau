@@ -5,13 +5,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from bson import ObjectId
 import os
-from fastapi.staticfiles import StaticFiles
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-STATIC_DIR = os.path.join(BASE_DIR, "backend", "static")
-
-app.mount("/legacy-static", StaticFiles(directory=STATIC_DIR), name="legacy-static")
 
 import shutil
 
@@ -46,6 +39,10 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
 )
+# Base directory and static mount for legacy static files
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "backend", "static")
+app.mount("/legacy-static", StaticFiles(directory=STATIC_DIR), name="legacy-static")
 
 # CORS Middleware
 app.add_middleware(
