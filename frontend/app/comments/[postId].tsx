@@ -15,9 +15,34 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getComments, addComment } from '../../utils/api';
 import UserAvatar from '../../components/UserAvatar';
 
+// 🔥 SAME universal DP normalizer we applied everywhere
+const normalizeDP = (input: any) => {
+  if (!input) return null;
+
+  if (typeof input === "object") {
+    input =
+      input.profile_picture ||
+      input.user_profile_picture ||
+      input.profile_pic ||
+      input.profile_picture_url ||
+      input.userProfilePicture ||
+      input.profilePicture ||
+      null;
+  }
+
+  if (!input) return null;
+  if (input.startsWith("http")) return input;
+
+  const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+  if (!input.startsWith("/")) return `${BASE}/${input}`;
+
+  return `${BASE}${input}`;
+};
+
 export default function CommentsScreen() {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
+
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -31,7 +56,20 @@ export default function CommentsScreen() {
     try {
       setLoading(true);
       const data = await getComments(postId);
-      setComments(data);
+
+      // 🔥 Normalize DP inside every comment
+      const fixed = data.map((c) => ({
+        ...c,
+        profile_pic: normalizeDP(
+          c.profile_pic ||
+          c.profile_picture ||
+          c.user_profile_picture ||
+          c.profile_picture_url ||
+          c.userProfilePicture
+        ),
+      }));
+
+      setComments(fixed);
     } catch (error) {
       console.error('Error fetching comments:', error);
     } finally {
@@ -46,7 +84,6 @@ export default function CommentsScreen() {
     try {
       await addComment(postId, commentText);
       setCommentText('');
-      // Refresh comments
       await fetchComments();
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -61,12 +98,12 @@ export default function CommentsScreen() {
   const formatTimestamp = (timestamp) => {
     const now = new Date();
     const commentDate = new Date(timestamp);
-    const diffInSeconds = Math.floor((now - commentDate) / 1000);
+    const diff = Math.floor((now - commentDate) / 1000);
 
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
     return commentDate.toLocaleDateString();
   };
 
@@ -75,7 +112,7 @@ export default function CommentsScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Header */}
+      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -84,7 +121,7 @@ export default function CommentsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Comments List */}
+      {/* COMMENTS */}
       <ScrollView style={styles.commentsContainer}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -114,13 +151,14 @@ export default function CommentsScreen() {
                   </Text>
                 </View>
               </View>
+
               <Text style={styles.commentText}>{comment.comment_text}</Text>
             </View>
           ))
         )}
       </ScrollView>
 
-      {/* Add Comment Input */}
+      {/* ADD COMMENT */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -147,10 +185,8 @@ export default function CommentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF',
-  },
+  container: { flex: 1, backgroundColor: '#FFF' },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -160,68 +196,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  commentsContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
+
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+
+  commentsContainer: { flex: 1, paddingHorizontal: 16 },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-  },
+
+  emptyContainer: { alignItems: 'center', paddingVertical: 60 },
+
+  emptyText: { fontSize: 18, fontWeight: '600', color: '#666', marginTop: 16 },
+
+  emptySubtext: { fontSize: 14, color: '#999', marginTop: 8 },
+
   commentCard: {
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 12,
-  },
-  commentInfo: {
-    flex: 1,
-  },
-  username: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
-  },
+
+  commentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+
+  commentInfo: { marginLeft: 12, flex: 1 },
+
+  username: { fontSize: 15, fontWeight: 'bold', color: '#333' },
+
+  timestamp: { fontSize: 12, color: '#999', marginTop: 2 },
+
   commentText: {
     fontSize: 15,
     color: '#333',
     lineHeight: 20,
     marginLeft: 48,
   },
+
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -231,6 +244,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E0E0E0',
     backgroundColor: '#FFF',
   },
+
   input: {
     flex: 1,
     paddingHorizontal: 16,
@@ -240,11 +254,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     maxHeight: 100,
   },
-  sendButton: {
-    marginLeft: 12,
-    padding: 8,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
+
+  sendButton: { marginLeft: 12, padding: 8 },
+  sendButtonDisabled: { opacity: 0.5 },
 });
