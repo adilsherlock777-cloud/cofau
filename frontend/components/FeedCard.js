@@ -59,7 +59,15 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const mediaUrl = fixUrl(post.media_url);
   const isVideo = mediaUrl?.toLowerCase().endsWith(".mp4");
 
-  const dpUrl = fixUrl(post.user_profile_picture);
+  const dpUrl = fixUrl(
+  post.user_profile_picture ||
+  post.profile_picture ||
+  post.profile_picture_url ||
+  post.profile_pic ||
+  post.user_profile_pic ||
+  post.userProfilePicture ||
+  post.profilePicture
+);
 
   const openPost = () => {
     router.push(`/post-details/${post.id}`);
