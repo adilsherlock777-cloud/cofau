@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,37 +8,54 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
-import axios from 'axios';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, useFocusEffect } from "expo-router";
+import axios from "axios";
 
-import { useAuth } from '../context/AuthContext';
-import RatingBar from '../components/RatingBar';
-import FeedCard from '../components/FeedCard';
-import UserAvatar from '../components/UserAvatar';
-import StoriesBar from '../components/StoriesBar';
-import { fetchUnreadCount } from '../utils/notifications';
+import { useAuth } from "../context/AuthContext";
+import RatingBar from "../components/RatingBar";
+import FeedCard from "../components/FeedCard";
+import UserAvatar from "../components/UserAvatar";
+import StoriesBar from "../components/StoriesBar";
+import { fetchUnreadCount } from "../utils/notifications";
 
-// Base backend URL (already includes /api)
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com/api";
+// BASE BACKEND URL
+const BACKEND =
+  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
-/** Fixes media & image URLs across the app */
-const fixUrl = (url) => {
+/* -----------------------------------------------------
+   🔥 UNIVERSAL MEDIA URL NORMALIZER (Safe for all)
+----------------------------------------------------- */
+const normalizeUrl = (url) => {
   if (!url) return null;
 
-  if (url.startsWith("http")) return url; // already complete URL
+  if (url.startsWith("http")) return url;
 
-  // Normalize slashes
   let cleaned = url.replace(/\/+/g, "/");
 
-  // If backend returned `/api/static/...` remove the first `/api`
-  if (cleaned.startsWith("/api/")) {
-    cleaned = cleaned.replace("/api", "");
+  if (cleaned.startsWith("/api/static/")) {
+    cleaned = cleaned.replace("/api", ""); // fix duplication
   }
 
-  // Ensure final URL is correct
-  return `${BASE}${cleaned.startsWith("/") ? cleaned : "/" + cleaned}`;
+  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
+
+  return `${BACKEND}${cleaned}`;
+};
+
+/* -----------------------------------------------------
+   🔥 FIX DP FOR FEED POSTS (all possible fields)
+----------------------------------------------------- */
+const getPostDP = (post) => {
+  return normalizeUrl(
+    post.user_profile_picture ||
+      post.profile_picture ||
+      post.profile_picture_url ||
+      post.profile_pic ||
+      post.user_profile_pic ||
+      post.userProfilePicture ||
+      post.profilePicture
+  );
 };
 
 export default function FeedScreen() {
@@ -64,6 +81,7 @@ export default function FeedScreen() {
 
   const loadUnreadCount = async () => {
     if (!token) return;
+
     try {
       const count = await fetchUnreadCount(token);
       setUnreadCount(count);
@@ -72,53 +90,43 @@ export default function FeedScreen() {
     }
   };
 
+  /* -----------------------------------------------------
+      🔥 FETCH FEED & FIX ALL DP/MEDIA URLS
+  ----------------------------------------------------- */
   const fetchFeed = async () => {
     try {
       setError(null);
-      const url = `${BASE}/feed`;
-      console.log("📡 Fetching feed:", url);
 
-      const response = await axios.get(url);
+      const response = await axios.get(`${BACKEND}/api/feed`);
       const data = response.data;
 
-      console.log(`📸 Received ${data.length} posts`);
+      const transformed = data.map((post) => ({
+        id: post.id,
+        user_id: post.user_id,
+        username: post.username,
 
-      const transformed = data.map(post => {
-        const mediaUrl = fixUrl(post.image_url || post.media_url);
+        // FIXED DP
+        user_profile_picture: getPostDP(post),
 
-        return {
-          id: post.id,
-          user_id: post.user_id,
-          username: post.username,
-          user_profile_picture: fixUrl(
-  post.user_profile_picture ||
-  post.profile_picture ||
-  post.profile_picture_url ||
-  post.profile_pic ||
-  post.user_profile_pic ||
-  post.userProfilePicture ||
-  post.profilePicture
-),
-          user_badge: post.user_badge,
-          user_level: post.user_level,
-          user_title: post.user_title,
+        user_badge: post.user_badge,
+        user_level: post.user_level,
+        user_title: post.user_title,
 
-          description: post.review_text,
-          rating: post.rating,
-          ratingLabel: getRatingLabel(post.rating),
+        description: post.review_text,
+        rating: post.rating,
+        ratingLabel: getRatingLabel(post.rating),
 
-          location: extractLocation(post.map_link),
-          mapsUrl: post.map_link,
+        location: extractLocation(post.map_link),
+        mapsUrl: post.map_link,
 
-          likes: post.likes_count,
-          comments: post.comments_count,
-          is_liked: post.is_liked_by_user,
+        likes: post.likes_count,
+        comments: post.comments_count,
+        is_liked: post.is_liked_by_user,
 
-          media_url: mediaUrl,
-          media_type: post.media_type,
-          created_at: post.created_at,
-        };
-      });
+        media_url: normalizeUrl(post.image_url || post.media_url),
+        media_type: post.media_type,
+        created_at: post.created_at,
+      }));
 
       setFeedPosts(transformed);
       setLoading(false);
@@ -151,6 +159,7 @@ export default function FeedScreen() {
       const u = new URL(mapLink);
       const q = u.searchParams.get("q");
       if (q) return q;
+
       const match = mapLink.match(/q=([^&]+)/);
       return match ? decodeURIComponent(match[1]) : "Location";
     } catch {
@@ -160,17 +169,16 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      
       {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cofau</Text>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.notificationButton}
-          onPress={() => router.push('/notifications')}
+          onPress={() => router.push("/notifications")}
         >
           <Ionicons name="notifications-outline" size={26} color="#fff" />
-          
+
           {unreadCount > 0 && (
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationBadgeText}>
@@ -188,13 +196,16 @@ export default function FeedScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-
-        {/* USER HEADER CARD */}
+        {/* USER HEADER */}
         {user && (
           <View style={styles.userCard}>
             <View style={styles.userRow}>
               <UserAvatar
-                profilePicture={fixUrl(user.profile_picture)}
+                profilePicture={normalizeUrl(
+                  user.profile_picture ||
+                    user.profile_picture_url ||
+                    user.user_profile_picture
+                )}
                 username={user.full_name || user.username}
                 size={50}
                 level={user.level}
@@ -215,7 +226,7 @@ export default function FeedScreen() {
           </View>
         )}
 
-        {/* STORIES BAR */}
+        {/* STORIES */}
         <StoriesBar />
 
         {/* LOADING */}
@@ -231,6 +242,7 @@ export default function FeedScreen() {
           <View style={styles.errorBox}>
             <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
             <Text style={styles.errorText}>{error}</Text>
+
             <TouchableOpacity style={styles.retryBtn} onPress={fetchFeed}>
               <Text style={styles.retryBtnText}>Retry</Text>
             </TouchableOpacity>
@@ -238,74 +250,71 @@ export default function FeedScreen() {
         )}
 
         {/* FEED POSTS */}
-        {!loading && !error && feedPosts.map(post => (
-          <FeedCard key={post.id} post={post} onLikeUpdate={fetchFeed} />
-        ))}
+        {!loading &&
+          !error &&
+          feedPosts.map((post) => (
+            <FeedCard key={post.id} post={post} onLikeUpdate={fetchFeed} />
+          ))}
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* NAVIGATION BAR */}
+      {/* NAVBAR */}
       <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.push('/feed')}>
+        <TouchableOpacity onPress={() => router.push("/feed")}>
           <Ionicons name="home" size={28} color="#000" />
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/explore')}>
+        <TouchableOpacity onPress={() => router.push("/explore")}>
           <Ionicons name="compass-outline" size={28} color="#000" />
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/add-post')}>
+        <TouchableOpacity onPress={() => router.push("/add-post")}>
           <Ionicons name="add-circle-outline" size={28} color="#000" />
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/happening')}>
+        <TouchableOpacity onPress={() => router.push("/happening")}>
           <Ionicons name="flame-outline" size={28} color="#000" />
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/profile')}>
+        <TouchableOpacity onPress={() => router.push("/profile")}>
           <Ionicons name="person-outline" size={28} color="#000" />
         </TouchableOpacity>
       </View>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: "#F5F5F5" },
 
   header: {
-    backgroundColor: '#3B5998',
+    backgroundColor: "#3B5998",
     paddingVertical: 18,
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
-  headerTitle: { color: '#fff', fontWeight: 'bold', fontSize: 20 },
+  headerTitle: { color: "#fff", fontWeight: "bold", fontSize: 20 },
 
-  notificationButton: { padding: 8, position: 'relative' },
+  notificationButton: { padding: 8, position: "relative" },
 
   notificationBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: '#FF4444',
+    backgroundColor: "#FF4444",
     borderRadius: 10,
     minWidth: 18,
     height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  notificationBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  notificationBadgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
 
   scrollView: { flex: 1 },
 
   userCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
@@ -313,36 +322,41 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 
-  userRow: { flexDirection: 'row', alignItems: 'center' },
+  userRow: { flexDirection: "row", alignItems: "center" },
 
   userInfo: { marginLeft: 16, flex: 1 },
 
-  userName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  userName: { fontSize: 18, fontWeight: "bold", color: "#333" },
 
-  levelText: { marginTop: 4, fontSize: 14, fontWeight: '600', color: '#333' },
+  levelText: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
 
-  loadingContainer: { padding: 40, alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#666' },
+  loadingContainer: { padding: 40, alignItems: "center" },
+  loadingText: { marginTop: 12, color: "#666" },
 
-  errorBox: { padding: 40, alignItems: 'center' },
-  errorText: { marginTop: 12, color: '#FF6B6B', fontSize: 16 },
+  errorBox: { padding: 40, alignItems: "center" },
+  errorText: { marginTop: 12, color: "#FF6B6B", fontSize: 16 },
 
   retryBtn: {
     marginTop: 16,
-    backgroundColor: '#4dd0e1',
+    backgroundColor: "#4dd0e1",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
 
-  retryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  retryBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 
   navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
+    borderColor: "#ccc",
+    backgroundColor: "#fff",
   },
 });
