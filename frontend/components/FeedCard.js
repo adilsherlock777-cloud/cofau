@@ -52,7 +52,11 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const [likesCount, setLikes] = useState(post.likes || 0);
 
   const mediaUrl = normalizeUrl(post.media_url);
-  const isVideo = mediaUrl?.toLowerCase().endsWith(".mp4");
+  const isVideo =
+  post.media_type === "video" ||
+  mediaUrl.includes(".mp4") ||
+  mediaUrl.includes(".mov") ||
+  mediaUrl.includes("video");
 
   const dpRaw =
     post.user_profile_picture ||
