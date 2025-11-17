@@ -59,7 +59,12 @@ export default function UserAvatar({
 
   const initials = getInitials();
 
-  const showFallback = !fullUrl || imageError;
+  const showFallback =
+  !fullUrl ||
+  fullUrl.endsWith("/null") ||
+  fullUrl.endsWith("/undefined") ||
+  fullUrl.endsWith("/profile_pictures/") ||
+  imageError;
 
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
