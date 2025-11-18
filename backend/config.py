@@ -6,7 +6,7 @@ load_dotenv()
 
 class Settings(BaseSettings):
     # MongoDB
-    MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+    MONGO_URL: str = os.getenv("MONGO_URL", "mongodb+srv://moinmisba92:quickSell%40121@quicksellify.mdhrm.mongodb.net/quickSellify?retryWrites=true&w=majority&appName=quickSellify")
     DATABASE_NAME: str = "cofau_db"
     
     # JWT

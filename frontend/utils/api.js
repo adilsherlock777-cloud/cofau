@@ -122,10 +122,29 @@ export const addComment = async (postId, commentText) => {
     const formData = new FormData();
     formData.append('comment_text', commentText);
     
-    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData);
+    // Get authorization token from axios defaults
+    const authToken = axios.defaults.headers.common['Authorization'];
+    
+    // Build headers - don't set Content-Type manually for FormData
+    // Let the browser/React Native set it with the boundary parameter
+    const headers = {};
+    if (authToken) {
+      headers['Authorization'] = authToken;
+    }
+    
+    console.log('📤 Adding comment:', { postId, commentText: commentText.substring(0, 50) });
+    console.log('🔑 Auth token present:', !!authToken);
+    
+    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData, {
+      headers,
+    });
+    
+    console.log('✅ Comment added successfully');
     return response.data;
   } catch (error) {
     console.error('❌ Error adding comment:', error.response?.data || error.message);
+    console.error('❌ Error status:', error.response?.status);
+    console.error('❌ Full error:', error);
     throw error;
   }
 };

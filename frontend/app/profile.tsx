@@ -36,11 +36,13 @@ const fixUrl = (url?: string | null) => {
   // Normalize slashes
   url = url.replace(/\/+/g, "/");
 
-  // ⚠️ Remove wrong `/api` prefix if it appears before `/static`
-  if (url.startsWith("/api/static/")) {
-    url = url.replace("/api", ""); // becomes /static/...
+  // ✅ Keep /api/static/... as is - backend serves static files at /api/static/
+  // If URL starts with /api/, prepend BACKEND_URL
+  if (url.startsWith("/api/")) {
+    return `${BACKEND_URL}${url}`;
   }
 
+  // For other relative URLs, prepend BACKEND_URL
   return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
 };
 
@@ -148,6 +150,7 @@ export default function ProfileScreen() {
 
       // ✅ Always normalize profile picture URL from any possible backend field
       const rawProfilePicture =
+        user.profile_image_url ||
         user.profile_picture ||
         user.profile_picture_url ||
         user.user_profile_picture;
@@ -425,11 +428,14 @@ export default function ProfileScreen() {
       console.log('✅ Profile picture uploaded:', response.data);
 
       const apiProfilePicture =
+        response.data.profile_image_url ||
         response.data.profile_picture ||
         response.data.profile_picture_url ||
         response.data.user_profile_picture;
 
       const normalizedProfilePicture = fixUrl(apiProfilePicture);
+      
+      console.log('🖼️ Normalized profile picture URL:', normalizedProfilePicture);
 
       // ✅ Ensure URL is absolute when saving to state
       setUserData((prev: any) => ({

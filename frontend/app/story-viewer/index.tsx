@@ -33,21 +33,33 @@ const API_URL = `${BACKEND_URL}/api`;
 const fixUrl = (url) => {
   if (!url) return null;
 
+  // Already absolute URL
+  if (url.startsWith("http")) return url;
+
   let cleaned = url.trim();
 
   // REMOVE accidental /api/api/ duplication
   cleaned = cleaned.replace(/\/api\/api\//g, "/api/");
 
-  // FIX missing /api/ prefix if server returns static/uploads/...
+  // FIX missing /api/ prefix if server returns static/... or /static/...
   if (cleaned.startsWith("static/") || cleaned.startsWith("/static/")) {
     cleaned = "/api/" + cleaned.replace(/^\//, "");
   }
 
-  // Add leading slash
+  // Ensure it starts with /api/static/ for story URLs
+  if (cleaned.includes("stories") && !cleaned.startsWith("/api/static/")) {
+    if (cleaned.startsWith("/static/stories/")) {
+      cleaned = "/api" + cleaned;
+    } else if (cleaned.startsWith("stories/")) {
+      cleaned = "/api/static/" + cleaned;
+    }
+  }
+
+  // Add leading slash if missing
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
 
   const finalUrl = `${BACKEND_URL}${cleaned}`;
-  console.log("🟦 FINAL STORY URL:", url, "➡️", finalUrl);
+  console.log("🟦 STORY URL FIX:", url, "➡️", finalUrl);
 
   return finalUrl;
 };
@@ -61,6 +73,7 @@ export default function StoryViewerScreen() {
   const [stories, setStories] = useState([]);
   const [storyUser, setStoryUser] = useState(null);
   const [paused, setPaused] = useState(false);
+  const [actualMediaType, setActualMediaType] = useState<"video" | "image" | null>(null); // Track actual working media type
 
   const progressAnims = useRef([]);
   const autoAdvanceTimer = useRef(null);
@@ -73,11 +86,38 @@ export default function StoryViewerScreen() {
       const parsedStories = JSON.parse(params.stories);
       const parsedUser = JSON.parse(params.user);
 
-      // Normalize media URLs
-      const fixedStories = parsedStories.map((s) => ({
-        ...s,
-        media_url: fixUrl(s.media_url),
-      }));
+      console.log("📦 Parsed stories:", parsedStories.length);
+      console.log("👤 Parsed user:", parsedUser.username);
+
+      // Normalize media URLs and ensure media_type is set
+      const fixedStories = parsedStories.map((s, idx) => {
+        const fixedUrl = fixUrl(s.media_url);
+        
+        // Better media type detection
+        let mediaType = s.media_type;
+        if (!mediaType && fixedUrl) {
+          const urlLower = fixedUrl.toLowerCase();
+          // Check for video extensions
+          if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.avi') || urlLower.endsWith('.webm')) {
+            mediaType = 'video';
+          } else {
+            // Default to image for jpeg, jpg, png, webp, gif
+            mediaType = 'image';
+          }
+        }
+        
+        console.log(`📹 Story ${idx + 1}:`, {
+          original_url: s.media_url,
+          fixed_url: fixedUrl,
+          media_type: mediaType,
+        });
+
+        return {
+          ...s,
+          media_url: fixedUrl,
+          media_type: mediaType || 'image', // Default to image if still unknown
+        };
+      });
 
       // Fix DP
       const fixedUser = {
@@ -102,6 +142,11 @@ export default function StoryViewerScreen() {
      AUTO ADVANCE STORY
   -----------------------------------------------------------*/
   useEffect(() => {
+    // Reset media type when story changes - will be determined by what actually loads
+    if (stories[currentIndex]) {
+      setActualMediaType(stories[currentIndex].media_type);
+    }
+    
     if (stories.length > 0 && !paused) {
       startProgress();
     }
@@ -238,21 +283,53 @@ export default function StoryViewerScreen() {
 
       {/* Story Media */}
       <View style={styles.contentContainer}>
-        {currentStory.media_type === "image" ? (
-          <Image
-            source={{ uri: currentStory.media_url }}
-            style={styles.storyImage}
-            resizeMode="cover"
-          />
-        ) : (
+        {(actualMediaType || currentStory.media_type) === "video" ? (
           <Video
             source={{ uri: currentStory.media_url }}
             style={styles.storyVideo}
             shouldPlay={!paused}
             resizeMode="cover"
             isLooping={false}
+            useNativeControls={false}
+            onError={(error) => {
+              console.error("❌ Video playback error:", error);
+              console.error("❌ Failed video URL:", currentStory.media_url);
+              // Try to load as image as fallback
+              console.log("🔄 Trying as image instead...");
+              setActualMediaType("image");
+            }}
+            onLoadStart={() => {
+              console.log("📹 Video loading:", currentStory.media_url);
+          }}
+            onLoad={() => {
+              console.log("✅ Video loaded successfully");
+              setActualMediaType("video");
+            }}
             onPlaybackStatusUpdate={(status) => {
-              if (status.didJustFinish) handleNext();
+              if (status.isLoaded && status.didJustFinish) {
+                console.log("✅ Video finished, advancing to next story");
+                handleNext();
+              }
+            }}
+          />
+        ) : (
+          <Image
+            source={{ uri: currentStory.media_url }}
+            style={styles.storyImage}
+            resizeMode="cover"
+            onError={(error) => {
+              console.error("❌ Image load error:", error);
+              console.error("❌ Failed image URL:", currentStory.media_url);
+              // Try to load as video as fallback
+              console.log("🔄 Trying as video instead...");
+              setActualMediaType("video");
+            }}
+            onLoadStart={() => {
+              console.log("🖼️ Image loading:", currentStory.media_url);
+            }}
+            onLoad={() => {
+              console.log("✅ Image loaded successfully");
+              setActualMediaType("image");
             }}
           />
         )}
@@ -298,6 +375,13 @@ const styles = StyleSheet.create({
   contentContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   storyImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
   storyVideo: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
+  errorContainer: {
+    position: "absolute",
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT - 150,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   tapLeft: {
     position: "absolute",
     left: 0,
