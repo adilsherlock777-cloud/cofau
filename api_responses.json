@@ -1,0 +1,17 @@
+{
+  "feed": {
+    "error": "Not authenticated",
+    "status_code": 401,
+    "message": "Failed to fetch. This endpoint may require authentication."
+  },
+  "stories_feed": {
+    "error": "Not authenticated",
+    "status_code": 401,
+    "message": "Failed to fetch. This endpoint may require authentication."
+  },
+  "user": {
+    "error": "User not found",
+    "status_code": 404,
+    "message": "Failed to fetch. This endpoint may require authentication."
+  }
+}

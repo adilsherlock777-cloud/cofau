@@ -6,15 +6,12 @@
     "orientation": "portrait",
     "scheme": "cofau",
     "userInterfaceStyle": "automatic",
-
     "icon": "./assets/images/icon.png",
-
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cofau.app",
@@ -23,7 +20,6 @@
         "NSCameraUsageDescription": "Allow Cofau to access your camera for taking pictures."
       }
     },
-
     "android": {
       "package": "com.cofau.app",
       "adaptiveIcon": {
@@ -38,13 +34,11 @@
       ],
       "allowBackup": false
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       [
         "expo-splash-screen",
@@ -56,22 +50,21 @@
       ],
       "expo-secure-store"
     ],
-
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-
-    "assetBundlePatterns": ["**/*"],
-
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "extra": {
       "apiUrl": "https://backend.cofau.com/api",
       "eas": {
-        "projectId": "2094671e-9a3c-410d-bfcd-aa523cffdf86"
+        "projectId": "99fd83ad-0052-4fde-85e4-117a0aefb0cc"
       }
     },
-
     "runtimeVersion": {
       "policy": "sdkVersion"
-    }
+    },
+    "owner": "drivebay"
   }
 }
