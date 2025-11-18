@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from bson import ObjectId
 import os
-
 import shutil
 
 # Import configurations and database
@@ -23,28 +22,42 @@ from routers.locations import router as locations_router
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     await connect_to_mongo()
     yield
-    # Shutdown
     await close_mongo_connection()
 
+
 app = FastAPI(
-    title="Cofau API", 
-    version="1.0.0", 
+    title="Cofau API",
+    version="1.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
 )
-# Base directory and static mount for legacy static files
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, "backend", "static")
-app.mount("/legacy-static", StaticFiles(directory=STATIC_DIR), name="legacy-static")
 
-# CORS Middleware
+
+# ======================================================
+# ✅ FIXED STATIC PATH — MAIN CAUSE OF BLANK IMAGES
+# ======================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))          # /root/cofau/backend
+STATIC_DIR = os.path.join(BASE_DIR, "static")                  # /root/cofau/backend/static
+
+print("STATIC DIRECTORY => ", STATIC_DIR)
+
+# Mount static files correctly
+app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Create uploads directory if missing
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
+
+# ======================================================
+# CORS
+# ======================================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,13 +66,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files under /api prefix to match Kubernetes ingress routing
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-# Use absolute path for static files
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-app.mount("/api/static", StaticFiles(directory=static_dir), name="static")
 
-# Include routers
+# ======================================================
+# Include Routers
+# ======================================================
 app.include_router(auth_router)
 app.include_router(notifications_router)
 app.include_router(follow_router)
@@ -67,54 +77,53 @@ app.include_router(profile_picture_router)
 app.include_router(stories_router)
 app.include_router(locations_router)
 
+
 @app.get("/api")
 async def root():
     return {"message": "Cofau API is running", "version": "1.0.0"}
 
-# ==================== POSTS ENDPOINTS ====================
 
+# ======================================================
+# POST CREATION
+# ======================================================
 @app.post("/api/posts/create")
 async def create_post(
     rating: int = Form(...),
     review_text: str = Form(...),
     map_link: str = Form(None),
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
-    """Create a new post with media upload"""
     db = get_database()
-    
+
     # Validate file
     file_ext = file.filename.split(".")[-1].lower()
     if file_ext not in settings.ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Invalid file type")
-    
-    # Save file
+
     unique_id = str(ObjectId())
-    file_path = f"{settings.UPLOAD_DIR}/{unique_id}_{file.filename}"
-    
+    filename = f"{unique_id}_{file.filename}"
+    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
-    # Determine media type
+
+    # Detect media type
     media_type = "video" if file_ext in ["mp4", "mov"] else "image"
 
-    # ---- SANITIZE MAP LINK ----
+    # Clean map link
     clean_map_link = None
     if map_link:
         map_link = map_link.strip()
-        
         if not map_link.startswith("http"):
             map_link = "https://" + map_link
-        
         if "google.com/maps" in map_link or "goo.gl/maps" in map_link:
             clean_map_link = map_link
 
-    # ---- FIX MEDIA URL ----
+    # FIX MEDIA PATH
     relative_path = file_path.replace(settings.UPLOAD_DIR + "/", "")
-    media_url = f"/api/static/{relative_path}"
+    media_url = f"/api/static/uploads/{relative_path}"
 
-    # Create post document
     post_doc = {
         "user_id": str(current_user["_id"]),
         "media_url": media_url,
@@ -125,13 +134,13 @@ async def create_post(
         "likes_count": 0,
         "comments_count": 0,
         "popular_photos": [],
-        "created_at": datetime.utcnow()
+        "created_at": datetime.utcnow(),
     }
 
     result = await db.posts.insert_one(post_doc)
     post_id = str(result.inserted_id)
 
-    # Level system update
+    # Level update
     level_update = calculateUserLevelAfterPost(current_user)
 
     await db.users.update_one(
@@ -154,176 +163,56 @@ async def create_post(
             notification_type="new_post",
             from_user_id=str(current_user["_id"]),
             to_user_id=follow["followerId"],
-            post_id=post_id
+            post_id=post_id,
         )
 
     return {
         "message": "Post created successfully",
         "post_id": post_id,
-        "leveledUp": level_update["leveledUp"],
-        "newLevel": level_update["level"],
-        "newTitle": level_update["title"],
-        "pointsEarned": level_update["pointsEarned"],
-        "currentPoints": level_update["currentPoints"],
-        "requiredPoints": level_update["requiredPoints"]
+        "level_update": level_update,
     }
 
-@app.get("/api/posts/user/{user_id}")
-async def get_user_posts(user_id: str):
-    """Get all posts by a user"""
-    db = get_database()
-    
-    posts = await db.posts.find({"user_id": user_id}).sort("created_at", -1).to_list(100)
-    
-    # Get user info
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    result = []
-    for post in posts:
-        result.append({
-            "id": str(post["_id"]),
-            "user_id": user_id,
-            "username": user["full_name"],
-            "user_profile_picture": user.get("profile_picture"),
-            "user_badge": user.get("badge"),
-            "media_url": post["media_url"],
-            "media_type": post["media_type"],
-            "rating": post["rating"],
-            "review_text": post["review_text"],
-            "map_link": post.get("map_link"),
-            "likes_count": post["likes_count"],
-            "comments_count": post["comments_count"],
-            "created_at": post["created_at"]
-        })
-    
-    return result
 
-@app.get("/api/posts/{post_id}")
-async def get_post(post_id: str):
-    """Get a single post"""
-    db = get_database()
-    
-    post = await db.posts.find_one({"_id": ObjectId(post_id)})
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-    
-    return {
-        "id": str(post["_id"]),
-        "user_id": post["user_id"],
-        "username": user["full_name"],
-        "user_profile_picture": user.get("profile_picture"),
-        "user_badge": user.get("badge"),
-        "media_url": post["media_url"],
-        "media_type": post["media_type"],
-        "rating": post["rating"],
-        "review_text": post["review_text"],
-        "map_link": post.get("map_link"),
-        "likes_count": post["likes_count"],
-        "comments_count": post["comments_count"],
-        "created_at": post["created_at"]
-    }
-
-@app.delete("/api/posts/{post_id}")
-async def delete_post(post_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete a post"""
-    db = get_database()
-    
-    post = await db.posts.find_one({"_id": ObjectId(post_id)})
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    # Check if user owns the post
-    if post["user_id"] != str(current_user["_id"]):
-        raise HTTPException(status_code=403, detail="Not authorized to delete this post")
-    
-    # Delete file
-    if os.path.exists(post["media_url"][1:]):  # Remove leading /
-        os.remove(post["media_url"][1:])
-    
-    await db.posts.delete_one({"_id": ObjectId(post_id)})
-    
-    return {"message": "Post deleted successfully"}
-
-# ==================== FEED ENDPOINT ====================
-
+# ======================================================
+# FEED
+# ======================================================
 @app.get("/api/feed")
 async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
-    """Get feed posts with full image URLs and normalized fields"""
     db = get_database()
-    
     posts = await db.posts.find().sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    
+
     result = []
     for post in posts:
-        # Normalize post ID - handle different field names
-        post_id = str(post.get("_id", ""))
-        if not post_id:
-            print(f"⚠️ Skipping post without _id: {post}")
-            continue
-        
-        # Normalize user ID - handle different field names
-        user_id = post.get("user_id") or post.get("ownerId") or post.get("owner_id") or post.get("userId")
-        if not user_id:
-            print(f"⚠️ Skipping post {post_id} without user_id")
-            continue
-        
-        user = await db.users.find_one({"_id": ObjectId(user_id)}) if user_id else None
-        
-        # Check if current user liked this post
+        post_id = str(post["_id"])
+        user_id = post["user_id"]
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+
         is_liked = await db.likes.find_one({
             "post_id": post_id,
             "user_id": str(current_user["_id"])
         }) is not None
-        
-        # Normalize image URL - handle different field names
-        media_url = (
-            post.get("media_url") or 
-            post.get("image_url") or 
-            post.get("image") or 
-            post.get("thumbnail") or 
-            ""
-        )
-        image_url = media_url
-        
-        # Skip posts without images
-        if not image_url:
-            print(f"⚠️ Skipping post {post_id} without image")
-            continue
-        
-        # Normalize likes and comments counts
-        likes_count = post.get("likes_count", 0)
-        if likes_count is None:
-            likes_count = 0
-            
-        comments_count = post.get("comments_count", 0)
-        if comments_count is None:
-            comments_count = 0
-        
+
+        media_url = post.get("media_url", "")
+
         result.append({
-            "id": post_id,  # Always string, never None
-            "user_id": user_id,  # Always present, never None
-            "username": user["full_name"] if user else "Unknown User",
+            "id": post_id,
+            "user_id": user_id,
+            "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "user_badge": user.get("badge") if user else None,
-            "user_level": user.get("level", 1) if user else 1,
-            "user_title": user.get("title", "Reviewer") if user else "Reviewer",
+            "user_level": user.get("level", 1),
             "media_url": media_url,
-            "image_url": image_url,  # Always present, never None
+            "image_url": media_url,
             "media_type": post.get("media_type", "image"),
             "rating": post.get("rating", 0),
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
-            "likes_count": likes_count,  # Always number, never None
-            "comments_count": comments_count,  # Always number, never None
-            "is_liked_by_user": is_liked,  # Always boolean
-            "is_liked": is_liked,  # Alias for compatibility
-            "created_at": post.get("created_at", datetime.utcnow())
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "is_liked_by_user": is_liked,
+            "created_at": post["created_at"],
         })
-    
+
     return result
 
 # ==================== LIKES ENDPOINTS ====================
