@@ -5,11 +5,12 @@ import os
 import shutil
 from database import get_database
 from routers.auth import get_current_user
+from config import settings
 
 router = APIRouter(prefix="/api/users", tags=["profile_picture"])
 
-# REAL FOLDER WHERE YOUR IMAGES EXIST (verified from server)
-UPLOAD_DIR = "backend/static/uploads/profile_pictures"
+# Use same upload directory as feed images
+UPLOAD_DIR = settings.UPLOAD_DIR  # "static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -41,18 +42,23 @@ async def upload_profile_image(
     old_profile_pic = current_user.get("profile_picture")
 
     if old_profile_pic:
-        # old_profile_pic is like "/legacy-static/uploads/profile_pictures/xxx.jpg"
+        # Handle old paths: /legacy-static/uploads/profile_pictures/xxx.jpg or /api/static/uploads/xxx.jpg
+        old_path = None
         if "/legacy-static/" in old_profile_pic:
-            old_path = old_profile_pic.replace(
-                "/legacy-static/", "backend/static/"
-            )  # convert URL path → local server path
-
-            if os.path.exists(old_path):
-                try:
-                    os.remove(old_path)
-                    print(f"🗑️ Deleted old profile picture: {old_path}")
-                except Exception as e:
-                    print(f"⚠️ Failed to delete old profile picture: {e}")
+            # Old format: /legacy-static/uploads/profile_pictures/xxx.jpg
+            filename = old_profile_pic.split("/")[-1]
+            old_path = os.path.join(UPLOAD_DIR, filename)
+        elif "/api/static/uploads/" in old_profile_pic:
+            # New format: /api/static/uploads/xxx.jpg
+            filename = old_profile_pic.replace("/api/static/uploads/", "")
+            old_path = os.path.join(UPLOAD_DIR, filename)
+        
+        if old_path and os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+                print(f"🗑️ Deleted old profile picture: {old_path}")
+            except Exception as e:
+                print(f"⚠️ Failed to delete old profile picture: {e}")
 
     # -------------------------------------------------------------
     # SAVE NEW FILE
@@ -65,9 +71,9 @@ async def upload_profile_image(
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
 
     # -------------------------------------------------------------
-    # PUBLIC URL (Frontend will use this)
+    # PUBLIC URL (Frontend will use this) - Use same format as feed images
     # -------------------------------------------------------------
-    profile_image_url = f"/legacy-static/uploads/profile_pictures/{filename}"
+    profile_image_url = f"/api/static/uploads/{filename}"
 
     # DB update
     await db.users.update_one(
@@ -92,12 +98,19 @@ async def delete_profile_image(current_user: dict = Depends(get_current_user)):
 
     old_profile_pic = current_user.get("profile_picture")
 
-    if old_profile_pic and "/legacy-static/" in old_profile_pic:
-        old_path = old_profile_pic.replace(
-            "/legacy-static/", "backend/static/"
-        )
-
-        if os.path.exists(old_path):
+    if old_profile_pic:
+        # Handle old paths: /legacy-static/uploads/profile_pictures/xxx.jpg or /api/static/uploads/xxx.jpg
+        old_path = None
+        if "/legacy-static/" in old_profile_pic:
+            # Old format: /legacy-static/uploads/profile_pictures/xxx.jpg
+            filename = old_profile_pic.split("/")[-1]
+            old_path = os.path.join(UPLOAD_DIR, filename)
+        elif "/api/static/uploads/" in old_profile_pic:
+            # New format: /api/static/uploads/xxx.jpg
+            filename = old_profile_pic.replace("/api/static/uploads/", "")
+            old_path = os.path.join(UPLOAD_DIR, filename)
+        
+        if old_path and os.path.exists(old_path):
             try:
                 os.remove(old_path)
                 print(f"🗑️ Deleted profile picture file: {old_path}")

@@ -1,19 +1,22 @@
 {
   "name": "frontend",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
     "optimize-badges": "node ./scripts/optimize-badges.js",
     "prebuild": "npm run optimize-badges",
-    "build:android:production": "eas build --platform android --profile production",
-    "build:android:preview": "eas build --platform android --profile preview",
-    "build:android:dev": "eas build --platform android --profile development"
+    "clean": "node -e \"const fs=require('fs');['.expo','node_modules/.cache','.metro','android','ios','dist','build'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch(e){}})\"",
+    "clean:cache": "npm cache clean --force",
+    "build:android:production": "eas build --platform android --profile production --clear-cache",
+    "build:android:preview": "eas build --platform android --profile preview --clear-cache",
+    "build:android:dev": "eas build --platform android --profile development --clear-cache",
+    "build:android:apk": "npm run clean && eas build --platform android --profile preview --clear-cache"
   },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",

@@ -6,39 +6,7 @@ import { Video } from "expo-av";
 
 import UserAvatar from "./UserAvatar";
 import { likePost, unlikePost } from "../utils/api";
-
-const BACKEND =
-  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
-
-/* ----------------------------------------------------------
-   ✅ UNIVERSAL URL NORMALIZER
------------------------------------------------------------*/
-const normalizeUrl = (url) => {
-  if (!url) return null;
-  
-  // Already absolute URL
-  if (url.startsWith("http")) return url;
-
-  let cleaned = url.trim();
-  
-  // Remove duplicate slashes
-  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
-  
-  // Ensure /api/static/ URLs are preserved correctly
-  if (cleaned.startsWith("/api/")) {
-    return `${BACKEND}${cleaned}`;
-  }
-  
-  // If it starts with /static/, add /api/ prefix
-  if (cleaned.startsWith("/static/")) {
-    cleaned = "/api" + cleaned;
-  }
-  
-  // If it doesn't start with /, add it
-  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
-
-  return `${BACKEND}${cleaned}`;
-};
+import { normalizeMediaUrl } from "../utils/imageUrlFix";
 
 /* ----------------------------------------------------------
    ✅ EXTRACT CLEAN LOCATION FROM GOOGLE MAPS LINK
@@ -104,8 +72,9 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const [isLiked, setIsLiked] = useState(post.is_liked || false);
   const [likesCount, setLikes] = useState(post.likes || 0);
   const [videoPlaying, setVideoPlaying] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
-  const mediaUrl = normalizeUrl(post.media_url);
+  const mediaUrl = normalizeMediaUrl(post.media_url);
   const isVideo =
     post.media_type === "video" ||
     (mediaUrl && (
@@ -196,6 +165,15 @@ export default function FeedCard({ post, onLikeUpdate }) {
               onError={(error) => {
                 console.error("❌ Video playback error in FeedCard:", error);
                 console.error("❌ Video URL:", mediaUrl);
+                
+                // Try to recover by forcing a reload
+                const timestamp = new Date().getTime();
+                const refreshedUrl = mediaUrl.includes('?') 
+                  ? `${mediaUrl}&_t=${timestamp}` 
+                  : `${mediaUrl}?_t=${timestamp}`;
+                  
+                // Set state to trigger re-render with refreshed URL
+                setVideoError(true);
               }}
               onLoadStart={() => {
                 console.log("📹 Video loading in FeedCard:", mediaUrl);
