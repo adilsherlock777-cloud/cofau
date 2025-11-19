@@ -179,12 +179,14 @@ export default function FeedScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+
+        {console.log("userss", user)}
         {/* USER HEADER */}
         {user && (
           <View style={styles.userCard}>
             <View style={styles.userRow}>
               <UserAvatar
-                profilePicture={normalizeProfilePicture(user.profile_picture)}
+                profilePicture={user.profile_picture}
                 username={user.full_name || user.username}
                 size={50}
                 level={user.level}

@@ -117,27 +117,38 @@ export default function ProfileScreen() {
           user = meResponse.data.user || meResponse.data;
           setIsOwnProfile(true);
         } else {
-          const feedResponse = await axios.get(`${API_URL}/feed`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          // Use the proper user profile endpoint to get complete user data including profile_picture
+          try {
+            const userResponse = await axios.get(`${API_URL}/users/${userId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            user = userResponse.data;
+            console.log('✅ Fetched user profile from /users endpoint:', user);
+          } catch (userError: any) {
+            console.log('⚠️ User endpoint failed, trying feed fallback:', userError.message);
+            // Fallback to feed if user endpoint fails
+            const feedResponse = await axios.get(`${API_URL}/feed`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
 
-          const userPost = feedResponse.data.find(
-            (post: any) => post.user_id === userId
-          );
-          if (userPost) {
-            user = {
-              id: userPost.user_id,
-              full_name: userPost.username,
-              // some feeds may send user_profile_picture or profile_picture_url
-              profile_picture:
-                userPost.user_profile_picture ||
-                userPost.profile_picture ||
-                userPost.profile_picture_url,
-              level: userPost.user_level,
-              title: userPost.user_title,
-            };
-          } else {
-            throw new Error('User not found');
+            const userPost = feedResponse.data.find(
+              (post: any) => post.user_id === userId
+            );
+            if (userPost) {
+              user = {
+                id: userPost.user_id,
+                full_name: userPost.username,
+                // some feeds may send user_profile_picture or profile_picture_url
+                profile_picture:
+                  userPost.user_profile_picture ||
+                  userPost.profile_picture ||
+                  userPost.profile_picture_url,
+                level: userPost.user_level,
+                title: userPost.user_title,
+              };
+            } else {
+              throw new Error('User not found');
+            }
           }
         }
       } else {
