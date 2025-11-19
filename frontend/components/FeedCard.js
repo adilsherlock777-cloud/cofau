@@ -6,7 +6,7 @@ import { Video } from "expo-av";
 
 import UserAvatar from "./UserAvatar";
 import { likePost, unlikePost } from "../utils/api";
-import { normalizeMediaUrl } from "../utils/imageUrlFix";
+import { normalizeMediaUrl, normalizeProfilePicture } from "../utils/imageUrlFix";
 
 /* ----------------------------------------------------------
    ✅ EXTRACT CLEAN LOCATION FROM GOOGLE MAPS LINK
@@ -86,12 +86,14 @@ export default function FeedCard({ post, onLikeUpdate }) {
       mediaUrl.toLowerCase().includes("video")
     ));
 
-  const dpRaw =
+  // Normalize profile picture URL to ensure it works in feed
+  const dpRaw = normalizeProfilePicture(
     post.user_profile_picture ||
     post.profile_picture ||
     post.user_profile_pic ||
     post.profile_pic ||
-    post.userProfilePicture;
+    post.userProfilePicture
+  );
 
   const openPost = () => {
     // If it's a video, toggle play/pause instead of navigating

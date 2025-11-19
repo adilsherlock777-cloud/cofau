@@ -723,11 +723,14 @@ async def get_user_profile(user_id: str):
         "email": user["email"],
         "profile_picture": user.get("profile_picture"),
         "bio": user.get("bio"),
-        "points": user["points"],
-        "level": user["level"],
+        "points": user.get("points", 0),
+        "level": user.get("level", 1),
+        "currentPoints": user.get("currentPoints", 0),
+        "requiredPoints": user.get("requiredPoints", 1250),
+        "title": user.get("title", "Reviewer"),
         "badge": user.get("badge"),
-        "followers_count": user["followers_count"],
-        "following_count": user["following_count"],
+        "followers_count": user.get("followers_count", 0),
+        "following_count": user.get("following_count", 0),
         "created_at": user["created_at"]
     }
 
