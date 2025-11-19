@@ -768,18 +768,49 @@ async def update_profile_picture(
     if file_ext not in ["jpg", "jpeg", "png", "gif"]:
         raise HTTPException(status_code=400, detail="Invalid file type")
     
+    # Generate unique filename
+    unique_id = str(ObjectId())
+    filename = f"profile_{str(current_user['_id'])}_{unique_id}.{file_ext}"
+    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+    
+    # Delete old profile picture if exists
+    old_profile_pic = current_user.get("profile_picture")
+    if old_profile_pic:
+        # Handle old paths
+        old_filename = None
+        if "/api/static/uploads/" in old_profile_pic:
+            old_filename = old_profile_pic.replace("/api/static/uploads/", "")
+        elif "/legacy-static/" in old_profile_pic:
+            old_filename = old_profile_pic.split("/")[-1]
+        
+        if old_filename:
+            old_path = os.path.join(settings.UPLOAD_DIR, old_filename)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                    print(f"🗑️ Deleted old profile picture: {old_path}")
+                except Exception as e:
+                    print(f"⚠️ Failed to delete old profile picture: {e}")
+    
     # Save file
-    file_path = f"{settings.UPLOAD_DIR}/profile_{str(current_user['_id'])}_{file.filename}"
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+    
+    # Calculate relative path for URL
+    if os.path.isabs(file_path):
+        relative_path = os.path.relpath(file_path, STATIC_DIR)
+    else:
+        relative_path = file_path.replace(settings.UPLOAD_DIR + os.sep, "").replace(settings.UPLOAD_DIR + "/", "")
+    
+    profile_image_url = f"/api/static/{relative_path}"
     
     # Update user
     await db.users.update_one(
         {"_id": current_user["_id"]},
-        {"$set": {"profile_picture": f"/{file_path}"}}
+        {"$set": {"profile_picture": profile_image_url}}
     )
     
-    return {"message": "Profile picture updated", "profile_picture": f"/{file_path}"}
+    return {"message": "Profile picture updated", "profile_picture": profile_image_url}
 
 
 # ==================== LOGOUT ENDPOINT ====================

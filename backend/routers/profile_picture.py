@@ -9,8 +9,12 @@ from config import settings
 
 router = APIRouter(prefix="/api/users", tags=["profile_picture"])
 
-# Use same upload directory as feed images
-UPLOAD_DIR = settings.UPLOAD_DIR  # "static/uploads"
+# Use same upload directory as feed images - ensure absolute path
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # backend directory
+if not os.path.isabs(settings.UPLOAD_DIR):
+    UPLOAD_DIR = os.path.join(BASE_DIR, settings.UPLOAD_DIR)
+else:
+    UPLOAD_DIR = settings.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
