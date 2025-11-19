@@ -46,7 +46,13 @@ app = FastAPI(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))          # /root/cofau/backend
 STATIC_DIR = os.path.join(BASE_DIR, "static")                  # /root/cofau/backend/static
 
+# Fix UPLOAD_DIR to use absolute path (relative paths cause 404 errors)
+# Convert relative "static/uploads" to absolute path
+if not os.path.isabs(settings.UPLOAD_DIR):
+    settings.UPLOAD_DIR = os.path.join(BASE_DIR, settings.UPLOAD_DIR)
+
 print("STATIC DIRECTORY => ", STATIC_DIR)
+print("UPLOAD DIRECTORY => ", settings.UPLOAD_DIR)
 
 # Mount static files correctly
 app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -120,9 +126,17 @@ async def create_post(
         if "google.com/maps" in map_link or "goo.gl/maps" in map_link:
             clean_map_link = map_link
 
-    # FIX MEDIA PATH
-    relative_path = file_path.replace(settings.UPLOAD_DIR + "/", "")
-    media_url = f"/api/static/uploads/{relative_path}"
+    # FIX MEDIA PATH - Calculate relative path from static directory
+    # file_path is absolute: /root/cofau/backend/static/uploads/filename.jpg
+    # We need: uploads/filename.jpg for URL: /api/static/uploads/filename.jpg
+    if os.path.isabs(file_path):
+        # Get relative path from STATIC_DIR
+        relative_path = os.path.relpath(file_path, STATIC_DIR)
+    else:
+        # Fallback for relative paths
+        relative_path = file_path.replace(settings.UPLOAD_DIR + os.sep, "").replace(settings.UPLOAD_DIR + "/", "")
+    
+    media_url = f"/api/static/{relative_path}"
 
     post_doc = {
         "user_id": str(current_user["_id"]),

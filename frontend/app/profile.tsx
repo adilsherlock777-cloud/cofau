@@ -52,6 +52,8 @@ export default function ProfileScreen() {
   const { token, logout, user: currentUser } = useAuth();
 
   const [userData, setUserData] = useState<any>(null);
+
+  console.log("userDataProfile", userData);
   const [userStats, setUserStats] = useState<any>(null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -527,6 +529,8 @@ export default function ProfileScreen() {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
     const isVideo = mediaUrl?.toLowerCase().endsWith('.mp4');
 
+
+    console.log("mediaUrl", mediaUrl);
     return (
       <TouchableOpacity
         style={styles.gridItem}
