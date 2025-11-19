@@ -11,46 +11,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import axios from "axios";
-import Constants from "expo-constants";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
-
-/* --------------------------------------------------
-   BACKEND URL
--------------------------------------------------- */
-const BACKEND_URL =
-  Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
-  "https://backend.cofau.com";
-
-/* --------------------------------------------------
-   FIXED UNIVERSAL URL NORMALIZER
--------------------------------------------------- */
-const normalizeUrl = (url) => {
-  if (!url) return null;
-
-  if (typeof url === "object") {
-    url =
-      url.profile_picture ||
-      url.profile_pic ||
-      url.user_profile_picture ||
-      url.profilePicture ||
-      null;
-  }
-
-  if (!url) return null;
-
-  if (url.startsWith("http")) return url;
-
-  let cleaned = url.replace(/([^:]\/)\/+/g, "$1");
-
-  if (cleaned.startsWith("backend/")) {
-    cleaned = cleaned.replace("backend/", "/");
-  }
-
-  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
-
-  return `${BACKEND_URL}${cleaned}`;
-};
+import { normalizeMediaUrl, normalizeProfilePicture, normalizeStoryUrl, BACKEND_URL } from "../utils/imageUrlFix";
 
 export default function StoriesBar() {
   const router = useRouter();
@@ -80,11 +43,11 @@ export default function StoriesBar() {
           ...u.user,
           id: u.user.id || u.user._id,
           username: u.user.username || u.user.full_name || "User",
-          profile_picture: normalizeUrl(u.user.profile_picture),
+          profile_picture: normalizeProfilePicture(u.user.profile_picture),
         },
         stories: u.stories.map((s) => ({
           ...s,
-          media_url: normalizeUrl(s.media_url),
+          media_url: normalizeStoryUrl(s.media_url),
           media_type: s.media_type || s.type || "image", // ★ FIX 1 — Needed for StoryViewer
         })),
       }));
@@ -133,7 +96,7 @@ export default function StoriesBar() {
         <TouchableOpacity style={styles.storyItem} onPress={handleAddStory}>
           <View style={styles.yourStoryContainer}>
             <UserAvatar
-              profilePicture={normalizeUrl(user.profile_picture)}
+              profilePicture={normalizeProfilePicture(user.profile_picture)}
               username={user.full_name}
               size={60}
               showLevelBadge={false}
@@ -165,7 +128,7 @@ export default function StoriesBar() {
             >
               <View style={styles.storyInnerWhiteRing}>
                 <UserAvatar
-                  profilePicture={normalizeUrl(u.user.profile_picture)}
+                  profilePicture={normalizeProfilePicture(u.user.profile_picture)}
                   username={u.user.username}
                   size={58}
                 />

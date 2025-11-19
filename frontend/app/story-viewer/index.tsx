@@ -17,52 +17,11 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
+import { normalizeStoryUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Backend root
-const BACKEND_URL =
-  Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
-  'https://backend.cofau.com';
-
 const API_URL = `${BACKEND_URL}/api`;
-
-/* ----------------------------------------------------------
-   ✅ FINAL UNIVERSAL URL NORMALIZER — FIXES ALL STORY URL PROBLEMS
------------------------------------------------------------*/
-const fixUrl = (url) => {
-  if (!url) return null;
-
-  // Already absolute URL
-  if (url.startsWith("http")) return url;
-
-  let cleaned = url.trim();
-
-  // REMOVE accidental /api/api/ duplication
-  cleaned = cleaned.replace(/\/api\/api\//g, "/api/");
-
-  // FIX missing /api/ prefix if server returns static/... or /static/...
-  if (cleaned.startsWith("static/") || cleaned.startsWith("/static/")) {
-    cleaned = "/api/" + cleaned.replace(/^\//, "");
-  }
-
-  // Ensure it starts with /api/static/ for story URLs
-  if (cleaned.includes("stories") && !cleaned.startsWith("/api/static/")) {
-    if (cleaned.startsWith("/static/stories/")) {
-      cleaned = "/api" + cleaned;
-    } else if (cleaned.startsWith("stories/")) {
-      cleaned = "/api/static/" + cleaned;
-    }
-  }
-
-  // Add leading slash if missing
-  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
-
-  const finalUrl = `${BACKEND_URL}${cleaned}`;
-  console.log("🟦 STORY URL FIX:", url, "➡️", finalUrl);
-
-  return finalUrl;
-};
 
 export default function StoryViewerScreen() {
   const router = useRouter();
@@ -91,7 +50,7 @@ export default function StoryViewerScreen() {
 
       // Normalize media URLs and ensure media_type is set
       const fixedStories = parsedStories.map((s, idx) => {
-        const fixedUrl = fixUrl(s.media_url);
+        const fixedUrl = normalizeStoryUrl(s.media_url);
         
         // Better media type detection
         let mediaType = s.media_type;
@@ -122,7 +81,7 @@ export default function StoryViewerScreen() {
       // Fix DP
       const fixedUser = {
         ...parsedUser,
-        profile_picture: fixUrl(parsedUser.profile_picture),
+        profile_picture: normalizeProfilePicture(parsedUser.profile_picture),
       };
 
       setStories(fixedStories);
@@ -294,7 +253,16 @@ export default function StoryViewerScreen() {
             onError={(error) => {
               console.error("❌ Video playback error:", error);
               console.error("❌ Failed video URL:", currentStory.media_url);
-              // Try to load as image as fallback
+              
+              // Try to reload with timestamp to bypass cache
+              const timestamp = new Date().getTime();
+              const refreshedUrl = currentStory.media_url.includes('?') 
+                ? `${currentStory.media_url}&_t=${timestamp}` 
+                : `${currentStory.media_url}?_t=${timestamp}`;
+              
+              console.log("🔄 Refreshed URL:", refreshedUrl);
+              
+              // If still failing, try as image
               console.log("🔄 Trying as image instead...");
               setActualMediaType("image");
             }}

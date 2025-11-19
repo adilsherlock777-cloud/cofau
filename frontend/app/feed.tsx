@@ -18,42 +18,16 @@ import FeedCard from "../components/FeedCard";
 import UserAvatar from "../components/UserAvatar";
 import StoriesBar from "../components/StoriesBar";
 import { fetchUnreadCount } from "../utils/notifications";
+import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
 
 // BASE BACKEND URL
-const BACKEND =
-  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
-
-/* -----------------------------------------------------
-   ✅ UNIVERSAL MEDIA/DP URL NORMALIZER (SAFE)
-   (same pattern as FeedCard, StoryViewer, StoriesBar)
------------------------------------------------------ */
-const normalizeUrl = (url: string | null | undefined) => {
-  if (!url) return null;
-
-  // Already absolute
-  if (url.startsWith("http")) return url;
-
-  let cleaned = url.trim();
-
-  // Remove duplicated slashes, but keep http(s):// intact
-  cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
-
-  // Handle paths like backend/static/uploads/...
-  cleaned = cleaned.replace("backend/", "/");
-
-  // Ensure leading slash
-  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
-
-  const finalUrl = `${BACKEND}${cleaned}`;
-  // console.log("FEED normalizeUrl:", url, "➡", finalUrl);
-  return finalUrl;
-};
+const BACKEND = BACKEND_URL;
 
 /* -----------------------------------------------------
    ✅ FIX DP FOR FEED POSTS (all possible fields)
 ----------------------------------------------------- */
 const getPostDP = (post: any) => {
-  return normalizeUrl(
+  return normalizeProfilePicture(
     post.user_profile_picture ||
       post.profile_picture ||
       post.profile_picture_url ||
@@ -131,7 +105,7 @@ export default function FeedScreen() {
         is_liked: post.is_liked_by_user,
 
         // ✅ media URL normalized safely
-        media_url: normalizeUrl(post.image_url || post.media_url),
+        media_url: normalizeMediaUrl(post.image_url || post.media_url),
         media_type: post.media_type,
 
         // ✅ keep raw timestamp; FeedCard formats as "2h ago"
@@ -210,7 +184,7 @@ export default function FeedScreen() {
           <View style={styles.userCard}>
             <View style={styles.userRow}>
               <UserAvatar
-                profilePicture={normalizeUrl(user.profile_picture)}
+                profilePicture={normalizeProfilePicture(user.profile_picture)}
                 username={user.full_name || user.username}
                 size={50}
                 level={user.level}

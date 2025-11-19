@@ -127,6 +127,7 @@ async def create_post(
     post_doc = {
         "user_id": str(current_user["_id"]),
         "media_url": media_url,
+        "image_url": media_url if media_type == "image" else None,  # Only set image_url for images
         "media_type": media_type,
         "rating": rating,
         "review_text": review_text,
@@ -193,6 +194,10 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
         }) is not None
 
         media_url = post.get("media_url", "")
+        media_type = post.get("media_type", "image")
+        
+        # Only set image_url for images, not videos
+        image_url = post.get("image_url") if media_type == "image" else None
 
         result.append({
             "id": post_id,
@@ -202,8 +207,8 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "user_badge": user.get("badge") if user else None,
             "user_level": user.get("level", 1),
             "media_url": media_url,
-            "image_url": media_url,
-            "media_type": post.get("media_type", "image"),
+            "image_url": image_url,  # Only for images, None for videos
+            "media_type": media_type,
             "rating": post.get("rating", 0),
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
@@ -365,13 +370,16 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "user_id": str(current_user["_id"])
         }) is not None
         
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
-            "image_url": post.get("media_url", ""),
+            "image_url": image_url,  # Only for images, None for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -402,13 +410,16 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "user_id": str(current_user["_id"])
         }) is not None
         
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
-            "image_url": post.get("media_url", ""),
+            "image_url": image_url,  # Only for images, None for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -477,13 +488,16 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
             "user_id": str(current_user["_id"])
         }) is not None
         
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
-            "image_url": post.get("media_url", ""),
+            "image_url": image_url,  # Only for images, None for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -514,13 +528,16 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "user_id": str(current_user["_id"])
         }) is not None
         
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
-            "image_url": post.get("media_url", ""),
+            "image_url": image_url,  # Only for images, None for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -549,13 +566,16 @@ async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: 
             "user_id": str(current_user["_id"])
         }) is not None
         
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
-            "image_url": post.get("media_url", ""),
+            "image_url": image_url,  # Only for images, None for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -807,12 +827,15 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
     for post in posts:
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
         
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "media_url": post.get("media_url", ""),
-            "image_url": post.get("media_url", ""),
+            "image_url": image_url,  # Only for images, None for videos
             "media_type": post.get("media_type", "photo"),
             "rating": post["rating"],
             "review_text": post["review_text"],
@@ -843,12 +866,15 @@ async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = 20):
     for post in posts:
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
         
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "media_url": post.get("media_url", ""),
-            "image_url": post.get("media_url", ""),
+            "image_url": image_url,  # Only for images, None for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "likes_count": post["likes_count"],

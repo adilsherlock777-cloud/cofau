@@ -8,10 +8,12 @@ from typing import List
 
 from database import get_database
 from routers.auth import get_current_user
+from config import settings
 
 router = APIRouter(prefix="/api/stories", tags=["stories"])
 
-UPLOAD_DIR = "/app/backend/static/stories"
+# Use same upload directory as feed images
+UPLOAD_DIR = settings.UPLOAD_DIR  # "static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -22,7 +24,7 @@ async def upload_story(
 ):
     """
     Upload a new story (image or video)
-    - Saves file to /static/stories/
+    - Saves file to static/uploads/ (same as feed images)
     - Sets expiration to 24 hours from now
     - Returns story object
     """
@@ -52,7 +54,7 @@ async def upload_story(
         
         story_doc = {
             "user_id": str(current_user["_id"]),
-            "media_url": f"/api/static/stories/{unique_filename}",
+            "media_url": f"/api/static/uploads/{unique_filename}",
             "media_type": media_type,
             "created_at": now,
             "expires_at": expires_at,
@@ -224,10 +226,19 @@ async def delete_story(
         
         # Delete file from filesystem
         if story.get("media_url"):
-            file_path = story["media_url"].replace("/api/static/stories/", "")
-            full_path = os.path.join(UPLOAD_DIR, file_path)
-            if os.path.exists(full_path):
-                os.remove(full_path)
+            # Handle both old and new URL formats
+            filename = None
+            if "/api/static/stories/" in story["media_url"]:
+                # Old format: /api/static/stories/filename
+                filename = story["media_url"].replace("/api/static/stories/", "")
+            elif "/api/static/uploads/" in story["media_url"]:
+                # New format: /api/static/uploads/filename
+                filename = story["media_url"].replace("/api/static/uploads/", "")
+            
+            if filename:
+                full_path = os.path.join(UPLOAD_DIR, filename)
+                if os.path.exists(full_path):
+                    os.remove(full_path)
         
         # Delete from database
         await db.stories.delete_one({"_id": ObjectId(story_id)})
@@ -260,10 +271,19 @@ async def cleanup_expired_stories(
         for story in expired_stories:
             # Delete file
             if story.get("media_url"):
-                file_path = story["media_url"].replace("/api/static/stories/", "")
-                full_path = os.path.join(UPLOAD_DIR, file_path)
-                if os.path.exists(full_path):
-                    os.remove(full_path)
+                # Handle both old and new URL formats
+                filename = None
+                if "/api/static/stories/" in story["media_url"]:
+                    # Old format: /api/static/stories/filename
+                    filename = story["media_url"].replace("/api/static/stories/", "")
+                elif "/api/static/uploads/" in story["media_url"]:
+                    # New format: /api/static/uploads/filename
+                    filename = story["media_url"].replace("/api/static/uploads/", "")
+                
+                if filename:
+                    full_path = os.path.join(UPLOAD_DIR, filename)
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
             
             # Delete from database
             await db.stories.delete_one({"_id": story["_id"]})
