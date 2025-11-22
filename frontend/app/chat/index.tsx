@@ -8,6 +8,16 @@ import UserAvatar from "../../components/UserAvatar";
 const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 const API_URL = `${API_BASE}/api`;
 
+// Fix URL helper for profile pics
+const fixUrl = (url?: string | null) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+
+  url = url.replace(/\/+/g, "/");
+  if (url.startsWith("/api")) return `${API_BASE}${url}`;
+  return `${API_BASE}${url.startsWith("/") ? url : "/" + url}`;
+};
+
 export default function ChatListScreen() {
   const { token } = useAuth();
   const router = useRouter();
@@ -15,28 +25,78 @@ export default function ChatListScreen() {
 
   useEffect(() => {
     if (!token) return;
-    axios.get(`${API_URL}/chat/list`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => setItems(res.data))
-      .catch((err) => console.log("Chat list error", err?.response?.data || err));
+
+    axios
+      .get(`${API_URL}/chat/list`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        const mapped = (res.data || []).map((it: any) => ({
+          ...it,
+          other_user_profile_picture: fixUrl(it.other_user_profile_picture),
+        }));
+        setItems(mapped);
+      })
+      .catch((err) =>
+        console.log("Chat list error", err?.response?.data || err?.message)
+      );
   }, [token]);
 
-  const renderItem = ({ item }: { item: any }) => (
+  const renderItem = ({ item }: any) => (
     <TouchableOpacity
       style={styles.item}
-      onPress={() => router.push({ pathname: "/chat/[userId]", params: { userId: item.other_user_id, fullName: item.other_user_name } })}
+      onPress={() =>
+        router.push({
+          pathname: "/chat/[userId]",
+          params: {
+            userId: item.other_user_id,
+            fullName: item.other_user_name || "User",
+          },
+        })
+      }
     >
-      <UserAvatar profilePicture={item.other_user_profile_picture} username={item.other_user_name} size={40} />
+      <UserAvatar
+        profilePicture={item.other_user_profile_picture}
+        username={item.other_user_name}
+        size={45}
+      />
+
       <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.name}>{item.other_user_name}</Text>
-          <Text numberOfLines={1} style={styles.preview}>{item.last_from_me ? "You: " : ""}{item.last_message}</Text>
+        <Text style={styles.name}>{item.other_user_name || "Unknown User"}</Text>
+
+        <Text numberOfLines={1} style={styles.preview}>
+          {item.last_from_me ? "You: " : ""}
+          {item.last_message || ""}
+        </Text>
       </View>
-      <Text style={styles.time}>{new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+
+      {/* Time fix to avoid crash on invalid timestamps */}
+      <Text style={styles.time}>
+        {item.created_at
+          ? new Date(item.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : ""}
+      </Text>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <FlatList data={items} keyExtractor={(item) => item.other_user_id} renderItem={renderItem} ItemSeparatorComponent={() => <View style={styles.sep} />} />
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.other_user_id}
+        renderItem={renderItem}
+        ItemSeparatorComponent={() => <View style={styles.sep} />}
+        ListEmptyComponent={() => (
+          <View style={{ padding: 20 }}>
+            <Text style={{ textAlign: "center", color: "#999" }}>
+              No chats yet.
+            </Text>
+          </View>
+        )}
+      />
     </View>
   );
 }
