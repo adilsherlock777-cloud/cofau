@@ -13,103 +13,75 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 
-const API_BASE =
-  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
-// Convert http/https → ws/wss
+// Convert https → wss
 const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 export default function ChatScreen() {
   const { user, token } = useAuth();
-  const { userId, fullName } = useLocalSearchParams<{
-    userId: string;
-    fullName?: string;
-  }>();
+  const { userId, fullName } = useLocalSearchParams();
   const router = useRouter();
 
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const wsRef = useRef<WebSocket | null>(null);
-  const flatListRef = useRef<FlatList<any>>(null);
+  const wsRef = useRef(null);
+  const flatListRef = useRef(null);
 
-  const currentUserId = user?.id || (user as any)?._id;
+  const currentUserId = user?.id || user?._id;
 
-  // 🟢 CONNECT TO BACKEND WEBSOCKET
   useEffect(() => {
-    if (!token || !userId) {
-      console.log("⚠️ Missing token or userId, not opening WS");
-      return;
-    }
+    if (!token || !userId) return;
 
-    // ✅ MUST MATCH: router = APIRouter(prefix="/api/chat") + @router.websocket("/ws/{other_user_id}")
-    const wsUrl = `${WS_BASE}/api/chat/ws/${userId}?token=${encodeURIComponent(
-      token as string
-    )}`;
+    // CORRECT URL — matches backend route `/ws/chat/{id}`
+    const wsUrl = `${WS_BASE}/ws/chat/${userId}?token=${encodeURIComponent(token)}`;
 
-    console.log("🔗 Connecting WebSocket to:", wsUrl);
+    console.log("🔗 Connecting WS:", wsUrl);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log("🟢 WebSocket connected");
-    };
+    ws.onopen = () => console.log("🟢 WebSocket Connected");
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
 
         if (data.type === "history") {
-          // Initial history from backend
           setMessages(data.messages || []);
         } else if (data.type === "message") {
-          // New live message
           setMessages((prev) => [...prev, data]);
         }
 
-        // Scroll to bottom
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       } catch (e) {
-        console.log("❌ WS parse error", e);
+        console.log("WS parse error:", e);
       }
     };
 
-    ws.onerror = (err) => {
-      console.log("❌ WS error", err);
-    };
-
-    ws.onclose = (e) => {
-      console.log("🔴 WS closed", e?.code, e?.reason);
-    };
+    ws.onerror = (err) => console.log("❌ WS error:", err);
+    ws.onclose = () => console.log("🔴 WS closed");
 
     return () => {
-      console.log("🔌 Cleaning up WS (closing)");
-      try {
-        ws.close();
-      } catch (e) {
-        console.log("WS close error", e);
-      }
+      console.log("🔌 WS cleanup");
+      ws.close();
     };
   }, [token, userId]);
 
-  // 🟣 SEND MESSAGE
   const sendMsg = () => {
-    const text = input.trim();
-    if (!text) return;
-
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.log("⚠️ WebSocket not ready, cannot send");
+    if (!input.trim()) return;
+    if (!wsRef.current || wsRef.current.readyState !== 1) {
+      console.log("WS not ready");
       return;
     }
 
-    wsRef.current.send(JSON.stringify({ message: text }));
+    wsRef.current.send(JSON.stringify({ message: input.trim() }));
     setInput("");
   };
 
-  // 💬 RENDER EACH MESSAGE BUBBLE
-  const renderItem = ({ item }: any) => {
+  const renderItem = ({ item }) => {
     const isMe = item.from_user === currentUserId;
 
     return (
@@ -120,7 +92,6 @@ export default function ChatScreen() {
         ]}
       >
         <Text style={styles.msg}>{item.message}</Text>
-
         <Text style={styles.time}>
           {new Date(item.created_at || Date.now()).toLocaleTimeString([], {
             hour: "2-digit",
@@ -137,7 +108,6 @@ export default function ChatScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={90}
     >
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={26} color="#000" />
@@ -145,7 +115,6 @@ export default function ChatScreen() {
         <Text style={styles.headerTitle}>{fullName || "Chat"}</Text>
       </View>
 
-      {/* CHAT LIST */}
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -154,7 +123,6 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messageList}
       />
 
-      {/* INPUT BOX */}
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -177,10 +145,8 @@ export default function ChatScreen() {
   );
 }
 
-// 🎨 STYLES
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -188,44 +154,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#eee",
   },
-  headerTitle: {
-    marginLeft: 12,
-    fontSize: 18,
-    fontWeight: "600",
-  },
-
-  messageList: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-
-  bubble: {
-    maxWidth: "75%",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginVertical: 4,
-  },
-  bubbleLeft: {
-    alignSelf: "flex-start",
-    backgroundColor: "#f2f2f2",
-  },
-  bubbleRight: {
-    alignSelf: "flex-end",
-    backgroundColor: "#4dd0e1",
-  },
+  headerTitle: { marginLeft: 12, fontSize: 18, fontWeight: "600" },
+  messageList: { paddingHorizontal: 12, paddingVertical: 8 },
+  bubble: { maxWidth: "75%", padding: 10, borderRadius: 15, marginVertical: 4 },
+  bubbleLeft: { alignSelf: "flex-start", backgroundColor: "#f2f2f2" },
+  bubbleRight: { alignSelf: "flex-end", backgroundColor: "#4dd0e1" },
   msg: { fontSize: 15 },
-  time: {
-    fontSize: 10,
-    marginTop: 4,
-    textAlign: "right",
-    color: "#555",
-  },
-
+  time: { fontSize: 10, marginTop: 4, color: "#555", textAlign: "right" },
   inputRow: {
     flexDirection: "row",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    padding: 10,
     borderTopWidth: 1,
     borderColor: "#eee",
     alignItems: "center",
@@ -247,4 +185,3 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
-
