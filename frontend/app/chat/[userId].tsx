@@ -33,10 +33,10 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!token || !userId) return;
 
-    // CORRECT URL — matches backend route `/ws/chat/{id}`
-    const wsUrl = `${WS_BASE}/ws/chat/${userId}?token=${encodeURIComponent(token)}`;
+    // ✅ THIS IS THE REAL WORKING ROUTE
+    const wsUrl = `${WS_BASE}/api/chat/ws/${userId}?token=${encodeURIComponent(token)}`;
 
-    console.log("🔗 Connecting WS:", wsUrl);
+    console.log("🔗 Connecting WebSocket:", wsUrl);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -55,9 +55,9 @@ export default function ChatScreen() {
 
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+        }, 80);
       } catch (e) {
-        console.log("WS parse error:", e);
+        console.log("❌ WS parse error:", e);
       }
     };
 
@@ -65,25 +65,26 @@ export default function ChatScreen() {
     ws.onclose = () => console.log("🔴 WS closed");
 
     return () => {
-      console.log("🔌 WS cleanup");
+      console.log("🔌 Cleaning WebSocket");
       ws.close();
     };
   }, [token, userId]);
 
   const sendMsg = () => {
-    if (!input.trim()) return;
+    const text = input.trim();
+    if (!text) return;
+
     if (!wsRef.current || wsRef.current.readyState !== 1) {
       console.log("WS not ready");
       return;
     }
 
-    wsRef.current.send(JSON.stringify({ message: input.trim() }));
+    wsRef.current.send(JSON.stringify({ message: text }));
     setInput("");
   };
 
   const renderItem = ({ item }) => {
     const isMe = item.from_user === currentUserId;
-
     return (
       <View
         style={[
@@ -93,7 +94,7 @@ export default function ChatScreen() {
       >
         <Text style={styles.msg}>{item.message}</Text>
         <Text style={styles.time}>
-          {new Date(item.created_at || Date.now()).toLocaleTimeString([], {
+          {new Date(item.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}
