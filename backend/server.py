@@ -18,6 +18,7 @@ from routers.follow import router as follow_router
 from routers.profile_picture import router as profile_picture_router
 from routers.stories import router as stories_router
 from routers.locations import router as locations_router
+from routers.chat import router as chat_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
@@ -82,6 +83,7 @@ app.include_router(follow_router)
 app.include_router(profile_picture_router)
 app.include_router(stories_router)
 app.include_router(locations_router)
+app.include_router(chat_router) 
 
 
 @app.get("/api")
