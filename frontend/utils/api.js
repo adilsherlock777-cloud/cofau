@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 const API_URL = `${API_BASE_URL}/api`;
@@ -28,6 +29,9 @@ export const createPost = async (postData) => {
     formData.append('review_text', postData.review_text);
     if (postData.map_link) {
       formData.append('map_link', postData.map_link);
+    }
+    if (postData.location_name) {
+      formData.append('location_name', postData.location_name);
     }
     if (postData.media_type) {
       formData.append('media_type', postData.media_type);   // 👈 NEW
@@ -106,7 +110,15 @@ export const unlikePost = async (postId) => {
  */
 export const getComments = async (postId) => {
   try {
-    const response = await axios.get(`${API_URL}/posts/${postId}/comments`);
+    // Normalize postId
+    const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
+    
+    if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
+      throw new Error('Invalid post ID');
+    }
+    
+    console.log('📥 Fetching comments for postId:', normalizedPostId);
+    const response = await axios.get(`${API_URL}/posts/${normalizedPostId}/comments`);
     return response.data;
   } catch (error) {
     console.error('❌ Error fetching comments:', error.response?.data || error.message);
@@ -116,26 +128,53 @@ export const getComments = async (postId) => {
 
 /**
  * Add a comment to a post
+ * @param {string} postId - The post ID
+ * @param {string} commentText - The comment text
+ * @param {string} token - Optional token (if not provided, uses axios defaults)
  */
-export const addComment = async (postId, commentText) => {
+export const addComment = async (postId, commentText, token = null) => {
+  // Validate and normalize postId (outside try block so it's available in catch)
+  if (!postId) {
+    throw new Error('Post ID is required');
+  }
+  
+  // Ensure postId is a string (handle array case from expo-router)
+  const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
+  
+  if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
+    throw new Error('Invalid post ID');
+  }
+  
   try {
     const formData = new FormData();
-    formData.append('comment_text', commentText);
+    formData.append('comment_text', commentText.trim());
     
-    // Get authorization token from axios defaults
-    const authToken = axios.defaults.headers.common['Authorization'];
+    // Get authorization token - prefer passed token, fallback to axios defaults
+    const authToken = token 
+      ? `Bearer ${token}` 
+      : axios.defaults.headers.common['Authorization'];
     
-    // Build headers - don't set Content-Type manually for FormData
-    // Let the browser/React Native set it with the boundary parameter
-    const headers = {};
-    if (authToken) {
-      headers['Authorization'] = authToken;
+    if (!authToken) {
+      throw new Error('No authorization token found. Please login again.');
     }
     
-    console.log('📤 Adding comment:', { postId, commentText: commentText.substring(0, 50) });
+    console.log('📤 Adding comment:', { 
+      postId: normalizedPostId, 
+      originalPostId: postId,
+      commentText: commentText.substring(0, 50),
+      tokenSource: token ? 'passed' : 'axios defaults'
+    });
     console.log('🔑 Auth token present:', !!authToken);
+    console.log('🌐 Platform:', Platform.OS);
+    console.log('🌐 API URL:', `${API_URL}/posts/${normalizedPostId}/comment`);
     
-    const response = await axios.post(`${API_URL}/posts/${postId}/comment`, formData, {
+    // Build headers - match post-details implementation exactly
+    const headers = {
+      'Authorization': authToken,
+      'Content-Type': 'multipart/form-data', // Always set like post-details does
+    };
+    
+    const response = await axios.post(`${API_URL}/posts/${normalizedPostId}/comment`, formData, {
       headers,
     });
     
@@ -144,6 +183,7 @@ export const addComment = async (postId, commentText) => {
   } catch (error) {
     console.error('❌ Error adding comment:', error.response?.data || error.message);
     console.error('❌ Error status:', error.response?.status);
+    console.error('❌ Error URL:', `${API_URL}/posts/${normalizedPostId}/comment`);
     console.error('❌ Full error:', error);
     throw error;
   }

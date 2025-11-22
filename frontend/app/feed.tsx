@@ -40,7 +40,7 @@ const getPostDP = (post: any) => {
 
 export default function FeedScreen() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, refreshUser } = useAuth();
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +56,10 @@ export default function FeedScreen() {
   useFocusEffect(
     React.useCallback(() => {
       loadUnreadCount();
+      // Refresh user data when screen comes into focus to show updated points
+      refreshUser();
+      // Refresh feed when returning to screen (e.g., from comments) to update counts
+      fetchFeed();
     }, [token])
   );
 
@@ -99,6 +103,8 @@ export default function FeedScreen() {
 
         location: extractLocation(post.map_link),
         mapsUrl: post.map_link,
+        map_link: post.map_link,
+        location_name: post.location_name,
 
         likes: post.likes_count,
         comments: post.comments_count,
@@ -191,6 +197,7 @@ export default function FeedScreen() {
                 size={50}
                 level={user.level}
                 showLevelBadge
+                style={{}}
               />
 
               <View style={styles.userInfo}>
@@ -234,7 +241,11 @@ export default function FeedScreen() {
         {!loading &&
           !error &&
           feedPosts.map((post) => (
-            <FeedCard key={post.id} post={post} onLikeUpdate={fetchFeed} />
+            <FeedCard 
+              key={post.id} 
+              post={post} 
+              onLikeUpdate={fetchFeed}
+            />
           ))}
 
         <View style={{ height: 40 }} />

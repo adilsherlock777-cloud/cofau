@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getComments, addComment } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
 
 // 🔥 SAME universal DP normalizer we applied everywhere
@@ -41,7 +43,11 @@ const normalizeDP = (input: any) => {
 
 export default function CommentsScreen() {
   const router = useRouter();
-  const { postId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const { token } = useAuth();
+  
+  // Handle postId - it might be a string or array from expo-router
+  const postId = Array.isArray(params.postId) ? params.postId[0] : params.postId;
 
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
@@ -49,13 +55,33 @@ export default function CommentsScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchComments();
+    if (postId) {
+      console.log('📝 CommentsScreen - postId:', postId, typeof postId);
+      fetchComments();
+    } else {
+      console.error('❌ CommentsScreen - No postId found in params:', params);
+      Alert.alert('Error', 'Post ID is missing. Please go back and try again.');
+    }
   }, [postId]);
 
   const fetchComments = async () => {
+    if (!postId) {
+      console.error('❌ fetchComments - No postId available');
+      return;
+    }
+    
+    // Normalize postId
+    const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
+    
+    if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
+      console.error('❌ fetchComments - Invalid postId:', postId, 'normalized:', normalizedPostId);
+      return;
+    }
+    
     try {
       setLoading(true);
-      const data = await getComments(postId);
+      console.log('📤 Fetching comments for postId:', normalizedPostId);
+      const data = await getComments(normalizedPostId);
 
       // 🔥 Normalize DP inside every comment
       const fixed = data.map((c) => ({
@@ -79,17 +105,30 @@ export default function CommentsScreen() {
 
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
+    
+    // Normalize postId again to ensure it's correct
+    const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
+    
+    if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
+      Alert.alert('Error', 'Post ID is missing or invalid. Please go back and try again.');
+      console.error('❌ Invalid postId in handleAddComment:', postId, 'normalized:', normalizedPostId);
+      return;
+    }
 
     setSubmitting(true);
     try {
-      await addComment(postId, commentText);
+      console.log('📤 Submitting comment for postId:', normalizedPostId);
+      // Use addComment with token explicitly, or use direct axios call like post-details
+      await addComment(normalizedPostId, commentText, token);
       setCommentText('');
       await fetchComments();
     } catch (error) {
-      console.error('Error adding comment:', error);
-      if (Platform.OS === 'web') {
-        window.alert('Failed to add comment');
-      }
+      console.error('❌ Error adding comment:', error);
+      const errorMessage = error?.response?.data?.detail || 
+                          error?.message || 
+                          'Failed to add comment. Please check your connection and try again.';
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setSubmitting(false);
     }

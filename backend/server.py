@@ -97,6 +97,7 @@ async def create_post(
     rating: int = Form(...),
     review_text: str = Form(...),
     map_link: str = Form(None),
+    location_name: str = Form(None),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -146,6 +147,7 @@ async def create_post(
         "rating": rating,
         "review_text": review_text,
         "map_link": clean_map_link,
+        "location_name": location_name.strip() if location_name else None,
         "likes_count": 0,
         "comments_count": 0,
         "popular_photos": [],
@@ -226,6 +228,7 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "rating": post.get("rating", 0),
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),  # Add location_name
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,

@@ -248,7 +248,7 @@ export default function FeedCard({ post, onLikeUpdate }) {
           <TouchableOpacity style={styles.locationButton} onPress={handleOpenMap}>
             <Ionicons name="location" size={18} color="#4ECDC4" />
             <Text style={styles.locationText}>
-              {extractLocationName(post.map_link)}
+              {post.location_name || extractLocationName(post.map_link)}
             </Text>
             <Ionicons name="chevron-forward" size={18} color="#4ECDC4" />
           </TouchableOpacity>
