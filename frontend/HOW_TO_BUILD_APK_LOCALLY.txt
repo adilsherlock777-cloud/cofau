@@ -1,0 +1,68 @@
+===========================================
+HOW TO BUILD APK LOCALLY (NO EXPO CLOUD)
+===========================================
+
+STEP-BY-STEP INSTRUCTIONS:
+---------------------------
+
+1. Open PowerShell or Command Prompt
+
+2. Navigate to frontend directory:
+   cd frontend
+
+3. Navigate to android directory:
+   cd android
+
+4. Build the Release APK:
+   .\gradlew.bat assembleRelease
+
+5. Wait for build to complete (may take 5-10 minutes)
+
+6. Find your APK file at:
+   D:\cofau-main\frontend\android\app\build\outputs\apk\release\app-release.apk
+
+
+===========================================
+APK LOCATION:
+===========================================
+
+Full Path:
+D:\cofau-main\frontend\android\app\build\outputs\apk\release\app-release.apk
+
+Relative Path (from frontend folder):
+android\app\build\outputs\apk\release\app-release.apk
+
+
+===========================================
+QUICK COMMANDS (Copy & Paste):
+===========================================
+
+cd frontend
+cd android
+.\gradlew.bat assembleRelease
+
+
+===========================================
+NOTES:
+===========================================
+
+- This builds locally on your computer (no Expo cloud needed)
+- Build time: 5-10 minutes depending on your system
+- The APK will be signed with debug keystore
+- You can install this APK directly on Android devices
+- File size: ~30-50 MB typically
+
+
+===========================================
+TROUBLESHOOTING:
+===========================================
+
+If build fails:
+1. Make sure Java JDK is installed
+2. Make sure Android SDK is installed
+3. Check that ANDROID_HOME environment variable is set
+4. Try: .\gradlew.bat clean assembleRelease
+
+
+===========================================
+
