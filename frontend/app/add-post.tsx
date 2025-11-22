@@ -18,10 +18,12 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { createPost } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function AddPostScreen() {
   const router = useRouter();
   const { showLevelUpAnimation } = useLevelAnimation();
+  const { refreshUser } = useAuth();
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
@@ -178,6 +180,7 @@ export default function AddPostScreen() {
         rating: numericRating,
         review_text: review.trim(),
         map_link: mapsLink.trim(),         // FINAL MAP LINK
+        location_name: locationName.trim(), // LOCATION NAME
         file: fileToUpload,
         media_type: mediaType,
       };
@@ -186,13 +189,24 @@ export default function AddPostScreen() {
 
       setLoading(false);
 
-      if (result.leveledUp) {
-        showLevelUpAnimation(result.newLevel);
+      // Refresh user data immediately to show updated points
+      await refreshUser();
+
+      // Check for level up in the level_update object
+      const levelUpdate = result.level_update;
+      if (levelUpdate && levelUpdate.leveledUp) {
+        showLevelUpAnimation(levelUpdate.level);
         setTimeout(() => router.push('/feed'), 3000);
         return;
       }
 
-      Alert.alert('Success!', 'Post submitted successfully!', [
+      // Show success message with points earned
+      const pointsEarned = levelUpdate?.pointsEarned || 0;
+      const message = pointsEarned > 0 
+        ? `Post submitted successfully! You earned ${pointsEarned} points! 🎉`
+        : 'Post submitted successfully!';
+      
+      Alert.alert('Success!', message, [
         { text: 'OK', onPress: () => router.push('/feed') },
       ]);
 

@@ -13,6 +13,7 @@ import {
   Platform,
   Share,
   Alert,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -301,10 +302,20 @@ export default function PostDetailsScreen() {
           ) : null}
 
           {post.map_link ? (
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={20} color="#666" />
-              <Text style={styles.locationText}>{post.map_link}</Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.locationRow}
+              onPress={() => {
+                if (post.map_link) {
+                  Linking.openURL(post.map_link);
+                }
+              }}
+            >
+              <Ionicons name="location" size={20} color="#4ECDC4" />
+              <Text style={styles.locationText}>
+                {post.location_name || post.map_link}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color="#4ECDC4" />
+            </TouchableOpacity>
           ) : null}
         </View>
 
@@ -439,9 +450,24 @@ const styles = StyleSheet.create({
 
   ratingText: { marginLeft: 6, fontWeight: "600" },
 
-  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+  locationRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginTop: 8,
+    backgroundColor: "#F3FFFD",
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#CFFAF0",
+  },
 
-  locationText: { marginLeft: 6, fontSize: 14 },
+  locationText: { 
+    marginLeft: 6, 
+    fontSize: 14,
+    flex: 1,
+    fontWeight: "500",
+    color: "#333",
+  },
 
   actionsRow: {
     padding: 12,
