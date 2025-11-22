@@ -685,7 +685,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-       {/* Edit Profile / Follow Button */}
+      {/* Edit Profile / Follow Button */}
 {isOwnProfile ? (
   <TouchableOpacity
     style={styles.editButton}
@@ -695,8 +695,9 @@ export default function ProfileScreen() {
     <Text style={styles.editButtonText}>Edit Profile</Text>
   </TouchableOpacity>
 ) : (
-  <>
-    {/* Follow / Unfollow button */}
+  <View style={{ width: "100%", alignItems: "center" }}>
+    
+    {/* Follow / Unfollow Button */}
     <TouchableOpacity
       style={[
         styles.editButton,
@@ -720,6 +721,18 @@ export default function ProfileScreen() {
         </>
       )}
     </TouchableOpacity>
+
+    {/* Message Button */}
+    <TouchableOpacity
+      style={[styles.editButton, { backgroundColor: "#4dd0e1", marginTop: 10 }]}
+      onPress={() => router.push(`/chat/${userData.id}`)}
+    >
+      <Ionicons name="chatbubbles-outline" size={20} color="#fff" />
+      <Text style={styles.editButtonText}>Message</Text>
+    </TouchableOpacity>
+
+  </View>
+)}
 
     {/* Message Button */}
     <TouchableOpacity
