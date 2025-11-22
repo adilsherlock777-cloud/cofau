@@ -26,3 +26,11 @@ def verify_token(token: str):
         return email
     except JWTError:
         return None
+        
+def decode_access_token(token: str):
+    """
+    Wrapper for verify_access_token() to match WebSocket chat usage.
+    Returns the payload containing user_id.
+    """
+    payload = verify_access_token(token)
+    return payload
