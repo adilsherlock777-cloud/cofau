@@ -13,9 +13,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 
-const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+const API_BASE =
+  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
-// Convert https → wss
+// Convert http/https → ws/wss
 const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 export default function ChatScreen() {
@@ -29,20 +30,23 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<any>>(null);
 
-  const currentUserId = user?.id || user?._id;
+  const currentUserId = user?.id || (user as any)?._id;
 
-  // 🟢 CONNECT TO BACKEND
+  // 🟢 CONNECT TO BACKEND WEBSOCKET
   useEffect(() => {
-    if (!token || !userId) return;
+    if (!token || !userId) {
+      console.log("⚠️ Missing token or userId, not opening WS");
+      return;
+    }
 
-    // CORRECT WEBSOCKET URL
-    const wsUrl = `${WS_BASE}/ws/chat/${userId}?token=${encodeURIComponent(
-      token
+    // ✅ MUST MATCH: router = APIRouter(prefix="/api/chat") + @router.websocket("/ws/{other_user_id}")
+    const wsUrl = `${WS_BASE}/api/chat/ws/${userId}?token=${encodeURIComponent(
+      token as string
     )}`;
 
-    console.log("🔗 Connecting WS:", wsUrl);
+    console.log("🔗 Connecting WebSocket to:", wsUrl);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -56,26 +60,37 @@ export default function ChatScreen() {
         const data = JSON.parse(event.data);
 
         if (data.type === "history") {
+          // Initial history from backend
           setMessages(data.messages || []);
         } else if (data.type === "message") {
+          // New live message
           setMessages((prev) => [...prev, data]);
         }
 
-        // Scroll to bottom after messages update
+        // Scroll to bottom
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       } catch (e) {
-        console.log("WS parse error", e);
+        console.log("❌ WS parse error", e);
       }
     };
 
-    ws.onerror = (err) => console.log("❌ WS error", err);
-    ws.onclose = () => console.log("🔴 WS closed");
+    ws.onerror = (err) => {
+      console.log("❌ WS error", err);
+    };
+
+    ws.onclose = (e) => {
+      console.log("🔴 WS closed", e?.code, e?.reason);
+    };
 
     return () => {
-      console.log("🔌 WS cleanup (closing)");
-      ws.close();
+      console.log("🔌 Cleaning up WS (closing)");
+      try {
+        ws.close();
+      } catch (e) {
+        console.log("WS close error", e);
+      }
     };
   }, [token, userId]);
 
@@ -84,8 +99,8 @@ export default function ChatScreen() {
     const text = input.trim();
     if (!text) return;
 
-    if (!wsRef.current || wsRef.current.readyState !== 1) {
-      console.log("WS not ready");
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log("⚠️ WebSocket not ready, cannot send");
       return;
     }
 
@@ -93,7 +108,7 @@ export default function ChatScreen() {
     setInput("");
   };
 
-  // 💬 RENDER EACH MESSAGE
+  // 💬 RENDER EACH MESSAGE BUBBLE
   const renderItem = ({ item }: any) => {
     const isMe = item.from_user === currentUserId;
 
@@ -232,3 +247,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
+
+export default ChatScreen;
