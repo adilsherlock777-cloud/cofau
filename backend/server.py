@@ -27,6 +27,17 @@ from utils.level_system import calculate_level, add_post_points, calculateUserLe
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
+    # Log registered routes on startup
+    print("=" * 50)
+    print("Registered Routes:")
+    for route in app.routes:
+        if hasattr(route, "path"):
+            if hasattr(route, "methods") and route.methods:
+                methods = ", ".join(route.methods)
+            else:
+                methods = "WebSocket"
+            print(f"  {methods:15} {route.path}")
+    print("=" * 50)
     yield
     await close_mongo_connection()
 
@@ -83,7 +94,8 @@ app.include_router(follow_router)
 app.include_router(profile_picture_router)
 app.include_router(stories_router)
 app.include_router(locations_router)
-app.include_router(chat_router) 
+app.include_router(chat_router)
+
 
 
 @app.get("/api")
