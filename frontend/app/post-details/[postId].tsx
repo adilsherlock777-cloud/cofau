@@ -301,18 +301,24 @@ export default function PostDetailsScreen() {
             </View>
           ) : null}
 
-          {post.map_link ? (
-            <TouchableOpacity 
+          {post.location_name ? (
+            <TouchableOpacity
               style={styles.locationRow}
               onPress={() => {
+                // If there's a map_link, open it
                 if (post.map_link) {
                   Linking.openURL(post.map_link);
+                }
+                // If there's only location_name, generate a Google Maps search link
+                else if (post.location_name) {
+                  const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                  Linking.openURL(searchUrl);
                 }
               }}
             >
               <Ionicons name="location" size={20} color="#4ECDC4" />
               <Text style={styles.locationText}>
-                {post.location_name || post.map_link}
+                {post.location_name}
               </Text>
               <Ionicons name="chevron-forward" size={18} color="#4ECDC4" />
             </TouchableOpacity>
@@ -450,9 +456,9 @@ const styles = StyleSheet.create({
 
   ratingText: { marginLeft: 6, fontWeight: "600" },
 
-  locationRow: { 
-    flexDirection: "row", 
-    alignItems: "center", 
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 8,
     backgroundColor: "#F3FFFD",
     padding: 10,
@@ -461,8 +467,8 @@ const styles = StyleSheet.create({
     borderColor: "#CFFAF0",
   },
 
-  locationText: { 
-    marginLeft: 6, 
+  locationText: {
+    marginLeft: 6,
     fontSize: 14,
     flex: 1,
     fontWeight: "500",

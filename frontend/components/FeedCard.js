@@ -105,8 +105,15 @@ export default function FeedCard({ post, onLikeUpdate }) {
   };
 
   const handleOpenMap = () => {
-    if (!post.map_link) return;
-    Linking.openURL(post.map_link);
+    // If there's a map_link, open it
+    if (post.map_link) {
+      Linking.openURL(post.map_link);
+    }
+    // If there's only location_name, generate a Google Maps search link
+    else if (post.location_name) {
+      const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+      Linking.openURL(searchUrl);
+    }
   };
 
   const handleLike = async () => {
@@ -167,13 +174,13 @@ export default function FeedCard({ post, onLikeUpdate }) {
               onError={(error) => {
                 console.error("❌ Video playback error in FeedCard:", error);
                 console.error("❌ Video URL:", mediaUrl);
-                
+
                 // Try to recover by forcing a reload
                 const timestamp = new Date().getTime();
-                const refreshedUrl = mediaUrl.includes('?') 
-                  ? `${mediaUrl}&_t=${timestamp}` 
+                const refreshedUrl = mediaUrl.includes('?')
+                  ? `${mediaUrl}&_t=${timestamp}`
                   : `${mediaUrl}?_t=${timestamp}`;
-                  
+
                 // Set state to trigger re-render with refreshed URL
                 setVideoError(true);
               }}
@@ -242,13 +249,13 @@ export default function FeedCard({ post, onLikeUpdate }) {
         </View>
 
         {/* ------------------------------------------
-            📍 LOCATION BUTTON (FREE GOOGLE MAPS LINK)
+            📍 LOCATION BUTTON (Shows if location_name exists)
         ------------------------------------------- */}
-        {post.map_link && (
+        {post.location_name && (
           <TouchableOpacity style={styles.locationButton} onPress={handleOpenMap}>
             <Ionicons name="location" size={18} color="#4ECDC4" />
             <Text style={styles.locationText}>
-              {post.location_name || extractLocationName(post.map_link)}
+              {post.location_name}
             </Text>
             <Ionicons name="chevron-forward" size={18} color="#4ECDC4" />
           </TouchableOpacity>
