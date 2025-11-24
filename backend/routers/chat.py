@@ -18,8 +18,9 @@ class ConnectionManager:
         self.active_connections: Dict[str, Set[WebSocket]] = {}
 
     async def connect(self, user_id: str, websocket: WebSocket):
-        await websocket.accept()
+        # Note: websocket.accept() is called before this, so we just add to connections
         self.active_connections.setdefault(user_id, set()).add(websocket)
+        print(f"📝 Added connection for user {user_id}, total connections: {len(self.active_connections.get(user_id, set()))}")
 
     def disconnect(self, user_id: str, websocket: WebSocket):
         conns = self.active_connections.get(user_id)
@@ -62,10 +63,25 @@ async def get_user_id_from_token(token: str) -> str:
 
 @router.websocket("/ws/{other_user_id}")
 async def chat_ws(websocket: WebSocket, other_user_id: str):
+    print(f"🔗 WebSocket connection attempt for user_id: {other_user_id}")
+    
+    # Accept connection first (required for WebSocket)
+    try:
+        await websocket.accept()
+        print(f"✅ WebSocket connection accepted")
+    except Exception as e:
+        print(f"❌ Failed to accept WebSocket: {str(e)}")
+        return
+    
     token = websocket.query_params.get("token")
+    if not token:
+        print(f"❌ No token provided")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing token")
+        return
     
     try:
         current_user_id = await get_user_id_from_token(token)
+        print(f"✅ Authenticated user: {current_user_id}")
     except HTTPException as e:
         print(f"❌ WebSocket auth error: {e.detail}")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=e.detail)
