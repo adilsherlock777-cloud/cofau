@@ -118,6 +118,14 @@ async def test_websocket(websocket: WebSocket):
         except:
             pass
 
+# Direct WebSocket endpoint on the main app
+@app.websocket("/api/chat/ws/{user_id}")
+async def direct_chat_ws(websocket: WebSocket, user_id: str):
+    """Direct WebSocket endpoint on the main app (bypassing router)"""
+    from routers.chat import chat_ws
+    print(f"🔄 Forwarding WebSocket connection to chat_ws handler for user_id: {user_id}")
+    await chat_ws(websocket, user_id)
+
 
 # ======================================================
 # POST CREATION
