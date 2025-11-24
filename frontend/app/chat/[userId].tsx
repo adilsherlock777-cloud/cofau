@@ -18,15 +18,23 @@ const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.c
 // Convert https → wss
 const WS_BASE = API_BASE.replace(/^http/, "ws");
 
+interface Message {
+  id: string;
+  from_user: string;
+  to_user: string;
+  message: string;
+  created_at: string;
+}
+
 export default function ChatScreen() {
-  const { user, token } = useAuth();
+  const { user, token } = useAuth() as { user: any; token: string | null };
   const { userId, fullName } = useLocalSearchParams();
   const router = useRouter();
 
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const wsRef = useRef(null);
-  const flatListRef = useRef(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const flatListRef = useRef<FlatList<Message> | null>(null);
 
   const currentUserId = user?.id || user?._id;
 
@@ -41,7 +49,9 @@ export default function ChatScreen() {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => console.log("🟢 WebSocket Connected");
+    ws.onopen = () => {
+      console.log("🟢 WebSocket Connected");
+    };
 
     ws.onmessage = (event) => {
       try {
@@ -61,12 +71,25 @@ export default function ChatScreen() {
       }
     };
 
-    ws.onerror = (err) => console.log("❌ WS error:", err);
-    ws.onclose = () => console.log("🔴 WS closed");
+    ws.onerror = (err) => {
+      console.log("❌ WS error:", err);
+      // The error event doesn't provide much detail, but we'll handle it in onclose
+    };
+
+    ws.onclose = (event) => {
+      console.log("🔴 WS closed", event.code, event.reason);
+      // If not a normal closure, try to reconnect after a delay
+      if (event.code !== 1000 && event.code !== 1001) {
+        console.log("🔄 Will attempt to reconnect...");
+        // Note: Auto-reconnect can be added here if needed
+      }
+    };
 
     return () => {
       console.log("🔌 Cleaning WebSocket");
-      ws.close();
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
     };
   }, [token, userId]);
 
@@ -74,16 +97,27 @@ export default function ChatScreen() {
     const text = input.trim();
     if (!text) return;
 
-    if (!wsRef.current || wsRef.current.readyState !== 1) {
-      console.log("WS not ready");
+    if (!wsRef.current) {
+      console.log("❌ WebSocket not initialized");
       return;
     }
 
-    wsRef.current.send(JSON.stringify({ message: text }));
-    setInput("");
+    const readyState = wsRef.current.readyState;
+    if (readyState !== WebSocket.OPEN) {
+      console.log(`❌ WebSocket not ready. State: ${readyState} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)`);
+      // Optionally show user-friendly error message
+      return;
+    }
+
+    try {
+      wsRef.current.send(JSON.stringify({ message: text }));
+      setInput("");
+    } catch (error) {
+      console.log("❌ Error sending message:", error);
+    }
   };
 
-  const renderItem = ({ item }) => {
+  const renderItem = ({ item }: { item: Message }) => {
     const isMe = item.from_user === currentUserId;
     return (
       <View
