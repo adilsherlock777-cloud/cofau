@@ -77,11 +77,25 @@ export default function ChatScreen() {
     };
 
     ws.onclose = (event) => {
-      console.log("🔴 WS closed", event.code, event.reason);
-      // If not a normal closure, try to reconnect after a delay
-      if (event.code !== 1000 && event.code !== 1001) {
-        console.log("🔄 Will attempt to reconnect...");
-        // Note: Auto-reconnect can be added here if needed
+      console.log("🔴 WS closed", {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean
+      });
+      
+      // Common WebSocket close codes:
+      // 1000 = Normal closure
+      // 1001 = Going away
+      // 1006 = Abnormal closure (connection lost)
+      // 1008 = Policy violation (auth error)
+      // 1011 = Internal server error
+      
+      if (event.code === 1008) {
+        console.log("❌ Authentication failed - token may be invalid");
+      } else if (event.code === 1006) {
+        console.log("❌ Connection lost - check nginx WebSocket configuration");
+      } else if (event.code !== 1000 && event.code !== 1001) {
+        console.log("🔄 Connection closed unexpectedly, code:", event.code);
       }
     };
 
@@ -93,7 +107,7 @@ export default function ChatScreen() {
     };
   }, [token, userId]);
 
-  const sendMsg = () => {
+  const sendMsg = async () => {
     const text = input.trim();
     if (!text) return;
 
@@ -103,14 +117,36 @@ export default function ChatScreen() {
     }
 
     const readyState = wsRef.current.readyState;
+    
+    // Wait a bit if still connecting
+    if (readyState === WebSocket.CONNECTING) {
+      console.log("⏳ WebSocket still connecting, waiting...");
+      // Wait up to 3 seconds for connection
+      let attempts = 0;
+      while (wsRef.current.readyState === WebSocket.CONNECTING && attempts < 30) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      
+      if (wsRef.current.readyState !== WebSocket.OPEN) {
+        console.log(`❌ WebSocket failed to connect. State: ${wsRef.current.readyState}`);
+        return;
+      }
+    }
+    
+    if (readyState === WebSocket.CLOSED || readyState === WebSocket.CLOSING) {
+      console.log(`❌ WebSocket is closed. State: ${readyState}`);
+      return;
+    }
+    
     if (readyState !== WebSocket.OPEN) {
       console.log(`❌ WebSocket not ready. State: ${readyState} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)`);
-      // Optionally show user-friendly error message
       return;
     }
 
     try {
       wsRef.current.send(JSON.stringify({ message: text }));
+      console.log("📤 Message sent:", text);
       setInput("");
     } catch (error) {
       console.log("❌ Error sending message:", error);
