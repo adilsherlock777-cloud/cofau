@@ -8,6 +8,11 @@ from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+# Test endpoint to verify router is working
+@router.get("/test")
+async def test_chat_router():
+    return {"message": "Chat router is working", "status": "ok"}
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, Set[WebSocket]] = {}
