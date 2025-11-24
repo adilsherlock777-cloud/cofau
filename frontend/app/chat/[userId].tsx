@@ -15,8 +15,8 @@ import { useAuth } from "../../context/AuthContext";
 
 const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 
-// Convert https → wss
-const WS_BASE = API_BASE.replace(/^http/, "ws");
+// Convert https → wss or http → ws
+const WS_BASE = API_BASE.replace(/^https?/, (match) => match === "https" ? "wss" : "ws");
 
 interface Message {
   id: string;
@@ -82,14 +82,14 @@ export default function ChatScreen() {
         reason: event.reason,
         wasClean: event.wasClean
       });
-      
+
       // Common WebSocket close codes:
       // 1000 = Normal closure
       // 1001 = Going away
       // 1006 = Abnormal closure (connection lost)
       // 1008 = Policy violation (auth error)
       // 1011 = Internal server error
-      
+
       if (event.code === 1008) {
         console.log("❌ Authentication failed - token may be invalid");
       } else if (event.code === 1006) {
@@ -117,7 +117,7 @@ export default function ChatScreen() {
     }
 
     const readyState = wsRef.current.readyState;
-    
+
     // Wait a bit if still connecting
     if (readyState === WebSocket.CONNECTING) {
       console.log("⏳ WebSocket still connecting, waiting...");
@@ -127,18 +127,18 @@ export default function ChatScreen() {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
-      
+
       if (wsRef.current.readyState !== WebSocket.OPEN) {
         console.log(`❌ WebSocket failed to connect. State: ${wsRef.current.readyState}`);
         return;
       }
     }
-    
+
     if (readyState === WebSocket.CLOSED || readyState === WebSocket.CLOSING) {
       console.log(`❌ WebSocket is closed. State: ${readyState}`);
       return;
     }
-    
+
     if (readyState !== WebSocket.OPEN) {
       console.log(`❌ WebSocket not ready. State: ${readyState} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)`);
       return;
