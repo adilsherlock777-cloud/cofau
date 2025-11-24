@@ -3,7 +3,7 @@ from typing import Dict, Set, List, Any
 from bson import ObjectId
 from datetime import datetime
 from database import get_database
-from utils.jwt import decode_access_token  # adjust if named differently
+from utils.jwt import decode_access_token
 from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -32,32 +32,50 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def get_user_id_from_token(token: str) -> str:
+async def get_user_id_from_token(token: str) -> str:
+    """Get user_id from JWT token by decoding and looking up user in database"""
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
-    payload = decode_access_token(token)
-    user_id = (
-        payload.get("user_id")
-        or payload.get("sub")
-        or payload.get("id")
-    )
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    return str(user_id)
+    
+    try:
+        payload = decode_access_token(token)
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token: no email in payload")
+        
+        # Look up user by email to get user_id
+        db = get_database()
+        user = await db.users.find_one({"email": email})
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        
+        return str(user["_id"])
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Token validation failed: {str(e)}")
 
 @router.websocket("/ws/{other_user_id}")
 async def chat_ws(websocket: WebSocket, other_user_id: str):
     token = websocket.query_params.get("token")
+    
     try:
-        current_user_id = get_user_id_from_token(token)
-    except HTTPException:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        current_user_id = await get_user_id_from_token(token)
+    except HTTPException as e:
+        print(f"❌ WebSocket auth error: {e.detail}")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=e.detail)
+        return
+    except Exception as e:
+        print(f"❌ WebSocket error: {str(e)}")
+        await websocket.close(code=status.WS_1011_INTERNAL_ERROR, reason="Internal server error")
         return
 
-    await manager.connect(current_user_id, websocket)
-    db = get_database()
-
     try:
+        await manager.connect(current_user_id, websocket)
+        print(f"✅ WebSocket connected: user {current_user_id} -> {other_user_id}")
+        
+        db = get_database()
+
         # send last 50 messages (history)
         cursor = db.messages.find({
             "$or": [
@@ -67,6 +85,7 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
         }).sort("created_at", -1).limit(50)
         history = await cursor.to_list(50)
         history.reverse()
+        
         await websocket.send_json({
             "type": "history",
             "messages": [
@@ -83,36 +102,52 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
 
         # receive and broadcast new messages
         while True:
-            data = await websocket.receive_json()
-            text = (data.get("message") or "").strip()
-            if not text:
+            try:
+                data = await websocket.receive_json()
+                text = (data.get("message") or "").strip()
+                if not text:
+                    continue
+
+                now = datetime.utcnow()
+                msg_doc = {
+                    "from_user": current_user_id,
+                    "to_user": other_user_id,
+                    "message": text,
+                    "created_at": now,
+                }
+                result = await db.messages.insert_one(msg_doc)
+                msg_id = str(result.inserted_id)
+                msg_payload = {
+                    "type": "message",
+                    "id": msg_id,
+                    "from_user": current_user_id,
+                    "to_user": other_user_id,
+                    "message": text,
+                    "created_at": now.isoformat() + "Z",
+                }
+                
+                # Send to both users
+                await manager.send_personal_message(current_user_id, msg_payload)
+                await manager.send_personal_message(other_user_id, msg_payload)
+                print(f"📨 Message sent: {current_user_id} -> {other_user_id}")
+                
+            except WebSocketDisconnect:
+                raise
+            except Exception as e:
+                print(f"❌ Error processing message: {str(e)}")
+                # Continue listening for more messages
                 continue
 
-            now = datetime.utcnow()
-            msg_doc = {
-                "from_user": current_user_id,
-                "to_user": other_user_id,
-                "message": text,
-                "created_at": now,
-            }
-            result = await db.messages.insert_one(msg_doc)
-            msg_id = str(result.inserted_id)
-            msg_payload = {
-                "type": "message",
-                "id": msg_id,
-                "from_user": current_user_id,
-                "to_user": other_user_id,
-                "message": text,
-                "created_at": now.isoformat() + "Z",
-            }
-            await manager.send_personal_message(current_user_id, msg_payload)
-            await manager.send_personal_message(other_user_id, msg_payload)
-
     except WebSocketDisconnect:
+        print(f"🔌 WebSocket disconnected: {current_user_id}")
         manager.disconnect(current_user_id, websocket)
-    except Exception:
+    except Exception as e:
+        print(f"❌ WebSocket error: {str(e)}")
         manager.disconnect(current_user_id, websocket)
-        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+        try:
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR, reason=str(e))
+        except:
+            pass
 
 @router.get("/conversation/{other_user_id}")
 async def get_conversation(other_user_id: str, current_user: dict = Depends(get_current_user)):

@@ -29,8 +29,11 @@ def verify_token(token: str):
         
 def decode_access_token(token: str):
     """
-    Wrapper for verify_access_token() to match WebSocket chat usage.
-    Returns the payload containing user_id.
+    Decode JWT access token and return the payload.
+    Returns the payload containing 'sub' (email) and other claims.
     """
-    payload = verify_access_token(token)
-    return payload
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload
+    except JWTError:
+        raise ValueError("Invalid token")
