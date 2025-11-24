@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form
+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -101,6 +101,22 @@ app.include_router(chat_router)
 @app.get("/api")
 async def root():
     return {"message": "Cofau API is running", "version": "1.0.0"}
+
+@app.websocket("/test-ws")
+async def test_websocket(websocket: WebSocket):
+    """Test WebSocket endpoint directly on the app (bypassing routers)"""
+    try:
+        print("⚡ Test WebSocket connection attempt")
+        await websocket.accept()
+        print("⚡ Test WebSocket accepted")
+        await websocket.send_text("Hello from WebSocket test endpoint!")
+        await websocket.close()
+    except Exception as e:
+        print(f"⚡ Test WebSocket error: {str(e)}")
+        try:
+            await websocket.close()
+        except:
+            pass
 
 
 # ======================================================
