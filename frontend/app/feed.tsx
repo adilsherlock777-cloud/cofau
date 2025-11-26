@@ -120,8 +120,14 @@ export default function FeedScreen() {
 
       setFeedPosts(transformed);
     } catch (err: any) {
-      console.log("❌ Feed fetch error:", err?.response?.data || err.message);
-      setError("Failed to load feed.");
+      // Only show error if it's not a 401 (expected when not authenticated)
+      if (err?.response?.status !== 401) {
+        console.log("❌ Feed fetch error:", err?.response?.data || err.message);
+        setError("Failed to load feed.");
+      } else {
+        // User not authenticated - this is handled by AuthContext
+        setError(null);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

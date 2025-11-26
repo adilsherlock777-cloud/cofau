@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { Image } from "expo-image";
 import { likePost, unlikePost } from "../utils/api";
+import HappeningPlaces from "../components/HappeningPlaces";
 
 // =======================
 //  CONFIG
@@ -74,6 +75,9 @@ export default function ExploreScreen() {
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,15 +130,69 @@ export default function ExploreScreen() {
   };
 
   // ==================================
-  // 🔍 Search Logic
+  // 🔍 Search Logic with Backend API
   // ==================================
-  const filteredPosts = useMemo(() => {
-    if (!searchQuery.trim()) return posts;
+  const performSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
 
-    return posts.filter((p) =>
-      (p.caption || "").toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery, posts]);
+    try {
+      setSearching(true);
+      const res = await axios.get(`${API_URL}/search/posts`, {
+        params: { q: query.trim(), limit: 100 },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const searchPosts = res.data.map((post: any) => {
+        const rawUrl = post.media_url || post.image_url;
+        const fullUrl = fixUrl(rawUrl);
+        const thumb = fixUrl(post.thumbnail_url);
+
+        return {
+          ...post,
+          full_image_url: fullUrl,
+          full_thumbnail_url: thumb,
+          is_liked: post.is_liked_by_user || false,
+          _isVideo: isVideoFile(fullUrl, post.media_type),
+        };
+      });
+
+      setSearchResults(searchPosts);
+    } catch (err) {
+      console.error("❌ Search error:", err);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (searchQuery.trim()) {
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(searchQuery);
+      }, 500); // 500ms debounce
+    } else {
+      setSearchResults([]);
+      setSearching(false);
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, token]);
+
+  // Determine which posts to display
+  const displayPosts = searchQuery.trim() ? searchResults : posts;
 
   // ==================================
   // ❤️ Like/Unlike Handler
@@ -229,21 +287,42 @@ export default function ExploreScreen() {
   // ==================================
   return (
     <View style={styles.container}>
+      {/* Happening Places Section */}
+      <HappeningPlaces />
+
       {/* Search bar */}
       <View style={styles.searchBox}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search posts…"
+          placeholder="Search posts, locations, users…"
           placeholderTextColor="#999"
           value={searchQuery}
           onChangeText={setSearchQuery}
+          returnKeyType="search"
         />
-        <Ionicons name="search" size={20} color="#777" />
+        {searching ? (
+          <ActivityIndicator size="small" color="#777" />
+        ) : (
+          <Ionicons name="search" size={20} color="#777" />
+        )}
       </View>
+
+      {/* Search Results Info */}
+      {searchQuery.trim() && (
+        <View style={styles.searchInfo}>
+          <Text style={styles.searchInfoText}>
+            {searching
+              ? "Searching…"
+              : searchResults.length > 0
+              ? `Found ${searchResults.length} result${searchResults.length !== 1 ? "s" : ""}`
+              : "No results found"}
+          </Text>
+        </View>
+      )}
 
       {/* Grid */}
       <FlatList
-        data={filteredPosts}
+        data={displayPosts}
         renderItem={renderGridItem}
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
@@ -253,12 +332,27 @@ export default function ExploreScreen() {
           gap: SPACING,
           paddingHorizontal: SPACING,
         }}
-        onEndReached={() => fetchPosts(false)}
+        onEndReached={() => {
+          if (!searchQuery.trim()) {
+            fetchPosts(false);
+          }
+        }}
         onEndReachedThreshold={0.4}
         ListFooterComponent={
           loadingMore ? (
             <View style={{ padding: 20 }}>
               <ActivityIndicator size="small" />
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          !loading && !searching && searchQuery.trim() && searchResults.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No posts found</Text>
+              <Text style={styles.emptySubtext}>
+                Try searching for different keywords
+              </Text>
             </View>
           ) : null
         }
@@ -322,5 +416,38 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     padding: 4,
     borderRadius: 20,
+  },
+
+  searchInfo: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#f8f8f8",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e5e5",
+  },
+
+  searchInfoText: {
+    fontSize: 14,
+    color: "#666",
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#666",
+  },
+
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#999",
   },
 });

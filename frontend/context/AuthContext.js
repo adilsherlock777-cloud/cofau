@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { storage } from '../utils/storage';
+import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
 
 // Use EXPO_PUBLIC_ prefix for environment variables accessible in Expo
 const API_BASE_URL = 'https://backend.cofau.com';
@@ -33,6 +34,11 @@ export const AuthProvider = ({ children }) => {
           const response = await axios.get(`${API_URL}/auth/me`);
           setUser(response.data);
           setToken(storedToken);
+          
+          // Register for push notifications
+          registerForPushNotificationsAsync(storedToken).catch(err => {
+            console.log('⚠️ Push notification registration failed:', err);
+          });
         } catch (error) {
           // Token invalid - delete it
           console.log('Token validation failed:', error.response?.status);
@@ -98,6 +104,11 @@ export const AuthProvider = ({ children }) => {
         console.log('✅ User object:', userResponse.data);
         console.log('✅ isAuthenticated will be:', !!userResponse.data);
 
+        // Register for push notifications
+        registerForPushNotificationsAsync(access_token).catch(err => {
+          console.log('⚠️ Push notification registration failed:', err);
+        });
+
         console.log('🎉 Login successful! Returning success...');
         return { success: true, user: userResponse.data };
       } catch (meError) {
@@ -141,6 +152,11 @@ export const AuthProvider = ({ children }) => {
       const userResponse = await axios.get(`${API_URL}/auth/me`);
       setUser(userResponse.data);
 
+      // Register for push notifications
+      registerForPushNotificationsAsync(access_token).catch(err => {
+        console.log('⚠️ Push notification registration failed:', err);
+      });
+
       return { success: true };
     } catch (error) {
       console.log('Signup error:', error.response?.data || error.message);
@@ -172,7 +188,10 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get(`${API_URL}/auth/me`);
       setUser(response.data);
     } catch (error) {
-      console.log('Error refreshing user:', error);
+      // Only log if it's not a 401 (expected when not authenticated)
+      if (error.response?.status !== 401) {
+        console.log('Error refreshing user:', error);
+      }
       // If refresh fails, logout
       await logout();
     }

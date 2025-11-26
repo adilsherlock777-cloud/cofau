@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 from bson import ObjectId
 from typing import List
+from pydantic import BaseModel
 from database import get_database
 from routers.auth import get_current_user
+from utils.push_notifications import send_push_notification, get_user_device_tokens, register_device_token
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
@@ -14,11 +16,12 @@ async def create_notification(
     from_user_id: str,
     to_user_id: str,
     post_id: str = None,
-    message: str = None
+    message: str = None,
+    send_push: bool = True
 ):
     """
-    Helper function to create a notification.
-    Types: "like", "comment", "follow", "new_post"
+    Helper function to create a notification and optionally send push notification.
+    Types: "like", "comment", "follow", "new_post", "message"
     """
     # Don't notify yourself
     if from_user_id == to_user_id:
@@ -39,6 +42,8 @@ async def create_notification(
             message = f"{from_user['full_name']} started following you"
         elif notification_type == "new_post":
             message = f"{from_user['full_name']} uploaded a new post"
+        elif notification_type == "message":
+            message = f"{from_user['full_name']} sent you a message"
     
     notification_doc = {
         "type": notification_type,
@@ -51,7 +56,47 @@ async def create_notification(
     }
     
     result = await db.notifications.insert_one(notification_doc)
-    return str(result.inserted_id)
+    notification_id = str(result.inserted_id)
+    
+    # Send push notification if enabled
+    if send_push:
+        try:
+            device_tokens = await get_user_device_tokens(to_user_id)
+            if device_tokens:
+                # Prepare notification data for navigation
+                notification_data = {
+                    "type": notification_type,
+                    "fromUserId": from_user_id,
+                    "fromUserName": from_user.get("full_name", "Someone"),
+                    "notificationId": notification_id,
+                }
+                
+                if post_id:
+                    notification_data["postId"] = post_id
+                
+                # Determine title based on type
+                title = "New Notification"
+                if notification_type == "message":
+                    title = "New Message"
+                elif notification_type == "like":
+                    title = "New Like"
+                elif notification_type == "comment":
+                    title = "New Comment"
+                elif notification_type == "follow":
+                    title = "New Follower"
+                elif notification_type == "new_post":
+                    title = "New Post"
+                
+                await send_push_notification(
+                    device_tokens=device_tokens,
+                    title=title,
+                    body=message,
+                    data=notification_data
+                )
+        except Exception as e:
+            print(f"⚠️ Error sending push notification: {str(e)}")
+    
+    return notification_id
 
 
 @router.get("")
@@ -147,3 +192,25 @@ async def mark_notification_as_read(
         raise HTTPException(status_code=404, detail="Notification not found")
     
     return {"success": True}
+
+
+class DeviceTokenRequest(BaseModel):
+    deviceToken: str
+    platform: str = "unknown"
+
+
+@router.post("/register-device")
+async def register_device(
+    request: DeviceTokenRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Register device token for push notifications"""
+    user_id = str(current_user["_id"])
+    
+    success = await register_device_token(
+        user_id=user_id,
+        device_token=request.deviceToken,
+        platform=request.platform
+    )
+    
+    return {"success": success, "message": "Device registered successfully"}

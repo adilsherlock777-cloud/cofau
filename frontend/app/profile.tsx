@@ -66,6 +66,8 @@ export default function ProfileScreen() {
   const [followLoading, setFollowLoading] = useState(false);
   const [isOwnProfile, setIsOwnProfile] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [levelDetailsModalVisible, setLevelDetailsModalVisible] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -450,12 +452,18 @@ export default function ProfileScreen() {
       
       console.log('🖼️ Normalized profile picture URL:', normalizedProfilePicture);
 
-      // ✅ Ensure URL is absolute when saving to state
+      // ✅ Update state immediately for instant UI feedback
       setUserData((prev: any) => ({
         ...prev,
         profile_picture: normalizedProfilePicture,
         profile_picture_url: normalizedProfilePicture,
       }));
+
+      // Refresh profile data from server to ensure consistency and get fresh data
+      // This ensures the old image is deleted and new one is properly loaded
+      setTimeout(() => {
+        fetchProfileData();
+      }, 500);
 
       Alert.alert('Success', 'Profile picture updated successfully!');
     } catch (error: any) {
@@ -535,26 +543,45 @@ export default function ProfileScreen() {
     return null;
   };
 
-  // ✅ Grid item for PHOTO tab only; videos show a placeholder (no crash)
+  // ✅ Grid item for both PHOTOS and VIDEOS - navigates to post details
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
-    const isVideo = mediaUrl?.toLowerCase().endsWith('.mp4');
+    // Check for video using media_type field or file extension
+    const isVideo = 
+      item.media_type === 'video' || 
+      mediaUrl?.toLowerCase().endsWith('.mp4') ||
+      mediaUrl?.toLowerCase().endsWith('.mov') ||
+      mediaUrl?.toLowerCase().endsWith('.avi') ||
+      mediaUrl?.toLowerCase().endsWith('.webm');
 
+    const handlePostPress = () => {
+      if (item.id) {
+        console.log('📱 Navigating to post details:', item.id, 'isVideo:', isVideo);
+        router.push(`/post-details/${item.id}`);
+      } else {
+        console.warn('⚠️ Post ID is missing:', item);
+      }
+    };
 
-    console.log("mediaUrl", mediaUrl);
     return (
       <TouchableOpacity
         style={styles.gridItem}
-        onPress={() => {
-          if (!isVideo) {
-            console.log('Photo clicked:', item.id);
-            // router.push(`/post-details/${item.id}`);
-          }
-        }}
+        onPress={handlePostPress}
         activeOpacity={0.8}
       >
         {mediaUrl && !isVideo ? (
           <Image source={{ uri: mediaUrl }} style={styles.gridImage} resizeMode="cover" />
+        ) : mediaUrl && isVideo ? (
+          <View style={styles.gridImageContainer}>
+            <Image 
+              source={{ uri: mediaUrl }} 
+              style={styles.gridImage} 
+              resizeMode="cover" 
+            />
+            <View style={styles.videoOverlay}>
+              <Ionicons name="play-circle" size={40} color="#fff" />
+            </View>
+          </View>
         ) : (
           <View style={styles.gridPlaceholder}>
             <Ionicons
@@ -622,13 +649,30 @@ export default function ProfileScreen() {
           <Text style={styles.username}>
             {userData.full_name || userData.username || 'User'}
           </Text>
-          <TouchableOpacity style={styles.infoButton}>
-            <Ionicons
-              name="information-circle-outline"
-              size={24}
-              color="#FF6B6B"
-            />
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.infoButton}
+              onPress={() => setLevelDetailsModalVisible(true)}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={24}
+                color="#FF6B6B"
+              />
+            </TouchableOpacity>
+            {isOwnProfile && (
+              <TouchableOpacity 
+                style={styles.settingsButton}
+                onPress={() => setSettingsModalVisible(true)}
+              >
+                <Ionicons
+                  name="settings-outline"
+                  size={24}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Profile Identity Section */}
@@ -802,45 +846,6 @@ export default function ProfileScreen() {
           )}
         />
 
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          activeOpacity={0.7}
-          onPress={() => {
-            console.log('🔴 Logout button pressed!');
-            if (Platform.OS === 'web') {
-              const confirmed = window.confirm(
-                'Are you sure you want to logout?'
-              );
-              if (confirmed) {
-                console.log('✅ User confirmed logout (web)');
-                handleLogout();
-              } else {
-                console.log('❌ Logout cancelled (web)');
-              }
-            } else {
-              Alert.alert('Logout', 'Are you sure you want to logout?', [
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                  onPress: () => console.log('❌ Logout cancelled'),
-                },
-                {
-                  text: 'Logout',
-                  onPress: () => {
-                    console.log('✅ User confirmed logout');
-                    handleLogout();
-                  },
-                  style: 'destructive',
-                },
-              ]);
-            }
-          }}
-        >
-          <Ionicons name="log-out-outline" size={20} color="#FF6B6B" />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
@@ -906,6 +911,164 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Settings Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={settingsModalVisible}
+        onRequestClose={() => setSettingsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Settings</Text>
+              <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.logoutButtonModal}
+              activeOpacity={0.7}
+              onPress={() => {
+                setSettingsModalVisible(false);
+                if (Platform.OS === 'web') {
+                  const confirmed = window.confirm(
+                    'Are you sure you want to logout?'
+                  );
+                  if (confirmed) {
+                    console.log('✅ User confirmed logout (web)');
+                    handleLogout();
+                  } else {
+                    console.log('❌ Logout cancelled (web)');
+                  }
+                } else {
+                  Alert.alert('Logout', 'Are you sure you want to logout?', [
+                    {
+                      text: 'Cancel',
+                      style: 'cancel',
+                      onPress: () => console.log('❌ Logout cancelled'),
+                    },
+                    {
+                      text: 'Logout',
+                      onPress: () => {
+                        console.log('✅ User confirmed logout');
+                        handleLogout();
+                      },
+                      style: 'destructive',
+                    },
+                  ]);
+                }
+              }}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#FF6B6B" />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Level Details Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={levelDetailsModalVisible}
+        onRequestClose={() => setLevelDetailsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Level Details</Text>
+              <TouchableOpacity onPress={() => setLevelDetailsModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.levelDetailsContent}>
+              <View style={styles.levelInfoCard}>
+                <View style={styles.levelInfoRow}>
+                  <Text style={styles.levelInfoLabel}>Current Level:</Text>
+                  <View style={styles.levelBadgeContainer}>
+                    <Text style={styles.levelBadgeText}>
+                      Level {userData?.level || 1}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.levelInfoRow}>
+                  <Text style={styles.levelInfoLabel}>Title:</Text>
+                  <Text style={styles.levelInfoValue}>
+                    {userData?.title || 'Reviewer'}
+                  </Text>
+                </View>
+
+                {userData?.points !== undefined && (
+                  <View style={styles.levelInfoRow}>
+                    <Text style={styles.levelInfoLabel}>Current Points:</Text>
+                    <Text style={styles.levelInfoValue}>
+                      {userData.points || 0}
+                    </Text>
+                  </View>
+                )}
+
+                {userData?.total_points !== undefined && (
+                  <View style={styles.levelInfoRow}>
+                    <Text style={styles.levelInfoLabel}>Total Points:</Text>
+                    <Text style={styles.levelInfoValue}>
+                      {userData.total_points || 0}
+                    </Text>
+                  </View>
+                )}
+
+                {userData?.requiredPoints !== undefined && (
+                  <View style={styles.levelInfoRow}>
+                    <Text style={styles.levelInfoLabel}>Points for Next Level:</Text>
+                    <Text style={styles.levelInfoValue}>
+                      {userData.requiredPoints || 1250}
+                    </Text>
+                  </View>
+                )}
+
+                {userData?.requiredPoints && userData?.points !== undefined && (
+                  <View style={styles.progressContainer}>
+                    <Text style={styles.progressLabel}>Progress to Next Level</Text>
+                    <View style={styles.progressBar}>
+                      <View 
+                        style={[
+                          styles.progressFill, 
+                          { 
+                            width: `${Math.min(100, (userData.points / userData.requiredPoints) * 100)}%` 
+                          }
+                        ]} 
+                      />
+                    </View>
+                    <Text style={styles.progressText}>
+                      {userData.points} / {userData.requiredPoints} points
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.levelSystemInfo}>
+                <Text style={styles.levelSystemTitle}>Level System</Text>
+                <Text style={styles.levelSystemText}>
+                  • Levels 1-4: Reviewer (25 points per post)
+                </Text>
+                <Text style={styles.levelSystemText}>
+                  • Levels 5-8: Top Reviewer (15 points per post)
+                </Text>
+                <Text style={styles.levelSystemText}>
+                  • Levels 9-12: Influencer (5 points per post)
+                </Text>
+                <Text style={styles.levelSystemText}>
+                  • Earn points by creating posts and engaging with content
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -948,7 +1111,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   infoButton: {
+    padding: 5,
+  },
+  settingsButton: {
     padding: 5,
   },
   identitySection: {
@@ -1078,6 +1249,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  gridImageContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   gridPlaceholder: {
     width: '100%',
     height: '100%',
@@ -1109,22 +1295,103 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
-  logoutButton: {
+  logoutButtonModal: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 20,
     marginTop: 20,
-    paddingVertical: 12,
+    paddingVertical: 15,
     borderRadius: 25,
     borderWidth: 1,
     borderColor: '#FF6B6B',
+    backgroundColor: '#fff',
   },
   logoutText: {
     color: '#FF6B6B',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  levelDetailsContent: {
+    maxHeight: 400,
+  },
+  levelInfoCard: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+  },
+  levelInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  levelInfoLabel: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+  },
+  levelInfoValue: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  levelBadgeContainer: {
+    backgroundColor: '#4dd0e1',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  levelBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  progressContainer: {
+    marginTop: 10,
+  },
+  progressLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 5,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4dd0e1',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+  },
+  levelSystemInfo: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  levelSystemTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  levelSystemText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 22,
+    marginBottom: 8,
   },
   bottomSpacer: {
     height: 40,
