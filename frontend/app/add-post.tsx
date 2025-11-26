@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { createPost } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
+import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
 
 export default function AddPostScreen() {
   const router = useRouter();
@@ -34,6 +35,8 @@ export default function AddPostScreen() {
   const [mapsLink, setMapsLink] = useState('');          // UPDATED
 
   const [loading, setLoading] = useState(false);
+  const [showPointsAnimation, setShowPointsAnimation] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
 
   // ------------------------------ MEDIA PICKERS ------------------------------
 
@@ -200,15 +203,22 @@ export default function AddPostScreen() {
         return;
       }
 
-      // Show success message with points earned
-      const pointsEarned = levelUpdate?.pointsEarned || 0;
-      const message = pointsEarned > 0 
-        ? `Post submitted successfully! You earned ${pointsEarned} points! 🎉`
-        : 'Post submitted successfully!';
-      
-      Alert.alert('Success!', message, [
-        { text: 'OK', onPress: () => router.push('/feed') },
-      ]);
+      // Show points earned animation based on points earned
+      const earnedPoints = levelUpdate?.pointsEarned || 0;
+      if (earnedPoints > 0) {
+        setPointsEarned(earnedPoints);
+        setShowPointsAnimation(true);
+        // Navigate to feed after animation (3 seconds)
+        setTimeout(() => {
+          setShowPointsAnimation(false);
+          router.push('/feed');
+        }, 3000);
+      } else {
+        // Fallback if no points (shouldn't happen, but just in case)
+        Alert.alert('Success!', 'Post submitted successfully!', [
+          { text: 'OK', onPress: () => router.push('/feed') },
+        ]);
+      }
 
     } catch (error: any) {
       console.error('❌ Error creating post:', error);
@@ -359,6 +369,16 @@ export default function AddPostScreen() {
         <View style={{ height: 20 }} />
 
       </ScrollView>
+
+      {/* Points Earned Animation */}
+      <PointsEarnedAnimation
+        visible={showPointsAnimation}
+        pointsEarned={pointsEarned}
+        onClose={() => {
+          setShowPointsAnimation(false);
+          router.push('/feed');
+        }}
+      />
     </View>
   );
 }

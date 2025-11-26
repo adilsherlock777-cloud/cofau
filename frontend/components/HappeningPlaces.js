@@ -59,8 +59,13 @@ export default function HappeningPlaces() {
 
   const handleLocationPress = (location) => {
     console.log('📍 Location pressed:', location);
-    // TODO: Navigate to location details
-    // router.push(`/location-details/${location.location}`);
+    const locationName = location.location || location.location_name;
+    if (locationName) {
+      router.push({
+        pathname: '/location-details',
+        params: { locationName: encodeURIComponent(locationName) }
+      });
+    }
   };
 
   if (loading) {
@@ -111,7 +116,7 @@ export default function HappeningPlaces() {
       {/* Location Cards */}
       {topLocations.map((location, index) => (
         <TouchableOpacity
-          key={location.location}
+          key={location.location || location.location_name || index}
           style={styles.card}
           onPress={() => handleLocationPress(location)}
           activeOpacity={0.8}
@@ -125,56 +130,32 @@ export default function HappeningPlaces() {
             {/* Location Info */}
             <View style={styles.locationInfo}>
               <Text style={styles.locationName} numberOfLines={1}>
-                {location.location}
+                {location.location || location.location_name}
               </Text>
               <Text style={styles.uploadCount}>
                 {formatUploadCount(location.uploads)} uploaded
               </Text>
             </View>
 
-            {/* Image Thumbnails */}
+            {/* Image Thumbnails - Max 5 images */}
             <View style={styles.imageRow}>
-              {location.images.slice(0, 3).map((imageUrl, imgIndex) => (
-                <LinearGradient
-                  key={imgIndex}
-                  colors={['#ffeaa7', '#fd79a8', '#a29bfe']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.imageThumbnail}
-                >
-                  <Image
-                    source={{ uri: imageUrl }}
-                    style={styles.thumbnailImage}
-                    resizeMode="cover"
-                  />
-                </LinearGradient>
-              ))}
-              
-              {/* Placeholder gradients if less than 3 images */}
-              {[...Array(Math.max(0, 3 - location.images.length))].map((_, idx) => (
-                <LinearGradient
-                  key={`placeholder-${idx}`}
-                  colors={['#ffeaa7', '#fd79a8', '#a29bfe']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.imageThumbnail}
-                />
-              ))}
+              {location.images.slice(0, 5).map((imageUrl, imgIndex) => {
+                // Fix URL if needed
+                const fixedUrl = imageUrl?.startsWith('http') 
+                  ? imageUrl 
+                  : `https://backend.cofau.com${imageUrl?.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+                
+                return (
+                  <View key={imgIndex} style={styles.imageThumbnail}>
+                    <Image
+                      source={{ uri: fixedUrl }}
+                      style={styles.thumbnailImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                );
+              })}
             </View>
-
-            {/* "+NN+" Badge */}
-            {location.uploads > 3 && (
-              <LinearGradient
-                colors={['#f3a683', '#3dc1d3']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.badge}
-              >
-                <Text style={styles.badgeText}>
-                  +{location.uploads - 3}+
-                </Text>
-              </LinearGradient>
-            )}
           </View>
         </TouchableOpacity>
       ))}
@@ -258,10 +239,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   imageThumbnail: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 8,
     overflow: 'hidden',
+    marginRight: 4,
+    backgroundColor: '#f0f0f0',
   },
   thumbnailImage: {
     width: '100%',

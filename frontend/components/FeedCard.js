@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, Linking } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Linking, Share, Platform, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 
 import UserAvatar from "./UserAvatar";
 import { likePost, unlikePost } from "../utils/api";
-import { normalizeMediaUrl, normalizeProfilePicture } from "../utils/imageUrlFix";
+import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
 
 /* ----------------------------------------------------------
    ✅ EXTRACT CLEAN LOCATION FROM GOOGLE MAPS LINK
@@ -133,6 +133,37 @@ export default function FeedCard({ post, onLikeUpdate }) {
     }
   };
 
+  const handleShare = async () => {
+    try {
+      const postUrl = `${BACKEND_URL}/post/${post.id}`;
+      const shareText = `${post.username} shared a post on Cofau!\n\n${post.description || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${postUrl}`;
+      
+      const shareOptions = {
+        message: shareText,
+        url: postUrl,
+        title: `Check out ${post.username}'s post on Cofau`,
+      };
+
+      const result = await Share.share(shareOptions);
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared with activity type of result.activityType
+          console.log("Shared via:", result.activityType);
+        } else {
+          // Shared
+          console.log("Post shared successfully");
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // Dismissed
+        console.log("Share dismissed");
+      }
+    } catch (error) {
+      console.error("❌ Error sharing post:", error);
+      Alert.alert("Error", "Unable to share post. Please try again.");
+    }
+  };
+
   return (
     <View style={styles.card}>
       {/* Header */}
@@ -234,6 +265,11 @@ export default function FeedCard({ post, onLikeUpdate }) {
         >
           <Ionicons name="chatbubble-outline" size={22} color="#999" />
           <Text style={styles.actionText}>{post.comments || 0}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.action} onPress={handleShare}>
+          <Ionicons name="share-outline" size={22} color="#999" />
+          <Text style={styles.actionText}>Share</Text>
         </TouchableOpacity>
       </View>
 

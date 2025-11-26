@@ -642,6 +642,176 @@ async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: 
     
     return result
 
+@app.get("/api/search/posts")
+async def search_posts(
+    q: str,
+    skip: int = 0,
+    limit: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Search posts with intelligent ranking algorithm.
+    Searches across: review_text, location_name, and username.
+    Ranking based on:
+    - Exact matches (highest priority)
+    - Partial matches in review_text
+    - Location matches
+    - Username matches
+    - Engagement score (likes + comments + rating)
+    - Recency (newer posts ranked higher)
+    """
+    if not q or not q.strip():
+        return []
+    
+    db = get_database()
+    query = q.strip().lower()
+    
+    # Build MongoDB query to search across multiple fields
+    search_regex = {"$regex": query, "$options": "i"}
+    
+    # Get all posts that match the search query
+    all_posts = await db.posts.find({
+        "$or": [
+            {"review_text": search_regex},
+            {"location_name": search_regex},
+        ]
+    }).to_list(None)
+    
+    # Also search by username
+    users_matching = await db.users.find({
+        "full_name": search_regex
+    }).to_list(None)
+    
+    user_ids_matching = [str(u["_id"]) for u in users_matching]
+    
+    # Get posts from matching users
+    posts_by_users = await db.posts.find({
+        "user_id": {"$in": user_ids_matching}
+    }).to_list(None)
+    
+    # Combine and deduplicate posts
+    all_post_ids = set()
+    posts_with_scores = []
+    
+    # Process posts matching review_text or location_name
+    for post in all_posts:
+        post_id = str(post["_id"])
+        if post_id in all_post_ids:
+            continue
+        all_post_ids.add(post_id)
+        
+        # Calculate relevance score
+        score = 0
+        review_text = (post.get("review_text") or "").lower()
+        location_name = (post.get("location_name") or "").lower()
+        
+        # Exact match in review_text (highest score)
+        if query in review_text:
+            if review_text.startswith(query) or review_text.endswith(query):
+                score += 100  # Starts or ends with query
+            else:
+                score += 80   # Contains query
+        
+        # Exact match in location_name
+        if query in location_name:
+            if location_name.startswith(query):
+                score += 90
+            else:
+                score += 70
+        
+        # Engagement score (likes + comments + rating * 2)
+        engagement = post.get("likes_count", 0) + post.get("comments_count", 0) + (post.get("rating", 0) * 2)
+        score += engagement * 0.1
+        
+        # Recency score (newer posts get higher score)
+        created_at = post.get("created_at")
+        if created_at:
+            try:
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                elif not isinstance(created_at, datetime):
+                    created_at = None
+                
+                if created_at:
+                    days_old = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+                    recency_score = max(0, 50 - (days_old * 2))  # Decay over time
+                    score += recency_score
+            except (ValueError, TypeError):
+                pass  # Skip recency score if date parsing fails
+        
+        posts_with_scores.append((post, score))
+    
+    # Process posts from matching users
+    for post in posts_by_users:
+        post_id = str(post["_id"])
+        if post_id in all_post_ids:
+            continue
+        all_post_ids.add(post_id)
+        
+        # Lower score for username matches (indirect match)
+        score = 30
+        
+        # Engagement score
+        engagement = post.get("likes_count", 0) + post.get("comments_count", 0) + (post.get("rating", 0) * 2)
+        score += engagement * 0.1
+        
+        # Recency score
+        created_at = post.get("created_at")
+        if created_at:
+            try:
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                elif not isinstance(created_at, datetime):
+                    created_at = None
+                
+                if created_at:
+                    days_old = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+                    recency_score = max(0, 50 - (days_old * 2))
+                    score += recency_score
+            except (ValueError, TypeError):
+                pass  # Skip recency score if date parsing fails
+        
+        posts_with_scores.append((post, score))
+    
+    # Sort by score (descending)
+    posts_with_scores.sort(key=lambda x: x[1], reverse=True)
+    
+    # Apply pagination
+    paginated_posts = posts_with_scores[skip:skip + limit]
+    
+    # Build result
+    result = []
+    for post, score in paginated_posts:
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": image_url,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
+            "caption": post.get("review_text", ""),  # Alias for frontend compatibility
+            "location_name": post.get("location_name"),
+            "map_link": post.get("map_link"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "is_liked_by_user": is_liked,
+            "created_at": post["created_at"],
+            "relevance_score": score  # For debugging/analytics
+        })
+    
+    return result
+
 # ==================== FOLLOW ENDPOINTS ====================
 
 @app.post("/api/users/{user_id}/follow")

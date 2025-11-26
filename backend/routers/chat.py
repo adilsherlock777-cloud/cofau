@@ -5,6 +5,7 @@ from datetime import datetime
 from database import get_database
 from utils.jwt import decode_access_token
 from routers.auth import get_current_user
+from routers.notifications import create_notification
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -151,6 +152,20 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                 await manager.send_personal_message(current_user_id, msg_payload)
                 await manager.send_personal_message(other_user_id, msg_payload)
                 print(f"📨 Message sent: {current_user_id} -> {other_user_id}")
+                
+                # Create notification and send push notification for the recipient
+                try:
+                    await create_notification(
+                        db=db,
+                        notification_type="message",
+                        from_user_id=current_user_id,
+                        to_user_id=other_user_id,
+                        post_id=None,
+                        message=None,  # Will use default message
+                        send_push=True
+                    )
+                except Exception as e:
+                    print(f"⚠️ Error creating message notification: {str(e)}")
                 
             except WebSocketDisconnect:
                 raise

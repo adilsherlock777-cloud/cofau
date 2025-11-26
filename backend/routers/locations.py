@@ -26,18 +26,18 @@ async def get_top_locations(
         
         print("🔍 Fetching top locations...")
         
-        # Fetch all posts with non-empty locations
+        # Fetch all posts with non-empty location_name
         posts = await db.posts.find({
-            "location": {"$exists": True, "$ne": None, "$ne": ""}
+            "location_name": {"$exists": True, "$ne": None, "$ne": ""}
         }).to_list(None)
         
-        print(f"📊 Found {len(posts)} posts with locations")
+        print(f"📊 Found {len(posts)} posts with location_name")
         
-        # Group posts by location
+        # Group posts by location_name
         location_data = defaultdict(lambda: {"uploads": 0, "images": [], "posts": []})
         
         for post in posts:
-            location = post.get("location", "").strip()
+            location = post.get("location_name", "").strip()
             if not location:
                 continue
             
@@ -47,8 +47,8 @@ async def get_top_locations(
             # Increment upload count
             location_data[location]["uploads"] += 1
             
-            # Add post image if available and not already at limit
-            if post.get("media_url") and len(location_data[location]["images"]) < 4:
+            # Add post image if available and not already at limit (max 5 images)
+            if post.get("media_url") and len(location_data[location]["images"]) < 5:
                 location_data[location]["images"].append(post["media_url"])
             
             # Store post ID
@@ -60,9 +60,10 @@ async def get_top_locations(
         top_locations = [
             {
                 "location": location,
+                "location_name": location,  # Alias for consistency
                 "uploads": data["uploads"],
-                "images": data["images"][:3],  # Top 3 images for display
-                "post_ids": data["posts"][:10],  # Sample of post IDs
+                "images": data["images"][:5],  # Max 5 images for display
+                "post_ids": data["posts"],  # All post IDs for this location
             }
             for location, data in location_data.items()
         ]
@@ -103,9 +104,9 @@ async def get_location_details(
         # Normalize location name
         location_normalized = location_name.strip().title()
         
-        # Find all posts for this location
+        # Find all posts for this location (search by location_name)
         posts = await db.posts.find({
-            "location": {"$regex": f"^{location_normalized}$", "$options": "i"}
+            "location_name": {"$regex": f"^{location_normalized}$", "$options": "i"}
         }).sort("created_at", -1).to_list(None)
         
         # Format posts
@@ -117,13 +118,19 @@ async def get_location_details(
             formatted_posts.append({
                 "id": str(post["_id"]),
                 "media_url": post.get("media_url"),
+                "image_url": post.get("image_url") or post.get("media_url"),
                 "rating": post.get("rating"),
                 "review_text": post.get("review_text"),
-                "location": post.get("location"),
+                "location_name": post.get("location_name"),
+                "location": post.get("location_name"),  # For backward compatibility
+                "media_type": post.get("media_type", "image"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
                 "created_at": post.get("created_at").isoformat() if post.get("created_at") else None,
+                "user_id": str(post.get("user_id", "")),
                 "user": {
                     "id": str(user["_id"]) if user else None,
-                    "username": user.get("username") if user else "Unknown",
+                    "username": user.get("full_name") or user.get("username") if user else "Unknown",
                     "profile_picture": user.get("profile_picture") if user else None,
                 }
             })

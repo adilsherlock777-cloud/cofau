@@ -6,11 +6,20 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { LevelProvider } from "../context/LevelContext";
 import LevelUpAnimation from "../components/LevelUpAnimation";
 import { useEffect } from "react";
+import { setupNotificationListeners } from "../utils/pushNotifications";
 
 function RootLayoutNav() {
   const { isAuthenticated, loading, user, token } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Setup push notification listeners
+  useEffect(() => {
+    if (isAuthenticated) {
+      const cleanup = setupNotificationListeners(router);
+      return cleanup;
+    }
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
     console.log("🔄 _layout: Auth state changed");
