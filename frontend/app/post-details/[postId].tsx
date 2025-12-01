@@ -54,6 +54,7 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -106,6 +107,28 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
     } catch (e) {
       setIsLiked(prevLiked);
       setLikesCount(prevCount);
+    }
+  };
+
+  const handleSaveToggle = async () => {
+    const prevSaved = isSaved;
+
+    setIsSaved(!prevSaved);
+
+    try {
+      if (prevSaved) {
+        await axios.delete(`${API_URL}/posts/${post.id}/save`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(
+          `${API_URL}/posts/${post.id}/save`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+    } catch (e) {
+      setIsSaved(prevSaved);
     }
   };
 
@@ -268,6 +291,14 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
           onPress={() => onPostPress(post.id)}
         >
           <Ionicons name="share-outline" size={26} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={handleSaveToggle}>
+          <Ionicons
+            name={isSaved ? "bookmark" : "bookmark-outline"}
+            size={26}
+            color={isSaved ? "#4dd0e1" : "#000"}
+          />
         </TouchableOpacity>
       </View>
 

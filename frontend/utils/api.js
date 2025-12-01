@@ -241,4 +241,89 @@ export const getFollowing = async (userId) => {
   }
 };
 
+/**
+ * Send a compliment to a user
+ */
+export const sendCompliment = async (recipientId, complimentType) => {
+  try {
+    const response = await axios.post(`${API_URL}/compliments/send`, {
+      recipient_id: recipientId,
+      compliment_type: complimentType,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error sending compliment:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Save a post
+ */
+export const savePost = async (postId) => {
+  try {
+    const response = await axios.post(`${API_URL}/posts/${postId}/save`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error saving post:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Unsave a post
+ */
+export const unsavePost = async (postId) => {
+  try {
+    const response = await axios.delete(`${API_URL}/posts/${postId}/save`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error unsaving post:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get user's saved posts
+ */
+export const getSavedPosts = async (userId) => {
+  try {
+    const response = await axios.get(`${API_URL}/users/${userId}/saved-posts`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error fetching saved posts:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Search users by username
+ */
+export const searchUsers = async (query) => {
+  try {
+    const response = await axios.get(`${API_URL}/search/users`, {
+      params: { q: query, limit: 10 },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error searching users:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Search locations/restaurants
+ */
+export const searchLocations = async (query) => {
+  try {
+    const response = await axios.get(`${API_URL}/search/locations`, {
+      params: { q: query, limit: 10 },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error searching locations:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export default api;

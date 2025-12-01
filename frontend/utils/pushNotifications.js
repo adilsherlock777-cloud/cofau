@@ -105,6 +105,8 @@ export function setupNotificationListeners(navigation) {
       navigation?.push(`/post-details/${data.postId}`);
     } else if (data?.type === 'follow' && data?.fromUserId) {
       navigation?.push(`/profile?userId=${data.fromUserId}`);
+    } else if (data?.type === 'compliment' && data?.fromUserId) {
+      navigation?.push(`/profile?userId=${data.fromUserId}`);
     }
   });
 

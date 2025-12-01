@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 
 import UserAvatar from "./UserAvatar";
-import { likePost, unlikePost } from "../utils/api";
+import { likePost, unlikePost, savePost, unsavePost } from "../utils/api";
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
 
 /* ----------------------------------------------------------
@@ -71,6 +71,7 @@ export default function FeedCard({ post, onLikeUpdate }) {
 
   const [isLiked, setIsLiked] = useState(post.is_liked || false);
   const [likesCount, setLikes] = useState(post.likes || 0);
+  const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoError, setVideoError] = useState(false);
 
@@ -161,6 +162,20 @@ export default function FeedCard({ post, onLikeUpdate }) {
     } catch (error) {
       console.error("❌ Error sharing post:", error);
       Alert.alert("Error", "Unable to share post. Please try again.");
+    }
+  };
+
+  const handleSave = async () => {
+    const prev = isSaved;
+
+    setIsSaved(!prev);
+
+    try {
+      if (prev) await unsavePost(post.id);
+      else await savePost(post.id);
+    } catch (e) {
+      setIsSaved(prev);
+      console.log("❌ Save toggle failed:", e);
     }
   };
 
@@ -270,6 +285,14 @@ export default function FeedCard({ post, onLikeUpdate }) {
         <TouchableOpacity style={styles.action} onPress={handleShare}>
           <Ionicons name="share-outline" size={22} color="#999" />
           <Text style={styles.actionText}>Share</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.action} onPress={handleSave}>
+          <Ionicons
+            name={isSaved ? "bookmark" : "bookmark-outline"}
+            size={22}
+            color={isSaved ? "#4dd0e1" : "#999"}
+          />
         </TouchableOpacity>
       </View>
 
