@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, Linking, Share, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Linking, Share, Platform, Alert, Modal, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 
 import UserAvatar from "./UserAvatar";
-import { likePost, unlikePost, savePost, unsavePost } from "../utils/api";
+import { likePost, unlikePost, savePost, unsavePost, reportPost } from "../utils/api";
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
 
 /* ----------------------------------------------------------
@@ -75,6 +75,12 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoError, setVideoError] = useState(false);
 
+  // Report modal state
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportDescription, setReportDescription] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
+
   const mediaUrl = normalizeMediaUrl(post.media_url);
   const isVideo =
     post.media_type === "video" ||
@@ -138,7 +144,7 @@ export default function FeedCard({ post, onLikeUpdate }) {
     try {
       const postUrl = `${BACKEND_URL}/post/${post.id}`;
       const shareText = `${post.username} shared a post on Cofau!\n\n${post.description || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${postUrl}`;
-      
+
       const shareOptions = {
         message: shareText,
         url: postUrl,
@@ -202,6 +208,13 @@ export default function FeedCard({ post, onLikeUpdate }) {
               {getTimeAgo(post.created_at)}
             </Text>
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setShowMenuModal(true)}
+        >
+          <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
         </TouchableOpacity>
       </View>
 
@@ -320,6 +333,108 @@ export default function FeedCard({ post, onLikeUpdate }) {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Menu Modal */}
+      <Modal
+        visible={showMenuModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMenuModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenuModal(false)}
+        >
+          <View style={styles.menuModalContent}>
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={() => {
+                setShowMenuModal(false);
+                setShowReportModal(true);
+                setReportDescription('');
+              }}
+            >
+              <Ionicons name="flag-outline" size={20} color="#FF3B30" />
+              <Text style={styles.menuOptionText}>Report Post</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuCancel}
+              onPress={() => setShowMenuModal(false)}
+            >
+              <Text style={styles.menuCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal
+        visible={showReportModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.reportModalContent}>
+            <View style={styles.reportModalHeader}>
+              <Text style={styles.reportModalTitle}>Report Post</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowReportModal(false);
+                  setReportDescription('');
+                }}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.reportModalSubtitle}>
+              Please describe why you're reporting this post
+            </Text>
+
+            <TextInput
+              style={styles.reportDescriptionInput}
+              placeholder="Enter description..."
+              placeholderTextColor="#999"
+              value={reportDescription}
+              onChangeText={setReportDescription}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[styles.reportSubmitButton, submittingReport && styles.reportSubmitButtonDisabled]}
+              onPress={async () => {
+                if (!reportDescription.trim()) {
+                  Alert.alert('Error', 'Please provide a description for your report');
+                  return;
+                }
+
+                setSubmittingReport(true);
+                try {
+                  await reportPost(post.id, reportDescription);
+                  Alert.alert('Success', 'Post reported successfully');
+                  setShowReportModal(false);
+                  setReportDescription('');
+                } catch (error) {
+                  Alert.alert('Error', error.response?.data?.detail || error.message || 'Failed to submit report');
+                } finally {
+                  setSubmittingReport(false);
+                }
+              }}
+              disabled={submittingReport}
+            >
+              {submittingReport ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.reportSubmitButtonText}>Submit Report</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -333,9 +448,10 @@ const styles = StyleSheet.create({
     padding: 12,
   },
 
-  userHeader: { flexDirection: "row", marginBottom: 12 },
+  userHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   userInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
   userMeta: { marginLeft: 8 },
+  menuButton: { padding: 4 },
 
   username: { fontWeight: "bold", fontSize: 15, color: "#333" },
   timestamp: { fontSize: 12, color: "#888" },
@@ -393,5 +509,89 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#333",
+  },
+
+  // Report Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  menuModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  menuOptionText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  menuCancel: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  menuCancelText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
+  },
+  reportModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  reportModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reportModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  reportModalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  reportDescriptionInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 15,
+    color: '#333',
+    minHeight: 120,
+    marginBottom: 20,
+    backgroundColor: '#FAFAFA',
+  },
+  reportSubmitButton: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportSubmitButtonDisabled: {
+    opacity: 0.6,
+  },
+  reportSubmitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

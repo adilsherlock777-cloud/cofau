@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
 import { createPost } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +25,8 @@ import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
 export default function AddPostScreen() {
   const router = useRouter();
   const { showLevelUpAnimation } = useLevelAnimation();
-  const { refreshUser } = useAuth();
+  const auth = useAuth() as any;
+  const { refreshUser } = auth;
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
@@ -252,13 +254,15 @@ export default function AddPostScreen() {
                   <Image source={{ uri: mediaUri }} style={styles.mediaImage} />
                 ) : (
                   <View style={styles.videoPreview}>
-                    <LinearGradient
-                      colors={['#66D9E8', '#F093FB', '#F5576C']}
-                      style={styles.videoGradient}
-                    >
-                      <Ionicons name="play-circle" size={60} color="#FFF" />
-                      <Text style={styles.videoText}>Video Selected</Text>
-                    </LinearGradient>
+                    <Video
+                      source={{ uri: mediaUri }}
+                      style={styles.videoPlayer}
+                      resizeMode={ResizeMode.COVER}
+                      shouldPlay={false}
+                      useNativeControls={true}
+                      isLooping={false}
+                      isMuted={false}
+                    />
                   </View>
                 )}
 
@@ -282,7 +286,7 @@ export default function AddPostScreen() {
           <View style={styles.ratingContainer}>
             <Text style={styles.ratingNumber}>{rating || 0}/10</Text>
             <View style={styles.starsContainer}>
-              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                 <TouchableOpacity key={n} onPress={() => setRating(n.toString())}>
                   <Ionicons
                     name="star"
@@ -423,6 +427,16 @@ const styles = StyleSheet.create({
 
   mediaPreview: { flex: 1 },
   mediaImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  videoPreview: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
+  },
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+  },
 
   changeMediaButton: {
     position: 'absolute',

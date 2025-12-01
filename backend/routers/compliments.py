@@ -195,3 +195,52 @@ async def get_sent_compliments(
     
     return result
 
+
+@router.get("/user/{user_id}/count")
+async def get_user_compliments_count(user_id: str):
+    """Get total compliments count received by a user"""
+    db = get_database()
+    
+    # Count compliments received by this user
+    count = await db.compliments.count_documents({"to_user_id": user_id})
+    
+    return {"compliments_count": count}
+
+
+@router.get("/user/{user_id}/received")
+async def get_user_received_compliments(
+    user_id: str,
+    limit: int = 50,
+    skip: int = 0
+):
+    """Get compliments received by a specific user"""
+    db = get_database()
+    
+    # Fetch compliments
+    cursor = db.compliments.find(
+        {"to_user_id": user_id}
+    ).sort("created_at", -1).skip(skip).limit(limit)
+    
+    compliments = await cursor.to_list(length=limit)
+    
+    # Enrich with user details
+    result = []
+    for compliment in compliments:
+        from_user = await db.users.find_one({"_id": ObjectId(compliment["from_user_id"])})
+        compliment_type = compliment["compliment_type"]
+        compliment_info = COMPLIMENT_TYPES.get(compliment_type, {})
+        
+        result.append({
+            "id": str(compliment["_id"]),
+            "from_user_id": compliment["from_user_id"],
+            "from_user_name": from_user["full_name"] if from_user else "Unknown User",
+            "from_user_profile_picture": from_user.get("profile_picture") if from_user else None,
+            "compliment_type": compliment_type,
+            "compliment_name": compliment_info.get("name", compliment_type),
+            "compliment_icon": compliment_info.get("icon", "💝"),
+            "compliment_color": compliment_info.get("color", "#999"),
+            "created_at": compliment["created_at"].isoformat() if hasattr(compliment["created_at"], "isoformat") else str(compliment["created_at"])
+        })
+    
+    return result
+

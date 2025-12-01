@@ -23,7 +23,7 @@ const api = axios.create({
 export const createPost = async (postData) => {
   try {
     const formData = new FormData();
-    
+
     // Append form fields
     formData.append('rating', postData.rating);
     formData.append('review_text', postData.review_text);
@@ -36,7 +36,7 @@ export const createPost = async (postData) => {
     if (postData.media_type) {
       formData.append('media_type', postData.media_type);   // 👈 NEW
     }
-    
+
     // Append file - handle both web and native
     if (postData.file) {
       if (postData.file.uri) {
@@ -44,7 +44,7 @@ export const createPost = async (postData) => {
         const fileUri = postData.file.uri;
         const filename = postData.file.name || fileUri.split('/').pop();
         const fileType = postData.file.type || 'image/jpeg';
-        
+
         formData.append('file', {
           uri: fileUri,
           name: filename,
@@ -55,7 +55,7 @@ export const createPost = async (postData) => {
         formData.append('file', postData.file);
       }
     }
-    
+
     console.log('📤 Creating post with data:', {
       rating: postData.rating,
       review_text: postData.review_text,
@@ -63,14 +63,14 @@ export const createPost = async (postData) => {
       media_type: postData.media_type,
       file: postData.file?.name || postData.file?.uri || 'unknown'
     });
-    
+
     const response = await axios.post(`${API_URL}/posts/create`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         'Authorization': axios.defaults.headers.common['Authorization'],
       },
     });
-    
+
     console.log('✅ Post created successfully:', response.data);
     return response.data;
   } catch (error) {
@@ -112,11 +112,11 @@ export const getComments = async (postId) => {
   try {
     // Normalize postId
     const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
-    
+
     if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
       throw new Error('Invalid post ID');
     }
-    
+
     console.log('📥 Fetching comments for postId:', normalizedPostId);
     const response = await axios.get(`${API_URL}/posts/${normalizedPostId}/comments`);
     return response.data;
@@ -137,29 +137,29 @@ export const addComment = async (postId, commentText, token = null) => {
   if (!postId) {
     throw new Error('Post ID is required');
   }
-  
+
   // Ensure postId is a string (handle array case from expo-router)
   const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
-  
+
   if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
     throw new Error('Invalid post ID');
   }
-  
+
   try {
     const formData = new FormData();
     formData.append('comment_text', commentText.trim());
-    
+
     // Get authorization token - prefer passed token, fallback to axios defaults
-    const authToken = token 
-      ? `Bearer ${token}` 
+    const authToken = token
+      ? `Bearer ${token}`
       : axios.defaults.headers.common['Authorization'];
-    
+
     if (!authToken) {
       throw new Error('No authorization token found. Please login again.');
     }
-    
-    console.log('📤 Adding comment:', { 
-      postId: normalizedPostId, 
+
+    console.log('📤 Adding comment:', {
+      postId: normalizedPostId,
       originalPostId: postId,
       commentText: commentText.substring(0, 50),
       tokenSource: token ? 'passed' : 'axios defaults'
@@ -167,17 +167,17 @@ export const addComment = async (postId, commentText, token = null) => {
     console.log('🔑 Auth token present:', !!authToken);
     console.log('🌐 Platform:', Platform.OS);
     console.log('🌐 API URL:', `${API_URL}/posts/${normalizedPostId}/comment`);
-    
+
     // Build headers - match post-details implementation exactly
     const headers = {
       'Authorization': authToken,
       'Content-Type': 'multipart/form-data', // Always set like post-details does
     };
-    
+
     const response = await axios.post(`${API_URL}/posts/${normalizedPostId}/comment`, formData, {
       headers,
     });
-    
+
     console.log('✅ Comment added successfully');
     return response.data;
   } catch (error) {
@@ -322,6 +322,72 @@ export const searchLocations = async (query) => {
     return response.data;
   } catch (error) {
     console.error('❌ Error searching locations:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Report a post
+ */
+export const reportPost = async (postId, description) => {
+  try {
+    const formData = new FormData();
+    formData.append('description', description);
+
+    const response = await axios.post(`${API_URL}/posts/${postId}/report`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error reporting post:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Report a user
+ */
+export const reportUser = async (userId, description) => {
+  try {
+    const formData = new FormData();
+    formData.append('description', description);
+
+    const response = await axios.post(`${API_URL}/users/${userId}/report`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error reporting user:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Mark a story as viewed
+ */
+export const markStoryViewed = async (storyId) => {
+  try {
+    const response = await axios.post(`${API_URL}/stories/${storyId}/view`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error marking story as viewed:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get story views count and viewers list
+ */
+export const getStoryViews = async (storyId) => {
+  try {
+    const response = await axios.get(`${API_URL}/stories/${storyId}/views`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error getting story views:', error.response?.data || error.message);
     throw error;
   }
 };

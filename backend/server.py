@@ -20,9 +20,11 @@ from routers.stories import router as stories_router
 from routers.locations import router as locations_router
 from routers.chat import router as chat_router
 from routers.compliments import router as compliments_router
+from routers.moderation import router as moderation_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
+from utils.moderation import check_image_moderation, save_moderation_result
 
 
 @asynccontextmanager
@@ -97,6 +99,7 @@ app.include_router(stories_router)
 app.include_router(locations_router)
 app.include_router(chat_router)
 app.include_router(compliments_router)
+app.include_router(moderation_router)
 
 
 
@@ -158,6 +161,58 @@ async def create_post(
     # Detect media type
     media_type = "video" if file_ext in ["mp4", "mov"] else "image"
 
+    # ======================================================
+    # CONTENT MODERATION - Check for banned content
+    # ======================================================
+    moderation_result = None
+    if media_type == "image":
+        moderation_response = check_image_moderation(
+            file_path=file_path,
+            user_id=str(current_user["_id"])
+        )
+        
+        if not moderation_response.allowed:
+            # ❌ BANNED CONTENT DETECTED - Delete file immediately (NOT uploaded to server)
+            print(f"🚫 BANNED CONTENT DETECTED - User: {current_user.get('full_name', 'Unknown')} (ID: {current_user['_id']})")
+            print(f"   Reason: {moderation_response.reason}")
+            print(f"   File: {file_path}")
+            
+            # Delete the file immediately - it will NOT be saved to server
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"✅ Banned file deleted from server: {file_path}")
+                else:
+                    print(f"⚠️ File not found (may have been deleted already): {file_path}")
+            except Exception as e:
+                print(f"❌ CRITICAL: Failed to delete banned file: {str(e)}")
+                # Try again
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+            
+            # Save moderation result for tracking (even though file is deleted)
+            if moderation_response.moderation_result:
+                await save_moderation_result(
+                    db=db,
+                    moderation_result=moderation_response.moderation_result,
+                    post_id=None  # No post created - upload was blocked
+                )
+            
+            # Block the upload - return error to user
+            raise HTTPException(
+                status_code=400,
+                detail=f"Content not allowed: {moderation_response.reason or 'Banned content detected. Image contains nudity, alcohol, or other prohibited content.'}"
+            )
+        
+        # Save moderation result for allowed content
+        if moderation_response.moderation_result:
+            # We'll save this after post creation with the post_id
+            moderation_result = moderation_response.moderation_result
+    # Note: For videos, moderation is optional (Sightengine supports video but it's more expensive)
+    # You can add video moderation later if needed
+
     # Clean map link
     clean_map_link = None
     if map_link:
@@ -196,6 +251,14 @@ async def create_post(
 
     result = await db.posts.insert_one(post_doc)
     post_id = str(result.inserted_id)
+
+    # Save moderation result with post_id
+    if moderation_result:
+        await save_moderation_result(
+            db=db,
+            moderation_result=moderation_result,
+            post_id=post_id
+        )
 
     # Level update
     level_update = calculateUserLevelAfterPost(current_user)
@@ -954,8 +1017,8 @@ async def search_users(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Search users by username/full_name for preview
-    Returns user profiles with basic info
+    Search users by username/full_name for preview (Instagram-like)
+    Returns user profiles with basic info and sample posts
     """
     if not q or not q.strip():
         return []
@@ -980,6 +1043,23 @@ async def search_users(
             "following_id": str(user["_id"])
         }) is not None
         
+        # Get sample posts (recent 6 posts for Instagram-like preview)
+        sample_posts = []
+        user_posts = await db.posts.find({
+            "user_id": str(user["_id"])
+        }).sort("created_at", -1).limit(6).to_list(6)
+        
+        for post in user_posts:
+            media_type = post.get("media_type", "image")
+            if media_type == "image":
+                media_url = post.get("media_url") or post.get("image_url")
+                if media_url:
+                    sample_posts.append({
+                        "post_id": str(post["_id"]),
+                        "media_url": media_url,
+                        "media_type": media_type
+                    })
+        
         result.append({
             "id": str(user["_id"]),
             "username": user["full_name"],
@@ -990,7 +1070,8 @@ async def search_users(
             "posts_count": posts_count,
             "followers_count": user.get("followers_count", 0),
             "is_following": is_following,
-            "is_own_profile": str(user["_id"]) == str(current_user["_id"])
+            "is_own_profile": str(user["_id"]) == str(current_user["_id"]),
+            "sample_posts": sample_posts[:6]  # Max 6 posts for preview
         })
     
     return result
@@ -1035,8 +1116,8 @@ async def search_locations(
         location_map[location_name]["posts"].append(post)
         location_map[location_name]["total_posts"] += 1
         
-        # Collect sample photos (up to 4)
-        if len(location_map[location_name]["sample_photos"]) < 4:
+        # Collect sample photos (up to 6 for better preview)
+        if len(location_map[location_name]["sample_photos"]) < 6:
             media_type = post.get("media_type", "image")
             if media_type == "image":
                 media_url = post.get("media_url") or post.get("image_url")
@@ -1058,7 +1139,7 @@ async def search_locations(
             "name": location_data["name"],
             "total_posts": location_data["total_posts"],
             "average_rating": round(avg_rating, 1),
-            "sample_photos": location_data["sample_photos"][:4],  # Max 4 photos
+            "sample_photos": location_data["sample_photos"][:6],  # Max 6 photos for better preview
             "map_link": location_data["posts"][0].get("map_link") if location_data["posts"] else None
         })
     
@@ -1397,3 +1478,84 @@ async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = 20):
         })
     
     return result
+
+# ==================== REPORT ENDPOINTS ====================
+
+@app.post("/api/posts/{post_id}/report")
+async def report_post(
+    post_id: str,
+    description: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Report a post with description"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if user already reported this post
+    existing_report = await db.reports.find_one({
+        "post_id": post_id,
+        "reporter_id": str(current_user["_id"])
+    })
+    
+    if existing_report:
+        raise HTTPException(status_code=400, detail="You have already reported this post")
+    
+    # Create report
+    report_doc = {
+        "post_id": post_id,
+        "reporter_id": str(current_user["_id"]),
+        "reported_user_id": post["user_id"],
+        "description": description.strip(),
+        "status": "pending",
+        "created_at": datetime.utcnow()
+    }
+    
+    await db.reports.insert_one(report_doc)
+    
+    return {"message": "Post reported successfully"}
+
+@app.post("/api/users/{user_id}/report")
+async def report_user(
+    user_id: str,
+    description: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Report a user with description"""
+    db = get_database()
+    
+    # Check if user exists
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent self-reporting
+    if str(user["_id"]) == str(current_user["_id"]):
+        raise HTTPException(status_code=400, detail="You cannot report yourself")
+    
+    # Check if user already reported this user
+    existing_report = await db.reports.find_one({
+        "reported_user_id": user_id,
+        "reporter_id": str(current_user["_id"]),
+        "post_id": None  # User report, not post report
+    })
+    
+    if existing_report:
+        raise HTTPException(status_code=400, detail="You have already reported this user")
+    
+    # Create report
+    report_doc = {
+        "post_id": None,
+        "reporter_id": str(current_user["_id"]),
+        "reported_user_id": user_id,
+        "description": description.strip(),
+        "status": "pending",
+        "created_at": datetime.utcnow()
+    }
+    
+    await db.reports.insert_one(report_doc)
+    
+    return {"message": "User reported successfully"}

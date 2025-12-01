@@ -8,14 +8,15 @@ import {
   ActivityIndicator,
   Dimensions,
   TextInput,
+  Modal,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { Image } from "expo-image";
-import { likePost, unlikePost } from "../utils/api";
-import HappeningPlaces from "../components/HappeningPlaces";
+import { likePost, unlikePost, reportPost } from "../utils/api";
 
 // =======================
 //  CONFIG
@@ -68,7 +69,8 @@ const isVideoFile = (url: string, media_type: string) => {
 // =======================
 export default function ExploreScreen() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const auth = useAuth() as { user: any; token: string | null };
+  const { user, token } = auth;
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
@@ -78,6 +80,13 @@ export default function ExploreScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Report modal state
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [reportDescription, setReportDescription] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -100,7 +109,7 @@ export default function ExploreScreen() {
       const skip = refresh ? 0 : (page - 1) * 30;
 
       const res = await axios.get(`${API_URL}/feed?limit=30&skip=${skip}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token || ''}` },
       });
 
       const newPosts = res.data.map((post: any) => {
@@ -114,7 +123,7 @@ export default function ExploreScreen() {
           full_image_url: fullUrl,
           full_thumbnail_url: thumb,
           is_liked: post.is_liked_by_user || false,
-          _isVideo: isVideoFile(fullUrl, post.media_type),
+          _isVideo: isVideoFile(fullUrl || '', post.media_type),
         };
       });
 
@@ -143,7 +152,7 @@ export default function ExploreScreen() {
       setSearching(true);
       const res = await axios.get(`${API_URL}/search/posts`, {
         params: { q: query.trim(), limit: 100 },
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token || ''}` },
       });
 
       const searchPosts = res.data.map((post: any) => {
@@ -156,7 +165,7 @@ export default function ExploreScreen() {
           full_image_url: fullUrl,
           full_thumbnail_url: thumb,
           is_liked: post.is_liked_by_user || false,
-          _isVideo: isVideoFile(fullUrl, post.media_type),
+          _isVideo: isVideoFile(fullUrl || '', post.media_type),
         };
       });
 
@@ -203,10 +212,10 @@ export default function ExploreScreen() {
         prev.map((p) =>
           p.id === id
             ? {
-                ...p,
-                is_liked: !liked,
-                likes_count: p.likes_count + (liked ? -1 : 1),
-              }
+              ...p,
+              is_liked: !liked,
+              likes_count: p.likes_count + (liked ? -1 : 1),
+            }
             : p
         )
       );
@@ -259,8 +268,41 @@ export default function ExploreScreen() {
             color={item.is_liked ? "#FF4D4D" : "#ffffff"}
           />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={(e) => {
+            e.stopPropagation();
+            setSelectedPostId(item.id);
+            setShowMenuModal(true);
+          }}
+        >
+          <Ionicons name="ellipsis-horizontal" size={16} color="#fff" />
+        </TouchableOpacity>
       </TouchableOpacity>
     );
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportDescription.trim()) {
+      Alert.alert('Error', 'Please provide a description for your report');
+      return;
+    }
+
+    if (!selectedPostId) return;
+
+    setSubmittingReport(true);
+    try {
+      await reportPost(selectedPostId, reportDescription);
+      Alert.alert('Success', 'Post reported successfully');
+      setShowReportModal(false);
+      setReportDescription('');
+      setSelectedPostId(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || error.message || 'Failed to submit report');
+    } finally {
+      setSubmittingReport(false);
+    }
   };
 
   // ==================================
@@ -287,9 +329,6 @@ export default function ExploreScreen() {
   // ==================================
   return (
     <View style={styles.container}>
-      {/* Happening Places Section */}
-      <HappeningPlaces />
-
       {/* Search bar */}
       <View style={styles.searchBox}>
         <TextInput
@@ -314,8 +353,8 @@ export default function ExploreScreen() {
             {searching
               ? "Searching…"
               : searchResults.length > 0
-              ? `Found ${searchResults.length} result${searchResults.length !== 1 ? "s" : ""}`
-              : "No results found"}
+                ? `Found ${searchResults.length} result${searchResults.length !== 1 ? "s" : ""}`
+                : "No results found"}
           </Text>
         </View>
       )}
@@ -357,6 +396,91 @@ export default function ExploreScreen() {
           ) : null
         }
       />
+
+      {/* Menu Modal */}
+      <Modal
+        visible={showMenuModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMenuModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenuModal(false)}
+        >
+          <View style={styles.menuModalContent}>
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={() => {
+                setShowMenuModal(false);
+                setShowReportModal(true);
+                setReportDescription('');
+              }}
+            >
+              <Ionicons name="flag-outline" size={20} color="#FF3B30" />
+              <Text style={styles.menuOptionText}>Report Post</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuCancel}
+              onPress={() => setShowMenuModal(false)}
+            >
+              <Text style={styles.menuCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal
+        visible={showReportModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.reportModalContent}>
+            <View style={styles.reportModalHeader}>
+              <Text style={styles.reportModalTitle}>Report Post</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowReportModal(false);
+                  setReportDescription('');
+                }}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.reportModalSubtitle}>
+              Please describe why you're reporting this post
+            </Text>
+
+            <TextInput
+              style={styles.reportDescriptionInput}
+              placeholder="Enter description..."
+              placeholderTextColor="#999"
+              value={reportDescription}
+              onChangeText={setReportDescription}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[styles.reportSubmitButton, submittingReport && styles.reportSubmitButtonDisabled]}
+              onPress={handleSubmitReport}
+              disabled={submittingReport}
+            >
+              {submittingReport ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.reportSubmitButtonText}>Submit Report</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -416,6 +540,96 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     padding: 4,
     borderRadius: 20,
+  },
+  menuBtn: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 4,
+    borderRadius: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  menuModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  menuOptionText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  menuCancel: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  menuCancelText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
+  },
+  reportModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  reportModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reportModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  reportModalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  reportDescriptionInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 15,
+    color: '#333',
+    minHeight: 120,
+    marginBottom: 20,
+    backgroundColor: '#FAFAFA',
+  },
+  reportSubmitButton: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportSubmitButtonDisabled: {
+    opacity: 0.6,
+  },
+  reportSubmitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 
   searchInfo: {

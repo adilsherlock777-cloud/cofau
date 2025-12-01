@@ -12,6 +12,8 @@ import {
   Linking,
   FlatList,
   Dimensions,
+  Modal,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -59,12 +61,37 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const videoRef = useRef(null);
 
   const isVideo = (post.media_type || "").toLowerCase() === "video";
   const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url);
   const imageUrl = normalizeMediaUrl(post.image_url || post.media_url);
   const profilePic = normalizeProfilePicture(post.user_profile_picture);
+
+  // Ensure we have a valid URL for display (fallback to normalizeUrl if needed)
+  const getDisplayUrl = () => {
+    if (isVideo) {
+      return mediaUrl || normalizeUrl(post.media_url || post.image_url);
+    }
+    return imageUrl || mediaUrl || normalizeUrl(post.image_url || post.media_url);
+  };
+
+  const displayUrl = getDisplayUrl();
+
+  // Debug URLs for share modal
+  useEffect(() => {
+    if (showShareModal) {
+      console.log("🔍 Share Modal Debug:");
+      console.log("  Post ID:", post.id);
+      console.log("  Is Video:", isVideo);
+      console.log("  Original media_url:", post.media_url);
+      console.log("  Original image_url:", post.image_url);
+      console.log("  Normalized mediaUrl:", mediaUrl);
+      console.log("  Normalized imageUrl:", imageUrl);
+      console.log("  Display URL:", displayUrl);
+    }
+  }, [showShareModal, post.id, isVideo, mediaUrl, imageUrl, displayUrl]);
 
   useEffect(() => {
     if (showComments) {
@@ -172,6 +199,31 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
     if (hrs < 24) return `${hrs}h ago`;
     if (days < 7) return `${days}d ago`;
     return date.toLocaleDateString();
+  };
+
+  const handleSharePost = async () => {
+    try {
+      const postUrl = `${BACKEND}/post/${post.id}`;
+      const shareText = `${post.username} shared a post on Cofau!\n\n${post.review_text || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${postUrl}`;
+
+      const shareOptions = {
+        message: shareText,
+        url: postUrl,
+        title: `Check out ${post.username}'s post on Cofau`,
+      };
+
+      const result = await Share.share(shareOptions);
+
+      if (result.action === Share.sharedAction) {
+        setShowShareModal(false);
+        console.log("Post shared successfully");
+      } else if (result.action === Share.dismissedAction) {
+        console.log("Share dismissed");
+      }
+    } catch (error) {
+      console.error("❌ Error sharing post:", error);
+      Alert.alert("Error", "Unable to share post. Please try again.");
+    }
   };
 
   return (
@@ -288,7 +340,7 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
 
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => onPostPress(post.id)}
+          onPress={() => setShowShareModal(true)}
         >
           <Ionicons name="share-outline" size={26} color="#000" />
         </TouchableOpacity>
@@ -356,6 +408,92 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
           </View>
         </View>
       )}
+
+      {/* Share Modal */}
+      <Modal
+        visible={showShareModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowShareModal(false)}
+      >
+        <View style={styles.shareModalOverlay}>
+          <View style={styles.shareModalContent}>
+            <View style={styles.shareModalHeader}>
+              <Text style={styles.shareModalTitle}>Share Post</Text>
+              <TouchableOpacity onPress={() => setShowShareModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Post Image */}
+            {displayUrl && (
+              <View style={styles.sharePostImageContainer}>
+                {isVideo ? (
+                  <Video
+                    source={{ uri: displayUrl }}
+                    style={styles.sharePostImage}
+                    resizeMode="cover"
+                    useNativeControls={false}
+                    isLooping
+                    shouldPlay={false}
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: displayUrl }}
+                    style={styles.sharePostImage}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                )}
+              </View>
+            )}
+
+            {/* Post Details */}
+            <View style={styles.sharePostDetails}>
+              {/* Rating */}
+              {post.rating ? (
+                <View style={styles.shareDetailRow}>
+                  <Ionicons name="star" size={20} color="#FFD700" />
+                  <Text style={styles.shareDetailText}>-{post.rating}/10</Text>
+                </View>
+              ) : null}
+
+              {/* Location */}
+              {post.location_name ? (
+                <View style={styles.shareDetailRow}>
+                  <Ionicons name="location" size={20} color="#FF3B30" />
+                  <Text style={styles.shareDetailText}>-{post.location_name}</Text>
+                </View>
+              ) : null}
+
+              {/* Link */}
+              <TouchableOpacity
+                style={styles.shareDetailRow}
+                onPress={() => {
+                  const postUrl = `${BACKEND}/post/${post.id}`;
+                  Linking.openURL(postUrl).catch((err) =>
+                    console.error("Failed to open URL:", err)
+                  );
+                }}
+              >
+                <Ionicons name="link" size={20} color="#888" />
+                <Text style={styles.shareLinkText}>
+                  click on this link to view on Cofau
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Share Button */}
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleSharePost}
+            >
+              <Ionicons name="share-outline" size={20} color="#fff" />
+              <Text style={styles.shareButtonText}>Share Post</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -734,5 +872,94 @@ const styles = StyleSheet.create({
   footerLoader: {
     padding: 20,
     alignItems: "center",
+  },
+
+  // Share Modal Styles
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  shareModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    width: "90%",
+    maxWidth: 400,
+    padding: 20,
+    alignItems: "center",
+  },
+
+  shareModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 20,
+  },
+
+  shareModalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#000",
+  },
+
+  sharePostImageContainer: {
+    width: "100%",
+    height: 300,
+    borderRadius: 15,
+    overflow: "hidden",
+    marginBottom: 20,
+    backgroundColor: "#000",
+  },
+
+  sharePostImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  sharePostDetails: {
+    width: "100%",
+    marginBottom: 20,
+  },
+
+  shareDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingVertical: 8,
+  },
+
+  shareDetailText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "500",
+  },
+
+  shareLinkText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: "#888",
+    textDecorationLine: "underline",
+  },
+
+  shareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4dd0e1",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+    width: "100%",
+  },
+
+  shareButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
   },
 });

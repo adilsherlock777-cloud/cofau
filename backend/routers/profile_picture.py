@@ -7,6 +7,7 @@ import glob
 from database import get_database
 from routers.auth import get_current_user
 from config import settings
+from utils.moderation import check_image_moderation, save_moderation_result
 
 router = APIRouter(prefix="/api/users", tags=["profile_picture"])
 
@@ -150,6 +151,59 @@ async def upload_profile_image(
         print(f"✅ Saved profile picture: {file_path}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+    # -------------------------------------------------------------
+    # CONTENT MODERATION - Check for banned content
+    # -------------------------------------------------------------
+    moderation_response = check_image_moderation(
+        file_path=file_path,
+        user_id=user_id
+    )
+    
+    if not moderation_response.allowed:
+        # ❌ BANNED CONTENT DETECTED - Delete file immediately (NOT uploaded to server)
+        print(f"🚫 BANNED CONTENT DETECTED (Profile Picture) - User: {user_id}")
+        print(f"   Reason: {moderation_response.reason}")
+        print(f"   File: {file_path}")
+        
+        # Delete the file immediately - it will NOT be saved to server
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"✅ Banned file deleted from server: {file_path}")
+            else:
+                print(f"⚠️ File not found (may have been deleted already): {file_path}")
+        except Exception as e:
+            print(f"❌ CRITICAL: Failed to delete banned file: {str(e)}")
+            # Try again
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        
+        # Save moderation result for tracking (even though file is deleted)
+        if moderation_response.moderation_result:
+            await save_moderation_result(
+                db=db,
+                moderation_result=moderation_response.moderation_result,
+                post_id=None,
+                story_id=None
+            )
+        
+        # Block the upload - return error to user
+        raise HTTPException(
+            status_code=400,
+            detail=f"Content not allowed: {moderation_response.reason or 'Banned content detected. Image contains nudity, alcohol, or other prohibited content.'}"
+        )
+    
+    # Save moderation result for allowed content
+    if moderation_response.moderation_result:
+        await save_moderation_result(
+            db=db,
+            moderation_result=moderation_response.moderation_result,
+            post_id=None,
+            story_id=None
+        )
 
     # -------------------------------------------------------------
     # PUBLIC URL (Frontend will use this) - Use same format as feed images
