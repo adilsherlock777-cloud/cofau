@@ -22,6 +22,8 @@ import { useAuth } from '../context/AuthContext';
 import LevelBadge from '../components/LevelBadge';
 import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
+import ComplimentModal from '../components/ComplimentModal';
+import { sendCompliment } from '../utils/api';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 const API_URL = `${BACKEND_URL}/api`;
@@ -58,7 +60,7 @@ export default function ProfileScreen() {
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'photo' | 'video' | 'collabs'>('photo');
+  const [activeTab, setActiveTab] = useState<'photo' | 'video' | 'collabs' | 'saved'>('photo');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editedBio, setEditedBio] = useState('');
   const [editedName, setEditedName] = useState('');
@@ -68,6 +70,8 @@ export default function ProfileScreen() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [levelDetailsModalVisible, setLevelDetailsModalVisible] = useState(false);
+  const [complimentModalVisible, setComplimentModalVisible] = useState(false);
+  const [sendingCompliment, setSendingCompliment] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -200,6 +204,8 @@ export default function ProfileScreen() {
         endpoint += '&media_type=video';
       } else if (activeTab === 'collabs') {
         endpoint = `${API_URL}/users/${userData.id}/collaborations?limit=50`;
+      } else if (activeTab === 'saved') {
+        endpoint = `${API_URL}/users/${userData.id}/saved-posts?limit=50`;
       }
 
       const response = await axios.get(endpoint, {
@@ -773,6 +779,15 @@ export default function ProfileScreen() {
               <Ionicons name="chatbubbles-outline" size={20} color="#fff" />
               <Text style={styles.editButtonText}>Message</Text>
             </TouchableOpacity>
+
+            {/* Compliment Button */}
+            <TouchableOpacity
+              style={[styles.editButton, { backgroundColor: "#FF6B6B", marginTop: 10 }]}
+              onPress={() => setComplimentModalVisible(true)}
+            >
+              <Ionicons name="heart-outline" size={20} color="#fff" />
+              <Text style={styles.editButtonText}>Compliment</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -825,6 +840,21 @@ export default function ProfileScreen() {
               Collabs
             </Text>
           </TouchableOpacity>
+          {isOwnProfile && (
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'saved' && styles.activeTab]}
+              onPress={() => setActiveTab('saved')}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === 'saved' && styles.activeTabText,
+                ]}
+              >
+                Saved
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Content Grid */}
@@ -841,6 +871,7 @@ export default function ProfileScreen() {
                 {activeTab === 'photo' && 'No photos yet'}
                 {activeTab === 'video' && 'No videos yet'}
                 {activeTab === 'collabs' && 'No collaborations yet'}
+                {activeTab === 'saved' && 'No saved posts yet'}
               </Text>
             </View>
           )}
@@ -968,6 +999,31 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Compliment Modal */}
+      <ComplimentModal
+        visible={complimentModalVisible}
+        onClose={() => setComplimentModalVisible(false)}
+        onSend={async (complimentType: string) => {
+          if (!userData?.id || !token) return;
+          
+          setSendingCompliment(true);
+          try {
+            await sendCompliment(userData.id, complimentType);
+            Alert.alert('Success', 'Compliment sent successfully!');
+            setComplimentModalVisible(false);
+          } catch (error: any) {
+            console.error('❌ Error sending compliment:', error);
+            Alert.alert(
+              'Error',
+              error.response?.data?.detail || 'Failed to send compliment. Please try again.'
+            );
+          } finally {
+            setSendingCompliment(false);
+          }
+        }}
+        loading={sendingCompliment}
+      />
 
       {/* Level Details Modal */}
       <Modal

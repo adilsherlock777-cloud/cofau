@@ -21,7 +21,7 @@ async def create_notification(
 ):
     """
     Helper function to create a notification and optionally send push notification.
-    Types: "like", "comment", "follow", "new_post", "message"
+    Types: "like", "comment", "follow", "new_post", "message", "compliment"
     """
     # Don't notify yourself
     if from_user_id == to_user_id:
@@ -86,6 +86,8 @@ async def create_notification(
                     title = "New Follower"
                 elif notification_type == "new_post":
                     title = "New Post"
+                elif notification_type == "compliment":
+                    title = "New Compliment"
                 
                 await send_push_notification(
                     device_tokens=device_tokens,

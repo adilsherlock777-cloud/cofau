@@ -109,6 +109,7 @@ export default function FeedScreen() {
         likes: post.likes_count,
         comments: post.comments_count,
         is_liked: post.is_liked_by_user,
+        is_saved_by_user: post.is_saved_by_user,
 
         // ✅ media URL normalized safely
         media_url: normalizeMediaUrl(post.image_url || post.media_url),

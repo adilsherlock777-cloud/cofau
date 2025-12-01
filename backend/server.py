@@ -19,6 +19,7 @@ from routers.profile_picture import router as profile_picture_router
 from routers.stories import router as stories_router
 from routers.locations import router as locations_router
 from routers.chat import router as chat_router
+from routers.compliments import router as compliments_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
@@ -95,6 +96,7 @@ app.include_router(profile_picture_router)
 app.include_router(stories_router)
 app.include_router(locations_router)
 app.include_router(chat_router)
+app.include_router(compliments_router)
 
 
 
@@ -247,6 +249,11 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "user_id": str(current_user["_id"])
         }) is not None
 
+        is_saved = await db.saved_posts.find_one({
+            "post_id": post_id,
+            "user_id": str(current_user["_id"])
+        }) is not None
+
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
         
@@ -270,6 +277,7 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
             "created_at": post["created_at"],
         })
 
@@ -340,6 +348,101 @@ async def unlike_post(post_id: str, current_user: dict = Depends(get_current_use
     )
     
     return {"message": "Post unliked"}
+
+# ==================== SAVE POSTS ENDPOINTS ====================
+
+@app.post("/api/posts/{post_id}/save")
+async def save_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Save a post"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if already saved
+    existing_save = await db.saved_posts.find_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"])
+    })
+    
+    if existing_save:
+        raise HTTPException(status_code=400, detail="Post already saved")
+    
+    # Add save
+    await db.saved_posts.insert_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"]),
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "Post saved"}
+
+@app.delete("/api/posts/{post_id}/save")
+async def unsave_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Unsave a post"""
+    db = get_database()
+    
+    result = await db.saved_posts.delete_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"])
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Post not saved")
+    
+    return {"message": "Post unsaved"}
+
+@app.get("/api/users/{user_id}/saved-posts")
+async def get_saved_posts(user_id: str, skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
+    """Get user's saved posts"""
+    db = get_database()
+    
+    # Only allow users to view their own saved posts
+    if user_id != str(current_user["_id"]):
+        raise HTTPException(status_code=403, detail="Cannot view other users' saved posts")
+    
+    # Get saved posts
+    saved_posts = await db.saved_posts.find({"user_id": user_id}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for saved in saved_posts:
+        post = await db.posts.find_one({"_id": ObjectId(saved["post_id"])})
+        if not post:
+            continue  # Skip if post was deleted
+        
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
+        is_liked = await db.likes.find_one({
+            "post_id": saved["post_id"],
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": image_url,
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "is_liked_by_user": is_liked,
+            "is_saved_by_user": True,  # Always true for saved posts
+            "created_at": post["created_at"],
+            "saved_at": saved["created_at"]
+        })
+    
+    return result
 
 # ==================== COMMENTS ENDPOINTS ====================
 
@@ -425,6 +528,11 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "user_id": str(current_user["_id"])
         }) is not None
         
+        is_saved = await db.saved_posts.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
         
@@ -441,6 +549,7 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
             "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
             "created_at": post["created_at"]
         })
     
@@ -465,6 +574,11 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "user_id": str(current_user["_id"])
         }) is not None
         
+        is_saved = await db.saved_posts.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
         
@@ -481,6 +595,7 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
             "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
             "created_at": post["created_at"]
         })
     
@@ -583,6 +698,11 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "user_id": str(current_user["_id"])
         }) is not None
         
+        is_saved = await db.saved_posts.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
         
@@ -599,6 +719,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
             "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
             "created_at": post["created_at"]
         })
     
@@ -621,6 +742,11 @@ async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: 
             "user_id": str(current_user["_id"])
         }) is not None
         
+        is_saved = await db.saved_posts.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
         
@@ -637,6 +763,7 @@ async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: 
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
             "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
             "created_at": post["created_at"]
         })
     
@@ -788,6 +915,11 @@ async def search_posts(
             "user_id": str(current_user["_id"])
         }) is not None
         
+        is_saved = await db.saved_posts.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
         
@@ -806,11 +938,134 @@ async def search_posts(
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
             "created_at": post["created_at"],
             "relevance_score": score  # For debugging/analytics
         })
     
     return result
+
+# ==================== SEARCH ENDPOINTS ====================
+
+@app.get("/api/search/users")
+async def search_users(
+    q: str,
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Search users by username/full_name for preview
+    Returns user profiles with basic info
+    """
+    if not q or not q.strip():
+        return []
+    
+    db = get_database()
+    query = q.strip().lower()
+    search_regex = {"$regex": query, "$options": "i"}
+    
+    # Search users by full_name
+    users = await db.users.find({
+        "full_name": search_regex
+    }).limit(limit).to_list(limit)
+    
+    result = []
+    for user in users:
+        # Count posts for this user
+        posts_count = await db.posts.count_documents({"user_id": str(user["_id"])})
+        
+        # Check if current user is following this user
+        is_following = await db.follows.find_one({
+            "follower_id": str(current_user["_id"]),
+            "following_id": str(user["_id"])
+        }) is not None
+        
+        result.append({
+            "id": str(user["_id"]),
+            "username": user["full_name"],
+            "full_name": user["full_name"],
+            "profile_picture": user.get("profile_picture"),
+            "level": user.get("level", 1),
+            "badge": user.get("badge"),
+            "posts_count": posts_count,
+            "followers_count": user.get("followers_count", 0),
+            "is_following": is_following,
+            "is_own_profile": str(user["_id"]) == str(current_user["_id"])
+        })
+    
+    return result
+
+@app.get("/api/search/locations")
+async def search_locations(
+    q: str,
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Search locations/restaurants by name and return preview with photos
+    Returns locations with sample photos from posts
+    """
+    if not q or not q.strip():
+        return []
+    
+    db = get_database()
+    query = q.strip().lower()
+    search_regex = {"$regex": query, "$options": "i"}
+    
+    # Find posts with matching location_name
+    posts = await db.posts.find({
+        "location_name": search_regex
+    }).sort("created_at", -1).limit(50).to_list(50)
+    
+    # Group posts by location_name
+    location_map = {}
+    for post in posts:
+        location_name = post.get("location_name")
+        if not location_name:
+            continue
+        
+        if location_name not in location_map:
+            location_map[location_name] = {
+                "name": location_name,
+                "posts": [],
+                "total_posts": 0,
+                "sample_photos": []
+            }
+        
+        location_map[location_name]["posts"].append(post)
+        location_map[location_name]["total_posts"] += 1
+        
+        # Collect sample photos (up to 4)
+        if len(location_map[location_name]["sample_photos"]) < 4:
+            media_type = post.get("media_type", "image")
+            if media_type == "image":
+                media_url = post.get("media_url") or post.get("image_url")
+                if media_url:
+                    location_map[location_name]["sample_photos"].append({
+                        "post_id": str(post["_id"]),
+                        "media_url": media_url,
+                        "media_type": media_type
+                    })
+    
+    # Convert to list and sort by total_posts
+    result = []
+    for location_name, location_data in location_map.items():
+        # Calculate average rating for this location
+        ratings = [p.get("rating", 0) for p in location_data["posts"] if p.get("rating")]
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0
+        
+        result.append({
+            "name": location_data["name"],
+            "total_posts": location_data["total_posts"],
+            "average_rating": round(avg_rating, 1),
+            "sample_photos": location_data["sample_photos"][:4],  # Max 4 photos
+            "map_link": location_data["posts"][0].get("map_link") if location_data["posts"] else None
+        })
+    
+    # Sort by total_posts (most popular first)
+    result.sort(key=lambda x: x["total_posts"], reverse=True)
+    
+    return result[:limit]
 
 # ==================== FOLLOW ENDPOINTS ====================
 

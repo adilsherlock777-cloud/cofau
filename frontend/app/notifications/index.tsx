@@ -64,7 +64,7 @@ export default function NotificationsScreen() {
       if (notification.postId) {
         router.push(`/post-details/${notification.postId}`);
       }
-    } else if (notification.type === 'follow') {
+    } else if (notification.type === 'follow' || notification.type === 'compliment') {
       router.push(`/profile?userId=${notification.fromUserId}`);
     }
   };
