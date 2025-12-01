@@ -23,7 +23,7 @@ import LevelBadge from '../components/LevelBadge';
 import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
-import { sendCompliment } from '../utils/api';
+import { sendCompliment, getFollowers, getFollowing } from '../utils/api';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 const API_URL = `${BACKEND_URL}/api`;
@@ -51,7 +51,8 @@ const fixUrl = (url?: string | null) => {
 export default function ProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams(); // Get userId from query params
-  const { token, logout, user: currentUser } = useAuth();
+  const auth = useAuth() as any;
+  const { token, logout, user: currentUser } = auth;
 
   const [userData, setUserData] = useState<any>(null);
 
@@ -60,7 +61,10 @@ export default function ProfileScreen() {
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'photo' | 'video' | 'collabs' | 'saved'>('photo');
+  const [activeTab, setActiveTab] = useState<'posts' | 'people' | 'contributions'>('posts');
+  const [complimentsCount, setComplimentsCount] = useState(0);
+  const [peopleList, setPeopleList] = useState<any[]>([]);
+  const [peopleTab, setPeopleTab] = useState<'followers' | 'following'>('followers');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editedBio, setEditedBio] = useState('');
   const [editedName, setEditedName] = useState('');
@@ -92,6 +96,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (userData) {
       fetchUserPosts();
+      fetchComplimentsCount();
     }
   }, [userData, activeTab]);
 
@@ -198,14 +203,15 @@ export default function ProfileScreen() {
     try {
       let endpoint = `${API_URL}/users/${userData.id}/posts?limit=50`;
 
-      if (activeTab === 'photo') {
-        endpoint += '&media_type=photo';
-      } else if (activeTab === 'video') {
-        endpoint += '&media_type=video';
-      } else if (activeTab === 'collabs') {
+      if (activeTab === 'posts') {
+        // Show all posts (both photo and video)
+        // No filter needed
+      } else if (activeTab === 'contributions') {
         endpoint = `${API_URL}/users/${userData.id}/collaborations?limit=50`;
-      } else if (activeTab === 'saved') {
-        endpoint = `${API_URL}/users/${userData.id}/saved-posts?limit=50`;
+      } else if (activeTab === 'people') {
+        // For people tab, fetch followers or following
+        await fetchPeople();
+        return;
       }
 
       const response = await axios.get(endpoint, {
@@ -225,6 +231,41 @@ export default function ProfileScreen() {
       setUserPosts([]);
     }
   };
+
+  const fetchComplimentsCount = async () => {
+    if (!userData?.id) return;
+
+    try {
+      const response = await axios.get(`${API_URL}/compliments/user/${userData.id}/count`);
+      setComplimentsCount(response.data.compliments_count || 0);
+    } catch (err) {
+      console.error('❌ Error fetching compliments count:', err);
+      setComplimentsCount(0);
+    }
+  };
+
+  const fetchPeople = async () => {
+    if (!userData?.id) return;
+
+    try {
+      let people;
+      if (peopleTab === 'followers') {
+        people = await getFollowers(userData.id);
+      } else {
+        people = await getFollowing(userData.id);
+      }
+      setPeopleList(people || []);
+    } catch (err) {
+      console.error('❌ Error fetching people:', err);
+      setPeopleList([]);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'people' && userData) {
+      fetchPeople();
+    }
+  }, [activeTab, peopleTab, userData]);
 
   const fetchFollowStatus = async () => {
     if (!userData?.id || !token) return;
@@ -455,7 +496,7 @@ export default function ProfileScreen() {
         response.data.user_profile_picture;
 
       const normalizedProfilePicture = fixUrl(apiProfilePicture);
-      
+
       console.log('🖼️ Normalized profile picture URL:', normalizedProfilePicture);
 
       // ✅ Update state immediately for instant UI feedback
@@ -553,8 +594,8 @@ export default function ProfileScreen() {
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
     // Check for video using media_type field or file extension
-    const isVideo = 
-      item.media_type === 'video' || 
+    const isVideo =
+      item.media_type === 'video' ||
       mediaUrl?.toLowerCase().endsWith('.mp4') ||
       mediaUrl?.toLowerCase().endsWith('.mov') ||
       mediaUrl?.toLowerCase().endsWith('.avi') ||
@@ -579,10 +620,10 @@ export default function ProfileScreen() {
           <Image source={{ uri: mediaUrl }} style={styles.gridImage} resizeMode="cover" />
         ) : mediaUrl && isVideo ? (
           <View style={styles.gridImageContainer}>
-            <Image 
-              source={{ uri: mediaUrl }} 
-              style={styles.gridImage} 
-              resizeMode="cover" 
+            <Image
+              source={{ uri: mediaUrl }}
+              style={styles.gridImage}
+              resizeMode="cover"
             />
             <View style={styles.videoOverlay}>
               <Ionicons name="play-circle" size={40} color="#fff" />
@@ -656,7 +697,7 @@ export default function ProfileScreen() {
             {userData.full_name || userData.username || 'User'}
           </Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.infoButton}
               onPress={() => setLevelDetailsModalVisible(true)}
             >
@@ -667,7 +708,7 @@ export default function ProfileScreen() {
               />
             </TouchableOpacity>
             {isOwnProfile && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.settingsButton}
                 onPress={() => setSettingsModalVisible(true)}
               >
@@ -684,6 +725,7 @@ export default function ProfileScreen() {
         {/* Profile Identity Section */}
         <View style={styles.identitySection}>
           <View style={styles.profilePictureContainer}>
+            {/* @ts-ignore */}
             <ProfileBadge
               profilePicture={userData.profile_picture}
               username={userData.full_name || userData.username}
@@ -723,9 +765,9 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>
-              {userStats?.photos_count || 0}
+              {complimentsCount}
             </Text>
-            <Text style={styles.statLabel}>Photos</Text>
+            <Text style={styles.statLabel}>Compliment</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>
@@ -745,11 +787,11 @@ export default function ProfileScreen() {
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
         ) : (
-          <View style={{ width: "100%", alignItems: "center" }}>
+          <View style={styles.actionButtonsRow}>
             {/* Follow / Unfollow Button */}
             <TouchableOpacity
               style={[
-                styles.editButton,
+                styles.actionButton,
                 isFollowing ? styles.followingButton : styles.followButton,
               ]}
               onPress={handleFollowToggle}
@@ -761,10 +803,10 @@ export default function ProfileScreen() {
                 <>
                   <Ionicons
                     name={isFollowing ? "checkmark" : "person-add"}
-                    size={20}
+                    size={18}
                     color="#fff"
                   />
-                  <Text style={styles.editButtonText}>
+                  <Text style={styles.actionButtonText}>
                     {isFollowing ? "Following" : "Follow"}
                   </Text>
                 </>
@@ -773,20 +815,20 @@ export default function ProfileScreen() {
 
             {/* Message Button */}
             <TouchableOpacity
-              style={[styles.editButton, { backgroundColor: "#4dd0e1", marginTop: 10 }]}
+              style={[styles.actionButton, { backgroundColor: "#4dd0e1" }]}
               onPress={() => router.push(`/chat/${userData.id}`)}
             >
-              <Ionicons name="chatbubbles-outline" size={20} color="#fff" />
-              <Text style={styles.editButtonText}>Message</Text>
+              <Ionicons name="chatbubbles-outline" size={18} color="#fff" />
+              <Text style={styles.actionButtonText}>Message</Text>
             </TouchableOpacity>
 
             {/* Compliment Button */}
             <TouchableOpacity
-              style={[styles.editButton, { backgroundColor: "#FF6B6B", marginTop: 10 }]}
+              style={[styles.actionButton, { backgroundColor: "#FF6B6B" }]}
               onPress={() => setComplimentModalVisible(true)}
             >
-              <Ionicons name="heart-outline" size={20} color="#fff" />
-              <Text style={styles.editButtonText}>Compliment</Text>
+              <Ionicons name="heart-outline" size={18} color="#fff" />
+              <Text style={styles.actionButtonText}>Compliment</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -802,80 +844,122 @@ export default function ProfileScreen() {
         {/* Tab Navigation */}
         <View style={styles.tabBar}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'photo' && styles.activeTab]}
-            onPress={() => setActiveTab('photo')}
+            style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
+            onPress={() => setActiveTab('posts')}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'photo' && styles.activeTabText,
+                activeTab === 'posts' && styles.activeTabText,
               ]}
             >
-              Photo
+              Posts
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'video' && styles.activeTab]}
-            onPress={() => setActiveTab('video')}
+            style={[styles.tab, activeTab === 'people' && styles.activeTab]}
+            onPress={() => setActiveTab('people')}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'video' && styles.activeTabText,
+                activeTab === 'people' && styles.activeTabText,
               ]}
             >
-              Video
+              People
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'collabs' && styles.activeTab]}
-            onPress={() => setActiveTab('collabs')}
+            style={[styles.tab, activeTab === 'contributions' && styles.activeTab]}
+            onPress={() => setActiveTab('contributions')}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'collabs' && styles.activeTabText,
+                activeTab === 'contributions' && styles.activeTabText,
               ]}
             >
-              Collabs
+              Contributions
             </Text>
           </TouchableOpacity>
-          {isOwnProfile && (
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'saved' && styles.activeTab]}
-              onPress={() => setActiveTab('saved')}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === 'saved' && styles.activeTabText,
-                ]}
-              >
-                Saved
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
 
-        {/* Content Grid */}
-        <FlatList
-          data={userPosts}
-          renderItem={renderGridItem}
-          keyExtractor={(item: any) => item.id}
-          numColumns={3}
-          scrollEnabled={false}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="images-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>
-                {activeTab === 'photo' && 'No photos yet'}
-                {activeTab === 'video' && 'No videos yet'}
-                {activeTab === 'collabs' && 'No collaborations yet'}
-                {activeTab === 'saved' && 'No saved posts yet'}
-              </Text>
+        {/* Content Grid / People List */}
+        {activeTab === 'people' ? (
+          <View>
+            {/* Followers/Following Toggle */}
+            <View style={styles.peopleToggle}>
+              <TouchableOpacity
+                style={[styles.peopleToggleButton, peopleTab === 'followers' && styles.peopleToggleActive]}
+                onPress={() => setPeopleTab('followers')}
+              >
+                <Text style={[styles.peopleToggleText, peopleTab === 'followers' && styles.peopleToggleTextActive]}>
+                  Followers ({userStats?.followers_count || 0})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.peopleToggleButton, peopleTab === 'following' && styles.peopleToggleActive]}
+                onPress={() => setPeopleTab('following')}
+              >
+                <Text style={[styles.peopleToggleText, peopleTab === 'following' && styles.peopleToggleTextActive]}>
+                  Following ({userStats?.following_count || 0})
+                </Text>
+              </TouchableOpacity>
             </View>
-          )}
-        />
+
+            {/* People List */}
+            <FlatList
+              data={peopleList}
+              renderItem={({ item }: any) => (
+                <TouchableOpacity
+                  style={styles.peopleItem}
+                  onPress={() => router.push(`/profile?userId=${item.id}`)}
+                >
+                  <UserAvatar
+                    profilePicture={fixUrl(item.profile_picture)}
+                    username={item.full_name}
+                    size={50}
+                    level={item.level || 1}
+                    showLevelBadge={false}
+                    style={{}}
+                  />
+                  <View style={styles.peopleInfo}>
+                    <Text style={styles.peopleName}>{item.full_name}</Text>
+                    {item.badge && (
+                      <Text style={styles.peopleBadge}>{item.badge}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item: any) => item.id}
+              ListEmptyComponent={() => (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyText}>
+                    {peopleTab === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
+                  </Text>
+                </View>
+              )}
+            />
+          </View>
+        ) : (
+          <FlatList
+            data={userPosts}
+            renderItem={renderGridItem}
+            keyExtractor={(item: any) => item.id}
+            numColumns={3}
+            scrollEnabled={false}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="images-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>
+                  {activeTab === 'posts' && 'No posts yet'}
+                  {activeTab === 'contributions' && 'No contributions yet'}
+                </Text>
+              </View>
+            )}
+          />
+        )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -1006,7 +1090,7 @@ export default function ProfileScreen() {
         onClose={() => setComplimentModalVisible(false)}
         onSend={async (complimentType: string) => {
           if (!userData?.id || !token) return;
-          
+
           setSendingCompliment(true);
           try {
             await sendCompliment(userData.id, complimentType);
@@ -1090,13 +1174,13 @@ export default function ProfileScreen() {
                   <View style={styles.progressContainer}>
                     <Text style={styles.progressLabel}>Progress to Next Level</Text>
                     <View style={styles.progressBar}>
-                      <View 
+                      <View
                         style={[
-                          styles.progressFill, 
-                          { 
-                            width: `${Math.min(100, (userData.points / userData.requiredPoints) * 100)}%` 
+                          styles.progressFill,
+                          {
+                            width: `${Math.min(100, (userData.points / userData.requiredPoints) * 100)}%`
                           }
-                        ]} 
+                        ]}
                       />
                     </View>
                     <Text style={styles.progressText}>
@@ -1464,6 +1548,74 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: '#ccc',
     backgroundColor: '#fff',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginTop: 10,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4dd0e1',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  peopleToggle: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    marginBottom: 10,
+  },
+  peopleToggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  peopleToggleActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#4dd0e1',
+  },
+  peopleToggleText: {
+    fontSize: 14,
+    color: '#999',
+  },
+  peopleToggleTextActive: {
+    color: '#333',
+    fontWeight: '600',
+  },
+  peopleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  peopleInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  peopleName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  peopleBadge: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   modalContainer: {
     flex: 1,

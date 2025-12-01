@@ -9,6 +9,7 @@ from typing import List
 from database import get_database
 from routers.auth import get_current_user
 from config import settings
+from utils.moderation import check_image_moderation, save_moderation_result
 
 router = APIRouter(prefix="/api/stories", tags=["stories"])
 
@@ -52,6 +53,56 @@ async def upload_story(
             content = await file.read()
             f.write(content)
         
+        # ======================================================
+        # CONTENT MODERATION - Check for banned content
+        # ======================================================
+        moderation_result = None
+        if media_type == "image":
+            moderation_response = check_image_moderation(
+                file_path=file_path,
+                user_id=str(current_user["_id"])
+            )
+            
+            if not moderation_response.allowed:
+                # ❌ BANNED CONTENT DETECTED - Delete file immediately (NOT uploaded to server)
+                print(f"🚫 BANNED CONTENT DETECTED (Story) - User: {current_user.get('full_name', 'Unknown')} (ID: {current_user['_id']})")
+                print(f"   Reason: {moderation_response.reason}")
+                print(f"   File: {file_path}")
+                
+                # Delete the file immediately - it will NOT be saved to server
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        print(f"✅ Banned file deleted from server: {file_path}")
+                    else:
+                        print(f"⚠️ File not found (may have been deleted already): {file_path}")
+                except Exception as e:
+                    print(f"❌ CRITICAL: Failed to delete banned file: {str(e)}")
+                    # Try again
+                    try:
+                        os.remove(file_path)
+                    except:
+                        pass
+                
+                # Save moderation result for tracking (even though file is deleted)
+                if moderation_response.moderation_result:
+                    await save_moderation_result(
+                        db=db,
+                        moderation_result=moderation_response.moderation_result,
+                        story_id=None  # No story created - upload was blocked
+                    )
+                
+                # Block the upload - return error to user
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Content not allowed: {moderation_response.reason or 'Banned content detected. Image contains nudity, alcohol, or other prohibited content.'}"
+                )
+            
+            # Save moderation result for allowed content
+            if moderation_response.moderation_result:
+                moderation_result = moderation_response.moderation_result
+        # Note: For videos, moderation is optional
+        
         # Create story document
         now = datetime.utcnow()
         expires_at = now + timedelta(hours=24)
@@ -65,12 +116,21 @@ async def upload_story(
         }
         
         result = await db.stories.insert_one(story_doc)
-        story_doc["_id"] = str(result.inserted_id)
+        story_id = str(result.inserted_id)
+        story_doc["_id"] = story_id
+        
+        # Save moderation result with story_id
+        if moderation_result:
+            await save_moderation_result(
+                db=db,
+                moderation_result=moderation_result,
+                story_id=story_id
+            )
         
         return {
             "message": "Story uploaded successfully",
             "story": {
-                "id": str(result.inserted_id),
+                "id": story_id,
                 "user_id": story_doc["user_id"],
                 "media_url": story_doc["media_url"],
                 "media_type": story_doc["media_type"],
@@ -301,3 +361,118 @@ async def cleanup_expired_stories(
     except Exception as e:
         print(f"❌ Error cleaning up expired stories: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to cleanup stories: {str(e)}")
+
+
+@router.post("/{story_id}/view")
+async def mark_story_viewed(
+    story_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Mark a story as viewed by the current user
+    Tracks who viewed the story (Instagram-like)
+    """
+    try:
+        db = get_database()
+        viewer_id = str(current_user["_id"])
+        
+        # Check if story exists
+        story = await db.stories.find_one({"_id": ObjectId(story_id)})
+        if not story:
+            raise HTTPException(status_code=404, detail="Story not found")
+        
+        # Don't count views from the story owner
+        if story["user_id"] == viewer_id:
+            return {"message": "Story owner view not counted", "view_count": 0}
+        
+        # Check if user already viewed this story
+        existing_view = await db.story_views.find_one({
+            "story_id": story_id,
+            "viewer_id": viewer_id
+        })
+        
+        if existing_view:
+            # User already viewed, return current count
+            view_count = await db.story_views.count_documents({"story_id": story_id})
+            return {"message": "Already viewed", "view_count": view_count}
+        
+        # Record the view
+        view_doc = {
+            "story_id": story_id,
+            "viewer_id": viewer_id,
+            "viewed_at": datetime.utcnow()
+        }
+        
+        await db.story_views.insert_one(view_doc)
+        
+        # Get updated view count
+        view_count = await db.story_views.count_documents({"story_id": story_id})
+        
+        return {
+            "message": "Story viewed",
+            "view_count": view_count
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error marking story as viewed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to mark story as viewed: {str(e)}")
+
+
+@router.get("/{story_id}/views")
+async def get_story_views(
+    story_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get view count and list of viewers for a story
+    Only story owner can see the full list
+    """
+    try:
+        db = get_database()
+        current_user_id = str(current_user["_id"])
+        
+        # Check if story exists
+        story = await db.stories.find_one({"_id": ObjectId(story_id)})
+        if not story:
+            raise HTTPException(status_code=404, detail="Story not found")
+        
+        # Get view count
+        view_count = await db.story_views.count_documents({"story_id": story_id})
+        
+        # Only story owner can see viewer details
+        is_owner = story["user_id"] == current_user_id
+        
+        if is_owner:
+            # Get list of viewers with user details
+            views = await db.story_views.find({"story_id": story_id}).sort("viewed_at", -1).to_list(100)
+            
+            viewer_details = []
+            for view in views:
+                viewer = await db.users.find_one({"_id": ObjectId(view["viewer_id"])})
+                if viewer:
+                    viewer_details.append({
+                        "user_id": view["viewer_id"],
+                        "username": viewer.get("full_name") or viewer.get("username", "Unknown"),
+                        "profile_picture": viewer.get("profile_picture"),
+                        "viewed_at": view["viewed_at"].isoformat()
+                    })
+            
+            return {
+                "view_count": view_count,
+                "viewers": viewer_details,
+                "is_owner": True
+            }
+        else:
+            return {
+                "view_count": view_count,
+                "viewers": [],
+                "is_owner": False
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting story views: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get story views: {str(e)}")

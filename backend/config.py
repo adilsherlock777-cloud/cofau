@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_EXTENSIONS: set = {"jpg", "jpeg", "png", "gif", "mp4", "mov"}
     
+    # Sightengine API for content moderation
+    SIGHTENGINE_API_USER: str = os.getenv("SIGHTENGINE_API_USER", "144214407")
+    SIGHTENGINE_API_SECRET: str = os.getenv("SIGHTENGINE_API_SECRET", "JYA4RySafgQeKMUqnNGiQcdBFBuTKDk9")
+    
     class Config:
         env_file = ".env"
         extra = "allow"
