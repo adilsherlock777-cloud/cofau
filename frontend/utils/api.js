@@ -392,4 +392,17 @@ export const getStoryViews = async (storyId) => {
   }
 };
 
+/**
+ * Share/repost a story to your own story
+ */
+export const shareStory = async (storyId) => {
+  try {
+    const response = await axios.post(`${API_URL}/stories/${storyId}/share`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error sharing story:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export default api;

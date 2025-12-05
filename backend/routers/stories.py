@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime, timedelta
 from bson import ObjectId
 import os
 import uuid
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 
 from database import get_database
 from routers.auth import get_current_user
@@ -12,6 +13,9 @@ from config import settings
 from utils.moderation import check_image_moderation, save_moderation_result
 
 router = APIRouter(prefix="/api/stories", tags=["stories"])
+
+class ShareStoryRequest(BaseModel):
+    story_id: str
 
 # Use same upload directory as feed images - ensure absolute path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # backend directory
@@ -187,6 +191,35 @@ async def get_stories_feed(
         for user_id, user_stories in user_stories_map.items():
             user = await db.users.find_one({"_id": ObjectId(user_id)})
             if user:
+                # Get view counts for each story
+                formatted_stories = []
+                for s in user_stories:
+                    story_id = str(s["_id"])
+                    # Get view count for this story
+                    view_count = await db.story_views.count_documents({"story_id": story_id})
+                    # Get year from created_at
+                    created_year = s["created_at"].year
+                    # Calculate story length (24 hours for all stories, or video duration if available)
+                    story_length_seconds = 5 if s["media_type"] == "image" else 30  # Default: 5s for images, 30s for videos
+                    
+                    story_data = {
+                        "id": story_id,
+                        "media_url": s["media_url"],
+                        "media_type": s["media_type"],
+                        "created_at": s["created_at"].isoformat(),
+                        "expires_at": s["expires_at"].isoformat(),
+                        "view_count": view_count,
+                        "year": created_year,
+                        "story_length": story_length_seconds,
+                    }
+                    
+                    # Include shared story information if it's a shared story
+                    if s.get("is_shared"):
+                        story_data["is_shared"] = True
+                        story_data["shared_from"] = s.get("shared_from")
+                    
+                    formatted_stories.append(story_data)
+                
                 result.append({
                     "user": {
                         "id": str(user["_id"]),
@@ -195,16 +228,7 @@ async def get_stories_feed(
                         "profile_picture": user.get("profile_picture"),
                         "level": user.get("level", 1),
                     },
-                    "stories": [
-                        {
-                            "id": str(s["_id"]),
-                            "media_url": s["media_url"],
-                            "media_type": s["media_type"],
-                            "created_at": s["created_at"].isoformat(),
-                            "expires_at": s["expires_at"].isoformat(),
-                        }
-                        for s in user_stories
-                    ]
+                    "stories": formatted_stories
                 })
         
         # Sort: current user first, then by most recent story
@@ -242,6 +266,35 @@ async def get_user_stories(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
+        # Get view counts and additional info for each story
+        formatted_stories = []
+        for s in stories:
+            story_id = str(s["_id"])
+            # Get view count for this story
+            view_count = await db.story_views.count_documents({"story_id": story_id})
+            # Get year from created_at
+            created_year = s["created_at"].year
+            # Calculate story length (5s for images, 30s for videos)
+            story_length_seconds = 5 if s["media_type"] == "image" else 30
+            
+            story_data = {
+                "id": story_id,
+                "media_url": s["media_url"],
+                "media_type": s["media_type"],
+                "created_at": s["created_at"].isoformat(),
+                "expires_at": s["expires_at"].isoformat(),
+                "view_count": view_count,
+                "year": created_year,
+                "story_length": story_length_seconds,
+            }
+            
+            # Include shared story information if it's a shared story
+            if s.get("is_shared"):
+                story_data["is_shared"] = True
+                story_data["shared_from"] = s.get("shared_from")
+            
+            formatted_stories.append(story_data)
+        
         return {
             "user": {
                 "id": str(user["_id"]),
@@ -250,16 +303,7 @@ async def get_user_stories(
                 "profile_picture": user.get("profile_picture"),
                 "level": user.get("level", 1),
             },
-            "stories": [
-                {
-                    "id": str(s["_id"]),
-                    "media_url": s["media_url"],
-                    "media_type": s["media_type"],
-                    "created_at": s["created_at"].isoformat(),
-                    "expires_at": s["expires_at"].isoformat(),
-                }
-                for s in stories
-            ]
+            "stories": formatted_stories
         }
     
     except HTTPException:
@@ -452,9 +496,14 @@ async def get_story_views(
             for view in views:
                 viewer = await db.users.find_one({"_id": ObjectId(view["viewer_id"])})
                 if viewer:
+                    full_name = viewer.get("full_name", "")
+                    username = viewer.get("username", "")
+                    display_name = full_name or username or "Unknown"
+                    
                     viewer_details.append({
                         "user_id": view["viewer_id"],
-                        "username": viewer.get("full_name") or viewer.get("username", "Unknown"),
+                        "username": display_name,
+                        "full_name": full_name,
                         "profile_picture": viewer.get("profile_picture"),
                         "viewed_at": view["viewed_at"].isoformat()
                     })
@@ -476,3 +525,83 @@ async def get_story_views(
     except Exception as e:
         print(f"❌ Error getting story views: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get story views: {str(e)}")
+
+
+@router.post("/{story_id}/share")
+async def share_story(
+    story_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Share/repost someone else's story to your own story
+    Creates a new story that references the original
+    """
+    try:
+        db = get_database()
+        current_user_id = str(current_user["_id"])
+        
+        # Check if original story exists and is not expired
+        original_story = await db.stories.find_one({"_id": ObjectId(story_id)})
+        if not original_story:
+            raise HTTPException(status_code=404, detail="Story not found")
+        
+        # Check if story is expired
+        if original_story["expires_at"] < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Cannot share expired story")
+        
+        # Don't allow sharing your own story
+        if original_story["user_id"] == current_user_id:
+            raise HTTPException(status_code=400, detail="Cannot share your own story")
+        
+        # Get original story owner details
+        original_user = await db.users.find_one({"_id": ObjectId(original_story["user_id"])})
+        if not original_user:
+            raise HTTPException(status_code=404, detail="Original story owner not found")
+        
+        # Get follower count for original user
+        follower_count = await db.follows.count_documents({"following_id": original_story["user_id"]})
+        
+        # Create shared story document
+        now = datetime.utcnow()
+        expires_at = now + timedelta(hours=24)
+        
+        shared_story_doc = {
+            "user_id": current_user_id,
+            "media_url": original_story["media_url"],
+            "media_type": original_story["media_type"],
+            "created_at": now,
+            "expires_at": expires_at,
+            "is_shared": True,
+            "original_story_id": story_id,
+            "shared_from": {
+                "user_id": original_story["user_id"],
+                "username": original_user.get("username", original_user.get("full_name", "Unknown")),
+                "full_name": original_user.get("full_name", "Unknown"),
+                "profile_picture": original_user.get("profile_picture"),
+                "follower_count": follower_count
+            }
+        }
+        
+        result = await db.stories.insert_one(shared_story_doc)
+        shared_story_id = str(result.inserted_id)
+        shared_story_doc["_id"] = shared_story_id
+        
+        return {
+            "message": "Story shared successfully",
+            "story": {
+                "id": shared_story_id,
+                "user_id": shared_story_doc["user_id"],
+                "media_url": shared_story_doc["media_url"],
+                "media_type": shared_story_doc["media_type"],
+                "created_at": shared_story_doc["created_at"].isoformat(),
+                "expires_at": shared_story_doc["expires_at"].isoformat(),
+                "is_shared": True,
+                "shared_from": shared_story_doc["shared_from"]
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error sharing story: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to share story: {str(e)}")

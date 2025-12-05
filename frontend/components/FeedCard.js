@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 
 import UserAvatar from "./UserAvatar";
+import ShareModal from "./ShareModal";
 import { likePost, unlikePost, savePost, unsavePost, reportPost } from "../utils/api";
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
 
@@ -80,6 +81,9 @@ export default function FeedCard({ post, onLikeUpdate }) {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportDescription, setReportDescription] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const mediaUrl = normalizeMediaUrl(post.media_url);
   const isVideo =
@@ -435,6 +439,13 @@ export default function FeedCard({ post, onLikeUpdate }) {
           </View>
         </View>
       </Modal>
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        post={post}
+      />
     </View>
   );
 }

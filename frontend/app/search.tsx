@@ -27,11 +27,15 @@ export default function SearchScreen() {
   const router = useRouter();
   const { token } = useAuth() as { token: string | null };
   const [searchText, setSearchText] = useState('');
-  const [userResults, setUserResults] = useState([]);
-  const [locationResults, setLocationResults] = useState([]);
+  const [userResults, setUserResults] = useState<any[]>([]);
+  const [locationResults, setLocationResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{type: 'user' | 'location', id: string, name: string, profilePicture?: string | null, subtitle?: string}>>([]);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const suggestionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -42,48 +46,102 @@ export default function SearchScreen() {
   const [reportType, setReportType] = useState<'post' | 'user' | null>(null);
   const [submittingReport, setSubmittingReport] = useState(false);
 
-  // Debounced search
+  // Debounced suggestions (lightweight - just names)
   useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+    if (suggestionsTimeoutRef.current) {
+      clearTimeout(suggestionsTimeoutRef.current);
     }
 
     if (searchText.trim().length > 0) {
-      setShowResults(true);
-      setLoading(true);
-
-      searchTimeoutRef.current = setTimeout(() => {
-        performSearch(searchText.trim());
-      }, 300); // 300ms debounce
+      setShowSuggestions(true);
+      suggestionsTimeoutRef.current = setTimeout(() => {
+        fetchSuggestions(searchText.trim());
+      }, 200); // Faster debounce for suggestions
     } else {
+      setShowSuggestions(false);
+      setSuggestions([]);
       setShowResults(false);
       setUserResults([]);
       setLocationResults([]);
-      setLoading(false);
     }
 
     return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
+      if (suggestionsTimeoutRef.current) {
+        clearTimeout(suggestionsTimeoutRef.current);
       }
     };
   }, [searchText, token]);
 
-  const performSearch = async (query: string) => {
+  // Fetch lightweight suggestions (just names and profile images, no post previews)
+  const fetchSuggestions = async (query: string) => {
     if (!query || !token) {
-      setLoading(false);
+      setSuggestions([]);
       return;
     }
 
     try {
-      // Search both users and locations in parallel
+      // Fetch suggestions with limit to reduce DB load
       const [users, locations] = await Promise.all([
         searchUsers(query).catch(() => []),
         searchLocations(query).catch(() => []),
       ]);
 
-      setUserResults(users || []);
-      setLocationResults(locations || []);
+      // Create simple suggestions array (max 5 users + 5 locations = 10 total)
+      const userSuggestions = (users || []).slice(0, 5).map((user: any) => ({
+        type: 'user' as const,
+        id: user.id,
+        name: user.username,
+        profilePicture: user.profile_picture || user.user_profile_picture || null,
+        subtitle: user.posts_count ? `${user.posts_count} posts` : undefined,
+      }));
+
+      const locationSuggestions = (locations || []).slice(0, 5).map((location: any) => ({
+        type: 'location' as const,
+        id: location.name,
+        name: location.name,
+        subtitle: location.total_posts ? `${location.total_posts} posts` : undefined,
+      }));
+
+      setSuggestions([...userSuggestions, ...locationSuggestions]);
+    } catch (error) {
+      console.error('❌ Suggestions error:', error);
+      setSuggestions([]);
+    }
+  };
+
+  // Full search with post previews (only called when user clicks a suggestion)
+  const performSearch = async (query: string, suggestionType?: 'user' | 'location', suggestionId?: string) => {
+    if (!query || !token) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setShowSuggestions(false);
+    setShowResults(true);
+
+    try {
+      // If a specific suggestion was clicked, search for that specific item
+      if (suggestionType === 'user' && suggestionId) {
+        const users: any[] = await searchUsers(query).catch(() => []);
+        const foundUser = users.find((u: any) => u.id === suggestionId);
+        setUserResults(foundUser ? [foundUser] : [] as any[]);
+        setLocationResults([]);
+      } else if (suggestionType === 'location' && suggestionId) {
+        const locations: any[] = await searchLocations(query).catch(() => []);
+        const foundLocation = locations.find((l: any) => l.name === suggestionId);
+        setLocationResults(foundLocation ? [foundLocation] : [] as any[]);
+        setUserResults([]);
+      } else {
+        // Full search for all results
+        const [users, locations] = await Promise.all([
+          searchUsers(query).catch(() => []),
+          searchLocations(query).catch(() => []),
+        ]);
+
+        setUserResults(users || []);
+        setLocationResults(locations || []);
+      }
     } catch (error) {
       console.error('❌ Search error:', error);
       setUserResults([]);
@@ -93,15 +151,24 @@ export default function SearchScreen() {
     }
   };
 
+  const handleSuggestionPress = (suggestion: {type: 'user' | 'location', id: string, name: string, profilePicture?: string | null}) => {
+    setSelectedSuggestion(suggestion.id);
+    setSearchText(suggestion.name);
+    // Trigger full search with post previews
+    performSearch(suggestion.name, suggestion.type as 'user' | 'location', suggestion.id);
+  };
+
   const handleUserPress = (userId: string) => {
     setSearchText('');
     setShowResults(false);
+    setShowSuggestions(false);
     router.push(`/profile?userId=${userId}`);
   };
 
   const handleLocationPress = (locationName: string) => {
     setSearchText('');
     setShowResults(false);
+    setShowSuggestions(false);
     router.push(`/location-details?name=${encodeURIComponent(locationName)}`);
   };
 
@@ -318,12 +385,23 @@ export default function SearchScreen() {
             value={searchText}
             onChangeText={setSearchText}
             autoFocus={false}
+            onFocus={() => {
+              if (searchText.trim().length > 0) {
+                setShowSuggestions(true);
+              }
+            }}
+            onBlur={() => {
+              // Delay hiding suggestions to allow clicks
+              setTimeout(() => setShowSuggestions(false), 200);
+            }}
           />
           {searchText.length > 0 && (
             <TouchableOpacity
               onPress={() => {
                 setSearchText('');
                 setShowResults(false);
+                setShowSuggestions(false);
+                setSuggestions([]);
               }}
               style={styles.clearButton}
             >
@@ -331,6 +409,57 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Suggestions Dropdown */}
+        {showSuggestions && suggestions.length > 0 && (
+          <View style={styles.suggestionsContainer}>
+            <ScrollView 
+              style={styles.suggestionsList}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+            >
+              {suggestions.map((suggestion, index) => {
+                const suggestionItem = suggestion as {type: 'user' | 'location', id: string, name: string, profilePicture?: string | null, subtitle?: string};
+                return (
+                  <TouchableOpacity
+                    key={`${suggestionItem.type}-${suggestionItem.id}-${index}`}
+                    style={styles.suggestionItem}
+                    onPress={() => handleSuggestionPress(suggestionItem)}
+                    activeOpacity={0.7}
+                  >
+                    {suggestionItem.type === 'user' ? (
+                      // Show profile image for users
+                      <View style={styles.suggestionAvatarContainer}>
+                        {suggestionItem.profilePicture ? (
+                          <Image
+                            source={{ uri: normalizeProfilePicture(suggestionItem.profilePicture) || '' }}
+                            style={styles.suggestionAvatar}
+                          />
+                        ) : (
+                          <View style={styles.suggestionAvatarPlaceholder}>
+                            <Ionicons name="person" size={20} color="#999" />
+                          </View>
+                        )}
+                      </View>
+                    ) : (
+                      // Show location icon for locations
+                      <View style={styles.suggestionIconContainer}>
+                        <Ionicons name="location" size={20} color="#4ECDC4" />
+                      </View>
+                    )}
+                    <View style={styles.suggestionContent}>
+                      <Text style={styles.suggestionName}>{suggestionItem.name}</Text>
+                      {suggestionItem.subtitle && (
+                        <Text style={styles.suggestionSubtitle}>{suggestionItem.subtitle}</Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Search Results */}
@@ -525,6 +654,75 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    position: 'relative',
+    zIndex: 1000,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 16,
+    right: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginTop: 4,
+    maxHeight: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    zIndex: 1001,
+  },
+  suggestionsList: {
+    maxHeight: 300,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  suggestionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  suggestionAvatarContainer: {
+    marginRight: 12,
+  },
+  suggestionAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  suggestionAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  suggestionContent: {
+    flex: 1,
+  },
+  suggestionName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  suggestionSubtitle: {
+    fontSize: 12,
+    color: '#999',
   },
   searchBar: {
     flexDirection: 'row',

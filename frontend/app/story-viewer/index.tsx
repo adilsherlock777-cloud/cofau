@@ -11,6 +11,7 @@ import {
   Animated,
   Modal,
   FlatList,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -41,6 +42,7 @@ export default function StoryViewerScreen() {
   const [viewers, setViewers] = useState<any[]>([]);
   const [viewedStories, setViewedStories] = useState(new Set<string>());
   const [showViewersModal, setShowViewersModal] = useState(false);
+  const [showShareOptions, setShowShareOptions] = useState(false);
 
   const progressAnims = useRef<any[]>([]);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -81,10 +83,14 @@ export default function StoryViewerScreen() {
           media_type: mediaType,
         });
 
+        // Calculate story length if not provided (5s for images, 30s for videos)
+        const storyLength = s.story_length || (mediaType === 'video' ? 30 : 5);
+
         return {
           ...s,
           media_url: fixedUrl,
           media_type: mediaType || 'image', // Default to image if still unknown
+          story_length: storyLength,
         };
       });
 
@@ -239,10 +245,43 @@ export default function StoryViewerScreen() {
     ]);
   };
 
+  /* ----------------------------------------------------------
+     SHARE STORY
+  -----------------------------------------------------------*/
+  const handleShare = async () => {
+    setPaused(true); // Pause story while sharing
+    setShowShareOptions(true);
+  };
+
+  const shareToSocialMedia = async (platform: string) => {
+    try {
+      const currentStory = stories[currentIndex];
+      const shareText = `Check out ${storyUser.username}'s story on Cofau!`;
+      
+      const result = await Share.share({
+        message: shareText,
+        url: currentStory.media_url,
+        title: `${storyUser.username}'s Story`,
+      });
+
+      if (result.action === Share.sharedAction) {
+        console.log(`✅ Story shared to ${platform}`);
+      }
+    } catch (error) {
+      console.error('❌ Error sharing story:', error);
+      Alert.alert('Error', 'Failed to share story');
+    } finally {
+      setShowShareOptions(false);
+      setPaused(false);
+    }
+  };
+
   if (!stories.length || !storyUser) return null;
 
   const currentStory = stories[currentIndex];
   const isOwner = storyUser?.id === user?._id;
+
+  console.log("🔍 Current story:", isOwner)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -286,8 +325,11 @@ export default function StoryViewerScreen() {
         </View>
 
         <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
+            <Ionicons name="share-outline" size={24} color="#FFF" />
+          </TouchableOpacity>
           {isOwner && (
-            <TouchableOpacity onPress={handleDelete}>
+            <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
               <Ionicons name="trash-outline" size={24} color="#FFF" />
             </TouchableOpacity>
           )}
@@ -360,21 +402,24 @@ export default function StoryViewerScreen() {
         )}
       </View>
 
-      {/* Bottom Eye Icon with View Count */}
-      {isOwner && (
+      {/* Bottom Eye Icon with View Count and Story Length */}
+      {/* {isOwner && ( */}
         <TouchableOpacity
           style={styles.eyeIconContainer}
           onPress={() => setShowViewersModal(true)}
           activeOpacity={0.7}
         >
-          <Ionicons name="eye" size={24} color="#FFF" />
-          {viewCount > 0 && (
-            <View style={styles.viewCountBadge}>
-              <Text style={styles.viewCountBadgeText}>{viewCount}</Text>
-            </View>
-          )}
+          <View style={styles.eyeIconContent}>
+            <Ionicons name="eye" size={20} color="#FFF" />
+            {viewCount > 0 && (
+              <Text style={styles.eyeIconText}>{viewCount}</Text>
+            )}
+          </View>
+          <Text style={styles.storyLengthText}>
+            {currentStory?.story_length || (currentStory?.media_type === 'video' ? 30 : 5)}s
+          </Text>
         </TouchableOpacity>
-      )}
+      {/* )} */}
 
       {/* Tap zones */}
       <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
@@ -390,7 +435,14 @@ export default function StoryViewerScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.viewersModalContent}>
             <View style={styles.viewersModalHeader}>
-              <Text style={styles.viewersModalTitle}>Views</Text>
+              <View>
+                <Text style={styles.viewersModalTitle}>Views</Text>
+                {viewCount > 0 && (
+                  <Text style={styles.viewersModalSubtitle}>
+                    {viewCount} {viewCount === 1 ? 'person viewed' : 'people viewed'} this story
+                  </Text>
+                )}
+              </View>
               <TouchableOpacity onPress={() => setShowViewersModal(false)}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
@@ -418,7 +470,12 @@ export default function StoryViewerScreen() {
                       style={{}}
                     />
                     <View style={styles.viewerInfo}>
-                      <Text style={styles.viewerUsername}>{item.username}</Text>
+                      <Text style={styles.viewerUsername}>
+                        {(item as any).full_name || item.username}
+                      </Text>
+                      {(item as any).full_name && item.username && (item as any).full_name !== item.username && (
+                        <Text style={styles.viewerUsernameSecondary}>@{item.username}</Text>
+                      )}
                       <Text style={styles.viewerTime}>
                         {new Date(item.viewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </Text>
@@ -475,6 +532,7 @@ const styles = StyleSheet.create({
   username: { color: "#FFF", fontSize: 16, fontWeight: "600" },
   viewCount: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 },
   headerActions: { flexDirection: "row", gap: 16 },
+  headerButton: { padding: 4 },
   contentContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   storyImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
   storyVideo: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
@@ -524,6 +582,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  viewersModalSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
   viewerItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -540,6 +603,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#333',
+  },
+  viewerUsernameSecondary: {
+    fontSize: 13,
+    color: '#999',
+    marginTop: 1,
   },
   viewerTime: {
     fontSize: 13,
@@ -559,32 +627,76 @@ const styles = StyleSheet.create({
   eyeIconContainer: {
     position: 'absolute',
     bottom: 20,
-    left: SCREEN_WIDTH / 2 - 25,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    left: SCREEN_WIDTH / 2 - 60,
+    minWidth: 120,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
     zIndex: 10,
   },
-  viewCountBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+  eyeIconContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  eyeIconText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  storyLengthText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  shareModalBackdrop: {
+    flex: 1,
+  },
+  shareModalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 20,
+  },
+  shareModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  shareModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  shareOptionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 24,
+    paddingHorizontal: 12,
+  },
+  shareOptionItem: {
+    alignItems: 'center',
+    width: 70,
+  },
+  shareOptionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: '#000',
+    marginBottom: 8,
   },
-  viewCountBadgeText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '600',
+  shareOptionText: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
   },
 });
