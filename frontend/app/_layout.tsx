@@ -35,10 +35,13 @@ function RootLayoutNav() {
     }
 
     const inAuthGroup = segments[0] === "auth";
+    const inShareGroup = segments[0] === "share"; // Share pages are public
     console.log("   - inAuthGroup:", inAuthGroup);
+    console.log("   - inShareGroup:", inShareGroup);
 
     setTimeout(() => {
-      if (!isAuthenticated && !inAuthGroup) {
+      // Allow public access to share pages (for social media previews)
+      if (!isAuthenticated && !inAuthGroup && !inShareGroup) {
         console.log("🔐 Redirect → /auth/login");
         router.replace("/auth/login");
       } else if (isAuthenticated && inAuthGroup) {
