@@ -1,5 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from models.post_model import Post
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -1557,5 +1559,58 @@ async def report_user(
     }
     
     await db.reports.insert_one(report_doc)
+
+    @app.get("/share/{post_id}", response_class=HTMLResponse)
+async def share_preview(post_id: str):
+    """
+    Open Graph (OG) Preview endpoint.
+    When a user shares a Cofau post to WhatsApp, Facebook, Instagram, etc.
+    These platforms fetch this URL and read the meta tags.
+    """
+
+    db = get_database()
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+
+    if not post:
+        return HTMLResponse("<h1>Post not found</h1>", status_code=404)
+
+    title = post.get("title", "Cofau Post")
+    description = post.get("description", "Check out this post on Cofau!")
+    image_url = post.get("image_url", "")
+
+    # Your deployed backend base URL
+    BASE_URL = "https://backend.cofau.com"
+
+    # If image_url is a relative path from /static/uploads/
+    if image_url and not image_url.startswith("http"):
+        image_url = f"{BASE_URL}/{image_url}"
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>{title}</title>
+
+        <!-- Open Graph Meta Tags -->
+        <meta property="og:title" content="{title}" />
+        <meta property="og:description" content="{description}" />
+        <meta property="og:image" content="{image_url}" />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="{BASE_URL}/share/{post_id}" />
+
+        <!-- Required for WhatsApp -->
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+    </head>
+    <body>
+        <h2>Preview for {title}</h2>
+        <img src="{image_url}" width="400" />
+    </body>
+    </html>
+    """
+
+    return HTMLResponse(content=html)
+
     
     return {"message": "User reported successfully"}
