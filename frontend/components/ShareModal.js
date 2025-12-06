@@ -76,7 +76,7 @@ export default function ShareModal({ visible, onClose, post }) {
       setLoading(true);
 
       // Build frontend share URL - this is what WhatsApp will scrape for preview
-      const shareUrl = `${FRONTEND_URL}/share/${post.id}`;
+      const shareUrl = `${BACKEND_URL}/share/${post.id}`;
 
       // Build share text with frontend URL
       const shareText = `${post.username} shared a post on Cofau!\n\n${post.review_text || post.description || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${shareUrl}`;
@@ -132,7 +132,7 @@ export default function ShareModal({ visible, onClose, post }) {
       setLoading(true);
 
       // Build frontend share URL - this is what Facebook will scrape for preview
-      const shareUrl = `${FRONTEND_URL}/share/${post.id}`;
+      const shareUrl = `${BACKEND_URL}/share/${post.id}`;
 
       const shareText = `${post.username} shared a post on Cofau!\n\n${post.review_text || post.description || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${shareUrl}`;
 
@@ -163,7 +163,7 @@ export default function ShareModal({ visible, onClose, post }) {
       setLoading(true);
 
       // Build frontend share URL - this is what Twitter will scrape for preview
-      const shareUrl = `${FRONTEND_URL}/share/${post.id}`;
+      const shareUrl = `${BACKEND_URL}/share/${post.id}`;
 
       const shareText = `${post.username} shared a post on Cofau!\n\n${post.review_text || post.description || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${shareUrl}`;
 
@@ -194,7 +194,7 @@ export default function ShareModal({ visible, onClose, post }) {
       setLoading(true);
 
       // Build frontend share URL - this is what social media platforms will scrape for preview
-      const shareUrl = `${FRONTEND_URL}/share/${post.id}`;
+      const shareUrl = `${BACKEND_URL}/share/${post.id}`;
 
       // Build share text with post details and frontend URL
       const shareText = `${post.username} shared a post on Cofau!\n\n${post.review_text || post.description || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${shareUrl}`;
