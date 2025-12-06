@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ post.title }}</title>
+    
+    <meta property="og:title" content="{{ post.title }}" />
+    
+    <meta property="og:description" content="{{ post.description }}" />
+    
+    <meta property="og:url" content="{{ post.full_url }}" />
+    
+    <meta property="og:image" content="{{ post.image_url }}" />
+    
+    <meta property="og:image:width" content="600" />
+    <meta property="og:image:height" content="400" />
+    <meta property="og:type" content="website" />
+    
+    <meta property="og:site_name" content="Cofau" />
+    
+</head>
+<body>
+    <h1>Loading Post on Cofau...</h1>
+    
+    <script>
+        window.location.replace("cofauapp://post/{{ post_id }}"); 
+    </script>
+</body>
+</html>

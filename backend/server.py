@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from datetime import datetime
