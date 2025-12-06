@@ -1,29 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ post.title }}</title>
-    
-    <meta property="og:title" content="{{ post.title }}" />
-    
-    <meta property="og:description" content="{{ post.description }}" />
-    
-    <meta property="og:url" content="{{ post.full_url }}" />
-    
+    <meta charset="UTF-8" />
+
+    <!-- REQUIRED BY WHATSAPP -->
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="{{ post.review_text }}" />
+    <meta property="og:description" content="Rated {{ post.rating }}/10 — {{ post.location }}" />
     <meta property="og:image" content="{{ post.image_url }}" />
-    
-    <meta property="og:image:width" content="600" />
-    <meta property="og:image:height" content="400" />
-    <meta property="og:type" content="website" />
-    
-    <meta property="og:site_name" content="Cofau" />
-    
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://backend.cofau.com/share/{{ post_id }}" />
+
 </head>
 <body>
-    <h1>Loading Post on Cofau...</h1>
-    
-    <script>
-        window.location.replace("cofauapp://post/{{ post_id }}"); 
-    </script>
+    Preview generated.
 </body>
 </html>
+
