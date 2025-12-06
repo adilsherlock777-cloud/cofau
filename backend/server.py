@@ -77,6 +77,63 @@ app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Create uploads directory if missing
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
+# ======================================================
+# OPEN GRAPH (WhatsApp Preview) CONFIGURATION
+# ======================================================
+# Configure the templates directory (must match your folder name)
+templates = Jinja2Templates(directory="templates")
+
+async def get_post_data_for_og(post_id: str):
+    """
+    Fetches dynamic data (Title, Description, Image URL) for the given post ID
+    from the database to populate Open Graph tags.
+    """
+    try:
+        db = get_database()
+        post_doc = await db.posts.find_one({"_id": ObjectId(post_id)})
+        
+        if not post_doc:
+            return None # Post not found
+            
+        # Extract necessary fields
+        rating = post_doc.get("rating", 0)
+        review_text = post_doc.get("review_text", "Check out this great rating on Cofau!")
+        
+        # Construct the absolute image URL
+        # The stored media_url is typically /api/static/uploads/filename.jpg
+        # We need the full absolute URL: https://backend.cofau.com/api/static/uploads/filename.jpg
+        # Assuming your base domain is configured elsewhere, but for simplicity, we'll use a placeholder structure
+        
+        # NOTE: You MUST replace 'https://backend.cofau.com' with your actual domain/URL prefix
+        base_domain = "https://backend.cofau.com" 
+        media_url = post_doc.get("media_url")
+        full_image_url = f"{base_domain}{media_url}" if media_url else None
+        
+        # Determine user who made the post
+        user_id = post_doc.get("user_id")
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        username = user.get("full_name", "A Cofau User") if user else "A Cofau User"
+        
+        # The main title for the preview
+        title = f"{username} shared a post on Cofau!"
+        
+        # The description for the preview
+        description = f"Rating: {rating}/10. {review_text[:100]}..." # Truncate description for preview
+        
+        # Construct the full share URL
+        full_url = f"{base_domain}/post/{post_id}"
+
+        return {
+            "title": title,
+            "description": description,
+            "image_url": full_image_url,
+            "full_url": full_url
+        }
+    except Exception as e:
+        print(f"Error fetching post data for OG tags: {e}")
+        return None
+
+# ======================================================
 
 # ======================================================
 # CORS
@@ -103,7 +160,32 @@ app.include_router(chat_router)
 app.include_router(compliments_router)
 app.include_router(moderation_router)
 
+# ======================================================
+# OPEN GRAPH ROUTE (Non-API, for Social Media Scrapers)
+# ======================================================
+@app.get("/post/{post_id}", response_class=HTMLResponse)
+async def share_post_preview(request: Request, post_id: str):
+    """
+    This route is accessed by WhatsApp/Facebook/Twitter scrapers. 
+    It returns an HTML page with Open Graph meta tags.
+    """
+    post = await get_post_data_for_og(post_id)
+    
+    if not post:
+        # Simple fallback if post is not found
+        return HTMLResponse("<html><head><title>Post Not Found</title></head><body>Post not found.</body></html>", status_code=404)
 
+    # Render the HTML template (og_preview.html)
+    return templates.TemplateResponse(
+        "og_preview.html", 
+        {"request": request, "post": post, "post_id": post_id}
+    )
+
+# ======================================================
+
+@app.get("/api")
+async def root():
+    return {"message": "Cofau API is running", "version": "1.0.0"}
 
 @app.get("/api")
 async def root():
