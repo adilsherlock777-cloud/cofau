@@ -1518,72 +1518,32 @@ async def report_post(
     
     await db.reports.insert_one(report_doc)
     
-    return {"message": "Post reported successfully"}
-
-@app.post("/api/users/{user_id}/report")
-async def report_user(
-    user_id: str,
-    description: str = Form(...),
-    current_user: dict = Depends(get_current_user)
-):
-    """Report a user with description"""
-    db = get_database()
+    return {"message": "Post reported successfully"} 
     
-    # Check if user exists
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Prevent self-reporting
-    if str(user["_id"]) == str(current_user["_id"]):
-        raise HTTPException(status_code=400, detail="You cannot report yourself")
-    
-    # Check if user already reported this user
-    existing_report = await db.reports.find_one({
-        "reported_user_id": user_id,
-        "reporter_id": str(current_user["_id"]),
-        "post_id": None  # User report, not post report
-    })
-    
-    if existing_report:
-        raise HTTPException(status_code=400, detail="You have already reported this user")
-    
-    # Create report
-    report_doc = {
-        "post_id": None,
-        "reporter_id": str(current_user["_id"]),
-        "reported_user_id": user_id,
-        "description": description.strip(),
-        "status": "pending",
-        "created_at": datetime.utcnow()
-    }
-    
-    await db.reports.insert_one(report_doc)
-
-    @app.get("/share/{post_id}", response_class=HTMLResponse)
+# ==================== REPORT ENDPOINTS ====================
+ 
+@app.get("/share/{post_id}", response_class=HTMLResponse)
 async def share_preview(post_id: str):
     """
     Open Graph (OG) Preview endpoint.
     When a user shares a Cofau post to WhatsApp, Facebook, Instagram, etc.
     These platforms fetch this URL and read the meta tags.
     """
-
     db = get_database()
     post = await db.posts.find_one({"_id": ObjectId(post_id)})
-
     if not post:
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
 
-    title = post.get("title", "Cofau Post")
-    description = post.get("description", "Check out this post on Cofau!")
+    title = post.get("review_text", "Cofau Post")
+    description = f"Rated {post.get('rating', 0)}/10 on Cofau!"
     image_url = post.get("image_url", "")
 
     # Your deployed backend base URL
     BASE_URL = "https://backend.cofau.com"
 
-    # If image_url is a relative path from /static/uploads/
+    # Convert relative image URL to absolute
     if image_url and not image_url.startswith("http"):
-        image_url = f"{BASE_URL}/{image_url}"
+        image_url = f"{BASE_URL}{image_url}"
 
     html = f"""
     <!DOCTYPE html>
@@ -1598,10 +1558,9 @@ async def share_preview(post_id: str):
         <meta property="og:type" content="article" />
         <meta property="og:url" content="{BASE_URL}/share/{post_id}" />
 
-        <!-- Required for WhatsApp -->
+        <!-- WhatsApp requires these sizes -->
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-
     </head>
     <body>
         <h2>Preview for {title}</h2>
@@ -1611,6 +1570,3 @@ async def share_preview(post_id: str):
     """
 
     return HTMLResponse(content=html)
-
-    
-    return {"message": "User reported successfully"}
