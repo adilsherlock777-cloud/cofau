@@ -1602,28 +1602,22 @@ async def report_post(
     
     return {"message": "Post reported successfully"} 
     
-# ==================== REPORT ENDPOINTS ====================
- 
 @app.get("/share/{post_id}", response_class=HTMLResponse)
 async def share_preview(post_id: str):
-    """
-    Open Graph (OG) Preview endpoint.
-    When a user shares a Cofau post to WhatsApp, Facebook, Instagram, etc.
-    These platforms fetch this URL and read the meta tags.
-    """
     db = get_database()
     post = await db.posts.find_one({"_id": ObjectId(post_id)})
+
     if not post:
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
 
-    title = post.get("review_text", "Cofau Post")
-    description = f"Rated {post.get('rating', 0)}/10 on Cofau!"
-    image_url = post.get("image_url", "")
-
-    # Your deployed backend base URL
     BASE_URL = "https://backend.cofau.com"
 
-    # Convert relative image URL to absolute
+    title = post.get("review_text", "Cofau Post")
+    rating = post.get("rating", 0)
+    location = post.get("location_name", "")
+    description = f"Rated {rating}/10 {('- ' + location) if location else ''} on Cofau!"
+
+    image_url = post.get("image_url", "")
     if image_url and not image_url.startswith("http"):
         image_url = f"{BASE_URL}{image_url}"
 
@@ -1637,12 +1631,17 @@ async def share_preview(post_id: str):
         <meta property="og:title" content="{title}" />
         <meta property="og:description" content="{description}" />
         <meta property="og:image" content="{image_url}" />
-        <meta property="og:type" content="article" />
+        <meta property="og:image:secure_url" content="{image_url}" />
         <meta property="og:url" content="{BASE_URL}/share/{post_id}" />
+        <meta property="og:type" content="article" />
 
-        <!-- WhatsApp requires these sizes -->
+        <!-- WhatsApp requires known dimensions -->
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
+
+        <!-- Twitter (helps WhatsApp fallback) -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="{image_url}" />
     </head>
     <body>
         <h2>Preview for {title}</h2>
