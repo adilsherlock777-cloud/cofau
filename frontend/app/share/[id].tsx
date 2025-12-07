@@ -2,8 +2,8 @@
 // Public share page for posts - returns HTML with Open Graph tags for social media previews
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Linking, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { Head } from 'expo-router/head';
 import axios from 'axios';
 import { Image } from 'expo-image';
@@ -26,7 +26,6 @@ interface Post {
 
 export default function SharePage() {
   const { id } = useLocalSearchParams();
-  const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,26 +39,22 @@ export default function SharePage() {
       setLoading(true);
       setError(null);
 
-      // Fetch post data - try public endpoint first, then authenticated
       let response;
+
+      // Try public post endpoint
       try {
-        // Try public endpoint (if available)
         response = await axios.get(`${API_URL}/posts/${id}`);
       } catch (e: any) {
-        // If public endpoint doesn't work, try with feed endpoint
-        // This is a workaround - ideally backend should have a public post endpoint
+        // Fallback — use feed and locate post
         const feedResponse = await axios.get(`${API_URL}/feed?limit=100&skip=0`);
         const foundPost = feedResponse.data.find((p: Post) => p.id === id);
-        if (foundPost) {
-          response = { data: foundPost };
-        } else {
-          throw new Error('Post not found');
-        }
+
+        if (foundPost) response = { data: foundPost };
+        else throw new Error('Post not found');
       }
 
       setPost(response.data);
     } catch (err: any) {
-      console.error('❌ Error fetching post:', err);
       setError('Post not found');
     } finally {
       setLoading(false);
@@ -70,7 +65,7 @@ export default function SharePage() {
     return (
       <View style={styles.container}>
         <Head>
-          <title>Loading... | Cofau</title>
+          <title>Loading… | Cofau</title>
         </Head>
         <ActivityIndicator size="large" color="#4dd0e1" />
         <Text style={styles.loadingText}>Loading post...</Text>
@@ -90,81 +85,78 @@ export default function SharePage() {
     );
   }
 
-  // Prepare data for OG tags
+  // ============================================================
+  // PREPARE OG TAG DATA
+  // ============================================================
+
   const imageUrl = normalizeMediaUrl(post.media_url || post.image_url);
   const profilePic = normalizeProfilePicture(post.user_profile_picture);
   const description = post.review_text || post.description || '';
-  const title = `${post.username} shared a post on Cofau!`;
-  const ogDescription = `${description}${post.rating ? ` · Rating ${post.rating}/10` : ''}${post.location_name ? ` · 📍 ${post.location_name}` : ''}`;
-  const shareUrl = Platform.OS === 'web' 
-    ? typeof window !== 'undefined' 
-      ? window.location.href 
-      : `https://cofau.com/share/${id}`
-    : `https://cofau.com/share/${id}`;
 
-  // Get the frontend URL - adjust this to your actual frontend domain
-  const frontendUrl = Platform.OS === 'web' && typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.host}`
-    : 'https://cofau.com';
-  
+  // OPTION C: Your chosen OG format
+  const ogTitle = `⭐ ${post.rating}/10 · 📍 ${post.location_name || ''} — ${post.username}'s Cofau Review`;
+  const ogDescription = `${description} · 📍 ${post.location_name || ''}`;
+
+  const frontendUrl =
+    Platform.OS === 'web' && typeof window !== 'undefined'
+      ? `${window.location.protocol}//${window.location.host}`
+      : 'https://cofau.com';
+
   const fullShareUrl = `${frontendUrl}/share/${id}`;
+
+  // ============================================================
+  // RENDER SHARE PAGE
+  // ============================================================
 
   return (
     <View style={styles.container}>
       <Head>
-        {/* Basic Meta Tags */}
-        <title>{title}</title>
+        {/* Browser Title */}
+        <title>{ogTitle}</title>
+
+        {/* Description */}
         <meta name="description" content={ogDescription} />
 
-        {/* Open Graph Tags - Required for WhatsApp, Facebook, etc. */}
-        <meta property="og:title" content={title} />
+        {/* OPEN GRAPH TAGS */}
+        <meta property="og:title" content={ogTitle} />
         <meta property="og:description" content={ogDescription} />
         <meta property="og:type" content="article" />
         <meta property="og:url" content={fullShareUrl} />
+
         {imageUrl && <meta property="og:image" content={imageUrl} />}
         {imageUrl && <meta property="og:image:width" content="1200" />}
         {imageUrl && <meta property="og:image:height" content="630" />}
         <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:site_name" content="Cofau" />
 
-        {/* Twitter Card Tags */}
+        {/* TWITTER CARD */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={title} />
+        <meta name="twitter:title" content={ogTitle} />
         <meta name="twitter:description" content={ogDescription} />
         {imageUrl && <meta name="twitter:image" content={imageUrl} />}
 
-        {/* Additional Meta Tags */}
+        {/* Required */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta httpEquiv="Content-Type" content="text/html; charset=utf-8" />
       </Head>
 
-      {/* Web View - Visible content for users who visit the page */}
+      {/* WEB PREVIEW BOX */}
       {Platform.OS === 'web' && (
         <View style={styles.webContainer}>
           <View style={styles.postCard}>
             {imageUrl && (
-              <Image
-                source={{ uri: imageUrl }}
-                style={styles.postImage}
-                contentFit="cover"
-              />
+              <Image source={{ uri: imageUrl }} style={styles.postImage} contentFit="cover" />
             )}
-            
+
             <View style={styles.postContent}>
               <View style={styles.userInfo}>
                 {profilePic && (
-                  <Image
-                    source={{ uri: profilePic }}
-                    style={styles.avatar}
-                    contentFit="cover"
-                  />
+                  <Image source={{ uri: profilePic }} style={styles.avatar} contentFit="cover" />
                 )}
                 <Text style={styles.username}>{post.username}</Text>
               </View>
 
-              {description && (
-                <Text style={styles.description}>{description}</Text>
-              )}
+              {description && <Text style={styles.description}>{description}</Text>}
 
               {post.rating && (
                 <View style={styles.ratingRow}>
@@ -181,9 +173,7 @@ export default function SharePage() {
               )}
 
               <View style={styles.ctaContainer}>
-                <Text style={styles.ctaText}>
-                  View this post and more on the Cofau app!
-                </Text>
+                <Text style={styles.ctaText}>View this post and more on the Cofau app!</Text>
                 <Text style={styles.ctaSubtext}>
                   Download Cofau to discover amazing places and share your experiences.
                 </Text>
@@ -193,7 +183,7 @@ export default function SharePage() {
         </View>
       )}
 
-      {/* Mobile View - Redirect to app or show message */}
+      {/* MOBILE DEVICE VIEW */}
       {Platform.OS !== 'web' && (
         <View style={styles.mobileContainer}>
           <Text style={styles.mobileText}>Opening in Cofau app...</Text>
@@ -204,35 +194,20 @@ export default function SharePage() {
   );
 }
 
+// ============================================================
+// STYLES
+// ============================================================
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  errorSubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    paddingHorizontal: 32,
-  },
-  webContainer: {
-    width: '100%',
-    maxWidth: 600,
-    padding: 20,
-  },
+  container: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+
+  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
+
+  errorText: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 },
+  errorSubtext: { fontSize: 14, color: '#666', textAlign: 'center', paddingHorizontal: 32 },
+
+  webContainer: { width: '100%', maxWidth: 600, padding: 20 },
+
   postCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -243,87 +218,33 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  postImage: {
-    width: '100%',
-    height: 400,
-    backgroundColor: '#f0f0f0',
-  },
-  postContent: {
-    padding: 20,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 12,
-  },
-  username: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  description: {
-    fontSize: 16,
-    color: '#333',
-    lineHeight: 24,
-    marginBottom: 12,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  ratingLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 8,
-  },
-  ratingValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFD700',
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  locationLabel: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#4ECDC4',
-    fontWeight: '500',
-  },
-  ctaContainer: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: '#E8F9FA',
-    borderRadius: 8,
-  },
-  ctaText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  ctaSubtext: {
-    fontSize: 14,
-    color: '#666',
-  },
-  mobileContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  mobileText: {
-    fontSize: 16,
-    color: '#666',
-  },
+
+  postImage: { width: '100%', height: 400, backgroundColor: '#f0f0f0' },
+
+  postContent: { padding: 20 },
+
+  userInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+
+  avatar: { width: 48, height: 48, borderRadius: 24, marginRight: 12 },
+
+  username: { fontSize: 18, fontWeight: '600', color: '#333' },
+
+  description: { fontSize: 16, color: '#333', lineHeight: 24, marginBottom: 12 },
+
+  ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  ratingLabel: { fontSize: 14, color: '#666', marginRight: 8 },
+  ratingValue: { fontSize: 16, fontWeight: '600', color: '#FFD700' },
+
+  locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  locationLabel: { fontSize: 16, marginRight: 8 },
+  locationText: { fontSize: 14, color: '#4ECDC4', fontWeight: '500' },
+
+  ctaContainer: { marginTop: 20, padding: 16, backgroundColor: '#E8F9FA', borderRadius: 8 },
+  ctaText: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 8 },
+  ctaSubtext: { fontSize: 14, color: '#666' },
+
+  mobileContainer: { padding: 32, alignItems: 'center' },
+  mobileText: { fontSize: 16, color: '#666' },
 });
+
+export {};
