@@ -76,6 +76,9 @@ export default function ProfileScreen() {
   const [levelDetailsModalVisible, setLevelDetailsModalVisible] = useState(false);
   const [complimentModalVisible, setComplimentModalVisible] = useState(false);
   const [sendingCompliment, setSendingCompliment] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedPostForDelete, setSelectedPostForDelete] = useState<any>(null);
+  const [deletingPost, setDeletingPost] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -590,6 +593,40 @@ export default function ProfileScreen() {
     return null;
   };
 
+  const handleDeletePost = async () => {
+    if (!selectedPostForDelete || !token) return;
+
+    setDeletingPost(true);
+    try {
+      await axios.delete(`${API_URL}/posts/${selectedPostForDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Remove post from local state
+      setUserPosts((prev) => prev.filter((p) => p.id !== selectedPostForDelete.id));
+      
+      // Update stats
+      if (userStats) {
+        setUserStats((prev: any) => ({
+          ...prev,
+          total_posts: Math.max(0, (prev?.total_posts || 0) - 1),
+        }));
+      }
+
+      Alert.alert('Success', 'Post deleted successfully');
+      setDeleteModalVisible(false);
+      setSelectedPostForDelete(null);
+    } catch (error: any) {
+      console.error('❌ Error deleting post:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.detail || 'Failed to delete post. Please try again.'
+      );
+    } finally {
+      setDeletingPost(false);
+    }
+  };
+
   // ✅ Grid item for both PHOTOS and VIDEOS - navigates to post details
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
@@ -608,6 +645,12 @@ export default function ProfileScreen() {
       } else {
         console.warn('⚠️ Post ID is missing:', item);
       }
+    };
+
+    const handleMenuPress = (e: any) => {
+      e.stopPropagation();
+      setSelectedPostForDelete(item);
+      setDeleteModalVisible(true);
     };
 
     return (
@@ -642,6 +685,15 @@ export default function ProfileScreen() {
           <View style={styles.ratingBadge}>
             <Text style={styles.ratingText}>{item.rating}</Text>
           </View>
+        )}
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.postMenuButton}
+            onPress={handleMenuPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+          </TouchableOpacity>
         )}
       </TouchableOpacity>
     );
@@ -1109,6 +1161,63 @@ export default function ProfileScreen() {
         loading={sendingCompliment}
       />
 
+      {/* Delete Post Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={deleteModalVisible}
+        onRequestClose={() => {
+          setDeleteModalVisible(false);
+          setSelectedPostForDelete(null);
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete Post</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setDeleteModalVisible(false);
+                  setSelectedPostForDelete(null);
+                }}
+              >
+                <Ionicons name="close" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.deleteConfirmText}>
+              Are you sure you want to delete this post? This action cannot be undone.
+            </Text>
+
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteCancelButton]}
+                onPress={() => {
+                  setDeleteModalVisible(false);
+                  setSelectedPostForDelete(null);
+                }}
+              >
+                <Text style={styles.deleteCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteConfirmButton]}
+                onPress={handleDeletePost}
+                disabled={deletingPost}
+              >
+                {deletingPost ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="trash-outline" size={20} color="#fff" />
+                    <Text style={styles.deleteConfirmTextButton}>Delete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Level Details Modal */}
       <Modal
         animationType="slide"
@@ -1424,6 +1533,53 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     color: '#333',
+  },
+  postMenuButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteConfirmText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteModalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  deleteCancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  deleteCancelText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteConfirmButton: {
+    backgroundColor: '#FF3B30',
+  },
+  deleteConfirmTextButton: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',

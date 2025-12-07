@@ -8,8 +8,6 @@ import {
   ActivityIndicator,
   Dimensions,
   TextInput,
-  Modal,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -80,13 +78,6 @@ export default function ExploreScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Report modal state
-  const [showMenuModal, setShowMenuModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [reportDescription, setReportDescription] = useState('');
-  const [submittingReport, setSubmittingReport] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -268,41 +259,8 @@ export default function ExploreScreen() {
             color={item.is_liked ? "#FF4D4D" : "#ffffff"}
           />
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={(e) => {
-            e.stopPropagation();
-            setSelectedPostId(item.id);
-            setShowMenuModal(true);
-          }}
-        >
-          <Ionicons name="ellipsis-horizontal" size={16} color="#fff" />
-        </TouchableOpacity>
       </TouchableOpacity>
     );
-  };
-
-  const handleSubmitReport = async () => {
-    if (!reportDescription.trim()) {
-      Alert.alert('Error', 'Please provide a description for your report');
-      return;
-    }
-
-    if (!selectedPostId) return;
-
-    setSubmittingReport(true);
-    try {
-      await reportPost(selectedPostId, reportDescription);
-      Alert.alert('Success', 'Post reported successfully');
-      setShowReportModal(false);
-      setReportDescription('');
-      setSelectedPostId(null);
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || error.message || 'Failed to submit report');
-    } finally {
-      setSubmittingReport(false);
-    }
   };
 
   // ==================================
@@ -396,91 +354,6 @@ export default function ExploreScreen() {
           ) : null
         }
       />
-
-      {/* Menu Modal */}
-      <Modal
-        visible={showMenuModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowMenuModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMenuModal(false)}
-        >
-          <View style={styles.menuModalContent}>
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={() => {
-                setShowMenuModal(false);
-                setShowReportModal(true);
-                setReportDescription('');
-              }}
-            >
-              <Ionicons name="flag-outline" size={20} color="#FF3B30" />
-              <Text style={styles.menuOptionText}>Report Post</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuCancel}
-              onPress={() => setShowMenuModal(false)}
-            >
-              <Text style={styles.menuCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Report Modal */}
-      <Modal
-        visible={showReportModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowReportModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.reportModalContent}>
-            <View style={styles.reportModalHeader}>
-              <Text style={styles.reportModalTitle}>Report Post</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowReportModal(false);
-                  setReportDescription('');
-                }}
-              >
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.reportModalSubtitle}>
-              Please describe why you're reporting this post
-            </Text>
-
-            <TextInput
-              style={styles.reportDescriptionInput}
-              placeholder="Enter description..."
-              placeholderTextColor="#999"
-              value={reportDescription}
-              onChangeText={setReportDescription}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={[styles.reportSubmitButton, submittingReport && styles.reportSubmitButtonDisabled]}
-              onPress={handleSubmitReport}
-              disabled={submittingReport}
-            >
-              {submittingReport ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.reportSubmitButtonText}>Submit Report</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -540,96 +413,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     padding: 4,
     borderRadius: 20,
-  },
-  menuBtn: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 4,
-    borderRadius: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  menuModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-  },
-  menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  menuOptionText: {
-    fontSize: 16,
-    color: '#FF3B30',
-    marginLeft: 12,
-    fontWeight: '500',
-  },
-  menuCancel: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  menuCancelText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-  },
-  reportModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  reportModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  reportModalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-  },
-  reportModalSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-  },
-  reportDescriptionInput: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    color: '#333',
-    minHeight: 120,
-    marginBottom: 20,
-    backgroundColor: '#FAFAFA',
-  },
-  reportSubmitButton: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reportSubmitButtonDisabled: {
-    opacity: 0.6,
-  },
-  reportSubmitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 
   searchInfo: {

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import axios from "axios";
@@ -110,6 +111,7 @@ export default function FeedScreen() {
         comments: post.comments_count,
         is_liked: post.is_liked_by_user,
         is_saved_by_user: post.is_saved_by_user,
+        is_following: post.is_following || false,
 
         // ✅ media URL normalized safely
         media_url: normalizeMediaUrl(post.image_url || post.media_url),
@@ -248,11 +250,12 @@ export default function FeedScreen() {
         {!loading &&
           !error &&
           feedPosts.map((post) => (
-            <FeedCard 
-              key={post.id} 
-              post={post} 
-              onLikeUpdate={fetchFeed}
-            />
+            <View key={post.id} style={styles.postContainer}>
+              <FeedCard 
+                post={post} 
+                onLikeUpdate={fetchFeed}
+              />
+            </View>
           ))}
 
         <View style={{ height: 40 }} />
@@ -281,7 +284,7 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F5F5" },
+  container: { flex: 1, backgroundColor: "#fff" },
 
   header: {
     backgroundColor: "#3B5998",
@@ -314,11 +317,13 @@ const styles = StyleSheet.create({
 
   userCard: {
     backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    borderRadius: 16,
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 0,
+    borderRadius: 0,
     padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5E5",
   },
 
   userRow: { flexDirection: "row", alignItems: "center" },
@@ -350,12 +355,17 @@ const styles = StyleSheet.create({
 
   retryBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 
+  postContainer: {
+    marginBottom: 20,
+    marginTop: 12,
+  },
+
   navBar: {
     flexDirection: "row",
     justifyContent: "space-around",
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E0E0E0",
     backgroundColor: "#fff",
   },
 });
