@@ -45,39 +45,38 @@ export default function ShareModal({ visible, onClose, post }) {
 
   // ===================== ADD TO COFAU STORY =====================
   async function addToCofauStory() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url || '');
+    const response = await fetch(`${BACKEND_URL}/api/stories/from-post`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${post.token}`, // ensure user token is passed
+      },
+      body: JSON.stringify({
+        post_id: post.id,
+      }),
+    });
 
-      // Prepare story payload
-      const storyPayload = {
-        postId: post.id,
-        mediaUrl,
-        username: post.username,
-        review: post.review_text || post.description || '',
-        rating: post.rating ?? null,
-        location: post.location_name || '',
-        createdAt: new Date().toISOString(),
-      };
+    const data = await response.json();
 
-      console.log('📌 Adding story:', storyPayload);
-
-      // Navigate to your story composer screen
-      // Make sure you create this screen: app/story/create.tsx
-      router.push({
-        pathname: '/story/create',
-        params: storyPayload,
-      });
-
-      onClose();
-    } catch (error) {
-      console.error('❌ Error adding to story:', error);
-      Alert.alert('Error', 'Unable to add story.');
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to create story");
     }
+
+    console.log("Story created:", data);
+
+    Alert.alert("Success", "Added to your Cofau story!");
+    onClose();
+
+  } catch (error) {
+    console.error("❌ Error adding story:", error);
+    Alert.alert("Error", error.message || "Unable to add story.");
+  } finally {
+    setLoading(false);
   }
+}
 
   // ===================== WHATSAPP =====================
   async function shareToWhatsApp() {
