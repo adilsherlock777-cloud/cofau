@@ -243,6 +243,58 @@ async def get_stories_feed(
         print(f"❌ Error fetching stories feed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch stories: {str(e)}")
 
+@router.post("/create-from-post")
+async def create_story_from_post(
+    post_id: str = Body(...),
+    media_url: str = Body(...),
+    review: str = Body(""),
+    rating: int = Body(0),
+    location: str = Body(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Create a story directly from a Post (Add To Story button)
+    No file upload required.
+    """
+    try:
+        db = get_database()
+
+        now = datetime.utcnow()
+        expires_at = now + timedelta(hours=24)
+
+        # Prepare story doc
+        story_doc = {
+            "user_id": str(current_user["_id"]),
+            "media_url": media_url,
+            "media_type": "image", 
+            "created_at": now,
+            "expires_at": expires_at,
+            "from_post": {
+                "post_id": post_id,
+                "review": review,
+                "rating": rating,
+                "location": location,
+            }
+        }
+
+        result = await db.stories.insert_one(story_doc)
+        story_id = str(result.inserted_id)
+
+        return {
+            "message": "Story created from post",
+            "story": {
+                "id": story_id,
+                "media_url": media_url,
+                "media_type": "image",
+                "created_at": now.isoformat(),
+                "expires_at": expires_at.isoformat(),
+                "from_post": story_doc["from_post"]
+            }
+        }
+
+    except Exception as e:
+        print("❌ Error creating story from post:", e)
+        raise HTTPException(status_code=500, detail="Failed to create story")
 
 @router.get("/user/{user_id}")
 async def get_user_stories(
