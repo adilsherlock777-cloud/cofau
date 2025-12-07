@@ -401,6 +401,12 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "user_id": str(current_user["_id"])
         }) is not None
 
+        # Check if current user is following the post author
+        is_following = await db.follows.find_one({
+            "follower_id": str(current_user["_id"]),
+            "following_id": user_id
+        }) is not None
+
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
         
@@ -425,6 +431,7 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
+            "is_following": is_following,
             "created_at": post["created_at"],
         })
 
@@ -540,6 +547,50 @@ async def unsave_post(post_id: str, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail="Post not saved")
     
     return {"message": "Post unsaved"}
+
+@app.delete("/api/posts/{post_id}")
+async def delete_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a post and its associated media file"""
+    db = get_database()
+    
+    # Find the post
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if the user owns the post
+    if str(post["user_id"]) != str(current_user["_id"]):
+        raise HTTPException(status_code=403, detail="You can only delete your own posts")
+    
+    # Get media URL to delete the file
+    media_url = post.get("media_url") or post.get("image_url")
+    
+    # Delete the media file from server if it exists
+    if media_url:
+        try:
+            # Extract filename from media_url (format: /api/static/uploads/filename)
+            if "/api/static/uploads/" in media_url:
+                filename = media_url.split("/api/static/uploads/")[-1]
+                file_path = os.path.join(settings.UPLOAD_DIR, filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"✅ Deleted media file: {file_path}")
+        except Exception as e:
+            print(f"⚠️ Error deleting media file: {e}")
+            # Continue with post deletion even if file deletion fails
+    
+    # Delete related data: likes, comments, saved_posts
+    await db.likes.delete_many({"post_id": post_id})
+    await db.comments.delete_many({"post_id": post_id})
+    await db.saved_posts.delete_many({"post_id": post_id})
+    
+    # Delete the post
+    result = await db.posts.delete_one({"_id": ObjectId(post_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to delete post")
+    
+    return {"message": "Post deleted successfully"}
 
 @app.get("/api/users/{user_id}/saved-posts")
 async def get_saved_posts(user_id: str, skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):

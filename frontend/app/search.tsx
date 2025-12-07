@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from '../components/UserAvatar';
+import PostBottomSheet from '../components/PostBottomSheet';
 import { searchUsers, searchLocations, reportPost, reportUser } from '../utils/api';
 import { normalizeMediaUrl, normalizeProfilePicture } from '../utils/imageUrlFix';
 
@@ -45,6 +46,10 @@ export default function SearchScreen() {
   const [reportDescription, setReportDescription] = useState('');
   const [reportType, setReportType] = useState<'post' | 'user' | null>(null);
   const [submittingReport, setSubmittingReport] = useState(false);
+  
+  // Bottom sheet state for post details
+  const [showPostBottomSheet, setShowPostBottomSheet] = useState(false);
+  const [bottomSheetPostId, setBottomSheetPostId] = useState<string | null>(null);
 
   // Debounced suggestions (lightweight - just names)
   useEffect(() => {
@@ -173,9 +178,13 @@ export default function SearchScreen() {
   };
 
   const handlePostPress = (postId: string) => {
-    setSearchText('');
-    setShowResults(false);
-    router.push(`/post-details/${postId}`);
+    setBottomSheetPostId(postId);
+    setShowPostBottomSheet(true);
+  };
+  
+  const handleClosePostBottomSheet = () => {
+    setShowPostBottomSheet(false);
+    setBottomSheetPostId(null);
   };
 
   const handlePostMenuPress = (postId: string, event?: any) => {
@@ -638,6 +647,13 @@ export default function SearchScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Post Bottom Sheet Modal */}
+      <PostBottomSheet
+        visible={showPostBottomSheet}
+        postId={bottomSheetPostId}
+        onClose={handleClosePostBottomSheet}
+      />
     </View>
   );
 }
