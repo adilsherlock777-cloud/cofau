@@ -416,6 +416,7 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
         visible={showShareModal}
         onClose={() => setShowShareModal(false)}
         post={post}
+        onStoryCreated={onStoryCreated}
       />
     </View>
   );
