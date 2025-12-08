@@ -146,35 +146,9 @@ export default function FeedCard({ post, onLikeUpdate }) {
     }
   };
 
-  const handleShare = async () => {
-    try {
-      const postUrl = `${BACKEND_URL}/post/${post.id}`;
-      const shareText = `${post.username} shared a post on Cofau!\n\n${post.description || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${postUrl}`;
-
-      const shareOptions = {
-        message: shareText,
-        url: postUrl,
-        title: `Check out ${post.username}'s post on Cofau`,
-      };
-
-      const result = await Share.share(shareOptions);
-
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          // Shared with activity type of result.activityType
-          console.log("Shared via:", result.activityType);
-        } else {
-          // Shared
-          console.log("Post shared successfully");
-        }
-      } else if (result.action === Share.dismissedAction) {
-        // Dismissed
-        console.log("Share dismissed");
-      }
-    } catch (error) {
-      console.error("❌ Error sharing post:", error);
-      Alert.alert("Error", "Unable to share post. Please try again.");
-    }
+  const handleShare = () => {
+    console.log("📤 Share button tapped, opening modal...");
+    setShowShareModal(true);
   };
 
   const handleSave = async () => {
