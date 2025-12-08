@@ -94,25 +94,32 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
   const [followLoading, setFollowLoading] = useState(false);
 
   // Instagram Reels-style video scaling formula
-  const getReelsVideoStyle = (userAspectRatio) => {
-    const reelAspect = 9 / 16; // Instagram Reels aspect ratio (0.5625)
+  const getReelsStyle = () => {
+    const { width, height } = videoDimensions;
     
-    if (userAspectRatio > reelAspect) {
-      // Video is WIDER than Reels format (landscape)
-      // Use letterbox (black bars top/bottom)
-      return {
-        width: '100%',
-        height: undefined,
-        aspectRatio: userAspectRatio,
-        resizeMode: 'contain',
+    // Default style before video loads
+    if (!width || !height) {
+      return { width: "100%", height: "100%" };
+    }
+
+    const userAspect = width / height;
+    const reelAspect = 9 / 16; // 0.5625
+
+    console.log(`📐 Video dimensions: ${width}x${height}, aspect: ${userAspect.toFixed(3)}`);
+
+    if (userAspect > reelAspect) {
+      // LANDSCAPE video → Letterbox with black bars
+      console.log("🎬 LANDSCAPE video detected - using letterbox");
+      return { 
+        width: "100%", 
+        aspectRatio: userAspect
       };
     } else {
-      // Video is TALLER or EQUAL to Reels format (portrait/square)
-      // Center-crop, fill width
-      return {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
+      // PORTRAIT/SQUARE → Center-crop
+      console.log("🎬 PORTRAIT/SQUARE video detected - using center-crop");
+      return { 
+        width: "100%", 
+        height: "100%" 
       };
     }
   };
