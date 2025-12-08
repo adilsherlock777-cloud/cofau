@@ -48,6 +48,7 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [storiesRefreshTrigger, setStoriesRefreshTrigger] = useState(0);
 
   useEffect(() => {
     fetchFeed();
