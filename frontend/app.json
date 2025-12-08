@@ -67,7 +67,8 @@
       "**/*"
     ],
     "extra": {
-      "apiUrl": "https://backend.cofau.com/api",
+      "EXPO_PUBLIC_BACKEND_URL": "https://foodsocial-app.preview.emergentagent.com/api",
+      "apiUrl": "https://foodsocial-app.preview.emergentagent.com/api",
       "eas": {
         "projectId": "99fd83ad-0052-4fde-85e4-117a0aefb0cc"
       }
