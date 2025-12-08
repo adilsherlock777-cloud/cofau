@@ -565,19 +565,25 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 
-  // Instagram-style square 1:1 image
+  // Instagram-style 4:5 portrait ratio
   image: { 
     width: "100%", 
-    aspectRatio: 1, // Square 1:1 like Instagram
+    aspectRatio: 4 / 5, // 4:5 Instagram portrait
     borderRadius: 0 
   },
   videoContainer: {
     width: "100%",
-    aspectRatio: 4/5, // 4:5 aspect ratio for videos
+    aspectRatio: 4 / 5, // 4:5 Instagram portrait
     borderRadius: 0,
-    backgroundColor: "#000",
+    backgroundColor: "#000", // Black background like Instagram
     position: "relative",
     overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  video: {
+    width: "100%",
+    height: "100%",
   },
   video: {
     width: "100%",
