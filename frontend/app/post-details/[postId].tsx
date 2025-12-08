@@ -887,10 +887,10 @@ export default function PostDetailsScreen() {
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
         
-        {posts.length > 0 && posts[initialPostIndex] && (
+        {currentVisiblePost && (
           <>
             <Text style={styles.headerUsernameTop} numberOfLines={1}>
-              {posts[initialPostIndex].username}
+              {currentVisiblePost.username}
             </Text>
             
             <TouchableOpacity
