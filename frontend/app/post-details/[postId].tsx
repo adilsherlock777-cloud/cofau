@@ -359,7 +359,7 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
           <Image
             source={{ uri: imageUrl || '' }}
             style={styles.fullScreenImage}
-            contentFit="cover"
+            contentFit="contain"
           />
         )}
 
