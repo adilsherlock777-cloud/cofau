@@ -1114,6 +1114,51 @@ export default function PostDetailsScreen() {
   };
 
   /* ---------------------------------------------------------
+     REPORT POST HANDLERS
+  ----------------------------------------------------------*/
+  const submitReport = async () => {
+    if (!currentVisiblePost) return;
+    
+    try {
+      await fetch(`${API_URL}/posts/${currentVisiblePost.id}/report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          description: "User reported this post",
+        }),
+      });
+
+      Alert.alert("Thank you", "Your report has been submitted.");
+    } catch (e) {
+      console.error("Report error:", e);
+      Alert.alert("Error", "Could not report this post. Try again.");
+    }
+  };
+
+  const handleReportMenu = () => {
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ["Report Post", "Cancel"],
+          destructiveButtonIndex: 0,
+          cancelButtonIndex: 1,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) submitReport();
+        }
+      );
+    } else {
+      Alert.alert("Post Options", "Choose an action", [
+        { text: "Report Post", style: "destructive", onPress: submitReport },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    }
+  };
+
+  /* ---------------------------------------------------------
      LOADING UI
   ----------------------------------------------------------*/
   if (loading)
