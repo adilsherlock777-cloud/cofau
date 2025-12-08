@@ -255,6 +255,10 @@ export default function FeedScreen() {
               <FeedCard 
                 post={post} 
                 onLikeUpdate={fetchFeed}
+                onStoryCreated={() => {
+                  console.log("✅ Story created! Refreshing stories...");
+                  setStoriesRefreshTrigger(prev => prev + 1);
+                }}
               />
             </View>
           ))}
