@@ -1,72 +1,177 @@
 <analysis>
-The trajectory details the development of the Cofau mobile app, a full-stack project using Expo, FastAPI, and MongoDB. The work began with fixing fundamental UI and navigation issues, specifically a corrupted bottom navigation bar across multiple screens, which was resolved by systematically replacing the faulty code with a unified component.
 
-A significant portion of the effort was dedicated to debugging and feature implementation. Key tasks included fixing broken image rendering by ensuring correct, full URL construction on the frontend and adding cache-busting headers. A major feature, a dynamic user profile screen, was built from a reference design, requiring new backend endpoints for stats, posts, and bio updates, alongside a complete frontend overhaul of the profile page. Subsequent debugging addressed non-functional logout and bio update features, tracing issues to a JSON vs. form-data mismatch on the backend and a web-incompatible  on the frontend, which was resolved using a platform-specific approach.
+original_problem_statement:
+The user is facing multiple critical issues after the agent pulled the latest code from a GitHub repository.
+1.  **Authentication is Broken**: Users are unable to log in or sign up. The profile screen shows an Unable to load profile error.
+2.  **Expo Go Connection Failure**: The user's Expo Go mobile app is failing to connect, showing an error that it's trying to reach an old  URL instead of the correct  URL. This blocks all mobile testing.
 
-The most recent and critical challenge involved restoring mobile device testing via Expo Go. Attempts to enable the Expo tunnel led to persistent authentication and  errors (ERR_NGROK_334), even with a provided . This blocked the Expo service from starting, causing a 502 Bad Gateway error on the web preview. The immediate last action was to disable the tunnel to restore the web preview, leaving mobile testing non-functional.
+The user has requested a full diagnostic and fix for the authentication flow and the Expo Go connection issue.
+
+**User's preferred language**: English
+
+**what currently exists?**
+A full-stack social media application (Cofau) with a FastAPI/MongoDB backend and an Expo (React Native) frontend. The application includes advanced features like user authentication, profile pictures, a level/points system, dynamic stories (similar to Instagram), a notifications system, and a Happening Places feature that aggregates post locations.
+
+However, the application is currently in a broken state. A recent  introduced breaking changes, and while some have been fixed (e.g., missing dependencies, hardcoded URLs), the core authentication flow is not working, and mobile testing is impossible due to a persistent Expo configuration issue.
+
+**Last working item**:
+    - Last item agent was working: The agent was trying to fix a critical issue where the Expo Go mobile app is attempting to connect to a hardcoded, old  URL. The user provided a screenshot confirming that despite the agent updating  and restarting services, the mobile client is still receiving the incorrect, stale configuration.
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use? manual testing by curl
+    - User Testing Done: Y
+
+**All Pending/In progress Issue list**:
+  - Issue 1: Expo Go client connects to wrong  URL (P0)
+  - Issue 2: Authentication flow is broken - Login/Signup non-functional (P1)
+  
+  Issues Detail:
+  - Issue 1: 
+     - **Description**: The Expo Go app on a physical device fails to load the application, displaying an error that it cannot connect to . This is despite the agent updating  and  files to use the correct  URL. This indicates a deep and persistent caching issue with the Expo manifest being served to mobile clients.
+     - **Attempted fixes**: 
+        - Updated  in .
+        - Verified  files contain the correct .
+        - Restarted Expo service multiple times.
+        - Cleared Expo and Metro caches.
+        These fixes worked for the web preview but not for the mobile Expo Go client.
+     - **Next debug checklist**:
+        - Thoroughly inspect all Expo-related configuration files for any lingering  references.
+        - Investigate  to see if it's injecting incorrect variables.
+        - Try stopping the expo service, running [16:36:49] Starting project at /app/frontend, and then restarting the service to force a complete manifest regeneration.
+        - Check any project-level  or configuration directories for stale cached values.
+     - **Why fix this issue and what will be achieved with the fix?**: This is a critical blocker. Fixing it will unblock all testing on real mobile devices, which is essential for a mobile app.
+     - **Status**:  IN PROGRESS
+     - **Is recurring issue?**: Y (Caching issues, in general, are highly recurrent in this project).
+     - **Should Test frontend/backend/both after fix?**: Frontend (specifically generating a new QR code and having the user test on their device).
+     - **Blocked on other issue**: None. This issue is the primary blocker.
+  - Issue 2: 
+     - **Description**: After the environment was updated from a git repository, the authentication flow broke. Users cannot log in or sign up. A previous frontend test revealed that button  handlers on the login/signup screens are not triggering the API calls.
+     - **Attempted fixes**: 
+        - The agent identified and fixed a hardcoded production API URL in .
+        - The agent cleared multiple layers of cache to ensure the frontend bundler picked up the change.
+        - The agent verified the backend authentication endpoints are working correctly via direct API tests.
+        The root cause of the unresponsive buttons was not found.
+     - **Next debug checklist**:
+        - Once Issue #1 is resolved, use the Expo Go debugger or browser console logs on the web preview to inspect the login/signup screens.
+        - Add  statements directly inside the  handlers of the login/signup buttons in  and  to confirm if they are firing at all.
+        - Verify the  hook is correctly providing the  and  functions to the components.
+        - Check the  file for any logic that might be preventing the auth screens from functioning correctly.
+     - **Why fix this issue and what will be achieved with the fix?**: This is a core functionality failure. Fixing it will restore the ability for users to access the application.
+     - **Status**:  IN PROGRESS
+     - **Is recurring issue?**: N
+     - **Should Test frontend/backend/both after fix?**: Both (Frontend for UI flow, Backend to ensure user creation/login works).
+     - **Blocked on other issue**: Blocked by Issue 1 for on-device testing.
+
+**In progress Task List**:
+None. The current focus is on critical bug fixes.
+
+**Upcoming and Future Tasks**
+- **Location Details Screen (P1)**: Implement navigation from the Happening Places cards to a new  screen.
+- **Seed Script (P2)**: Create a backend script to populate the empty database with sample users, posts, and locations for easier testing and development.
+- **Story Viewer Polish (P2)**: Implement the Delete story functionality for the story owner.
+- **Notification Polish (P2)**: Implement the Swipe to delete feature for notifications.
+
+**Completed work in this session**
+- **Git Repository Sync**: Pulled the latest code from , performed a HEAD is now at fd4b92f auto-commit for 4c9744b4-18a1-437e-89dd-575c5181b49a, installed new dependencies (), and restarted services.
+- **Authentication Debugging**: Partially debugged the broken auth flow by fixing a hardcoded API URL in .
+- **Full Profile Picture System**: Replaced all remaining letter-based avatars across the app (, ) with the reusable  component. Implemented the image upload/removal flow on the profile screen.
+- **Full-size Profile Level Badges**: Implemented large, dynamic level badges (Reviewer, Top Reviewer, Influencer) on the profile screen, matching a user-provided design.
+- **Dynamic Stories System**: Implemented a full, end-to-end Instagram-style stories feature, including a new backend model/API () and frontend UI components (, , ).
+- **Happening Places Feature**: Implemented a dynamic Happening Places screen, including a new backend aggregation endpoint () and a corresponding frontend UI with an empty state.
+- **Full Notifications System**: Implemented an end-to-end notifications system with a new backend API, a dedicated notifications screen, and a bell icon with an unread count badge in the feed header.
+- **Bug Fixes**:
+  - Fixed the home feed level bar to use dynamic  from the backend instead of a hardcoded value.
+  - Fixed a crash on the Happening Places screen caused by a missing  import.
+  - Adjusted layout spacing on the Happening Places screen.
+
+**Earlier issues found/mentioned but not fixed**
+   - **Issue 1**: Unresponsive buttons in the authentication flow.
+     - **Debug checklist**: A frontend testing agent reported that  handlers for login/signup buttons were not triggering API calls. The agent did not investigate the root cause of this UI unresponsiveness, instead focusing on configuration issues. The next agent needs to verify if the button handlers are even being called.
+     - **Why to solve this issue and what will be achieved with this?**: This is the core reason users cannot log in. Fixing it is essential to restoring app functionality.
+     - **Should Test frontend/backend/both after fix?**: Frontend.
+     - **Is recurring issue?**: N
+
+**Known issue recurrence from previous fork**
+  - **Issue recurrence in previous fork**: Metro Bundler Caching.
+  - **Recurrence count**: High (at least 4-5 separate instances in this session alone).
+  - **Status**: RESOLVED (temporarily each time).
+  Note: The agent repeatedly fought with the Metro bundler serving stale code, especially after file edits in  and . The solution was always to aggressively clear multiple cache directories (, , , ) and restart the expo service. The next agent should be aware that this is a frequent and time-consuming problem.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Frontend**: React Native (Expo), Expo Router (file-based routing), , , , / for state management.
+- **Backend**: FastAPI (Python), MongoDB with Motor (async), Pydantic for data validation.
+- **Authentication**: JWT via . The flow is currently broken.
+- **API**: Modular FastAPI routers for auth, posts, stories, locations, notifications, etc.
+- **Environment**: The entire environment's code was replaced by pulling from a remote git repository. Services are managed by backend                          STOPPED   Dec 08 04:36 PM
+code-server                      STOPPED   Not started
+expo                             STOPPED   Dec 08 04:36 PM
+mongodb                          RUNNING   pid 94, uptime 0:00:10
+nginx-code-proxy                 RUNNING   pid 88, uptime 0:00:10
+supervisor> .
+
+**key DB schema**
+  - **users**: {username, email, hashed_password, profile_picture, level, currentPoints, requiredPoints, ...}
+  - **posts**: {user_id, media_url, caption, location, ...}
+  - **notifications**: {user_id, actor_id, post_id, type, message, is_read, ...}
+  - **stories**: {user_id, media_url, media_type, created_at, expires_at}
+
+**changes in tech stack**
+  - Backend now uses the  library, which was installed after a .
+
+**All files of reference**
+- : Core navigation logic, responsible for redirecting based on auth state.
+- : Manages user state, token storage, and API calls for login/signup. Was recently edited to remove a hardcoded URL.
+- : Main Expo configuration file. Was recently edited to change , but the change did not propagate to the mobile client.
+- : Contains the backend logic for user registration and login.
+- : The UI for the login screen. Suspected of having unresponsive buttons.
+- : New file for the Stories feature backend.
+- : New file for the Happening Places backend.
+- : New component for the Happening Places UI.
+
+**Critical Info for New Agent**
+- **Primary Blocker**: The immediate priority is to fix the Expo Go connection issue (Issue #1). The user cannot test anything on mobile until the app connects to the correct preview URL. This is likely a deep caching problem with the Expo manifest.
+- **Source of Truth**: The project's code was completely overwritten by a HEAD is now at fd4b92f auto-commit for 4c9744b4-18a1-437e-89dd-575c5181b49a from the  repository. Do not trust the previous state; the git repo is the new baseline.
+- **Authentication is Broken**: The  broke the login/signup flow. While a hardcoded URL was fixed in , a frontend test showed buttons are unresponsive. This is the second most critical issue.
+- **Recurrent Caching Issues**: Be prepared for aggressive Metro bundler caching. If changes don't appear, the first step should be to stop the server, clear all possible caches (, , etc.), and restart.
+- **Database is Empty**: The local preview database was intentionally reset and is empty. No data will appear in features like Happening Places until a user signs up and creates posts.
+
+**documents created in this job**
+  - None.
+
+**Last 10 User Messages and any pending user messages**
+1.  **User**: Reports auth is broken with a screenshot.
+2.  **Agent**: Identifies hardcoded URL in , installs missing  backend dependency, fights cache issues, and finally confirms the correct URL is being used in the web preview.
+3.  **User**: Reports login is still not working even after creating a new account.
+4.  **Agent**: Runs backend and frontend tests. Backend tests pass. Frontend tests reveal a **critical failure**: buttons are not triggering API calls.
+5.  **User**: Reports Expo Go app is trying to connect to an old  URL.
+6.  **Agent**: Finds and fixes a hardcoded URL in  and restarts Expo.
+7.  **User**: Asks for a full diagnostic of the auth flow and a fix for the Expo mobile loading failure.
+8.  **Agent**: Confirms backend auth API is working 100%. Inspects  and  on the frontend, which appear correct.
+9.  **User**: Provides a screenshot from their phone, proving the Expo Go app is still trying to connect to the old  URL. **(This is the current, unresolved problem).**
+10. **Agent**: Acknowledges the issue is a persistent Expo manifest caching problem and begins a new fix attempt.
+
+**Project Health Check:**
+- **Broken**: The application is not usable as the core authentication flow is non-functional, and it cannot be loaded on a mobile device for testing due to a critical configuration/caching error.
+
+**3rd Party Integrations**
+- None identified.
+
+**Testing status**
+  - **Testing agent used after significant changes**: YES. Both backend and frontend testing agents were used.
+  - **Troubleshoot agent used after agent stuck in loop**: NO.
+  - **Test files created**:
+    - 
+    - 
+  - **Known regressions**:
+    - The entire authentication flow is a regression introduced after pulling code from the user's git repository.
+
+**Credentials to test flow:**
+- After fixing the signup/login flow, create a new user for testing as the database is empty. A previously used test account was  / .
+
+**What agent forgot to execute**
+- The agent never fully diagnosed or fixed the root cause of the unresponsive buttons on the login/signup screens, which was discovered by the frontend testing agent. The focus shifted to configuration/caching issues, but this underlying UI problem likely still exists and will need to be addressed after the connection issue is resolved.
+
 </analysis>
-
-<product_requirements>
-The Cofau application is a food-centric social media platform where users can share photos and reviews of their dining experiences. The product is a mobile-first application built with React Native (Expo) for the frontend and a Python (FastAPI) backend with a MongoDB database.
-
-**Core Features Implemented:**
-*   **Authentication:** A complete user authentication system with login, signup, and secure session management using JWT.
-*   **Main Feed:** A dynamic, scrollable feed that fetches and displays posts, including images, user details, ratings, and social interaction counts.
-*   **Post Creation:** A dedicated screen allowing users to upload a photo/video, add a rating, write a review, and submit it to the backend.
-*   **Explore Screen:** A discovery page featuring dynamic content like trending posts and top reviewers, displayed in a responsive 3-column grid.
-*   **Dynamic User Profile:** A comprehensive profile screen based on a specific UI design, featuring a user's avatar, bio (editable), achievement badges, and dynamic stats (posts, photos, followers). It includes tabbed views for different content types (Photos, Videos, Collabs).
-*   **Social Interactions:** Functionality for liking posts and viewing/adding comments has been implemented on the backend, with frontend integration in progress.
-</product_requirements>
-
-<key_technical_concepts>
-- **Frontend:** React Native (Expo), Expo Router for file-based routing.
-- **Backend:** FastAPI (Python), MongoDB with Motor for asynchronous database operations.
-- **Authentication:** JWT-based using  (React) and a cross-platform storage solution ().
-- **API Communication:** Centralized  instance for making authenticated requests to the backend.
-- **UI/UX:** Core  components,  for iconography, and platform-specific UI adjustments (e.g., ).
-- **Development Environment:** Supervisor for service management, Expo Tunnel (ngrok) for mobile device previewing.
-</key_technical_concepts>
-
-<code_architecture>
-The project is a monorepo containing distinct  and  directories.
-
-
-
-- ****
-    - **Importance:** This is the heart of the backend, defining all API logic for authentication, posts, feed, likes, comments, and the newer profile/explore features.
-    - **Recent Changes:** Endpoints were added to support the dynamic profile screen, including , , and  for bio/name changes. The update endpoint was modified to accept a JSON body instead of form data to fix a frontend integration issue.
-
-- ****
-    - **Importance:** This screen displays the user's identity and activity. It underwent a complete rewrite to match a detailed UI design.
-    - **Recent Changes:** The file was entirely replaced with a new implementation featuring dynamic data fetching for user stats and posts, tabbed navigation, and an Edit Profile modal. A critical fix was added to the logout button to use  on web and  on native, resolving a platform-specific bug.
-
-- **, , , , **
-    - **Importance:** These are the main screens of the application.
-    - **Recent Changes:** All these files had their bottom navigation JSX and styles replaced with a single, unified component to fix widespread corruption, syntax errors, and UI inconsistencies.
-
-- ****
-    - **Importance:** This configuration file controls how the Expo development server is run within the environment.
-    - **Recent Changes:** This file was the focus of the most recent debugging effort. It was modified multiple times to toggle  mode and manage the  and  environment variables. It was last edited to disable  to fix a 502 Bad Gateway error.
-</code_architecture>
-
-<pending_tasks>
-- Re-establish a working Expo Go tunnel (ngrok) to enable QR code-based testing on real mobile devices. This is currently the highest priority blocker.
-- Implement the  backend endpoint, which was noted as missing during backend testing.
-- Fully implement the Follow system on the frontend, including UI buttons and count updates.
-- Complete the frontend implementation for the Comments screen () to fetch and display comments.
-- Implement the backend logic for OTP and Forgot Password flows.
-</pending_tasks>
-
-<current_work>
-The most recent task was to diagnose and fix why the application was inaccessible, with both the web preview URL showing a 502 Bad Gateway error and the Expo Go QR code functionality being broken.
-
-The root cause was identified as the Expo service being stuck in a  state. This was due to a persistent failure in establishing an  tunnel for the Expo Go preview, which occurred even after adding a user-provided  and attempting various subdomain configurations. The tunnel connection repeatedly failed with an  error, preventing the Expo server from launching successfully.
-
-To provide an immediate working version of the application, the last action taken was to restore the web preview. This was achieved by editing the supervisor configuration () to remove the  flag from the Expo start command.
-
-After restarting the services, the Expo server started correctly, and the web preview at  is now functional. However, as a direct consequence of this fix, the ability to test the application on a real mobile device via Expo Go (QR Code) remains disabled.
-</current_work>
-
-<optional_next_step>
-Re-enable tunnel mode and troubleshoot the persistent  connection error to restore QR code preview functionality for mobile device testing.
-</optional_next_step>
