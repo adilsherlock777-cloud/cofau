@@ -456,7 +456,7 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
             </View>
 
             <Text style={styles.reportModalSubtitle}>
-              Please describe why you're reporting this post
+              Please describe why you&apos;re reporting this post
             </Text>
 
             <TextInput
