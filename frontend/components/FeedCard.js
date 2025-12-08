@@ -238,23 +238,35 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
           </View>
         </TouchableOpacity>
 
-        {user && String(post.user_id) !== String(user._id || user.id) && (
-          <TouchableOpacity 
-            style={[
-              styles.followButton,
-              isFollowing && styles.followingButton
-            ]}
-            onPress={handleFollowToggle}
-            disabled={followLoading}
-          >
-            <Text style={[
-              styles.followButtonText,
-              isFollowing && styles.followingButtonText
-            ]}>
-              {followLoading ? "..." : (isFollowing ? "Following" : "Follow")}
-            </Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerActions}>
+          {user && String(post.user_id) !== String(user._id || user.id) && (
+            <TouchableOpacity 
+              style={[
+                styles.followButton,
+                isFollowing && styles.followingButton
+              ]}
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+            >
+              <Text style={[
+                styles.followButtonText,
+                isFollowing && styles.followingButtonText
+              ]}>
+                {followLoading ? "..." : (isFollowing ? "Following" : "Follow")}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* 3-Dots Menu Button */}
+          {showOptionsMenu && (
+            <TouchableOpacity
+              style={styles.optionsButton}
+              onPress={() => setShowMenuModal(true)}
+            >
+              <Ionicons name="ellipsis-horizontal" size={24} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Media */}
