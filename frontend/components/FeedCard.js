@@ -322,7 +322,7 @@ export default function FeedCard({ post, onLikeUpdate }) {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.action} onPress={handleShare}>
-          <Ionicons name="triangle-outline" size={20} color="#666" />
+          <Ionicons name="share-outline" size={20} color="#666" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.action} onPress={handleSave}>
