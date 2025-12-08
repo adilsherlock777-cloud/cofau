@@ -186,7 +186,7 @@ export const AuthProvider = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      const response = await axios.get(`${API_URL}/auth/me`);
+      const response = await axios.get(`${API_URL}/api/auth/me`);
       setUser(response.data);
     } catch (error) {
       // Only log if it's not a 401 (expected when not authenticated)
