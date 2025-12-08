@@ -307,9 +307,10 @@ export default function StoryViewerScreen() {
   if (!stories.length || !storyUser) return null;
 
   const currentStory = stories[currentIndex];
-  const isOwner = storyUser?.id === user?._id;
+  const isOwner = user && storyUser && 
+    String(user._id || user.id) === String(storyUser._id || storyUser.id);
 
-  console.log("🔍 Current story:", isOwner)
+  console.log("🔍 Current story - isOwner:", isOwner, "user:", user?._id || user?.id, "storyUser:", storyUser?._id || storyUser?.id)
 
   return (
     <SafeAreaView style={styles.container}>
