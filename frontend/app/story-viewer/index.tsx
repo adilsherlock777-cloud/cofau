@@ -316,9 +316,9 @@ export default function StoryViewerScreen() {
           />
           <View>
             <Text style={styles.username}>{storyUser.username}</Text>
-            {isOwner && viewCount > 0 && (
+            {isOwner && (
               <Text style={styles.viewCount}>
-                {viewCount} {viewCount === 1 ? 'view' : 'views'}
+                👁 {viewCount} {viewCount === 1 ? 'view' : 'views'}
               </Text>
             )}
           </View>
