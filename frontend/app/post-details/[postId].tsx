@@ -404,6 +404,235 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
         )}
       </View>
 
+      {/* EXPANDED DETAILS VIEW - Reels Style */}
+      {showDetails && (
+        <View style={styles.expandedDetailsOverlay}>
+          {/* Shrunk Video/Image */}
+          <View style={styles.shrunkMediaContainer}>
+            <TouchableOpacity 
+              style={styles.shrunkMediaWrapper}
+              activeOpacity={1}
+              onPress={() => {
+                if (isVideo) {
+                  setIsMuted(!isMuted);
+                }
+              }}
+            >
+              {isVideo ? (
+                <>
+                  <Video
+                    ref={videoRef}
+                    source={{ uri: imageUrl || '' }}
+                    style={styles.shrunkVideo}
+                    resizeMode="cover"
+                    shouldPlay={post.id === currentPostId}
+                    isLooping
+                    isMuted={isMuted}
+                    useNativeControls={false}
+                  />
+                  {/* Mute indicator for shrunk video */}
+                  <View style={styles.muteIndicatorShrunk}>
+                    <Ionicons 
+                      name={isMuted ? "volume-mute" : "volume-high"} 
+                      size={20} 
+                      color="rgba(255,255,255,0.9)" 
+                    />
+                  </View>
+                </>
+              ) : (
+                <Image
+                  source={{ uri: imageUrl || '' }}
+                  style={styles.shrunkVideo}
+                  contentFit="cover"
+                />
+              )}
+            </TouchableOpacity>
+
+            {/* Close Details Button */}
+            <TouchableOpacity 
+              style={styles.closeDetailsButton}
+              onPress={() => setShowDetails(false)}
+            >
+              <Ionicons name="chevron-down" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Details Content */}
+          <ScrollView style={styles.detailsContent} showsVerticalScrollIndicator={false}>
+            {/* User Info */}
+            <TouchableOpacity
+              style={styles.detailsUserRow}
+              onPress={() => {
+                setShowDetails(false);
+                router.push(`/profile?userId=${post.user_id}`);
+              }}
+            >
+              <UserAvatar
+                profilePicture={profilePic}
+                username={post.username}
+                level={post.user_level}
+                size={50}
+                showLevelBadge
+                style={{}}
+              />
+              <View style={styles.detailsUserInfo}>
+                <Text style={styles.detailsUsername}>{post.username}</Text>
+                <Text style={styles.detailsTimestamp}>{formatTime(post.created_at)}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Action Buttons */}
+            <View style={styles.detailsActions}>
+              <TouchableOpacity 
+                style={styles.detailsActionBtn}
+                onPress={handleLikeToggle}
+              >
+                <Ionicons
+                  name={isLiked ? "heart" : "heart-outline"}
+                  size={28}
+                  color={isLiked ? "#FF6B6B" : "#000"}
+                />
+                <Text style={styles.detailsActionText}>{likesCount}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.detailsActionBtn}
+                onPress={() => setShowComments(!showComments)}
+              >
+                <Ionicons name="chatbubble-outline" size={26} color="#000" />
+                <Text style={styles.detailsActionText}>{post.comments_count || comments.length}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.detailsActionBtn}
+                onPress={() => {
+                  setShowDetails(false);
+                  setShowShareModal(true);
+                }}
+              >
+                <Ionicons name="share-outline" size={26} color="#000" />
+                <Text style={styles.detailsActionText}>Share</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.detailsActionBtn}
+                onPress={handleSaveToggle}
+              >
+                <Ionicons
+                  name={isSaved ? "bookmark" : "bookmark-outline"}
+                  size={26}
+                  color={isSaved ? "#4dd0e1" : "#000"}
+                />
+                <Text style={styles.detailsActionText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Rating */}
+            {post.rating && (
+              <View style={styles.detailsCard}>
+                <Text style={styles.detailsCardLabel}>Ratings</Text>
+                <View style={styles.detailsRatingRow}>
+                  <Ionicons name="star" size={28} color="#FFD700" />
+                  <Text style={styles.detailsRatingText}>{post.rating}/10</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Review Text */}
+            {post.review_text && (
+              <View style={styles.detailsCard}>
+                <Text style={styles.detailsCardLabel}>Reviews</Text>
+                <View style={styles.detailsReviewRow}>
+                  <Ionicons name="bulb" size={24} color="#FF9500" />
+                  <Text style={styles.detailsReviewText}>{post.review_text}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Location */}
+            {post.location_name && (
+              <View style={styles.detailsCard}>
+                <Text style={styles.detailsCardLabel}>Location</Text>
+                <TouchableOpacity
+                  style={styles.detailsLocationRow}
+                  onPress={() => {
+                    if (post.map_link) {
+                      Linking.openURL(post.map_link);
+                    } else if (post.location_name) {
+                      const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                      Linking.openURL(searchUrl);
+                    }
+                  }}
+                >
+                  <Ionicons name="location" size={24} color="#FF3B30" />
+                  <Text style={styles.detailsLocationText}>{post.location_name}</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Comments Section */}
+            {showComments && (
+              <View style={styles.detailsCommentsSection}>
+                <Text style={styles.detailsCommentsTitle}>
+                  Comments ({comments.length})
+                </Text>
+
+                {comments.length === 0 ? (
+                  <Text style={styles.noComments}>No comments yet</Text>
+                ) : (
+                  comments.map((c: any) => (
+                    <View key={c.id} style={styles.commentItem}>
+                      <UserAvatar
+                        profilePicture={c.profile_pic}
+                        username={c.username}
+                        size={36}
+                        level={c.level || 1}
+                        style={{}}
+                      />
+                      <View style={styles.commentContent}>
+                        <Text style={styles.commentUsername}>{c.username}</Text>
+                        <Text style={styles.commentText}>{c.comment_text}</Text>
+                        <Text style={styles.commentTime}>
+                          {formatTime(c.created_at)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+
+                {/* Comment Input */}
+                <View style={styles.commentInputContainer}>
+                  <TextInput
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    placeholder="Add a comment…"
+                    style={styles.commentInput}
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.sendButton,
+                      !commentText.trim() && { backgroundColor: "#ccc" },
+                    ]}
+                    disabled={!commentText.trim() || submittingComment}
+                    onPress={handleSubmitComment}
+                  >
+                    {submittingComment ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="send" size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            <View style={{ height: 60 }} />
+          </ScrollView>
+        </View>
+      )}
+
       {/* BOTTOM SHEET MODAL */}
       {showBottomSheet && (
         <View style={styles.bottomSheetOverlay} pointerEvents="box-none">
