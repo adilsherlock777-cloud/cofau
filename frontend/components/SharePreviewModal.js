@@ -30,25 +30,42 @@ export default function SharePreviewModal({ visible, onClose, post }) {
   const handleAddToStory = async () => {
     try {
       setLoading(true);
+      console.log("📸 Creating story from post...");
 
-      const response = await fetch(`${BACKEND_URL}/api/stories/from-post`, {
+      const response = await fetch(`${BACKEND_URL}/api/stories/create-from-post`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ post_id: post.id }),
+        body: JSON.stringify({ 
+          post_id: post.id,
+          media_url: post.media_url || post.image_url,
+          review: post.review_text || post.description || "",
+          rating: post.rating || 0,
+          location: post.location_name || ""
+        }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Failed to create story");
 
-      Alert.alert("Success", "Added to your Cofau story!");
-      onClose();
+      console.log("✅ Story created successfully:", data);
+      
+      Alert.alert("Success", "Added to your Cofau story! 🎉", [
+        {
+          text: "OK",
+          onPress: () => {
+            onClose();
+            // Trigger a refresh of the stories feed if possible
+            // The feed screen should automatically refresh on focus
+          }
+        }
+      ]);
 
     } catch (error) {
-      console.error("Story creation error:", error);
-      Alert.alert("Error", error.message);
+      console.error("❌ Story creation error:", error);
+      Alert.alert("Error", error.message || "Failed to add to story");
     } finally {
       setLoading(false);
     }
