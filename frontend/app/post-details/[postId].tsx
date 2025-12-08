@@ -839,91 +839,12 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
         </View>
       )}
 
-      {/* Share Modal */}
-      <Modal
+      {/* Share Modal - Using SharePreviewModal Component */}
+      <SharePreviewModal
         visible={showShareModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowShareModal(false)}
-      >
-        <View style={styles.shareModalOverlay}>
-          <View style={styles.shareModalContent}>
-            <View style={styles.shareModalHeader}>
-              <Text style={styles.shareModalTitle}>Share Post</Text>
-              <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Post Image */}
-            {displayUrl && (
-              <View style={styles.sharePostImageContainer}>
-                {isVideo ? (
-                  <Video
-                    source={{ uri: displayUrl || '' }}
-                    style={styles.sharePostImage}
-                    resizeMode={"cover" as any}
-                    useNativeControls={false}
-                    isLooping
-                    shouldPlay={false}
-                  />
-                ) : (
-                  <Image
-                    source={{ uri: displayUrl || '' }}
-                    style={styles.sharePostImage}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                )}
-              </View>
-            )}
-
-            {/* Post Details */}
-            <View style={styles.sharePostDetails}>
-              {/* Rating */}
-              {post.rating ? (
-                <View style={styles.shareDetailRow}>
-                  <Ionicons name="star" size={20} color="#FFD700" />
-                  <Text style={styles.shareDetailText}>{post.rating}/10</Text>
-                </View>
-              ) : null}
-
-              {/* Location */}
-              {post.location_name ? (
-                <View style={styles.shareDetailRow}>
-                  <Ionicons name="location" size={20} color="#FF3B30" />
-                  <Text style={styles.shareDetailText}>{post.location_name}</Text>
-                </View>
-              ) : null}
-
-              {/* Link */}
-              <TouchableOpacity
-                style={styles.shareDetailRow}
-                onPress={() => {
-                  const postUrl = `${BACKEND}/post/${post.id}`;
-                  Linking.openURL(postUrl).catch((err) =>
-                    console.error("Failed to open URL:", err)
-                  );
-                }}
-              >
-                <Ionicons name="link" size={20} color="#888" />
-                <Text style={styles.shareLinkText}>
-                  click on this link to view on Cofau
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Share Button */}
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={handleSharePost}
-            >
-              <Ionicons name="share-outline" size={20} color="#fff" />
-              <Text style={styles.shareButtonText}>Share Post</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowShareModal(false)}
+        post={post}
+      />
     </View>
   );
 }
