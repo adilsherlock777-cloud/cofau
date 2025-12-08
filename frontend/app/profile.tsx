@@ -101,6 +101,7 @@ export default function ProfileScreen() {
     if (userData) {
       fetchUserPosts();
       fetchComplimentsCount();
+      checkIfComplimented();
     }
   }, [userData, activeTab]);
 
