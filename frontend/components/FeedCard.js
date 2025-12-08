@@ -318,11 +318,14 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
                 }
               }}
             />
-            {!videoPlaying && (
-              <View style={styles.playButtonOverlay}>
-                <Ionicons name="play-circle" size={64} color="#FFF" />
-              </View>
-            )}
+            {/* Mute/Unmute indicator (Instagram style) */}
+            <View style={styles.muteIndicator}>
+              <Ionicons 
+                name={isMuted ? "volume-mute" : "volume-high"} 
+                size={24} 
+                color="rgba(255,255,255,0.9)" 
+              />
+            </View>
           </View>
         ) : (
           <Image
