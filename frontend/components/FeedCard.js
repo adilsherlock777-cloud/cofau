@@ -93,6 +93,24 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
   const [isFollowing, setIsFollowing] = useState(post.is_following || false);
   const [followLoading, setFollowLoading] = useState(false);
 
+  // Function to calculate video style based on aspect ratio
+  const getVideoStyle = (aspectRatio) => {
+    const containerAspectRatio = 4 / 5; // Instagram portrait ratio
+    
+    if (aspectRatio > containerAspectRatio) {
+      // Video is wider than container - fit height and center horizontally
+      return {
+        width: '100%',
+        height: '100%',
+      };
+    } else {
+      // Video is taller than container - fit width and center vertically
+      return {
+        width: '100%',
+        height: '100%',
+      };
+    }
+  };
   // Sync follow state with post data
   useEffect(() => {
     if (post.is_following != null) {
