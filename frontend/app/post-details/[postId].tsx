@@ -352,30 +352,56 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
     <View style={styles.postItem}>
       {/* FULL HEIGHT MEDIA - Instagram Style */}
       <View style={styles.fullScreenMediaContainer} {...panResponder.panHandlers}>
-        {isVideo ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: mediaUrl || '' }}
-            style={styles.fullScreenVideo}
-            resizeMode={"cover" as any}
-            useNativeControls
-            isLooping
-          />
-        ) : (
-          <Image
-            source={{ uri: imageUrl || '' }}
-            style={styles.fullScreenImage}
-            contentFit="contain"
-          />
+        {/* Fullscreen Reels-Style Media */}
+        <TouchableOpacity 
+          style={styles.fullScreenMediaContainer}
+          activeOpacity={1}
+          onPress={() => {
+            if (isVideo) {
+              setIsMuted(!isMuted);
+            }
+          }}
+        >
+          {isVideo ? (
+            <>
+              <Video
+                ref={videoRef}
+                source={{ uri: imageUrl || '' }}
+                style={styles.fullScreenVideo}
+                resizeMode="cover"
+                shouldPlay={post.id === currentPostId}
+                isLooping
+                isMuted={isMuted}
+                useNativeControls={false}
+              />
+              {/* Mute/Unmute Indicator */}
+              <View style={styles.muteIndicatorReels}>
+                <Ionicons 
+                  name={isMuted ? "volume-mute" : "volume-high"} 
+                  size={28} 
+                  color="rgba(255,255,255,0.9)" 
+                />
+              </View>
+            </>
+          ) : (
+            <Image
+              source={{ uri: imageUrl || '' }}
+              style={styles.fullScreenVideo}
+              contentFit="cover"
+            />
+          )}
+        </TouchableOpacity>
+
+        {/* Tap for Details Button */}
+        {!showDetails && (
+          <TouchableOpacity 
+            style={styles.tapForDetailsButton}
+            onPress={() => setShowDetails(true)}
+          >
+            <Ionicons name="chevron-up" size={20} color="#333" />
+            <Text style={styles.tapForDetailsText}>Tap for Details</Text>
+          </TouchableOpacity>
         )}
-
-        {/* Header removed - now using top-level header only */}
-
-        {/* Swipe up indicator */}
-        <View style={styles.swipeUpIndicator}>
-          <Ionicons name="chevron-up" size={24} color="#fff" />
-          <Text style={styles.swipeUpText}>Swipe up for details</Text>
-        </View>
       </View>
 
       {/* BOTTOM SHEET MODAL */}
