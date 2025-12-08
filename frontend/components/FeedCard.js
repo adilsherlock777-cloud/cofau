@@ -79,6 +79,8 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [isMuted, setIsMuted] = useState(true); // Videos start muted like Instagram
+  const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
 
   // Report modal state
   const [showMenuModal, setShowMenuModal] = useState(false);
