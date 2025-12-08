@@ -286,9 +286,9 @@ export const unsavePost = async (postId) => {
 /**
  * Get user's saved posts
  */
-export const getSavedPosts = async (userId) => {
+export const getSavedPosts = async () => {
   try {
-    const response = await axios.get(`${API_URL}/users/${userId}/saved-posts`);
+    const response = await axios.get(`${API_URL}/saved/list`);
     return response.data;
   } catch (error) {
     console.error('❌ Error fetching saved posts:', error.response?.data || error.message);
