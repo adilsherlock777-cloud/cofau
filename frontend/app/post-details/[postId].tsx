@@ -17,8 +17,10 @@ import {
   ScrollView,
   Animated,
   PanResponder,
+  Platform,
+  ActionSheetIOS,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
