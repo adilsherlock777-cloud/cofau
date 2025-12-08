@@ -247,33 +247,60 @@ export default function StoryViewerScreen() {
   };
 
   /* ----------------------------------------------------------
-     SHARE STORY
+     STORY DELETE & OPTIONS HANDLERS
   -----------------------------------------------------------*/
-  const handleShare = async () => {
-    setPaused(true); // Pause story while sharing
-    setShowShareOptions(true);
-  };
-
-  const shareToSocialMedia = async (platform: string) => {
+  const handleDeleteStory = async () => {
+    const currentStory = stories[currentIndex];
+    if (!currentStory || isDeleting) return;
+    
     try {
-      const currentStory = stories[currentIndex];
-      const shareText = `Check out ${storyUser.username}'s story on Cofau!`;
-      
-      const result = await Share.share({
-        message: shareText,
-        url: currentStory.media_url,
-        title: `${storyUser.username}'s Story`,
+      setIsDeleting(true);
+      const storyId = currentStory.id || currentStory._id;
+
+      await fetch(`${API_URL}/stories/${storyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       });
 
-      if (result.action === Share.sharedAction) {
-        console.log(`✅ Story shared to ${platform}`);
-      }
+      router.back();
+      Alert.alert('Story deleted', 'Your story has been deleted.');
     } catch (error) {
-      console.error('❌ Error sharing story:', error);
-      Alert.alert('Error', 'Failed to share story');
+      console.error('Error deleting story', error);
+      Alert.alert('Error', 'Could not delete story. Please try again.');
     } finally {
-      setShowShareOptions(false);
-      setPaused(false);
+      setIsDeleting(false);
+    }
+  };
+
+  const handleStoryOptions = () => {
+    const isOwner =
+      user && storyUser &&
+      String(user._id || user.id) === String(storyUser._id || storyUser.id);
+
+    if (!isOwner) {
+      Alert.alert('Story Options', 'No options available.');
+      return;
+    }
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Delete Story', 'Cancel'],
+          destructiveButtonIndex: 0,
+          cancelButtonIndex: 1,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) handleDeleteStory();
+        }
+      );
+    } else {
+      Alert.alert('Story Options', 'Choose an action', [
+        { text: 'Delete Story', style: 'destructive', onPress: handleDeleteStory },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
     }
   };
 
