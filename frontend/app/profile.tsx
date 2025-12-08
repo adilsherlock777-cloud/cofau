@@ -779,16 +779,28 @@ export default function ProfileScreen() {
               />
             </TouchableOpacity>
             {isOwnProfile && (
-              <TouchableOpacity
-                style={styles.settingsButton}
-                onPress={() => setSettingsModalVisible(true)}
-              >
-                <Ionicons
-                  name="settings-outline"
-                  size={24}
-                  color="#666"
-                />
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={() => router.push('/saved-posts')}
+                >
+                  <Ionicons
+                    name="bookmark"
+                    size={24}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={() => setSettingsModalVisible(true)}
+                >
+                  <Ionicons
+                    name="settings-outline"
+                    size={24}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
