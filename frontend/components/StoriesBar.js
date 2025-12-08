@@ -15,7 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
 import { normalizeMediaUrl, normalizeProfilePicture, normalizeStoryUrl, BACKEND_URL } from "../utils/imageUrlFix";
 
-export default function StoriesBar() {
+export default function StoriesBar({ refreshTrigger }) {
   const router = useRouter();
   const { user, token } = useAuth();
 
@@ -24,7 +24,7 @@ export default function StoriesBar() {
 
   useEffect(() => {
     if (token) fetchStories();
-  }, [token]);
+  }, [token, refreshTrigger]);
 
   /* --------------------------------------------------
      FETCH STORIES + FIX ALL URLS + FIX media_type
