@@ -11,7 +11,8 @@ import {
   Animated,
   Modal,
   FlatList,
-  Share,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
