@@ -367,23 +367,7 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
           />
         )}
 
-        {/* Header overlay on media */}
-        <View style={styles.headerOverlay}>
-          <TouchableOpacity
-            style={styles.userRowHeader}
-            onPress={() => router.push(`/profile?userId=${post.user_id}`)}
-          >
-            <UserAvatar
-              profilePicture={profilePic}
-              username={post.username}
-              level={post.user_level}
-              size={40}
-              showLevelBadge
-              style={{}}
-            />
-            <Text style={styles.headerUsername}>{post.username}</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Header removed - now using top-level header only */}
 
         {/* Swipe up indicator */}
         <View style={styles.swipeUpIndicator}>
