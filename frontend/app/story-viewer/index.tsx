@@ -43,7 +43,7 @@ export default function StoryViewerScreen() {
   const [viewers, setViewers] = useState<any[]>([]);
   const [viewedStories, setViewedStories] = useState(new Set<string>());
   const [showViewersModal, setShowViewersModal] = useState(false);
-  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const progressAnims = useRef<any[]>([]);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
