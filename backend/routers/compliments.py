@@ -207,6 +207,27 @@ async def get_user_compliments_count(user_id: str):
     return {"compliments_count": count}
 
 
+@router.get("/check/{user_id}")
+async def check_if_complimented(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check if the current user has already complimented the specified user"""
+    db = get_database()
+    current_user_id = str(current_user["_id"])
+    
+    # Check if a compliment exists from current user to target user
+    compliment = await db.compliments.find_one({
+        "from_user_id": current_user_id,
+        "to_user_id": user_id
+    })
+    
+    return {
+        "has_complimented": compliment is not None,
+        "compliment_id": str(compliment["_id"]) if compliment else None
+    }
+
+
 @router.get("/user/{user_id}/received")
 async def get_user_received_compliments(
     user_id: str,
