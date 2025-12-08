@@ -69,7 +69,7 @@ const getTimeAgo = (dateString) => {
   }
 };
 
-export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
+export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptionsMenu = true }) {
   const router = useRouter();
   const { user, token } = useAuth();
 
