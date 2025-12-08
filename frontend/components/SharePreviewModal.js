@@ -19,6 +19,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function SharePreviewModal({ visible, onClose, post, onStoryCreated }) {
   const [loading, setLoading] = useState(false);
+  const [showSocialOptions, setShowSocialOptions] = useState(false);
   const { token } = useAuth();
 
   if (!post) return null;
