@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 
 import UserAvatar from "./UserAvatar";
-import ShareModal from "./ShareModal";
+import SharePreviewModal from "./SharePreviewModal";
 import { useAuth } from "../context/AuthContext";
 import { likePost, unlikePost, savePost, unsavePost, reportPost } from "../utils/api";
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
