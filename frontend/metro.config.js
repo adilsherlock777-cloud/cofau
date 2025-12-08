@@ -12,24 +12,15 @@ config.cacheStores = [
 ];
 
 
-// Drastically reduce file watching to avoid ENOSPC error
+// Use watchman instead of node fs watchers to reduce file descriptor usage
 config.watchFolders = [__dirname];
 
-// Exclude large directories that don't need watching
-config.resolver.blockList = [
-  /node_modules\/.*\/(android|ios|windows|macos|linux|tvos|visionos)$/,
-  /node_modules\/.*\/__tests__$/,
-  /node_modules\/.*\/\.git$/,
-  /node_modules\/.*\/test$/,
-  /node_modules\/.*\/tests$/,
-  /node_modules\/.*\/spec$/,
-  /node_modules\/.*\/examples$/,
-  /node_modules\/.*\/docs$/,
-  /node_modules\/.*\/\.expo$/,
-  /node_modules\/react-native\/React\//,
-  /node_modules\/react-native\/Libraries\//,
-  /node_modules\/react-native\/third-party\//,
-];
+// Disable file watching entirely in low-resource environments
+config.watcher = {
+  watchman: {
+    deferStates: ['hg.update'],
+  },
+};
 
 // Reduce the number of workers to decrease resource usage
 config.maxWorkers = 1;
