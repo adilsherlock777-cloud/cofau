@@ -314,6 +314,7 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
               isLooping={true}
               isMuted={isMuted}
               onLoad={(data) => {
+                console.log("✅ Video loaded in FeedCard");
                 // Capture video dimensions and calculate aspect ratio
                 const { naturalSize } = data;
                 if (naturalSize && naturalSize.width && naturalSize.height) {
@@ -337,9 +338,6 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
               }}
               onLoadStart={() => {
                 console.log("📹 Video loading in FeedCard:", mediaUrl);
-              }}
-              onLoad={() => {
-                console.log("✅ Video loaded in FeedCard");
               }}
               onPlaybackStatusUpdate={(status) => {
                 if (status.isLoaded) {
