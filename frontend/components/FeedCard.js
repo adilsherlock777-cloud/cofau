@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Linking, Share, Platfo
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Video } from "expo-av";
+import axios from "axios";
 
 import UserAvatar from "./UserAvatar";
 import SharePreviewModal from "./SharePreviewModal";
