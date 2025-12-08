@@ -71,7 +71,7 @@ const getTimeAgo = (dateString) => {
 
 export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   const [isLiked, setIsLiked] = useState(post.is_liked || false);
   const [likesCount, setLikes] = useState(post.likes || 0);
