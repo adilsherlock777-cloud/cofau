@@ -248,6 +248,23 @@ export default function ProfileScreen() {
     }
   };
 
+  const checkIfComplimented = async () => {
+    if (!userData?.id || !token || isOwnProfile) return;
+    
+    try {
+      const response = await axios.get(
+        `${API_URL}/compliments/check/${userData.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setHasComplimented(response.data.has_complimented || false);
+    } catch (err) {
+      console.error('❌ Error checking compliment status:', err);
+      setHasComplimented(false);
+    }
+  };
+
   const fetchPeople = async () => {
     if (!userData?.id) return;
 
