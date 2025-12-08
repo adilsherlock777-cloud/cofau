@@ -1175,6 +1175,7 @@ export default function ProfileScreen() {
           setSendingCompliment(true);
           try {
             await sendCompliment(userData.id, complimentType);
+            setHasComplimented(true); // Update state after successful compliment
             Alert.alert('Success', 'Compliment sent successfully!');
             setComplimentModalVisible(false);
           } catch (error: any) {
