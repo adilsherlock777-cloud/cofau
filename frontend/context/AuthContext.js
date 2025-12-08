@@ -134,7 +134,7 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (fullName, email, password) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/signup`, {
+      const response = await axios.post(`${API_URL}/api/auth/signup`, {
         full_name: fullName,
         email: email,
         password: password,
@@ -150,7 +150,7 @@ export const AuthProvider = ({ children }) => {
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
 
       // Fetch user info
-      const userResponse = await axios.get(`${API_URL}/auth/me`);
+      const userResponse = await axios.get(`${API_URL}/api/auth/me`);
       setUser(userResponse.data);
 
       // Register for push notifications
