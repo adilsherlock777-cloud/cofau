@@ -1120,15 +1120,15 @@ export default function PostDetailsScreen() {
     if (!currentVisiblePost) return;
     
     try {
+      const formData = new FormData();
+      formData.append("description", "User reported this post");
+
       await fetch(`${API_URL}/posts/${currentVisiblePost.id}/report`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          description: "User reported this post",
-        }),
+        body: formData,
       });
 
       Alert.alert("Thank you", "Your report has been submitted.");
