@@ -875,13 +875,37 @@ export default function PostDetailsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* BACK BUTTON OVERLAY */}
-      <TouchableOpacity
-        style={styles.header}
-        onPress={() => router.back()}
-      >
-        <Ionicons name="arrow-back" size={28} color="#fff" />
-      </TouchableOpacity>
+      {/* HEADER OVERLAY WITH BACK BUTTON, USERNAME, AND 3-DOTS */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerBackButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={28} color="#fff" />
+        </TouchableOpacity>
+        
+        {posts[currentPostIndex] && (
+          <>
+            <Text style={styles.headerUsernameTop} numberOfLines={1}>
+              {posts[currentPostIndex].username}
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.headerOptionsButton}
+              onPress={() => {
+                // We'll need to pass this down to PostItem or handle here
+                // For now, let's add a simple alert
+                Alert.alert("Menu", "Report this post?", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Report", style: "destructive" }
+                ]);
+              }}
+            >
+              <Ionicons name="ellipsis-horizontal" size={28} color="#fff" />
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
 
       {/* FLATLIST FOR CONTINUOUS SCROLLING */}
       <FlatList
