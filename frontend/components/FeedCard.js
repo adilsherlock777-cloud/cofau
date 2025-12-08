@@ -86,6 +86,8 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(post.is_following || false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const mediaUrl = normalizeMediaUrl(post.media_url);
   const isVideo =
