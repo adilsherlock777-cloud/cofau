@@ -24,6 +24,7 @@ import { Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
+import SharePreviewModal from "../../components/SharePreviewModal";
 import axios from "axios";
 import { Image } from "expo-image";
 import { Video } from "expo-av";
