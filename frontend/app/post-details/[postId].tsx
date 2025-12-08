@@ -1708,4 +1708,188 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 6,
   },
+
+  // Expanded Details View Styles
+  expandedDetailsOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#fff",
+    zIndex: 1000,
+  },
+
+  shrunkMediaContainer: {
+    width: "100%",
+    height: SCREEN_HEIGHT * 0.6, // 4:5 aspect ratio area
+    backgroundColor: "#000",
+    position: "relative",
+  },
+
+  shrunkMediaWrapper: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  },
+
+  shrunkVideo: {
+    width: "100%",
+    height: "100%",
+  },
+
+  muteIndicatorShrunk: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 15,
+    padding: 6,
+  },
+
+  closeDetailsButton: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 20,
+    padding: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+
+  detailsContent: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+
+  detailsUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    marginBottom: 16,
+  },
+
+  detailsUserInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+
+  detailsUsername: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#000",
+  },
+
+  detailsTimestamp: {
+    fontSize: 13,
+    color: "#888",
+    marginTop: 2,
+  },
+
+  detailsActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    marginBottom: 20,
+  },
+
+  detailsActionBtn: {
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+
+  detailsActionText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#333",
+    fontWeight: "600",
+  },
+
+  detailsCard: {
+    marginBottom: 20,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 16,
+    padding: 16,
+  },
+
+  detailsCardLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
+    marginBottom: 12,
+  },
+
+  detailsRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF9E6",
+    padding: 16,
+    borderRadius: 12,
+  },
+
+  detailsRatingText: {
+    marginLeft: 12,
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#000",
+  },
+
+  detailsReviewRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF5E6",
+    padding: 16,
+    borderRadius: 12,
+  },
+
+  detailsReviewText: {
+    marginLeft: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#333",
+    flex: 1,
+  },
+
+  detailsLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF0F0",
+    padding: 16,
+    borderRadius: 12,
+  },
+
+  detailsLocationText: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+    flex: 1,
+  },
+
+  detailsCommentsSection: {
+    marginTop: 8,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+
+  detailsCommentsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+    color: "#000",
+  },
 });
