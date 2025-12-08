@@ -90,6 +90,13 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
   const [isFollowing, setIsFollowing] = useState(post.is_following || false);
   const [followLoading, setFollowLoading] = useState(false);
 
+  // Sync follow state with post data
+  useEffect(() => {
+    if (post.is_following != null) {
+      setIsFollowing(post.is_following);
+    }
+  }, [post]);
+
   const mediaUrl = normalizeMediaUrl(post.media_url);
   const isVideo =
     post.media_type === "video" ||
