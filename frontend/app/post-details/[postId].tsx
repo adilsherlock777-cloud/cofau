@@ -960,11 +960,38 @@ const styles = StyleSheet.create({
   header: {
     position: "absolute",
     top: 50,
-    left: 16,
+    left: 0,
+    right: 0,
     zIndex: 100,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "transparent",
+  },
+  
+  headerBackButton: {
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 20,
     padding: 10,
+    marginRight: 12,
+  },
+  
+  headerUsernameTop: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+    textShadowColor: "rgba(0, 0, 0, 0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  
+  headerOptionsButton: {
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 20,
+    padding: 10,
+    marginLeft: 12,
   },
 
   headerTitle: {
