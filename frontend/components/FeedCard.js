@@ -437,8 +437,8 @@ export default function FeedCard({ post, onLikeUpdate }) {
         </View>
       </Modal>
 
-      {/* Share Modal */}
-      <ShareModal
+      {/* Share Preview Modal */}
+      <SharePreviewModal
         visible={showShareModal}
         onClose={() => setShowShareModal(false)}
         post={post}
