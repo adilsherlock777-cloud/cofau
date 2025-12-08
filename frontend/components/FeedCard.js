@@ -307,12 +307,21 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
           <View style={styles.videoContainer}>
             <Video
               source={{ uri: mediaUrl }}
-              style={styles.videoResponsive}
+              style={videoAspectRatio ? getVideoStyle(videoAspectRatio) : styles.videoResponsive}
               resizeMode="cover"
               shouldPlay={true}
               useNativeControls={false}
               isLooping={true}
               isMuted={isMuted}
+              onLoad={(data) => {
+                // Capture video dimensions and calculate aspect ratio
+                const { naturalSize } = data;
+                if (naturalSize && naturalSize.width && naturalSize.height) {
+                  const aspectRatio = naturalSize.width / naturalSize.height;
+                  setVideoAspectRatio(aspectRatio);
+                  setVideoDimensions({ width: naturalSize.width, height: naturalSize.height });
+                }
+              }}
               onError={(error) => {
                 console.error("❌ Video playback error in FeedCard:", error);
                 console.error("❌ Video URL:", mediaUrl);
