@@ -14,7 +14,7 @@ import {
   ActionSheetIOS,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Video, ResizeMode } from 'expo-av';
 import axios from 'axios';
