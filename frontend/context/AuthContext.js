@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     console.log('🔐 AuthContext: Starting login process...');
     console.log('📧 Email:', email);
-    console.log('🌐 API URL:', `${API_URL}/auth/login`);
+    console.log('🌐 API URL:', `${API_URL}/api/auth/login`);
     
     try {
       // FastAPI OAuth2 expects form data with 'username' field
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }) => {
       formData.append('password', password);
 
       console.log('📤 Sending login request...');
-      const response = await axios.post(`${API_URL}/auth/login`, formData, {
+      const response = await axios.post(`${API_URL}/api/auth/login`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -91,12 +91,12 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 Authorization header set:', axios.defaults.headers.common['Authorization']);
 
       // Fetch user info
-      console.log('👤 Fetching user info from /auth/me...');
-      console.log('📡 Request URL:', `${API_URL}/auth/me`);
+      console.log('👤 Fetching user info from /api/auth/me...');
+      console.log('📡 Request URL:', `${API_URL}/api/auth/me`);
       console.log('📡 Request headers:', axios.defaults.headers.common);
       
       try {
-        const userResponse = await axios.get(`${API_URL}/auth/me`);
+        const userResponse = await axios.get(`${API_URL}/api/auth/me`);
         console.log('📥 User response received:', JSON.stringify(userResponse.data));
         
         // Set user state
