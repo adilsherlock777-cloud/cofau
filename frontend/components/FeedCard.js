@@ -78,6 +78,7 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Videos start muted like Instagram
 
   // Report modal state
   const [showMenuModal, setShowMenuModal] = useState(false);
