@@ -963,6 +963,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
+  // Instagram-style image viewer - centered with proper aspect ratio
   fullScreenImage: {
     width: "100%",
     height: "100%",
