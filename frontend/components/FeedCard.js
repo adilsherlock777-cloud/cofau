@@ -93,21 +93,26 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
   const [isFollowing, setIsFollowing] = useState(post.is_following || false);
   const [followLoading, setFollowLoading] = useState(false);
 
-  // Function to calculate video style based on aspect ratio
-  const getVideoStyle = (aspectRatio) => {
-    const containerAspectRatio = 4 / 5; // Instagram portrait ratio
+  // Instagram Reels-style video scaling formula
+  const getReelsVideoStyle = (userAspectRatio) => {
+    const reelAspect = 9 / 16; // Instagram Reels aspect ratio (0.5625)
     
-    if (aspectRatio > containerAspectRatio) {
-      // Video is wider than container - fit height and center horizontally
+    if (userAspectRatio > reelAspect) {
+      // Video is WIDER than Reels format (landscape)
+      // Use letterbox (black bars top/bottom)
       return {
         width: '100%',
-        height: '100%',
+        height: undefined,
+        aspectRatio: userAspectRatio,
+        resizeMode: 'contain',
       };
     } else {
-      // Video is taller than container - fit width and center vertically
+      // Video is TALLER or EQUAL to Reels format (portrait/square)
+      // Center-crop, fill width
       return {
         width: '100%',
         height: '100%',
+        resizeMode: 'cover',
       };
     }
   };
