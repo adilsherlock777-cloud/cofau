@@ -695,6 +695,7 @@ export default function PostDetailsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [skip, setSkip] = useState(0);
   const [initialPostIndex, setInitialPostIndex] = useState(0);
+  const [currentVisiblePost, setCurrentVisiblePost] = useState<any>(null);
   const flatListRef = useRef<FlatList<any> | null>(null);
   const bottomSheetCloseRef = useRef<(() => void) | null>(null);
 
