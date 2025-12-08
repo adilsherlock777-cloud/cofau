@@ -52,13 +52,16 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
 
       console.log("✅ Story created successfully:", data);
       
+      // Call the callback to refresh stories
+      if (onStoryCreated) {
+        onStoryCreated(data.story);
+      }
+      
       Alert.alert("Success", "Added to your Cofau story! 🎉", [
         {
           text: "OK",
           onPress: () => {
             onClose();
-            // Trigger a refresh of the stories feed if possible
-            // The feed screen should automatically refresh on focus
           }
         }
       ]);
