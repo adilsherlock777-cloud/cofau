@@ -225,7 +225,7 @@ export default function FeedScreen() {
         )}
 
         {/* STORIES */}
-        <StoriesBar />
+        <StoriesBar refreshTrigger={storiesRefreshTrigger} />
 
         {/* LOADING */}
         {loading && (
