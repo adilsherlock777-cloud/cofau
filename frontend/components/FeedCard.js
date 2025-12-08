@@ -155,29 +155,42 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
   };
 
   const handleFollowToggle = async () => {
-    if (!post.user_id || !token || followLoading) return;
-
-    setFollowLoading(true);
-    const previousFollowState = isFollowing;
-
-    // Optimistic UI update
-    setIsFollowing(!isFollowing);
+    if (!post.user_id || !token) {
+      console.warn("Missing token or user_id");
+      return;
+    }
 
     try {
-      const endpoint = isFollowing ? 'unfollow' : 'follow';
-      await axios.post(
-        `${BACKEND_URL}/api/users/${post.user_id}/${endpoint}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      setFollowLoading(true);
+      const previousState = isFollowing;
 
-      console.log(`✅ ${isFollowing ? 'Unfollowed' : 'Followed'} ${post.username}`);
-    } catch (err) {
-      console.error('❌ Error toggling follow:', err);
-      // Revert optimistic update on error
-      setIsFollowing(previousFollowState);
+      // Optimistic update
+      setIsFollowing(!previousState);
+
+      const endpoint = previousState
+        ? "/api/follow/unfollow"
+        : "/api/follow";
+
+      const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          targetUserId: post.user_id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Follow API failed");
+      }
+
+      console.log(`✅ ${previousState ? 'Unfollowed' : 'Followed'} ${post.username}`);
+    } catch (error) {
+      console.error('❌ Error toggling follow:', error);
+      // Revert state on failure
+      setIsFollowing(!isFollowing);
       Alert.alert('Error', 'Failed to update follow status. Please try again.');
     } finally {
       setFollowLoading(false);
