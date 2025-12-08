@@ -503,6 +503,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  followingButton: {
+    backgroundColor: "#4CAF50",
+  },
+  followingButtonText: {
+    color: "#FFF",
+  },
 
   // Instagram-style square 1:1 image
   image: { 
