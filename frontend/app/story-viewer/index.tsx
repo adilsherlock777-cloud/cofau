@@ -353,12 +353,9 @@ export default function StoryViewerScreen() {
         </View>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
-            <Ionicons name="share-outline" size={24} color="#FFF" />
-          </TouchableOpacity>
           {isOwner && (
-            <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
-              <Ionicons name="trash-outline" size={24} color="#FFF" />
+            <TouchableOpacity onPress={handleStoryOptions} style={styles.headerButton}>
+              <Feather name="more-vertical" size={24} color="#FFF" />
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => router.back()}>
