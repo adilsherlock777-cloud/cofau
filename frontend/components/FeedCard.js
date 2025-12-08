@@ -168,10 +168,10 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
       return;
     }
 
-    try {
-      setFollowLoading(true);
-      const previousState = isFollowing;
+    setFollowLoading(true);
+    const previousState = isFollowing;
 
+    try {
       // Optimistic update
       setIsFollowing(!previousState);
 
