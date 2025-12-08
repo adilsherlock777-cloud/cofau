@@ -70,6 +70,8 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [showDetails, setShowDetails] = useState(false); // Tap for Details state
+  const [isMuted, setIsMuted] = useState(true); // Video mute state
   const videoRef = useRef(null);
   
   // Bottom sheet animation
