@@ -312,8 +312,8 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
           <View style={styles.videoContainer}>
             <Video
               source={{ uri: mediaUrl }}
-              style={videoAspectRatio ? getVideoStyle(videoAspectRatio) : styles.videoResponsive}
-              resizeMode="cover"
+              style={videoAspectRatio ? getReelsVideoStyle(videoAspectRatio) : styles.videoResponsive}
+              resizeMode={videoAspectRatio && videoAspectRatio > (9/16) ? "contain" : "cover"}
               shouldPlay={true}
               useNativeControls={false}
               isLooping={true}
