@@ -895,11 +895,21 @@ export default function ProfileScreen() {
 
             {/* Compliment Button */}
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: "#FF6B6B" }]}
+              style={[
+                styles.actionButton, 
+                { backgroundColor: hasComplimented ? "#999" : "#FF6B6B" }
+              ]}
               onPress={() => setComplimentModalVisible(true)}
+              disabled={hasComplimented}
             >
-              <Ionicons name="heart-outline" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Compliment</Text>
+              <Ionicons 
+                name={hasComplimented ? "heart" : "heart-outline"} 
+                size={18} 
+                color="#fff" 
+              />
+              <Text style={styles.actionButtonText}>
+                {hasComplimented ? "Complimented" : "Compliment"}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
