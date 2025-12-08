@@ -548,6 +548,105 @@ async def unsave_post(post_id: str, current_user: dict = Depends(get_current_use
     
     return {"message": "Post unsaved"}
 
+# ==================== SAVED POSTS ENDPOINTS (Alternative API) ====================
+
+@app.post("/api/saved/add")
+async def add_saved_post(request: dict, current_user: dict = Depends(get_current_user)):
+    """Save a post (alternative endpoint)"""
+    db = get_database()
+    
+    post_id = request.get("postId")
+    if not post_id:
+        raise HTTPException(status_code=400, detail="postId is required")
+    
+    # Check if post exists
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if already saved
+    existing_save = await db.saved_posts.find_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"])
+    })
+    
+    if existing_save:
+        return {"message": "Post already saved", "status": "success"}
+    
+    # Add save
+    await db.saved_posts.insert_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"]),
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "Post saved", "status": "success"}
+
+@app.delete("/api/saved/remove/{post_id}")
+async def remove_saved_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Unsave a post (alternative endpoint)"""
+    db = get_database()
+    
+    result = await db.saved_posts.delete_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"])
+    })
+    
+    if result.deleted_count == 0:
+        return {"message": "Post not saved", "status": "success"}
+    
+    return {"message": "Post unsaved", "status": "success"}
+
+@app.get("/api/saved/list")
+async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
+    """Get current user's saved posts (alternative endpoint)"""
+    db = get_database()
+    
+    user_id = str(current_user["_id"])
+    
+    # Get saved posts
+    saved_posts = await db.saved_posts.find({"user_id": user_id}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for saved in saved_posts:
+        post = await db.posts.find_one({"_id": ObjectId(saved["post_id"])})
+        if not post:
+            continue  # Skip if post was deleted
+        
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
+        is_liked = await db.likes.find_one({
+            "post_id": saved["post_id"],
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        media_type = post.get("media_type", "image")
+        
+        result.append({
+            "_id": str(post["_id"]),
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user["username"] if user else "Unknown",
+            "full_name": user.get("full_name", user["username"]) if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "mediaUrl": post.get("media_url", ""),  # For compatibility
+            "image_url": post.get("media_url") if media_type == "image" else None,
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "is_liked_by_user": is_liked,
+            "is_saved_by_user": True,
+            "created_at": post["created_at"],
+            "saved_at": saved["created_at"]
+        })
+    
+    return result
+
 @app.delete("/api/posts/{post_id}")
 async def delete_post(post_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a post and its associated media file"""
