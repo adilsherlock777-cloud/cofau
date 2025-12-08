@@ -218,9 +218,21 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
           </View>
         </TouchableOpacity>
 
-        {!post.is_following && user && String(post.user_id) !== String(user._id || user.id) && (
-          <TouchableOpacity style={styles.followButton}>
-            <Text style={styles.followButtonText}>Follow</Text>
+        {user && String(post.user_id) !== String(user._id || user.id) && (
+          <TouchableOpacity 
+            style={[
+              styles.followButton,
+              isFollowing && styles.followingButton
+            ]}
+            onPress={handleFollowToggle}
+            disabled={followLoading}
+          >
+            <Text style={[
+              styles.followButtonText,
+              isFollowing && styles.followingButtonText
+            ]}>
+              {followLoading ? "..." : (isFollowing ? "Following" : "Follow")}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
