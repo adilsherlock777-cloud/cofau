@@ -709,6 +709,18 @@ export default function PostDetailsScreen() {
     }
   }, []);
 
+  // Track currently visible post
+  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      const visiblePost = viewableItems[0].item;
+      setCurrentVisiblePost(visiblePost);
+    }
+  }, []);
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 50,
+  };
+
   /* ---------------------------------------------------------
      LOAD INITIAL POST AND FEED
   ----------------------------------------------------------*/
