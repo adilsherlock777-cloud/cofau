@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Comprehensive Backend API Testing for Cofau Food Social App
-Testing Authentication Flow End-to-End
+Backend API Testing Script for Authentication Flow
+Includes specific diagnostic test for frontendtest@cofau.com credentials
 """
 
 import requests
@@ -13,6 +13,10 @@ from datetime import datetime
 # Configuration
 BASE_URL = "https://foodsocial-app.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
+
+# Specific test credentials as requested in diagnostic
+DIAGNOSTIC_EMAIL = "frontendtest@cofau.com"
+DIAGNOSTIC_PASSWORD = "Test123!"
 
 class Colors:
     GREEN = '\033[92m'
