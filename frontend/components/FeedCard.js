@@ -517,6 +517,14 @@ const styles = StyleSheet.create({
   },
   userInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
   userMeta: { marginLeft: 12 },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  optionsButton: {
+    padding: 4,
+  },
 
   username: {
     fontWeight: "600",
