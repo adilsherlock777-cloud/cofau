@@ -174,9 +174,10 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
       // Optimistic update
       setIsFollowing(!previousState);
 
+      // Use correct backend endpoint: /api/users/{user_id}/follow or /api/users/{user_id}/unfollow
       const endpoint = previousState
-        ? "/api/follow/unfollow"
-        : "/api/follow";
+        ? `/api/users/${post.user_id}/unfollow`
+        : `/api/users/${post.user_id}/follow`;
 
       const response = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: "POST",
@@ -184,20 +185,18 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          targetUserId: post.user_id,
-        }),
       });
 
       if (!response.ok) {
         throw new Error("Follow API failed");
       }
 
-      console.log(`✅ ${previousState ? 'Unfollowed' : 'Followed'} ${post.username}`);
+      const data = await response.json();
+      console.log(`✅ ${previousState ? 'Unfollowed' : 'Followed'} ${post.username}`, data);
     } catch (error) {
       console.error('❌ Error toggling follow:', error);
       // Revert state on failure
-      setIsFollowing(!isFollowing);
+      setIsFollowing(previousState);
       Alert.alert('Error', 'Failed to update follow status. Please try again.');
     } finally {
       setFollowLoading(false);
