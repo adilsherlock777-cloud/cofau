@@ -1189,27 +1189,24 @@ export default function PostDetailsScreen() {
         
         {currentVisiblePost && (
           <>
-            <Text style={styles.headerUsernameTop} numberOfLines={1}>
-              {currentVisiblePost.username}
-            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (currentVisiblePost?.user_id) {
+                  router.push(`/profile?userId=${currentVisiblePost.user_id}`);
+                }
+              }}
+              style={{ flexDirection: "row", alignItems: "center" }}
+            >
+              <Text style={styles.headerUsernameTop} numberOfLines={1}>
+                {currentVisiblePost.user?.fullName || currentVisiblePost.username}
+              </Text>
+            </TouchableOpacity>
             
             <TouchableOpacity
               style={styles.headerOptionsButton}
-              onPress={() => {
-                // Open report menu for the current post
-                Alert.alert("Post Options", "What would you like to do?", [
-                  { 
-                    text: "Report Post", 
-                    style: "destructive",
-                    onPress: () => {
-                      Alert.alert("Report", "This post has been reported.");
-                    }
-                  },
-                  { text: "Cancel", style: "cancel" }
-                ]);
-              }}
+              onPress={handleReportMenu}
             >
-              <Ionicons name="ellipsis-horizontal" size={28} color="#fff" />
+              <Feather name="more-vertical" size={24} color="#FFF" />
             </TouchableOpacity>
           </>
         )}
