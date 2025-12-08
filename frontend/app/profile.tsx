@@ -63,6 +63,7 @@ export default function ProfileScreen() {
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'people' | 'contributions'>('posts');
   const [complimentsCount, setComplimentsCount] = useState(0);
+  const [hasComplimented, setHasComplimented] = useState(false);
   const [peopleList, setPeopleList] = useState<any[]>([]);
   const [peopleTab, setPeopleTab] = useState<'followers' | 'following'>('followers');
   const [editModalVisible, setEditModalVisible] = useState(false);
