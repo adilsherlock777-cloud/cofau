@@ -287,7 +287,7 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
           <View style={styles.videoContainer}>
             <Video
               source={{ uri: mediaUrl }}
-              style={styles.video}
+              style={styles.videoResponsive}
               resizeMode="cover"
               shouldPlay={true}
               useNativeControls={false}
