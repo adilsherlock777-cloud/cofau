@@ -262,6 +262,89 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
           </View>
         </TouchableOpacity>
       </TouchableOpacity>
+
+      {/* Social Media Options Bottom Sheet */}
+      <Modal
+        visible={showSocialOptions}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSocialOptions(false)}
+      >
+        <TouchableOpacity
+          style={styles.bottomSheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSocialOptions(false)}
+        >
+          <TouchableOpacity
+            style={styles.bottomSheet}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.bottomSheetHeader}>
+              <Text style={styles.bottomSheetTitle}>Share to</Text>
+              <TouchableOpacity onPress={() => setShowSocialOptions(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.socialOptionsGrid}>
+              {/* WhatsApp */}
+              <TouchableOpacity
+                style={styles.socialOption}
+                onPress={shareToWhatsApp}
+                disabled={loading}
+              >
+                <View style={[styles.socialIconCircle, { backgroundColor: "#25D366" }]}>
+                  <Ionicons name="logo-whatsapp" size={32} color="#FFF" />
+                </View>
+                <Text style={styles.socialLabel}>WhatsApp</Text>
+              </TouchableOpacity>
+
+              {/* Instagram */}
+              <TouchableOpacity
+                style={styles.socialOption}
+                onPress={shareToInstagram}
+                disabled={loading}
+              >
+                <View style={[styles.socialIconCircle, { backgroundColor: "#E4405F" }]}>
+                  <Ionicons name="logo-instagram" size={32} color="#FFF" />
+                </View>
+                <Text style={styles.socialLabel}>Instagram</Text>
+              </TouchableOpacity>
+
+              {/* Twitter */}
+              <TouchableOpacity
+                style={styles.socialOption}
+                onPress={shareToTwitter}
+                disabled={loading}
+              >
+                <View style={[styles.socialIconCircle, { backgroundColor: "#1DA1F2" }]}>
+                  <Ionicons name="logo-twitter" size={32} color="#FFF" />
+                </View>
+                <Text style={styles.socialLabel}>Twitter</Text>
+              </TouchableOpacity>
+
+              {/* Facebook */}
+              <TouchableOpacity
+                style={styles.socialOption}
+                onPress={shareToFacebook}
+                disabled={loading}
+              >
+                <View style={[styles.socialIconCircle, { backgroundColor: "#1877F2" }]}>
+                  <Ionicons name="logo-facebook" size={32} color="#FFF" />
+                </View>
+                <Text style={styles.socialLabel}>Facebook</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator color="#4dd0e1" size="large" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 }
