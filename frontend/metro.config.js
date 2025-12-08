@@ -12,17 +12,20 @@ config.cacheStores = [
 ];
 
 
-// Use watchman instead of node fs watchers to reduce file descriptor usage
+// Reduce file watching to minimum for low-resource environments
 config.watchFolders = [__dirname];
 
-// Disable file watching entirely in low-resource environments
+// Use polling watcher instead of native file watchers to avoid ENOSPC
 config.watcher = {
-  watchman: {
-    deferStates: ['hg.update'],
+  healthCheck: {
+    enabled: false,
   },
 };
 
-// Reduce the number of workers to decrease resource usage
+// Drastically reduce workers
 config.maxWorkers = 1;
+
+// Disable file watching for node_modules
+config.resolver.disableHierarchicalLookup = true;
 
 module.exports = config;
