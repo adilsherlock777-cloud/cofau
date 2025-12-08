@@ -17,7 +17,7 @@ import { normalizeMediaUrl, BACKEND_URL } from '../utils/imageUrlFix';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export default function SharePreviewModal({ visible, onClose, post }) {
+export default function SharePreviewModal({ visible, onClose, post, onStoryCreated }) {
   const [loading, setLoading] = useState(false);
   const { token } = useAuth();
 
