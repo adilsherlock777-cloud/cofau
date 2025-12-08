@@ -593,6 +593,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
+  muteIndicator: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   postDetails: {
     paddingHorizontal: 16,
