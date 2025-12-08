@@ -626,8 +626,8 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "_id": str(post["_id"]),
             "id": str(post["_id"]),
             "user_id": post["user_id"],
-            "username": user["username"] if user else "Unknown",
-            "full_name": user.get("full_name", user["username"]) if user else "Unknown",
+            "username": user.get("username", "Unknown") if user else "Unknown",
+            "full_name": user.get("full_name", user.get("username", "Unknown")) if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
             "mediaUrl": post.get("media_url", ""),  # For compatibility
