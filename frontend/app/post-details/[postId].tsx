@@ -14,6 +14,9 @@ import {
   Dimensions,
   Modal,
   Share,
+  ScrollView,
+  Animated,
+  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -27,7 +30,7 @@ import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrl
 const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
 const API_URL = `${BACKEND}/api`;
-const SCREEN_HEIGHT = Dimensions.get("window").height;
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 /* ---------------------------------------------------------
    🔥 UNIVERSAL URL NORMALIZER (FINAL VERSION)
@@ -50,9 +53,9 @@ const normalizeUrl = (url: string | null | undefined): string | null => {
 };
 
 /* ---------------------------------------------------------
-   POST ITEM COMPONENT (for feed view)
+   POST ITEM COMPONENT (Instagram-style full screen)
 ----------------------------------------------------------*/
-function PostItem({ post, onPostPress, currentPostId, token }: any) {
+function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetRef }: any) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
@@ -62,7 +65,12 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
   const videoRef = useRef(null);
+  
+  // Bottom sheet animation
+  const bottomSheetY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const panY = useRef(0);
 
   const isVideo = (post.media_type || "").toLowerCase() === "video";
   const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url);
@@ -78,6 +86,107 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
   };
 
   const displayUrl = getDisplayUrl();
+
+  // Pan responder for swipe up gesture on the media
+  // Only responds to upward swipes from the very bottom (bottom 15% of screen)
+  // This allows FlatList to handle vertical scrolling for changing posts
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to upward swipes from very bottom area (bottom 15%)
+        // And only if bottom sheet is not already open
+        const isFromBottom = gestureState.y0 > SCREEN_HEIGHT * 0.85;
+        const isUpwardSwipe = gestureState.dy < -10;
+        const isVerticalSwipe = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        return !showBottomSheet && isFromBottom && isUpwardSwipe && isVerticalSwipe;
+      },
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy < 0 && !showBottomSheet) {
+          // Swiping up
+          const newY = Math.max(0, SCREEN_HEIGHT + gestureState.dy);
+          bottomSheetY.setValue(newY);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy < -100 && !showBottomSheet) {
+          // Swiped up significantly, show bottom sheet
+          openBottomSheet();
+        } else {
+          // Snap back
+          closeBottomSheet();
+        }
+      },
+    })
+  ).current;
+
+  // Pan responder for bottom sheet to close it
+  // Only handles downward swipes on the bottom sheet itself
+  const bottomSheetPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to downward swipes on the bottom sheet
+        const isDownwardSwipe = gestureState.dy > 5;
+        const isVerticalSwipe = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        return showBottomSheet && isDownwardSwipe && isVerticalSwipe;
+      },
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0 && showBottomSheet) {
+          // Swiping down
+          panY.current = gestureState.dy;
+          bottomSheetY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150 && showBottomSheet) {
+          // Swiped down significantly, close bottom sheet
+          closeBottomSheet();
+        } else if (showBottomSheet) {
+          // Snap back to open
+          Animated.spring(bottomSheetY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const openBottomSheet = () => {
+    setShowBottomSheet(true);
+    Animated.spring(bottomSheetY, {
+      toValue: 0,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeBottomSheet = useCallback(() => {
+    Animated.timing(bottomSheetY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowBottomSheet(false);
+      panY.current = 0;
+    });
+  }, []);
+
+  // Register close function with parent
+  useEffect(() => {
+    if (onCloseBottomSheetRef && post.id === currentPostId) {
+      onCloseBottomSheetRef(closeBottomSheet);
+    }
+    return () => {
+      if (onCloseBottomSheetRef) {
+        onCloseBottomSheetRef(null);
+      }
+    };
+  }, [onCloseBottomSheetRef, post.id, currentPostId, closeBottomSheet]);
 
   // Debug URLs for share modal
   useEffect(() => {
@@ -98,6 +207,13 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
       fetchComments();
     }
   }, [showComments, post.id]);
+
+  // Close bottom sheet when post changes (user scrolled to different post)
+  useEffect(() => {
+    if (showBottomSheet) {
+      closeBottomSheet();
+    }
+  }, [post.id]);
 
   const fetchComments = async () => {
     try {
@@ -228,184 +344,250 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
 
   return (
     <View style={styles.postItem}>
-      {/* Header */}
-      <View style={styles.postHeader}>
-        <TouchableOpacity
-          style={styles.userRowHeader}
-          onPress={() => router.push(`/profile?userId=${post.user_id}`)}
-        >
-          <UserAvatar
-            profilePicture={profilePic}
-            username={post.username}
-            level={post.user_level}
-            size={40}
-            showLevelBadge
+      {/* FULL HEIGHT MEDIA - Instagram Style */}
+      <View style={styles.fullScreenMediaContainer} {...panResponder.panHandlers}>
+        {isVideo ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: mediaUrl || '' }}
+            style={styles.fullScreenVideo}
+            resizeMode={"cover" as any}
+            useNativeControls
+            isLooping
           />
-          <Text style={styles.headerUsername}>{post.username}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Media */}
-      <TouchableOpacity
-        onPress={() => onPostPress(post.id)}
-        activeOpacity={0.95}
-      >
-        <View style={styles.mediaContainer}>
-          {isVideo ? (
-            <Video
-              ref={videoRef}
-              source={{ uri: mediaUrl }}
-              style={styles.video}
-              resizeMode="cover"
-              useNativeControls
-              isLooping
-            />
-          ) : (
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.postImage}
-              contentFit="cover"
-            />
-          )}
-        </View>
-      </TouchableOpacity>
-
-      {/* Post Details */}
-      <View style={styles.postInfo}>
-        <TouchableOpacity
-          style={styles.userRow}
-          onPress={() => router.push(`/profile?userId=${post.user_id}`)}
-        >
-          <UserAvatar
-            profilePicture={profilePic}
-            username={post.username}
-            size={40}
-            level={post.user_level}
-            showLevelBadge
+        ) : (
+          <Image
+            source={{ uri: imageUrl || '' }}
+            style={styles.fullScreenImage}
+            contentFit="cover"
           />
-          <View style={{ marginLeft: 10 }}>
-            <Text style={styles.username}>{post.username}</Text>
-            <Text style={styles.timestamp}>{formatTime(post.created_at)}</Text>
-          </View>
-        </TouchableOpacity>
+        )}
 
-        {post.review_text ? (
-          <Text style={styles.caption}>{post.review_text}</Text>
-        ) : null}
-
-        {post.rating ? (
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={20} color="#FFD700" />
-            <Text style={styles.ratingText}>{post.rating}/10</Text>
-          </View>
-        ) : null}
-
-        {post.location_name ? (
+        {/* Header overlay on media */}
+        <View style={styles.headerOverlay}>
           <TouchableOpacity
-            style={styles.locationRow}
-            onPress={() => {
-              if (post.map_link) {
-                Linking.openURL(post.map_link);
-              } else if (post.location_name) {
-                const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
-                Linking.openURL(searchUrl);
-              }
-            }}
+            style={styles.userRowHeader}
+            onPress={() => router.push(`/profile?userId=${post.user_id}`)}
           >
-            <Ionicons name="location" size={20} color="#4ECDC4" />
-            <Text style={styles.locationText}>{post.location_name}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#4ECDC4" />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      {/* Actions */}
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleLikeToggle}>
-          <Ionicons
-            name={isLiked ? "heart" : "heart-outline"}
-            size={28}
-            color={isLiked ? "#FF6B6B" : "#000"}
-          />
-          <Text style={styles.actionText}>{likesCount}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => setShowComments(!showComments)}
-        >
-          <Ionicons name="chatbubble-outline" size={26} color="#000" />
-          <Text style={styles.actionText}>{post.comments_count || comments.length}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => setShowShareModal(true)}
-        >
-          <Ionicons name="share-outline" size={26} color="#000" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={handleSaveToggle}>
-          <Ionicons
-            name={isSaved ? "bookmark" : "bookmark-outline"}
-            size={26}
-            color={isSaved ? "#4dd0e1" : "#000"}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Comments Section */}
-      {showComments && (
-        <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>
-            Comments ({comments.length})
-          </Text>
-
-          {comments.length === 0 ? (
-            <Text style={styles.noComments}>No comments yet</Text>
-          ) : (
-            comments.map((c: any) => (
-              <View key={c.id} style={styles.commentItem}>
-                <UserAvatar
-                  profilePicture={c.profile_pic}
-                  username={c.username}
-                  size={32}
-                />
-                <View style={styles.commentContent}>
-                  <Text style={styles.commentUsername}>{c.username}</Text>
-                  <Text style={styles.commentText}>{c.comment_text}</Text>
-                  <Text style={styles.commentTime}>
-                    {formatTime(c.created_at)}
-                  </Text>
-                </View>
-              </View>
-            ))
-          )}
-
-          {/* Comment Input */}
-          <View style={styles.commentInputContainer}>
-            <TextInput
-              value={commentText}
-              onChangeText={setCommentText}
-              placeholder="Add a comment…"
-              style={styles.commentInput}
+            <UserAvatar
+              profilePicture={profilePic}
+              username={post.username}
+              level={post.user_level}
+              size={40}
+              showLevelBadge
+              style={{}}
             />
+            <Text style={styles.headerUsername}>{post.username}</Text>
+          </TouchableOpacity>
+        </View>
 
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                !commentText.trim() && { backgroundColor: "#ccc" },
-              ]}
-              disabled={!commentText.trim() || submittingComment}
-              onPress={handleSubmitComment}
-            >
-              {submittingComment ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="send" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
+        {/* Swipe up indicator */}
+        <View style={styles.swipeUpIndicator}>
+          <Ionicons name="chevron-up" size={24} color="#fff" />
+          <Text style={styles.swipeUpText}>Swipe up for details</Text>
+        </View>
+      </View>
+
+      {/* BOTTOM SHEET MODAL */}
+      {showBottomSheet && (
+        <View style={styles.bottomSheetOverlay} pointerEvents="box-none">
+          <View style={styles.bottomSheetBackdrop} pointerEvents="auto">
+            <TouchableOpacity 
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={closeBottomSheet}
+            />
           </View>
+          <Animated.View
+            style={[
+              styles.bottomSheetContainer,
+              {
+                transform: [{ translateY: bottomSheetY }],
+              },
+            ]}
+            pointerEvents="auto"
+            {...bottomSheetPanResponder.panHandlers}
+          >
+            <View style={styles.bottomSheetHandle} />
+            
+            <ScrollView
+              style={styles.bottomSheetScroll}
+              showsVerticalScrollIndicator={false}
+              bounces={true}
+              nestedScrollEnabled={true}
+            >
+              {/* User Info */}
+              <TouchableOpacity
+                style={styles.bottomSheetUserRow}
+                onPress={() => {
+                  closeBottomSheet();
+                  router.push(`/profile?userId=${post.user_id}`);
+                }}
+              >
+                <UserAvatar
+                  profilePicture={profilePic}
+                  username={post.username}
+                  level={post.user_level}
+                  size={50}
+                  showLevelBadge
+                  style={{}}
+                />
+                <View style={styles.bottomSheetUserInfo}>
+                  <Text style={styles.bottomSheetUsername}>{post.username}</Text>
+                  <Text style={styles.bottomSheetTimestamp}>{formatTime(post.created_at)}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Action Buttons */}
+              <View style={styles.bottomSheetActions}>
+                <TouchableOpacity 
+                  style={styles.bottomSheetActionBtn}
+                  onPress={handleLikeToggle}
+                >
+                  <Ionicons
+                    name={isLiked ? "heart" : "heart-outline"}
+                    size={28}
+                    color={isLiked ? "#FF6B6B" : "#000"}
+                  />
+                  <Text style={styles.bottomSheetActionText}>{likesCount}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.bottomSheetActionBtn}
+                  onPress={() => setShowComments(!showComments)}
+                >
+                  <Ionicons name="chatbubble-outline" size={26} color="#000" />
+                  <Text style={styles.bottomSheetActionText}>{post.comments_count || comments.length}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.bottomSheetActionBtn}
+                  onPress={() => {
+                    closeBottomSheet();
+                    setShowShareModal(true);
+                  }}
+                >
+                  <Ionicons name="share-outline" size={26} color="#000" />
+                  <Text style={styles.bottomSheetActionText}>Share</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.bottomSheetActionBtn}
+                  onPress={handleSaveToggle}
+                >
+                  <Ionicons
+                    name={isSaved ? "bookmark" : "bookmark-outline"}
+                    size={26}
+                    color={isSaved ? "#4dd0e1" : "#000"}
+                  />
+                  <Text style={styles.bottomSheetActionText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Rating */}
+              {post.rating && (
+                <View style={styles.bottomSheetCard}>
+                  <Text style={styles.bottomSheetCardLabel}>Ratings</Text>
+                  <View style={styles.bottomSheetRatingRow}>
+                    <Ionicons name="star" size={28} color="#FFD700" />
+                    <Text style={styles.bottomSheetRatingText}>{post.rating}/10</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Review Text */}
+              {post.review_text && (
+                <View style={styles.bottomSheetCard}>
+                  <Text style={styles.bottomSheetCardLabel}>Reviews</Text>
+                  <View style={styles.bottomSheetReviewRow}>
+                    <Ionicons name="bulb" size={24} color="#FF9500" />
+                    <Text style={styles.bottomSheetReviewText}>{post.review_text}</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Location / Restaurant Name */}
+              {post.location_name && (
+                <View style={styles.bottomSheetCard}>
+                  <Text style={styles.bottomSheetCardLabel}>Location</Text>
+                  <TouchableOpacity
+                    style={styles.bottomSheetLocationRow}
+                    onPress={() => {
+                      if (post.map_link) {
+                        Linking.openURL(post.map_link);
+                      } else if (post.location_name) {
+                        const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                        Linking.openURL(searchUrl);
+                      }
+                    }}
+                  >
+                    <Ionicons name="location" size={24} color="#FF3B30" />
+                    <Text style={styles.bottomSheetLocationText}>{post.location_name}</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Comments Section */}
+              {showComments && (
+                <View style={styles.bottomSheetCommentsSection}>
+                  <Text style={styles.bottomSheetCommentsTitle}>
+                    Comments ({comments.length})
+                  </Text>
+
+                  {comments.length === 0 ? (
+                    <Text style={styles.noComments}>No comments yet</Text>
+                  ) : (
+                    comments.map((c: any) => (
+                      <View key={c.id} style={styles.commentItem}>
+                        <UserAvatar
+                          profilePicture={c.profile_pic}
+                          username={c.username}
+                          size={36}
+                          level={c.level || 1}
+                          style={{}}
+                        />
+                        <View style={styles.commentContent}>
+                          <Text style={styles.commentUsername}>{c.username}</Text>
+                          <Text style={styles.commentText}>{c.comment_text}</Text>
+                          <Text style={styles.commentTime}>
+                            {formatTime(c.created_at)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                  )}
+
+                  {/* Comment Input */}
+                  <View style={styles.commentInputContainer}>
+                    <TextInput
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      placeholder="Add a comment…"
+                      style={styles.commentInput}
+                    />
+
+                    <TouchableOpacity
+                      style={[
+                        styles.sendButton,
+                        !commentText.trim() && { backgroundColor: "#ccc" },
+                      ]}
+                      disabled={!commentText.trim() || submittingComment}
+                      onPress={handleSubmitComment}
+                    >
+                      {submittingComment ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Ionicons name="send" size={20} color="#fff" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              <View style={{ height: 60 }} />
+            </ScrollView>
+          </Animated.View>
         </View>
       )}
 
@@ -430,16 +612,16 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
               <View style={styles.sharePostImageContainer}>
                 {isVideo ? (
                   <Video
-                    source={{ uri: displayUrl }}
+                    source={{ uri: displayUrl || '' }}
                     style={styles.sharePostImage}
-                    resizeMode="cover"
+                    resizeMode={"cover" as any}
                     useNativeControls={false}
                     isLooping
                     shouldPlay={false}
                   />
                 ) : (
                   <Image
-                    source={{ uri: displayUrl }}
+                    source={{ uri: displayUrl || '' }}
                     style={styles.sharePostImage}
                     contentFit="cover"
                     transition={200}
@@ -454,7 +636,7 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
               {post.rating ? (
                 <View style={styles.shareDetailRow}>
                   <Ionicons name="star" size={20} color="#FFD700" />
-                  <Text style={styles.shareDetailText}>-{post.rating}/10</Text>
+                  <Text style={styles.shareDetailText}>{post.rating}/10</Text>
                 </View>
               ) : null}
 
@@ -462,7 +644,7 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
               {post.location_name ? (
                 <View style={styles.shareDetailRow}>
                   <Ionicons name="location" size={20} color="#FF3B30" />
-                  <Text style={styles.shareDetailText}>-{post.location_name}</Text>
+                  <Text style={styles.shareDetailText}>{post.location_name}</Text>
                 </View>
               ) : null}
 
@@ -501,7 +683,7 @@ function PostItem({ post, onPostPress, currentPostId, token }: any) {
 export default function PostDetailsScreen() {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
-  const { token, user } = useAuth();
+  const { token, user } = useAuth() as any;
 
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -510,8 +692,17 @@ export default function PostDetailsScreen() {
   const [skip, setSkip] = useState(0);
   const [initialPostIndex, setInitialPostIndex] = useState(0);
   const flatListRef = useRef<FlatList<any> | null>(null);
+  const bottomSheetCloseRef = useRef<(() => void) | null>(null);
 
   const LIMIT = 10;
+
+  // Close bottom sheet when scrolling between posts
+  const handleScrollBegin = useCallback(() => {
+    if (bottomSheetCloseRef.current) {
+      bottomSheetCloseRef.current();
+      bottomSheetCloseRef.current = null;
+    }
+  }, []);
 
   /* ---------------------------------------------------------
      LOAD INITIAL POST AND FEED
@@ -532,7 +723,7 @@ export default function PostDetailsScreen() {
       });
 
       // Find the current post index
-      const currentIndex = res.data.findIndex((p) => p.id === postId);
+      const currentIndex = res.data.findIndex((p: any) => p.id === postId);
 
       if (currentIndex === -1) {
         Alert.alert("Error", "Post not found");
@@ -590,7 +781,7 @@ export default function PostDetailsScreen() {
       }
 
       // Normalize new posts
-      const normalized = res.data.map((p) => ({
+      const normalized = res.data.map((p: any) => ({
         ...p,
         media_url: normalizeUrl(p.media_url),
         image_url: normalizeUrl(p.image_url || p.media_url),
@@ -639,6 +830,9 @@ export default function PostDetailsScreen() {
           onPostPress={handlePostPress}
           currentPostId={postId}
           token={token}
+          onCloseBottomSheetRef={(closeFn: (() => void) | null) => {
+            bottomSheetCloseRef.current = closeFn;
+          }}
         />
       );
     },
@@ -677,14 +871,13 @@ export default function PostDetailsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={26} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Posts</Text>
-        <View style={{ width: 26 }} />
-      </View>
+      {/* BACK BUTTON OVERLAY */}
+      <TouchableOpacity
+        style={styles.header}
+        onPress={() => router.back()}
+      >
+        <Ionicons name="arrow-back" size={28} color="#fff" />
+      </TouchableOpacity>
 
       {/* FLATLIST FOR CONTINUOUS SCROLLING */}
       <FlatList
@@ -697,10 +890,12 @@ export default function PostDetailsScreen() {
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         showsVerticalScrollIndicator={false}
-        pagingEnabled={false}
+        pagingEnabled={true}
         snapToInterval={SCREEN_HEIGHT}
         decelerationRate="fast"
         initialScrollIndex={initialPostIndex}
+        onScrollBeginDrag={handleScrollBegin}
+        onMomentumScrollBegin={handleScrollBegin}
         getItemLayout={(data: any, index: number) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
@@ -725,146 +920,340 @@ export default function PostDetailsScreen() {
    STYLES
 ----------------------------------------------------------*/
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#000" },
 
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#000",
   },
 
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderColor: "#e5e5e5",
-    backgroundColor: "#fff",
-    zIndex: 10,
+    position: "absolute",
+    top: 50,
+    left: 16,
+    zIndex: 100,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 20,
+    padding: 10,
   },
 
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#000",
+    color: "#fff",
+  },
+
+  postItem: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: "#000",
+  },
+
+  instagramScroll: {
+    flex: 1,
+  },
+
+  // Full screen media container
+  fullScreenMediaContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: "#000",
+    position: "relative",
+  },
+
+  fullScreenImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  fullScreenVideo: {
+    width: "100%",
+    height: "100%",
+  },
+
+  // Header overlay on top of media
+  headerOverlay: {
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 10,
   },
 
   userRowHeader: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: "flex-start",
   },
 
-  headerUsername: { fontSize: 16, fontWeight: "600", marginLeft: 10 },
-
-  postItem: {
-    width: "100%",
-    minHeight: SCREEN_HEIGHT - 100,
-    backgroundColor: "#fff",
+  headerUsername: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 10,
+    color: "#fff",
   },
 
-  postHeader: {
-    flexDirection: "row",
+  // Swipe up indicator
+  swipeUpIndicator: {
+    position: "absolute",
+    bottom: 30,
+    alignSelf: "center",
     alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderColor: "#e5e5e5",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
   },
 
-  mediaContainer: { width: "100%", backgroundColor: "#000" },
-
-  video: { width: "100%", height: 400 },
-
-  postImage: { width: "100%", height: 400 },
-
-  postInfo: { padding: 16 },
-
-  userRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-
-  username: { fontSize: 15, fontWeight: "bold" },
-
-  timestamp: { fontSize: 12, color: "#888" },
-
-  caption: { marginTop: 8, fontSize: 15, lineHeight: 22 },
-
-  ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-
-  ratingText: { marginLeft: 6, fontWeight: "600" },
-
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    backgroundColor: "#F3FFFD",
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#CFFAF0",
+  swipeUpText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
   },
 
-  locationText: {
-    marginLeft: 6,
-    fontSize: 14,
+  // Bottom Sheet Styles
+  bottomSheetOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+
+  bottomSheetBackdrop: {
     flex: 1,
-    fontWeight: "500",
-    color: "#333",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
 
-  actionsRow: {
-    padding: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-    flexDirection: "row",
+  bottomSheetContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.85,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 10,
   },
 
-  actionButton: {
+  bottomSheetHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: "#ddd",
+    borderRadius: 3,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+
+  bottomSheetScroll: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+
+  bottomSheetUserRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    marginBottom: 16,
   },
 
-  actionText: { marginLeft: 6, fontSize: 14 },
+  bottomSheetUserInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
 
-  commentsSection: { padding: 16 },
+  bottomSheetUsername: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#000",
+  },
 
-  commentsTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12 },
+  bottomSheetTimestamp: {
+    fontSize: 13,
+    color: "#888",
+    marginTop: 2,
+  },
 
-  noComments: { textAlign: "center", color: "#777", marginTop: 10 },
+  bottomSheetActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    marginBottom: 20,
+  },
 
-  commentItem: { flexDirection: "row", marginBottom: 14 },
+  bottomSheetActionBtn: {
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
 
-  commentContent: { marginLeft: 10, flex: 1 },
+  bottomSheetActionText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#333",
+    fontWeight: "600",
+  },
 
-  commentUsername: { fontSize: 14, fontWeight: "600" },
+  bottomSheetCard: {
+    marginBottom: 20,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 16,
+    padding: 16,
+  },
 
-  commentText: { marginTop: 2, fontSize: 14 },
+  bottomSheetCardLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
+    marginBottom: 12,
+  },
 
-  commentTime: { marginTop: 4, fontSize: 12, color: "#666" },
+  bottomSheetRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF9E6",
+    padding: 16,
+    borderRadius: 12,
+  },
+
+  bottomSheetRatingText: {
+    marginLeft: 12,
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#000",
+  },
+
+  bottomSheetReviewRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF5E6",
+    padding: 16,
+    borderRadius: 12,
+  },
+
+  bottomSheetReviewText: {
+    marginLeft: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#333",
+    flex: 1,
+  },
+
+  bottomSheetLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF0F0",
+    padding: 16,
+    borderRadius: 12,
+  },
+
+  bottomSheetLocationText: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+    flex: 1,
+  },
+
+  bottomSheetCommentsSection: {
+    marginTop: 8,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+
+  bottomSheetCommentsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+    color: "#000",
+  },
+
+  noComments: {
+    textAlign: "center",
+    color: "#777",
+    marginTop: 10,
+    fontSize: 14,
+  },
+
+  commentItem: {
+    flexDirection: "row",
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+  },
+
+  commentContent: {
+    marginLeft: 10,
+    flex: 1,
+  },
+
+  commentUsername: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#000",
+  },
+
+  commentText: {
+    marginTop: 4,
+    fontSize: 14,
+    color: "#333",
+    lineHeight: 20,
+  },
+
+  commentTime: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#999",
+  },
 
   commentInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderColor: "#eee",
+    borderColor: "#f0f0f0",
   },
 
   commentInput: {
     flex: 1,
-    backgroundColor: "#f2f2f2",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    backgroundColor: "#f8f8f8",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     marginRight: 10,
+    fontSize: 14,
   },
 
   sendButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     backgroundColor: "#4dd0e1",
-    borderRadius: 20,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
