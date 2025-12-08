@@ -1,248 +1,281 @@
-diff --git a/frontend/components/FeedCard.js b/frontend/components/FeedCard.js
-index 37dcfb6..517d0e2 100644
---- a/frontend/components/FeedCard.js
-+++ b/frontend/components/FeedCard.js
-@@ -503,6 +503,12 @@ const styles = StyleSheet.create({
-     fontSize: 14,
-     fontWeight: "600",
-   },
-+  followingButton: {
-+    backgroundColor: "#4CAF50",
-+  },
-+  followingButtonText: {
-+    color: "#FFF",
-+  },
+diff --git a/frontend/app/profile.tsx b/frontend/app/profile.tsx
+index 458e3ca..26d6468 100644
+--- a/frontend/app/profile.tsx
++++ b/frontend/app/profile.tsx
+@@ -248,6 +248,23 @@ export default function ProfileScreen() {
+     }
+   };
  
-   // Instagram-style square 1:1 image
-   image: { 
++  const checkIfComplimented = async () => {
++    if (!userData?.id || !token || isOwnProfile) return;
++    
++    try {
++      const response = await axios.get(
++        `${API_URL}/compliments/check/${userData.id}`,
++        {
++          headers: { Authorization: `Bearer ${token}` }
++        }
++      );
++      setHasComplimented(response.data.has_complimented || false);
++    } catch (err) {
++      console.error('❌ Error checking compliment status:', err);
++      setHasComplimented(false);
++    }
++  };
++
+   const fetchPeople = async () => {
+     if (!userData?.id) return;
+ 
 diff --git a/model.patch b/model.patch
-index b12bb75..e69de29 100644
+index aadbe7d..e69de29 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,226 +0,0 @@
+@@ -1,248 +0,0 @@
 -diff --git a/frontend/components/FeedCard.js b/frontend/components/FeedCard.js
--index 77978c8..1cb5f79 100644
+-index 37dcfb6..517d0e2 100644
 ---- a/frontend/components/FeedCard.js
 -+++ b/frontend/components/FeedCard.js
--@@ -86,6 +86,8 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
+-@@ -503,6 +503,12 @@ const styles = StyleSheet.create({
+-     fontSize: 14,
+-     fontWeight: "600",
+-   },
+-+  followingButton: {
+-+    backgroundColor: "#4CAF50",
+-+  },
+-+  followingButtonText: {
+-+    color: "#FFF",
+-+  },
 - 
--   // Share modal state
--   const [showShareModal, setShowShareModal] = useState(false);
--+  const [isFollowing, setIsFollowing] = useState(post.is_following || false);
--+  const [followLoading, setFollowLoading] = useState(false);
-- 
--   const mediaUrl = normalizeMediaUrl(post.media_url);
--   const isVideo =
+-   // Instagram-style square 1:1 image
+-   image: { 
 -diff --git a/model.patch b/model.patch
--index 5bed55f..e69de29 100644
+-index b12bb75..e69de29 100644
 ---- a/model.patch
 -+++ b/model.patch
--@@ -1,208 +0,0 @@
+-@@ -1,226 +0,0 @@
+--diff --git a/frontend/components/FeedCard.js b/frontend/components/FeedCard.js
+--index 77978c8..1cb5f79 100644
+----- a/frontend/components/FeedCard.js
+--+++ b/frontend/components/FeedCard.js
+--@@ -86,6 +86,8 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
+-- 
+--   // Share modal state
+--   const [showShareModal, setShowShareModal] = useState(false);
+--+  const [isFollowing, setIsFollowing] = useState(post.is_following || false);
+--+  const [followLoading, setFollowLoading] = useState(false);
+-- 
+--   const mediaUrl = normalizeMediaUrl(post.media_url);
+--   const isVideo =
 --diff --git a/model.patch b/model.patch
---index bc5f3fe..e69de29 100644
+--index 5bed55f..e69de29 100644
 ----- a/model.patch
 --+++ b/model.patch
---@@ -1,203 +0,0 @@
+--@@ -1,208 +0,0 @@
 ---diff --git a/model.patch b/model.patch
----index e655979..e69de29 100644
+---index bc5f3fe..e69de29 100644
 ------ a/model.patch
 ---+++ b/model.patch
----@@ -1,198 +0,0 @@
+---@@ -1,203 +0,0 @@
 ----diff --git a/model.patch b/model.patch
-----index 726664a..e69de29 100644
+----index e655979..e69de29 100644
 ------- a/model.patch
 ----+++ b/model.patch
-----@@ -1,193 +0,0 @@
+----@@ -1,198 +0,0 @@
 -----diff --git a/model.patch b/model.patch
------index b2103fc..e69de29 100644
+-----index 726664a..e69de29 100644
 -------- a/model.patch
 -----+++ b/model.patch
------@@ -1,164 +0,0 @@
+-----@@ -1,193 +0,0 @@
 ------diff --git a/model.patch b/model.patch
-------index 94ed2ec..e69de29 100644
+------index b2103fc..e69de29 100644
 --------- a/model.patch
 ------+++ b/model.patch
-------@@ -1,112 +0,0 @@
+------@@ -1,164 +0,0 @@
+-------diff --git a/model.patch b/model.patch
+-------index 94ed2ec..e69de29 100644
+---------- a/model.patch
+-------+++ b/model.patch
+-------@@ -1,112 +0,0 @@
+--------diff --git a/test_result.md b/test_result.md
+--------new file mode 100644
+--------index 0000000..9146bb6
+----------- /dev/null
+--------+++ b/test_result.md
+--------@@ -0,0 +1,105 @@
+--------+backend:
+--------+  - task: "User Authentication - Signup Flow"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "✅ Signup endpoint working correctly. Creates new user with valid JWT token. Response includes access_token and token_type. Token format is valid JWT with 3 parts."
+--------+
+--------+  - task: "User Authentication - Token Verification"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "✅ Token verification via /auth/me endpoint working correctly. Returns complete user profile data including id, full_name, email, level, points, etc. Email matches signup credentials."
+--------+
+--------+  - task: "User Authentication - Login Flow"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "✅ Login endpoint working correctly with form-data format (OAuth2PasswordRequestForm). Accepts username/password and returns valid JWT token. Token format is correct."
+--------+
+--------+  - task: "User Authentication - Login Token Verification"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "✅ Login token verification working correctly. /auth/me endpoint accepts Bearer token and returns user data. Email matches login credentials."
+--------+
+--------+  - task: "User Authentication - Error Handling"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "backend/routers/auth.py"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "✅ Error handling working correctly. Invalid login returns 401 Unauthorized with proper error message. Invalid token returns 401 with 'Could not validate credentials' message."
+--------+
+--------+  - task: "Backend Dependencies"
+--------+    implemented: true
+--------+    working: true
+--------+    file: "backend/server.py"
+--------+    stuck_count: 0
+--------+    priority: "medium"
+--------+    needs_retesting: false
+--------+    status_history:
+--------+        - working: false
+--------+          agent: "testing"
+--------+          comment: "❌ Missing jinja2 dependency causing backend startup failure"
+--------+        - working: true
+--------+          agent: "testing"
+--------+          comment: "✅ Fixed jinja2 dependency issue. Backend now starts successfully and serves API endpoints."
+--------+
+--------+frontend:
+--------+  - task: "Frontend Authentication Integration"
+--------+    implemented: true
+--------+    working: "NA"
+--------+    file: "frontend/src/contexts/AuthContext.js"
+--------+    stuck_count: 0
+--------+    priority: "high"
+--------+    needs_retesting: true
+--------+    status_history:
+--------+        - working: "NA"
+--------+          agent: "testing"
+--------+          comment: "Frontend testing not performed as per system limitations. Only backend API testing completed."
+--------+
+--------+metadata:
+--------+  created_by: "testing_agent"
+--------+  version: "1.0"
+--------+  test_sequence: 1
+--------+  run_ui: false
+--------+
+--------+test_plan:
+--------+  current_focus:
+--------+    - "User Authentication - Complete Flow Testing"
+--------+  stuck_tasks: []
+--------+  test_all: false
+--------+  test_priority: "high_first"
+--------+
+--------+agent_communication:
+--------+    - agent: "testing"
+--------+      message: "✅ CRITICAL AUTH TESTING COMPLETED - All 6 authentication tests PASSED! Signup, login, token verification, and error handling all working correctly. Fixed jinja2 dependency issue. Backend APIs are fully functional for authentication flow."
+--------\ No newline at end of file
 -------diff --git a/test_result.md b/test_result.md
--------new file mode 100644
--------index 0000000..9146bb6
----------- /dev/null
+-------index 9146bb6..86f3e21 100644
+---------- a/test_result.md
 -------+++ b/test_result.md
--------@@ -0,0 +1,105 @@
--------+backend:
--------+  - task: "User Authentication - Signup Flow"
--------+    implemented: true
--------+    working: true
--------+    file: "backend/routers/auth.py"
--------+    stuck_count: 0
--------+    priority: "high"
+-------@@ -77,15 +77,18 @@ backend:
+------- frontend:
+-------   - task: "Frontend Authentication Integration"
+-------     implemented: true
+--------    working: "NA"
+--------    file: "frontend/src/contexts/AuthContext.js"
+--------    stuck_count: 0
+-------+    working: false
+-------+    file: "frontend/context/AuthContext.js"
+-------+    stuck_count: 1
+-------     priority: "high"
+--------    needs_retesting: true
 -------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "✅ Signup endpoint working correctly. Creates new user with valid JWT token. Response includes access_token and token_type. Token format is valid JWT with 3 parts."
--------+
--------+  - task: "User Authentication - Token Verification"
--------+    implemented: true
--------+    working: true
--------+    file: "backend/routers/auth.py"
--------+    stuck_count: 0
--------+    priority: "high"
--------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "✅ Token verification via /auth/me endpoint working correctly. Returns complete user profile data including id, full_name, email, level, points, etc. Email matches signup credentials."
--------+
--------+  - task: "User Authentication - Login Flow"
--------+    implemented: true
--------+    working: true
--------+    file: "backend/routers/auth.py"
--------+    stuck_count: 0
--------+    priority: "high"
--------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "✅ Login endpoint working correctly with form-data format (OAuth2PasswordRequestForm). Accepts username/password and returns valid JWT token. Token format is correct."
--------+
--------+  - task: "User Authentication - Login Token Verification"
--------+    implemented: true
--------+    working: true
--------+    file: "backend/routers/auth.py"
--------+    stuck_count: 0
--------+    priority: "high"
--------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "✅ Login token verification working correctly. /auth/me endpoint accepts Bearer token and returns user data. Email matches login credentials."
--------+
--------+  - task: "User Authentication - Error Handling"
--------+    implemented: true
--------+    working: true
--------+    file: "backend/routers/auth.py"
--------+    stuck_count: 0
--------+    priority: "high"
--------+    needs_retesting: false
--------+    status_history:
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "✅ Error handling working correctly. Invalid login returns 401 Unauthorized with proper error message. Invalid token returns 401 with 'Could not validate credentials' message."
--------+
--------+  - task: "Backend Dependencies"
--------+    implemented: true
--------+    working: true
--------+    file: "backend/server.py"
--------+    stuck_count: 0
--------+    priority: "medium"
--------+    needs_retesting: false
--------+    status_history:
+-------     status_history:
+-------         - working: "NA"
+-------           agent: "testing"
+-------           comment: "Frontend testing not performed as per system limitations. Only backend API testing completed."
 -------+        - working: false
 -------+          agent: "testing"
--------+          comment: "❌ Missing jinja2 dependency causing backend startup failure"
--------+        - working: true
--------+          agent: "testing"
--------+          comment: "✅ Fixed jinja2 dependency issue. Backend now starts successfully and serves API endpoints."
--------+
--------+frontend:
--------+  - task: "Frontend Authentication Integration"
--------+    implemented: true
--------+    working: "NA"
--------+    file: "frontend/src/contexts/AuthContext.js"
--------+    stuck_count: 0
--------+    priority: "high"
--------+    needs_retesting: true
--------+    status_history:
--------+        - working: "NA"
--------+          agent: "testing"
--------+          comment: "Frontend testing not performed as per system limitations. Only backend API testing completed."
--------+
--------+metadata:
--------+  created_by: "testing_agent"
--------+  version: "1.0"
--------+  test_sequence: 1
--------+  run_ui: false
--------+
--------+test_plan:
--------+  current_focus:
--------+    - "User Authentication - Complete Flow Testing"
--------+  stuck_tasks: []
--------+  test_all: false
--------+  test_priority: "high_first"
--------+
--------+agent_communication:
--------+    - agent: "testing"
+-------+          comment: "❌ CRITICAL: Frontend authentication completely broken. Button click handlers not triggering API calls. No network requests sent to backend when login/signup buttons clicked. Users remain stuck on auth screens. AuthContext initialized but handleLogin/handleSignup functions never called."
+------- 
+------- metadata:
+-------   created_by: "testing_agent"
+-------@@ -95,11 +98,14 @@ metadata:
+------- 
+------- test_plan:
+-------   current_focus:
+--------    - "User Authentication - Complete Flow Testing"
+--------  stuck_tasks: []
+-------+    - "Frontend Authentication Integration"
+-------+  stuck_tasks:
+-------+    - "Frontend Authentication Integration"
+-------   test_all: false
+-------   test_priority: "high_first"
+------- 
+------- agent_communication:
+-------     - agent: "testing"
+--------      message: "✅ CRITICAL AUTH TESTING COMPLETED - All 6 authentication tests PASSED! Signup, login, token verification, and error handling all working correctly. Fixed jinja2 dependency issue. Backend APIs are fully functional for authentication flow."
+-------\ No newline at end of file
 -------+      message: "✅ CRITICAL AUTH TESTING COMPLETED - All 6 authentication tests PASSED! Signup, login, token verification, and error handling all working correctly. Fixed jinja2 dependency issue. Backend APIs are fully functional for authentication flow."
+-------+    - agent: "testing"
+-------+      message: "❌ CRITICAL FRONTEND ISSUE FOUND: Authentication UI completely broken. Backend APIs work perfectly, but frontend button handlers not triggering. No API calls made when users click login/signup buttons. Users cannot authenticate through the UI. This is a high-priority blocking issue that prevents any user from accessing the app."
 -------\ No newline at end of file
 ------diff --git a/test_result.md b/test_result.md
-------index 9146bb6..86f3e21 100644
+------index 86f3e21..a8c3278 100644
 --------- a/test_result.md
 ------+++ b/test_result.md
-------@@ -77,15 +77,18 @@ backend:
------- frontend:
-------   - task: "Frontend Authentication Integration"
-------     implemented: true
--------    working: "NA"
--------    file: "frontend/src/contexts/AuthContext.js"
--------    stuck_count: 0
-------+    working: false
-------+    file: "frontend/context/AuthContext.js"
-------+    stuck_count: 1
-------     priority: "high"
--------    needs_retesting: true
-------+    needs_retesting: false
-------     status_history:
-------         - working: "NA"
+------@@ -34,6 +34,9 @@ backend:
+------         - working: true
 ------           agent: "testing"
-------           comment: "Frontend testing not performed as per system limitations. Only backend API testing completed."
-------+        - working: false
+------           comment: "✅ Login endpoint working correctly with form-data format (OAuth2PasswordRequestForm). Accepts username/password and returns valid JWT token. Token format is correct."
+------+        - working: true
 ------+          agent: "testing"
-------+          comment: "❌ CRITICAL: Frontend authentication completely broken. Button click handlers not triggering API calls. No network requests sent to backend when login/signup buttons clicked. Users remain stuck on auth screens. AuthContext initialized but handleLogin/handleSignup functions never called."
+------+          comment: "✅ DIAGNOSTIC TEST PASSED: Confirmed login works with frontendtest@cofau.com credentials. Created missing user account and verified complete authentication flow. Login returns valid JWT token (eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...) and /auth/me endpoint returns correct user data. Backend authentication is 100% functional."
 ------ 
------- metadata:
-------   created_by: "testing_agent"
-------@@ -95,11 +98,14 @@ metadata:
------- 
------- test_plan:
-------   current_focus:
--------    - "User Authentication - Complete Flow Testing"
--------  stuck_tasks: []
-------+    - "Frontend Authentication Integration"
-------+  stuck_tasks:
-------+    - "Frontend Authentication Integration"
-------   test_all: false
-------   test_priority: "high_first"
------- 
------- agent_communication:
+------   - task: "User Authentication - Login Token Verification"
+------     implemented: true
+------@@ -108,4 +111,6 @@ agent_communication:
 ------     - agent: "testing"
--------      message: "✅ CRITICAL AUTH TESTING COMPLETED - All 6 authentication tests PASSED! Signup, login, token verification, and error handling all working correctly. Fixed jinja2 dependency issue. Backend APIs are fully functional for authentication flow."
+------       message: "✅ CRITICAL AUTH TESTING COMPLETED - All 6 authentication tests PASSED! Signup, login, token verification, and error handling all working correctly. Fixed jinja2 dependency issue. Backend APIs are fully functional for authentication flow."
+------     - agent: "testing"
+-------      message: "❌ CRITICAL FRONTEND ISSUE FOUND: Authentication UI completely broken. Backend APIs work perfectly, but frontend button handlers not triggering. No API calls made when users click login/signup buttons. Users cannot authenticate through the UI. This is a high-priority blocking issue that prevents any user from accessing the app."
 ------\ No newline at end of file
-------+      message: "✅ CRITICAL AUTH TESTING COMPLETED - All 6 authentication tests PASSED! Signup, login, token verification, and error handling all working correctly. Fixed jinja2 dependency issue. Backend APIs are fully functional for authentication flow."
-------+    - agent: "testing"
 ------+      message: "❌ CRITICAL FRONTEND ISSUE FOUND: Authentication UI completely broken. Backend APIs work perfectly, but frontend button handlers not triggering. No API calls made when users click login/signup buttons. Users cannot authenticate through the UI. This is a high-priority blocking issue that prevents any user from accessing the app."
+------+    - agent: "testing"
+------+      message: "✅ DIAGNOSTIC TEST COMPLETED: Confirmed backend authentication is 100% working for frontendtest@cofau.com. Issue was missing user account - created user and verified complete login flow. Login endpoint returns valid JWT token, /auth/me endpoint works correctly. Backend authentication system is fully functional. All authentication APIs working as expected."
 ------\ No newline at end of file
------diff --git a/test_result.md b/test_result.md
------index 86f3e21..a8c3278 100644
--------- a/test_result.md
------+++ b/test_result.md
------@@ -34,6 +34,9 @@ backend:
------         - working: true
------           agent: "testing"
------           comment: "✅ Login endpoint working correctly with form-data format (OAuth2PasswordRequestForm). Accepts username/password and returns valid JWT token. Token format is correct."
------+        - working: true
------+          agent: "testing"
------+          comment: "✅ DIAGNOSTIC TEST PASSED: Confirmed login works with frontendtest@cofau.com credentials. Created missing user account and verified complete authentication flow. Login returns valid JWT token (eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...) and /auth/me endpoint returns correct user data. Backend authentication is 100% functional."
------ 
------   - task: "User Authentication - Login Token Verification"
------     implemented: true
------@@ -108,4 +111,6 @@ agent_communication:
------     - agent: "testing"
------       message: "✅ CRITICAL AUTH TESTING COMPLETED - All 6 authentication tests PASSED! Signup, login, token verification, and error handling all working correctly. Fixed jinja2 dependency issue. Backend APIs are fully functional for authentication flow."
------     - agent: "testing"
-------      message: "❌ CRITICAL FRONTEND ISSUE FOUND: Authentication UI completely broken. Backend APIs work perfectly, but frontend button handlers not triggering. No API calls made when users click login/signup buttons. Users cannot authenticate through the UI. This is a high-priority blocking issue that prevents any user from accessing the app."
------\ No newline at end of file
------+      message: "❌ CRITICAL FRONTEND ISSUE FOUND: Authentication UI completely broken. Backend APIs work perfectly, but frontend button handlers not triggering. No API calls made when users click login/signup buttons. Users cannot authenticate through the UI. This is a high-priority blocking issue that prevents any user from accessing the app."
------+    - agent: "testing"
------+      message: "✅ DIAGNOSTIC TEST COMPLETED: Confirmed backend authentication is 100% working for frontendtest@cofau.com. Issue was missing user account - created user and verified complete login flow. Login endpoint returns valid JWT token, /auth/me endpoint works correctly. Backend authentication system is fully functional. All authentication APIs working as expected."
------\ No newline at end of file
