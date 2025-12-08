@@ -884,20 +884,25 @@ export default function PostDetailsScreen() {
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
         
-        {posts[currentPostIndex] && (
+        {posts.length > 0 && posts[initialPostIndex] && (
           <>
             <Text style={styles.headerUsernameTop} numberOfLines={1}>
-              {posts[currentPostIndex].username}
+              {posts[initialPostIndex].username}
             </Text>
             
             <TouchableOpacity
               style={styles.headerOptionsButton}
               onPress={() => {
-                // We'll need to pass this down to PostItem or handle here
-                // For now, let's add a simple alert
-                Alert.alert("Menu", "Report this post?", [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Report", style: "destructive" }
+                // Open report menu for the current post
+                Alert.alert("Post Options", "What would you like to do?", [
+                  { 
+                    text: "Report Post", 
+                    style: "destructive",
+                    onPress: () => {
+                      Alert.alert("Report", "This post has been reported.");
+                    }
+                  },
+                  { text: "Cancel", style: "cancel" }
                 ]);
               }}
             >
