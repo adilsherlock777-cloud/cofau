@@ -153,6 +153,36 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated }) {
     setShowShareModal(true);
   };
 
+  const handleFollowToggle = async () => {
+    if (!post.user_id || !token || followLoading) return;
+
+    setFollowLoading(true);
+    const previousFollowState = isFollowing;
+
+    // Optimistic UI update
+    setIsFollowing(!isFollowing);
+
+    try {
+      const endpoint = isFollowing ? 'unfollow' : 'follow';
+      await axios.post(
+        `${BACKEND_URL}/api/users/${post.user_id}/${endpoint}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      console.log(`✅ ${isFollowing ? 'Unfollowed' : 'Followed'} ${post.username}`);
+    } catch (err) {
+      console.error('❌ Error toggling follow:', err);
+      // Revert optimistic update on error
+      setIsFollowing(previousFollowState);
+      Alert.alert('Error', 'Failed to update follow status. Please try again.');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     const prev = isSaved;
 
