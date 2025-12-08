@@ -485,10 +485,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  image: { width: "100%", height: 300, borderRadius: 0 },
+  // Instagram-style square 1:1 image
+  image: { 
+    width: "100%", 
+    aspectRatio: 1, // Square 1:1 like Instagram
+    borderRadius: 0 
+  },
   videoContainer: {
     width: "100%",
-    height: 300,
+    aspectRatio: 1, // Square 1:1 like Instagram
     borderRadius: 0,
     backgroundColor: "#000",
     position: "relative",
