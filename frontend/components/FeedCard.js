@@ -271,17 +271,28 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
       </View>
 
       {/* Media */}
-      <TouchableOpacity onPress={openPost} activeOpacity={0.9}>
+      <TouchableOpacity 
+        onPress={() => {
+          if (isVideo) {
+            // Tap toggles mute for videos (Instagram style)
+            setIsMuted(!isMuted);
+          } else {
+            // Images open post details
+            router.push(`/post-details/${post.id}`);
+          }
+        }} 
+        activeOpacity={0.9}
+      >
         {isVideo ? (
           <View style={styles.videoContainer}>
             <Video
               source={{ uri: mediaUrl }}
               style={styles.video}
               resizeMode="cover"
-              shouldPlay={videoPlaying}
-              useNativeControls={true}
-              isLooping={false}
-              isMuted={false}
+              shouldPlay={true}
+              useNativeControls={false}
+              isLooping={true}
+              isMuted={isMuted}
               onError={(error) => {
                 console.error("❌ Video playback error in FeedCard:", error);
                 console.error("❌ Video URL:", mediaUrl);
