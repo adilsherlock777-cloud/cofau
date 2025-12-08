@@ -12,20 +12,25 @@ config.cacheStores = [
 ];
 
 
-// Reduce file watching to minimum for low-resource environments
+// Reduce file watching to minimum for low-resource environments  
 config.watchFolders = [__dirname];
 
-// Use polling watcher instead of native file watchers to avoid ENOSPC
+// Completely disable file watching to work around ENOSPC limits
+// This means you'll need to manually restart for file changes
 config.watcher = {
-  healthCheck: {
-    enabled: false,
+  watchman: {
+    deferStates: [],
   },
 };
+
+// Set environment to tell metro to avoid watching node_modules
+process.env.CHOKIDAR_USEPOLLING = 'true';
+process.env.WATCHPACK_POLLING = 'true';
 
 // Drastically reduce workers
 config.maxWorkers = 1;
 
-// Disable file watching for node_modules
-config.resolver.disableHierarchicalLookup = true;
+// Exclude platform-specific directories from resolution
+config.resolver.blacklistRE = /node_modules\/.*\/(android|ios|macos|windows|tvos)\/.*$/;
 
 module.exports = config;
