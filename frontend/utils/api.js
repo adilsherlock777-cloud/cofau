@@ -262,7 +262,7 @@ export const sendCompliment = async (recipientId, complimentType) => {
  */
 export const savePost = async (postId) => {
   try {
-    const response = await axios.post(`${API_URL}/posts/${postId}/save`);
+    const response = await axios.post(`${API_URL}/saved/add`, { postId });
     return response.data;
   } catch (error) {
     console.error('❌ Error saving post:', error.response?.data || error.message);
@@ -275,7 +275,7 @@ export const savePost = async (postId) => {
  */
 export const unsavePost = async (postId) => {
   try {
-    const response = await axios.delete(`${API_URL}/posts/${postId}/save`);
+    const response = await axios.delete(`${API_URL}/saved/remove/${postId}`);
     return response.data;
   } catch (error) {
     console.error('❌ Error unsaving post:', error.response?.data || error.message);
