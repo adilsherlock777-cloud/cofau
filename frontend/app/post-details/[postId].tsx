@@ -750,6 +750,8 @@ export default function PostDetailsScreen() {
 
       setPosts(postsFromCurrent);
       setInitialPostIndex(0);
+      // Set the current visible post
+      setCurrentVisiblePost(postsFromCurrent[0]);
       setSkip(postsFromCurrent.length);
 
       // Scroll to the current post after a short delay
