@@ -4,8 +4,9 @@ import { storage } from '../utils/storage';
 import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
 
 // Use EXPO_PUBLIC_ prefix for environment variables accessible in Expo
-const API_BASE_URL = 'https://backend.cofau.com';
-const API_URL = `${API_BASE_URL}/api`;
+import Constants from 'expo-constants';
+
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com/api';
 
 console.log('🔧 AuthContext initialized with API_URL:', API_URL);
 
