@@ -6,7 +6,7 @@ import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
 // Use EXPO_PUBLIC_ prefix for environment variables accessible in Expo
 import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://foodsocial-app.preview.emergentagent.com/api';
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://cofau-fix.preview.emergentagent.com/api';
 
 console.log('🔧 AuthContext initialized with API_URL:', API_URL);
 
