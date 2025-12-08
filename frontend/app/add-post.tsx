@@ -101,12 +101,46 @@ export default function AddPostScreen() {
   };
 
   const showMediaOptions = () => {
-    Alert.alert('Add Media', 'Choose an option:', [
-      { text: 'Take Photo', onPress: takePhoto },
-      { text: 'Choose Photo', onPress: pickImage },
-      { text: 'Choose Video (max 15s)', onPress: pickVideo },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    // On web, directly open file picker
+    if (Platform.OS === 'web') {
+      pickImageOrVideo();
+    } else {
+      // On mobile, show options
+      Alert.alert('Add Media', 'Choose an option:', [
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Choose Photo', onPress: pickImage },
+        { text: 'Choose Video (max 15s)', onPress: pickVideo },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
+  // Universal picker for web (supports both images and videos)
+  const pickImageOrVideo = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All, // Both images and videos
+        allowsEditing: true,
+        quality: 0.8,
+        videoMaxDuration: 15,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        
+        // Detect if it's video or image
+        if (asset.type === 'video' || asset.uri.includes('.mp4') || asset.uri.includes('.mov')) {
+          setMediaType('video');
+        } else {
+          setMediaType('image');
+        }
+        
+        setMediaUri(asset.uri);
+      }
+    } catch (error) {
+      console.error('Error picking media:', error);
+      Alert.alert('Error', 'Failed to pick media. Please try again.');
+    }
   };
 
   // ------------------------------ GOOGLE MAPS (FREE) ------------------------------
