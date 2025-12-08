@@ -66,6 +66,10 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
   const [showComments, setShowComments] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
   const videoRef = useRef(null);
   
   // Bottom sheet animation
