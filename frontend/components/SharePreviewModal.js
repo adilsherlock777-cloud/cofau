@@ -74,25 +74,95 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
     }
   };
 
-  // Share Post function
-  const handleSharePost = async () => {
+  // Share Post function - now opens social media options
+  const handleSharePost = () => {
+    setShowSocialOptions(true);
+  };
+
+  // Share to specific platform
+  const shareToWhatsApp = async () => {
     try {
       setLoading(true);
-
-      const message = `${post.username} shared a post on Cofau!\n\n${post.review_text || post.description || ''}\n\nView post: ${shareUrl}`;
-
+      const message = `Check out this post on Cofau!\n\n${post.review_text || post.description || ''}\n\nView post: ${shareUrl}`;
+      
       const result = await RNShare.share({ 
         message,
         url: shareUrl 
       });
 
       if (result.action === RNShare.sharedAction) {
+        setShowSocialOptions(false);
         onClose();
       }
-
     } catch (error) {
-      console.error("Share error:", error);
-      Alert.alert("Error", "Failed to share.");
+      console.error("WhatsApp share error:", error);
+      Alert.alert("Error", "Failed to share to WhatsApp");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const shareToInstagram = async () => {
+    try {
+      setLoading(true);
+      const message = `Check out this post on Cofau!\n\n${shareUrl}`;
+      
+      const result = await RNShare.share({ 
+        message,
+        url: shareUrl 
+      });
+
+      if (result.action === RNShare.sharedAction) {
+        setShowSocialOptions(false);
+        onClose();
+      }
+    } catch (error) {
+      console.error("Instagram share error:", error);
+      Alert.alert("Error", "Failed to share to Instagram");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const shareToTwitter = async () => {
+    try {
+      setLoading(true);
+      const message = `Check out this post on Cofau! ${shareUrl}`;
+      
+      const result = await RNShare.share({ 
+        message,
+        url: shareUrl 
+      });
+
+      if (result.action === RNShare.sharedAction) {
+        setShowSocialOptions(false);
+        onClose();
+      }
+    } catch (error) {
+      console.error("Twitter share error:", error);
+      Alert.alert("Error", "Failed to share to Twitter");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const shareToFacebook = async () => {
+    try {
+      setLoading(true);
+      const message = `Check out this post on Cofau!`;
+      
+      const result = await RNShare.share({ 
+        message,
+        url: shareUrl 
+      });
+
+      if (result.action === RNShare.sharedAction) {
+        setShowSocialOptions(false);
+        onClose();
+      }
+    } catch (error) {
+      console.error("Facebook share error:", error);
+      Alert.alert("Error", "Failed to share to Facebook");
     } finally {
       setLoading(false);
     }
