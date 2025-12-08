@@ -944,6 +944,8 @@ export default function PostDetailsScreen() {
         initialScrollIndex={initialPostIndex}
         onScrollBeginDrag={handleScrollBegin}
         onMomentumScrollBegin={handleScrollBegin}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         getItemLayout={(data: any, index: number) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
