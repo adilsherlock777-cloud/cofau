@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: "100%",
-    aspectRatio: 1, // Square 1:1 like Instagram
+    aspectRatio: 4/5, // 4:5 aspect ratio for videos
     borderRadius: 0,
     backgroundColor: "#000",
     position: "relative",
