@@ -67,8 +67,8 @@
       "**/*"
     ],
     "extra": {
-      "EXPO_PUBLIC_BACKEND_URL": "https://social-preview-1.preview.emergentagent.com",
-      "apiUrl": "https://social-preview-1.preview.emergentagent.com",
+      "EXPO_PUBLIC_BACKEND_URL": "https://backend.cofau.com",
+      "apiUrl": "https://backend.cofau.com",
       "eas": {
         "projectId": "99fd83ad-0052-4fde-85e4-117a0aefb0cc"
       }

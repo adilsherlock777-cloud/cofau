@@ -305,13 +305,8 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
       {/* Media */}
       <TouchableOpacity 
         onPress={() => {
-          if (isVideo) {
-            // Tap toggles mute for videos (Instagram style)
-            setIsMuted(!isMuted);
-          } else {
-            // Images open post details
-            router.push(`/post-details/${post.id}`);
-          }
+          // Both images and videos navigate to post details
+          router.push(`/post-details/${post.id}`);
         }} 
         activeOpacity={0.9}
       >

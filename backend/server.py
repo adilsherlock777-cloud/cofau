@@ -23,15 +23,21 @@ from routers.locations import router as locations_router
 from routers.chat import router as chat_router
 from routers.compliments import router as compliments_router
 from routers.moderation import router as moderation_router
+from routers.leaderboard import router as leaderboard_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
 from utils.moderation import check_image_moderation, save_moderation_result
+from utils.scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
+    
+    # Start the leaderboard scheduler
+    start_scheduler()
+    
     # Log registered routes on startup
     print("=" * 50)
     print("Registered Routes:")
@@ -44,6 +50,9 @@ async def lifespan(app: FastAPI):
             print(f"  {methods:15} {route.path}")
     print("=" * 50)
     yield
+    
+    # Shutdown scheduler
+    stop_scheduler()
     await close_mongo_connection()
 
 
@@ -159,6 +168,7 @@ app.include_router(locations_router)
 app.include_router(chat_router)
 app.include_router(compliments_router)
 app.include_router(moderation_router)
+app.include_router(leaderboard_router)
 
 # ======================================================
 # OPEN GRAPH ROUTE (Non-API, for Social Media Scrapers)
@@ -318,6 +328,25 @@ async def create_post(
     
     media_url = f"/api/static/{relative_path}"
 
+    # ======================================================
+    # QUALITY SCORING - Analyze media quality for leaderboard
+    # ======================================================
+    quality_score = 50.0  # Default score
+    try:
+        from utils.sightengine_quality import analyze_media_quality
+        
+        # Build full URL for Sightengine API
+        # Assuming backend is accessible at settings.BACKEND_URL or construct it
+        backend_url = os.getenv("BACKEND_URL", "https://backend.cofau.com")
+        full_media_url = f"{backend_url}{media_url}"
+        
+        # Analyze quality asynchronously
+        quality_score = await analyze_media_quality(full_media_url, media_type)
+        print(f"✅ Quality score calculated: {quality_score} for {full_media_url}")
+    except Exception as e:
+        print(f"⚠️ Quality scoring failed, using default: {str(e)}")
+        quality_score = 50.0
+
     post_doc = {
         "user_id": str(current_user["_id"]),
         "media_url": media_url,
@@ -330,7 +359,10 @@ async def create_post(
         "likes_count": 0,
         "comments_count": 0,
         "popular_photos": [],
-        "created_at": datetime.utcnow(),
+        "quality_score": quality_score,  # Add quality score for leaderboard
+        "engagement_score": 0.0,  # Will be calculated dynamically
+        "combined_score": quality_score * 0.6,  # Initial combined score (60% quality, 0% engagement)
+        "created_at": datetime.utcnow().isoformat(),
     }
 
     result = await db.posts.insert_one(post_doc)

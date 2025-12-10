@@ -6,7 +6,7 @@ import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
 // Use EXPO_PUBLIC_ prefix for environment variables accessible in Expo
 import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://social-preview-1.preview.emergentagent.com';
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
 
 console.log('🔧 AuthContext initialized with API_URL:', API_URL);
 
@@ -25,17 +25,17 @@ export const AuthProvider = ({ children }) => {
     try {
       // Get token from storage (SecureStore on native, localStorage on web)
       const storedToken = await storage.getItem('userToken');
-      
+
       if (storedToken) {
         // Set axios authorization header
         axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        
+
         // Validate token with backend
         try {
           const response = await axios.get(`${API_URL}/api/auth/me`);
           setUser(response.data);
           setToken(storedToken);
-          
+
           // Register for push notifications
           registerForPushNotificationsAsync(storedToken).catch(err => {
             console.log('⚠️ Push notification registration failed:', err);
@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }) => {
     console.log('🔐 AuthContext: Starting login process...');
     console.log('📧 Email:', email);
     console.log('🌐 API URL:', `${API_URL}/api/auth/login`);
-    
+
     try {
       // FastAPI OAuth2 expects form data with 'username' field
       const formData = new URLSearchParams();
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }) => {
       console.log('✅ Login response received:', response.status);
       const { access_token } = response.data;
       console.log('🔑 Token received:', access_token ? 'Yes' : 'No');
-      
+
       // Store token in storage
       await storage.setItem('userToken', access_token);
       console.log('💾 Token stored in SecureStore');
@@ -94,11 +94,11 @@ export const AuthProvider = ({ children }) => {
       console.log('👤 Fetching user info from /api/auth/me...');
       console.log('📡 Request URL:', `${API_URL}/api/auth/me`);
       console.log('📡 Request headers:', axios.defaults.headers.common);
-      
+
       try {
         const userResponse = await axios.get(`${API_URL}/api/auth/me`);
         console.log('📥 User response received:', JSON.stringify(userResponse.data));
-        
+
         // Set user state
         setUser(userResponse.data);
         console.log('✅ User state set:', userResponse.data.email);
@@ -141,7 +141,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       const { access_token } = response.data;
-      
+
       // Store token in storage
       await storage.setItem('userToken', access_token);
       setToken(access_token);
@@ -172,10 +172,10 @@ export const AuthProvider = ({ children }) => {
     try {
       // Delete token from storage
       await storage.deleteItem('userToken');
-      
+
       // Clear axios authorization header
       delete axios.defaults.headers.common['Authorization'];
-      
+
       // Clear state
       setToken(null);
       setUser(null);

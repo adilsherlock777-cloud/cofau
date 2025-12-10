@@ -1061,18 +1061,23 @@ export default function ProfileScreen() {
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => router.push('/feed')}>
           <Ionicons name="home-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/explore')}>
           <Ionicons name="compass-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/add-post')}>
-          <Ionicons name="add-circle-outline" size={28} color="#000" />
+        <TouchableOpacity onPress={() => router.push('/leaderboard')}>
+          <Ionicons name="trophy-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Leaderboard</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/happening')}>
-          <Ionicons name="flame-outline" size={28} color="#000" />
+          <Ionicons name="restaurant-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Restaurant</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/profile')}>
-          <Ionicons name="person" size={28} color="#4dd0e1" />
+          <Ionicons name="person" size={28} color="#000" />
+          <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
 
@@ -1742,10 +1747,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#E0E0E0',
     backgroundColor: '#fff',
+  },
+  navLabel: {
+    fontSize: 10,
+    color: '#000',
+    marginTop: 4,
   },
   actionButtonsRow: {
     flexDirection: 'row',
