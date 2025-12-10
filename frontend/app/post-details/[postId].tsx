@@ -27,7 +27,8 @@ import UserAvatar from "../../components/UserAvatar";
 import SharePreviewModal from "../../components/SharePreviewModal";
 import axios from "axios";
 import { Image } from "expo-image";
-import { Video } from "expo-av";
+import { Video, ResizeMode } from "expo-av";
+import { BlurView } from "expo-blur";
 import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
 
 const BACKEND =
@@ -131,33 +132,51 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
   ).current;
 
   // Pan responder for bottom sheet to close it
-  // Only handles downward swipes on the bottom sheet itself
+  // Handles vertical swipes on the bottom sheet
   const bottomSheetPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        // Allow starting from anywhere on the bottom sheet
+        return showBottomSheet;
+      },
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to downward swipes on the bottom sheet
-        const isDownwardSwipe = gestureState.dy > 5;
+        // Respond to vertical swipes
         const isVerticalSwipe = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-        return showBottomSheet && isDownwardSwipe && isVerticalSwipe;
+        const hasMovement = Math.abs(gestureState.dy) > 5;
+        return showBottomSheet && isVerticalSwipe && hasMovement;
+      },
+      onPanResponderGrant: () => {
+        // Store initial position
+        panY.current = 0;
       },
       onPanResponderTerminationRequest: () => true,
       onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0 && showBottomSheet) {
-          // Swiping down
+        if (showBottomSheet) {
+          // Allow both up and down movement
+          const newY = Math.max(0, gestureState.dy);
           panY.current = gestureState.dy;
-          bottomSheetY.setValue(gestureState.dy);
+          bottomSheetY.setValue(newY);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 150 && showBottomSheet) {
           // Swiped down significantly, close bottom sheet
           closeBottomSheet();
-        } else if (showBottomSheet) {
-          // Snap back to open
+        } else if (gestureState.dy < -50 && showBottomSheet) {
+          // Swiped up, snap back to fully open
           Animated.spring(bottomSheetY, {
             toValue: 0,
             useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }).start();
+        } else if (showBottomSheet) {
+          // Snap back to open position
+          Animated.spring(bottomSheetY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
           }).start();
         }
       },
@@ -223,6 +242,21 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
       closeBottomSheet();
     }
   }, [post.id]);
+
+  // Ensure video plays when component mounts or post changes
+  useEffect(() => {
+    if (isVideo && videoRef.current && post.id === currentPostId) {
+      // Small delay to ensure video is ready
+      const timer = setTimeout(() => {
+        if (videoRef.current) {
+          (videoRef.current as any).playAsync?.().catch((error: any) => {
+            console.error("❌ Error playing video:", error);
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isVideo, post.id, currentPostId]);
 
   const fetchComments = async () => {
     try {
@@ -353,11 +387,11 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
 
   return (
     <View style={styles.postItem}>
-      {/* FULL HEIGHT MEDIA - Instagram Style */}
-      <View style={styles.fullScreenMediaContainer} {...panResponder.panHandlers}>
-        {/* Fullscreen Reels-Style Media */}
+      {/* AUTO-HEIGHT MEDIA CONTAINER - Responsive */}
+      <View style={styles.responsiveMediaContainer} {...panResponder.panHandlers}>
+        {/* Responsive Media */}
         <TouchableOpacity 
-          style={styles.fullScreenMediaContainer}
+          style={styles.mediaWrapper}
           activeOpacity={1}
           onPress={() => {
             if (isVideo) {
@@ -369,48 +403,119 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
             <>
               <Video
                 ref={videoRef}
-                source={{ uri: imageUrl || '' }}
-                style={styles.fullScreenVideo}
-                resizeMode="cover"
-                shouldPlay={post.id === currentPostId}
+                source={{ uri: mediaUrl || displayUrl || '' }}
+                style={styles.responsiveMedia}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={true}
                 isLooping
                 isMuted={isMuted}
                 useNativeControls={false}
+                onLoad={() => {
+                  console.log("✅ Video loaded in post details");
+                }}
+                onError={(error) => {
+                  console.error("❌ Video playback error:", error);
+                  console.error("❌ Video URL:", mediaUrl || displayUrl);
+                }}
+                onPlaybackStatusUpdate={(status) => {
+                  if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
+                    // Video finished, restart it
+                    if (videoRef.current) {
+                      (videoRef.current as any).replayAsync?.();
+                    }
+                  }
+                }}
               />
               {/* Mute/Unmute Indicator */}
               <View style={styles.muteIndicatorReels}>
                 <Ionicons 
                   name={isMuted ? "volume-mute" : "volume-high"} 
-                  size={28} 
+                  size={24} 
                   color="rgba(255,255,255,0.9)" 
                 />
               </View>
             </>
           ) : (
             <Image
-              source={{ uri: imageUrl || '' }}
-              style={styles.fullScreenVideo}
-              contentFit="cover"
+              source={{ uri: imageUrl || displayUrl || '' }}
+              style={styles.responsiveMedia}
+              contentFit="contain"
             />
           )}
         </TouchableOpacity>
 
-        {/* Tap for Details Button */}
+        {/* User Info at Top - Always Visible */}
+        {!showDetails && (
+          <View style={styles.topUserInfoBar}>
+            <TouchableOpacity
+              style={styles.topUserRow}
+              onPress={() => router.push(`/profile?userId=${post.user_id}`)}
+            >
+              <UserAvatar
+                profilePicture={profilePic}
+                username={post.username}
+                level={post.user_level}
+                size={36}
+                showLevelBadge
+                style={{}}
+              />
+              <View style={styles.topUserDetails}>
+                <Text style={styles.topUsername}>{post.username}</Text>
+                <Text style={styles.topTimestamp}>{formatTime(post.created_at)}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Glass Morphism Bottom Overlay - Rating, Location, Name */}
         {!showDetails && (
           <TouchableOpacity 
-            style={styles.tapForDetailsButton}
+            style={styles.glassBottomOverlay}
+            activeOpacity={0.9}
             onPress={() => setShowDetails(true)}
           >
-            <Ionicons name="chevron-up" size={20} color="#333" />
-            <Text style={styles.tapForDetailsText}>Tap for Details</Text>
+            {/* Glass Effect Background */}
+            <View style={styles.glassBackground} />
+            
+            {/* Content Row */}
+            <View style={styles.glassContentRow}>
+              {/* Rating with Icon */}
+              {post.rating && (
+                <View style={styles.glassInfoItem}>
+                  <Ionicons name="star" size={18} color="#FFD700" style={styles.glassIcon} />
+                  <Text style={styles.glassInfoText}>{post.rating}/10</Text>
+                </View>
+              )}
+
+              {/* Location with Icon */}
+              {post.location_name && (
+                <View style={styles.glassInfoItem}>
+                  <Ionicons name="location" size={18} color="#4dd0e1" style={styles.glassIcon} />
+                  <Text style={styles.glassInfoText} numberOfLines={1} ellipsizeMode="tail">
+                    {post.location_name}
+                  </Text>
+                </View>
+              )}
+
+              {/* Username */}
+              <View style={styles.glassInfoItem}>
+                <Ionicons name="person" size={18} color="#FF6B6B" style={styles.glassIcon} />
+                <Text style={styles.glassInfoText} numberOfLines={1} ellipsizeMode="tail">
+                  {post.username}
+                </Text>
+              </View>
+
+              {/* Chevron Up Icon */}
+              <Ionicons name="chevron-up" size={20} color="#FFF" style={styles.glassChevron} />
+            </View>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* EXPANDED DETAILS VIEW - Reels Style */}
+      {/* EXPANDED DETAILS VIEW - Instagram Style */}
       {showDetails && (
         <View style={styles.expandedDetailsOverlay}>
-          {/* Shrunk Video/Image */}
+          {/* Shrunk Video/Image with Gradient */}
           <View style={styles.shrunkMediaContainer}>
             <TouchableOpacity 
               style={styles.shrunkMediaWrapper}
@@ -425,13 +530,20 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                 <>
                   <Video
                     ref={videoRef}
-                    source={{ uri: imageUrl || '' }}
+                    source={{ uri: mediaUrl || displayUrl || '' }}
                     style={styles.shrunkVideo}
-                    resizeMode="cover"
-                    shouldPlay={post.id === currentPostId}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={true}
                     isLooping
                     isMuted={isMuted}
                     useNativeControls={false}
+                    onLoad={() => {
+                      console.log("✅ Video loaded in expanded details");
+                    }}
+                    onError={(error) => {
+                      console.error("❌ Video playback error in expanded:", error);
+                      console.error("❌ Video URL:", mediaUrl || displayUrl);
+                    }}
                   />
                   {/* Mute indicator for shrunk video */}
                   <View style={styles.muteIndicatorShrunk}>
@@ -444,19 +556,19 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                 </>
               ) : (
                 <Image
-                  source={{ uri: imageUrl || '' }}
+                  source={{ uri: imageUrl || displayUrl || '' }}
                   style={styles.shrunkVideo}
                   contentFit="cover"
                 />
               )}
             </TouchableOpacity>
 
-            {/* Close Details Button */}
+            {/* Close Details Button - Modern Style */}
             <TouchableOpacity 
-              style={styles.closeDetailsButton}
+              style={styles.modernCloseButton}
               onPress={() => setShowDetails(false)}
             >
-              <Ionicons name="chevron-down" size={24} color="#333" />
+              <Ionicons name="close" size={26} color="#FFF" />
             </TouchableOpacity>
           </View>
 
@@ -530,14 +642,43 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
               </TouchableOpacity>
             </View>
 
-            {/* Rating */}
-            {post.rating && (
-              <View style={styles.detailsCard}>
-                <Text style={styles.detailsCardLabel}>Ratings</Text>
-                <View style={styles.detailsRatingRow}>
-                  <Ionicons name="star" size={28} color="#FFD700" />
-                  <Text style={styles.detailsRatingText}>{post.rating}/10</Text>
-                </View>
+            {/* Clean Info Row - Rating, Location, Name */}
+            {(post.rating || post.location_name) && (
+              <View style={styles.detailsInfoRow}>
+                {post.rating && (
+                  <View style={styles.detailsInfoItem}>
+                    <Ionicons name="star" size={16} color="#FFD700" />
+                    <Text style={styles.detailsInfoValue}>{post.rating}/10</Text>
+                  </View>
+                )}
+                
+                {post.location_name && (
+                  <TouchableOpacity
+                    style={styles.detailsInfoItem}
+                    onPress={() => {
+                      if (post.map_link) {
+                        Linking.openURL(post.map_link);
+                      } else if (post.location_name) {
+                        const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                        Linking.openURL(searchUrl);
+                      }
+                    }}
+                  >
+                    <Ionicons name="location" size={16} color="#4dd0e1" />
+                    <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
+                      {post.location_name}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {post.location_name && (
+                  <View style={styles.detailsInfoItem}>
+                    <Ionicons name="business" size={16} color="#666" />
+                    <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
+                      {post.location_name}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -549,28 +690,6 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                   <Ionicons name="bulb" size={24} color="#FF9500" />
                   <Text style={styles.detailsReviewText}>{post.review_text}</Text>
                 </View>
-              </View>
-            )}
-
-            {/* Location */}
-            {post.location_name && (
-              <View style={styles.detailsCard}>
-                <Text style={styles.detailsCardLabel}>Location</Text>
-                <TouchableOpacity
-                  style={styles.detailsLocationRow}
-                  onPress={() => {
-                    if (post.map_link) {
-                      Linking.openURL(post.map_link);
-                    } else if (post.location_name) {
-                      const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
-                      Linking.openURL(searchUrl);
-                    }
-                  }}
-                >
-                  <Ionicons name="location" size={24} color="#FF3B30" />
-                  <Text style={styles.detailsLocationText}>{post.location_name}</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#FF3B30" />
-                </TouchableOpacity>
               </View>
             )}
 
@@ -653,10 +772,25 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                 transform: [{ translateY: bottomSheetY }],
               },
             ]}
-            pointerEvents="auto"
-            {...bottomSheetPanResponder.panHandlers}
+            pointerEvents="box-none"
           >
-            <View style={styles.bottomSheetHandle} />
+            {/* Glass Effect Background */}
+            <BlurView
+              intensity={80}
+              tint="light"
+              style={StyleSheet.absoluteFill}
+            />
+            
+            {/* Glass Overlay for better effect */}
+            <View style={styles.bottomSheetGlassOverlay} />
+            
+            {/* Centered Handle - Draggable Area */}
+            <View 
+              style={styles.bottomSheetHandleContainer}
+              {...bottomSheetPanResponder.panHandlers}
+            >
+              <View style={styles.bottomSheetHandle} />
+            </View>
             
             <ScrollView
               style={styles.bottomSheetScroll}
@@ -732,14 +866,43 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                 </TouchableOpacity>
               </View>
 
-              {/* Rating */}
-              {post.rating && (
-                <View style={styles.bottomSheetCard}>
-                  <Text style={styles.bottomSheetCardLabel}>Ratings</Text>
-                  <View style={styles.bottomSheetRatingRow}>
-                    <Ionicons name="star" size={28} color="#FFD700" />
-                    <Text style={styles.bottomSheetRatingText}>{post.rating}/10</Text>
-                  </View>
+              {/* Clean Info Row - Rating, Location, Name */}
+              {(post.rating || post.location_name) && (
+                <View style={styles.detailsInfoRow}>
+                  {post.rating && (
+                    <View style={styles.detailsInfoItem}>
+                      <Ionicons name="star" size={16} color="#FFD700" />
+                      <Text style={styles.detailsInfoValue}>{post.rating}/10</Text>
+                    </View>
+                  )}
+                  
+                  {post.location_name && (
+                    <TouchableOpacity
+                      style={styles.detailsInfoItem}
+                      onPress={() => {
+                        if (post.map_link) {
+                          Linking.openURL(post.map_link);
+                        } else if (post.location_name) {
+                          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                          Linking.openURL(searchUrl);
+                        }
+                      }}
+                    >
+                      <Ionicons name="location" size={16} color="#4dd0e1" />
+                      <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
+                        {post.location_name}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {post.location_name && (
+                    <View style={styles.detailsInfoItem}>
+                      <Ionicons name="business" size={16} color="#666" />
+                      <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
+                        {post.location_name}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -751,28 +914,6 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                     <Ionicons name="bulb" size={24} color="#FF9500" />
                     <Text style={styles.bottomSheetReviewText}>{post.review_text}</Text>
                   </View>
-                </View>
-              )}
-
-              {/* Location / Restaurant Name */}
-              {post.location_name && (
-                <View style={styles.bottomSheetCard}>
-                  <Text style={styles.bottomSheetCardLabel}>Location</Text>
-                  <TouchableOpacity
-                    style={styles.bottomSheetLocationRow}
-                    onPress={() => {
-                      if (post.map_link) {
-                        Linking.openURL(post.map_link);
-                      } else if (post.location_name) {
-                        const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
-                        Linking.openURL(searchUrl);
-                      }
-                    }}
-                  >
-                    <Ionicons name="location" size={24} color="#FF3B30" />
-                    <Text style={styles.bottomSheetLocationText}>{post.location_name}</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#FF3B30" />
-                  </TouchableOpacity>
                 </View>
               )}
 
@@ -1231,8 +1372,32 @@ const styles = StyleSheet.create({
 
   postItem: {
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
+    minHeight: SCREEN_HEIGHT,
     backgroundColor: "#000",
+    position: "relative",
+  },
+
+  responsiveMediaContainer: {
+    width: SCREEN_WIDTH,
+    minHeight: SCREEN_HEIGHT * 0.7,
+    maxHeight: SCREEN_HEIGHT,
+    backgroundColor: "#000",
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  mediaWrapper: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  responsiveMedia: {
+    width: "100%",
+    height: "100%",
+    maxHeight: SCREEN_HEIGHT,
   },
 
   instagramScroll: {
@@ -1497,32 +1662,53 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.85,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderBottomWidth: 0,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: -3,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
     elevation: 10,
+  },
+
+  bottomSheetGlassOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+  },
+
+  bottomSheetHandleContainer: {
+    width: "100%",
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 8,
+    paddingHorizontal: 20,
+    zIndex: 10,
+    // Make handle area more touchable
+    minHeight: 40,
+    justifyContent: "center",
   },
 
   bottomSheetHandle: {
     width: 40,
-    height: 5,
-    backgroundColor: "#ddd",
-    borderRadius: 3,
-    alignSelf: "center",
-    marginTop: 12,
-    marginBottom: 8,
+    height: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    borderRadius: 2,
   },
 
   bottomSheetScroll: {
     flex: 1,
     paddingHorizontal: 20,
+    backgroundColor: "transparent",
   },
 
   bottomSheetUserRow: {
@@ -1542,12 +1728,12 @@ const styles = StyleSheet.create({
   bottomSheetUsername: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#000",
+    color: "#1a1a1a",
   },
 
   bottomSheetTimestamp: {
     fontSize: 13,
-    color: "#888",
+    color: "#666",
     marginTop: 2,
   },
 
@@ -1568,7 +1754,7 @@ const styles = StyleSheet.create({
   bottomSheetActionText: {
     marginTop: 6,
     fontSize: 12,
-    color: "#333",
+    color: "#1a1a1a",
     fontWeight: "600",
   },
 
@@ -1582,7 +1768,7 @@ const styles = StyleSheet.create({
   bottomSheetCardLabel: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#000",
+    color: "#1a1a1a",
     marginBottom: 12,
   },
 
@@ -1644,46 +1830,47 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 16,
-    color: "#000",
+    color: "#1a1a1a",
   },
 
   noComments: {
     textAlign: "center",
-    color: "#777",
-    marginTop: 10,
+    color: "#8E8E8E",
+    marginTop: 20,
+    marginBottom: 20,
     fontSize: 14,
   },
 
   commentItem: {
     flexDirection: "row",
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#EFEFEF",
   },
 
   commentContent: {
-    marginLeft: 10,
+    marginLeft: 12,
     flex: 1,
   },
 
   commentUsername: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#000",
+    fontWeight: "700",
+    color: "#262626",
   },
 
   commentText: {
     marginTop: 4,
     fontSize: 14,
-    color: "#333",
+    color: "#262626",
     lineHeight: 20,
   },
 
   commentTime: {
-    marginTop: 4,
+    marginTop: 6,
     fontSize: 12,
-    color: "#999",
+    color: "#8E8E8E",
   },
 
   commentInputContainer: {
@@ -1691,18 +1878,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 16,
     paddingTop: 16,
-    borderTopWidth: 1,
-    borderColor: "#f0f0f0",
+    paddingBottom: 20,
+    borderTopWidth: 0.5,
+    borderColor: "#DBDBDB",
+    backgroundColor: "#FFF",
   },
 
   commentInput: {
     flex: 1,
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#FAFAFA",
     borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    marginRight: 12,
     fontSize: 14,
+    borderWidth: 1,
+    borderColor: "#DBDBDB",
   },
 
   sendButton: {
@@ -1712,6 +1903,14 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#4dd0e1",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
 
   footerLoader: {
@@ -1818,32 +2017,121 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
-  // Tap for Details button
-  tapForDetailsButton: {
+  // Top User Info Bar
+  topUserInfoBar: {
     position: "absolute",
-    bottom: 30,
-    alignSelf: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    zIndex: 10,
+  },
+
+  topUserRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+
+  topUserDetails: {
+    marginLeft: 12,
+    flex: 1,
+  },
+
+  topUsername: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFF",
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+
+  topTimestamp: {
+    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginTop: 2,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+
+  // Glass Morphism Bottom Overlay
+  glassBottomOverlay: {
+    position: "absolute",
+    bottom: 20,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+
+  glassBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    // Enhanced glass morphism effect
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 8,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+    // Backdrop blur simulation with gradient overlay
+    opacity: 0.95,
   },
 
-  tapForDetailsText: {
-    color: "#333",
-    fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 6,
+  glassContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    gap: 12,
+  },
+
+  glassInfoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
+    maxWidth: "30%",
+  },
+
+  glassIcon: {
+    textShadowColor: "rgba(0, 0, 0, 0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+
+  glassInfoText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
+    textShadowColor: "rgba(0, 0, 0, 0.6)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    flexShrink: 1,
+    letterSpacing: 0.2,
+  },
+
+  glassChevron: {
+    marginLeft: "auto",
+    textShadowColor: "rgba(0, 0, 0, 0.6)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
 
   // Expanded Details View Styles
@@ -1859,7 +2147,7 @@ const styles = StyleSheet.create({
 
   shrunkMediaContainer: {
     width: "100%",
-    height: SCREEN_HEIGHT * 0.6, // 4:5 aspect ratio area
+    height: SCREEN_HEIGHT * 0.5,
     backgroundColor: "#000",
     position: "relative",
   },
@@ -1868,6 +2156,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   shrunkVideo: {
@@ -1884,37 +2174,41 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
-  closeDetailsButton: {
+  modernCloseButton: {
     position: "absolute",
     top: 50,
-    left: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: 20,
-    padding: 10,
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
   },
 
   detailsContent: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor: "#FAFAFA",
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
 
   detailsUserRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    backgroundColor: "#FFF",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#DBDBDB",
   },
 
   detailsUserInfo: {
@@ -1923,110 +2217,149 @@ const styles = StyleSheet.create({
   },
 
   detailsUsername: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#000",
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#262626",
   },
 
   detailsTimestamp: {
-    fontSize: 13,
-    color: "#888",
+    fontSize: 12,
+    color: "#8E8E8E",
     marginTop: 2,
   },
 
   detailsActions: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-    marginBottom: 20,
+    paddingVertical: 12,
+    backgroundColor: "#FFF",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#DBDBDB",
+    marginBottom: 0,
   },
 
   detailsActionBtn: {
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
 
   detailsActionText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#333",
+    marginTop: 4,
+    fontSize: 11,
+    color: "#262626",
     fontWeight: "600",
   },
 
+  detailsInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 16,
+    backgroundColor: "#FFF",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#DBDBDB",
+  },
+
+  detailsInfoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+
+  detailsInfoValue: {
+    fontSize: 14,
+    color: "#262626",
+    fontWeight: "500",
+  },
+
   detailsCard: {
-    marginBottom: 20,
-    backgroundColor: "#f9f9f9",
-    borderRadius: 16,
-    padding: 16,
+    marginBottom: 12,
+    backgroundColor: "#FFF",
+    borderRadius: 0,
+    padding: 20,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#DBDBDB",
   },
 
   detailsCardLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#000",
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#262626",
     marginBottom: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 
   detailsRatingRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF9E6",
-    padding: 16,
+    backgroundColor: "#FFFBF0",
+    padding: 18,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FFD700",
   },
 
   detailsRatingText: {
     marginLeft: 12,
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#000",
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#FF6B00",
   },
 
   detailsReviewRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#FFF5E6",
-    padding: 16,
+    backgroundColor: "#F8F8F8",
+    padding: 18,
     borderRadius: 12,
   },
 
   detailsReviewText: {
     marginLeft: 12,
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#333",
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#262626",
     flex: 1,
+    fontWeight: "400",
   },
 
   detailsLocationRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF0F0",
-    padding: 16,
+    backgroundColor: "#F0F8FF",
+    padding: 18,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#4dd0e1",
   },
 
   detailsLocationText: {
     marginLeft: 12,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
-    color: "#000",
+    color: "#262626",
     flex: 1,
   },
 
   detailsCommentsSection: {
-    marginTop: 8,
+    marginTop: 0,
     paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    paddingHorizontal: 20,
+    backgroundColor: "#FFF",
+    borderTopWidth: 0.5,
+    borderTopColor: "#DBDBDB",
   },
 
   detailsCommentsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 16,
+    fontWeight: "700",
     marginBottom: 16,
-    color: "#000",
+    color: "#262626",
   },
 });

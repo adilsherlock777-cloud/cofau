@@ -41,7 +41,8 @@ const getPostDP = (post: any) => {
 
 export default function FeedScreen() {
   const router = useRouter();
-  const { user, token, refreshUser } = useAuth();
+  const auth = useAuth() as any;
+  const { user, token, refreshUser } = auth;
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,19 +197,30 @@ export default function FeedScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-        {console.log("userss", user)}
         {/* USER HEADER */}
         {user && (
-          <View style={styles.userCard}>
+          <TouchableOpacity 
+            style={styles.userCard}
+            onPress={() => router.push("/add-post")}
+            activeOpacity={0.7}
+          >
             <View style={styles.userRow}>
-              <UserAvatar
-                profilePicture={user.profile_picture}
-                username={user.full_name || user.username}
-                size={50}
-                level={user.level}
-                showLevelBadge
-                style={{}}
-              />
+              <View style={styles.avatarContainer}>
+                <UserAvatar
+                  profilePicture={user.profile_picture}
+                  username={user.full_name || user.username}
+                  size={50}
+                  level={user.level}
+                  showLevelBadge={false}
+                  style={{}}
+                />
+                <TouchableOpacity
+                  style={styles.cameraIcon}
+                  onPress={() => router.push("/add-post")}
+                >
+                  <Ionicons name="camera" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
 
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{user.full_name}</Text>
@@ -221,7 +233,7 @@ export default function FeedScreen() {
                 />
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
 
         {/* STORIES */}
@@ -270,18 +282,23 @@ export default function FeedScreen() {
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => router.push("/feed")}>
           <Ionicons name="home" size={28} color="#000" />
+          <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push("/explore")}>
           <Ionicons name="compass-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/add-post")}>
-          <Ionicons name="add-circle-outline" size={28} color="#000" />
+        <TouchableOpacity onPress={() => router.push("/leaderboard")}>
+          <Ionicons name="trophy-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Leaderboard</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push("/happening")}>
-          <Ionicons name="flame-outline" size={28} color="#000" />
+          <Ionicons name="restaurant-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Restaurant</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push("/profile")}>
           <Ionicons name="person-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -333,7 +350,29 @@ const styles = StyleSheet.create({
 
   userRow: { flexDirection: "row", alignItems: "center" },
 
+  avatarContainer: {
+    position: "relative",
+  },
+
+  cameraIcon: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#4dd0e1",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+
   userInfo: { marginLeft: 16, flex: 1 },
+
+  uploadButton: {
+    padding: 8,
+  },
 
   userName: { fontSize: 18, fontWeight: "bold", color: "#333" },
 
@@ -368,9 +407,15 @@ const styles = StyleSheet.create({
   navBar: {
     flexDirection: "row",
     justifyContent: "space-around",
+    alignItems: "center",
     paddingVertical: 12,
     borderTopWidth: 1,
     borderColor: "#E0E0E0",
     backgroundColor: "#fff",
+  },
+  navLabel: {
+    fontSize: 10,
+    color: "#000",
+    marginTop: 4,
   },
 });

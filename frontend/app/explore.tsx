@@ -354,6 +354,30 @@ export default function ExploreScreen() {
           ) : null
         }
       />
+
+      {/* Bottom Navigation */}
+      <View style={styles.navBar}>
+        <TouchableOpacity onPress={() => router.push("/feed")}>
+          <Ionicons name="home-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/explore")}>
+          <Ionicons name="compass" size={28} color="#000" />
+          <Text style={styles.navLabel}>Explore</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/leaderboard")}>
+          <Ionicons name="trophy-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Leaderboard</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/happening")}>
+          <Ionicons name="restaurant-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Restaurant</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/profile")}>
+          <Ionicons name="person-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Profile</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -446,5 +470,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: "#999",
+  },
+  navBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#fff",
+  },
+  navLabel: {
+    fontSize: 10,
+    color: "#000",
+    marginTop: 4,
   },
 });
