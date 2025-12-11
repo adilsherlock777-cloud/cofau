@@ -110,11 +110,8 @@ async def get_post_data_for_og(post_id: str):
         
         # Construct the absolute image URL
         # The stored media_url is typically /api/static/uploads/filename.jpg
-        # We need the full absolute URL: https://backend.cofau.com/api/static/uploads/filename.jpg
-        # Assuming your base domain is configured elsewhere, but for simplicity, we'll use a placeholder structure
-        
-        # NOTE: You MUST replace 'https://backend.cofau.com' with your actual domain/URL prefix
-        base_domain = "https://backend.cofau.com" 
+        # We need the full absolute URL using the configured BACKEND_URL
+        base_domain = settings.BACKEND_URL
         media_url = post_doc.get("media_url")
         full_image_url = f"{base_domain}{media_url}" if media_url else None
         
@@ -188,7 +185,7 @@ async def share_post_preview(request: Request, post_id: str):
     # Render the HTML template (og_preview.html)
     return templates.TemplateResponse(
         "og_preview.html", 
-        {"request": request, "post": post, "post_id": post_id}
+        {"request": request, "post": post, "post_id": post_id, "base_url": settings.BACKEND_URL}
     )
 
 # ======================================================
@@ -336,9 +333,8 @@ async def create_post(
         from utils.sightengine_quality import analyze_media_quality
         
         # Build full URL for Sightengine API
-        # Assuming backend is accessible at settings.BACKEND_URL or construct it
-        backend_url = os.getenv("BACKEND_URL", "https://backend.cofau.com")
-        full_media_url = f"{backend_url}{media_url}"
+        # Use the configured BACKEND_URL from settings
+        full_media_url = f"{settings.BACKEND_URL}{media_url}"
         
         # Analyze quality asynchronously
         quality_score = await analyze_media_quality(full_media_url, media_type)
@@ -1792,7 +1788,7 @@ async def share_preview(post_id: str):
     if not post:
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
 
-    BASE_URL = "https://backend.cofau.com"
+    BASE_URL = settings.BACKEND_URL
 
     title = post.get("review_text", "Cofau Post")
     rating = post.get("rating", 0)

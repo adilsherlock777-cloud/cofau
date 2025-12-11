@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_EXTENSIONS: set = {"jpg", "jpeg", "png", "gif", "mp4", "mov"}
     
+    # Backend URL (for constructing absolute URLs)
+    # For local development: http://localhost:8000
+    # For production: https://backend.cofau.com
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "https://backend.cofau.com")
+    
     # Sightengine API for content moderation
     SIGHTENGINE_API_USER: str = os.getenv("SIGHTENGINE_API_USER", "144214407")
     SIGHTENGINE_API_SECRET: str = os.getenv("SIGHTENGINE_API_SECRET", "JYA4RySafgQeKMUqnNGiQcdBFBuTKDk9")
