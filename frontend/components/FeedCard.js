@@ -261,7 +261,7 @@ export default function FeedCard({ post, onLikeUpdate, onStoryCreated, showOptio
           <UserAvatar
             profilePicture={dpRaw}
             username={post.username}
-            size={40}
+            size={48}
             level={post.user_level}
             showLevelBadge
           />

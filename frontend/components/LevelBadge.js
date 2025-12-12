@@ -21,8 +21,8 @@ export default function LevelBadge({ level, size = 'small' }) {
   // Size configurations - kept small like Instagram badges
   const sizeConfig = {
     small: {
-      container: 16,
-      fontSize: 9,
+      container: 21,
+      fontSize: 10,
       borderWidth: 1.5,
       bottom: 0,
       right: 0,

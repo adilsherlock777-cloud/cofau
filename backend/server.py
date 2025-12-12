@@ -1314,12 +1314,12 @@ async def search_posts(
 @app.get("/api/search/users")
 async def search_users(
     q: str,
-    limit: int = 10,
+    limit: int = 100,
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Search users by username/full_name for preview (Instagram-like)
-    Returns user profiles with basic info and sample posts
+    Search users by username/full_name OR location_name
+    Returns user profiles with basic info and location images from places where user has posted
     """
     if not q or not q.strip():
         return []
@@ -1328,54 +1328,123 @@ async def search_users(
     query = q.strip().lower()
     search_regex = {"$regex": query, "$options": "i"}
     
-    # Search users by full_name
-    users = await db.users.find({
+    # Set to store unique user IDs
+    user_ids_set = set()
+    result = []
+    
+    # 1. Search users by full_name
+    users_by_name = await db.users.find({
         "full_name": search_regex
     }).limit(limit).to_list(limit)
     
-    result = []
-    for user in users:
-        # Count posts for this user
-        posts_count = await db.posts.count_documents({"user_id": str(user["_id"])})
-        
-        # Check if current user is following this user
-        is_following = await db.follows.find_one({
-            "follower_id": str(current_user["_id"]),
-            "following_id": str(user["_id"])
-        }) is not None
-        
-        # Get sample posts (recent 6 posts for Instagram-like preview)
-        sample_posts = []
-        user_posts = await db.posts.find({
-            "user_id": str(user["_id"])
-        }).sort("created_at", -1).limit(6).to_list(6)
-        
-        for post in user_posts:
-            media_type = post.get("media_type", "image")
-            if media_type == "image":
-                media_url = post.get("media_url") or post.get("image_url")
-                if media_url:
-                    sample_posts.append({
-                        "post_id": str(post["_id"]),
-                        "media_url": media_url,
-                        "media_type": media_type
-                    })
-        
-        result.append({
-            "id": str(user["_id"]),
-            "username": user["full_name"],
-            "full_name": user["full_name"],
-            "profile_picture": user.get("profile_picture"),
-            "level": user.get("level", 1),
-            "badge": user.get("badge"),
-            "posts_count": posts_count,
-            "followers_count": user.get("followers_count", 0),
-            "is_following": is_following,
-            "is_own_profile": str(user["_id"]) == str(current_user["_id"]),
-            "sample_posts": sample_posts[:6]  # Max 6 posts for preview
-        })
+    for user in users_by_name:
+        user_id = str(user["_id"])
+        if user_id not in user_ids_set:
+            user_ids_set.add(user_id)
+            
+            # Get all posts by this user with location_name
+            user_posts = await db.posts.find({
+                "user_id": user_id,
+                "location_name": {"$exists": True, "$ne": None}
+            }).sort("created_at", -1).to_list(None)
+            
+            # Collect location images from user's posts
+            location_images = []
+            location_names_set = set()
+            
+            for post in user_posts:
+                location_name = post.get("location_name")
+                if location_name and location_name not in location_names_set:
+                    location_names_set.add(location_name)
+                    
+                    # Get all images from this location (from all users, not just this user)
+                    location_posts = await db.posts.find({
+                        "location_name": location_name
+                    }).sort("created_at", -1).limit(20).to_list(20)
+                    
+                    for loc_post in location_posts:
+                        media_type = loc_post.get("media_type", "image")
+                        media_url = loc_post.get("media_url") or loc_post.get("image_url")
+                        if media_url:
+                            location_images.append({
+                                "post_id": str(loc_post["_id"]),
+                                "media_url": media_url,
+                                "media_type": media_type,
+                                "location_name": location_name
+                            })
+            
+            result.append({
+                "id": user_id,
+                "username": user["full_name"],
+                "full_name": user["full_name"],
+                "profile_picture": user.get("profile_picture"),
+                "level": user.get("level", 1),
+                "location_images": location_images[:50],  # Limit to 50 images
+            })
     
-    return result
+    # 2. Search users by location_name (users who have posts with matching location)
+    posts_by_location = await db.posts.find({
+        "location_name": search_regex
+    }).to_list(None)
+    
+    # Get unique user IDs from posts with matching location
+    location_user_ids = set()
+    for post in posts_by_location:
+        location_user_ids.add(post["user_id"])
+    
+    # Fetch users who have posts with matching location
+    if location_user_ids:
+        users_by_location = await db.users.find({
+            "_id": {"$in": [ObjectId(uid) for uid in location_user_ids]}
+        }).to_list(None)
+        
+        for user in users_by_location:
+            user_id = str(user["_id"])
+            if user_id not in user_ids_set:
+                user_ids_set.add(user_id)
+                
+                # Get all posts by this user with location_name
+                user_posts = await db.posts.find({
+                    "user_id": user_id,
+                    "location_name": {"$exists": True, "$ne": None}
+                }).sort("created_at", -1).to_list(None)
+                
+                # Collect location images from user's posts
+                location_images = []
+                location_names_set = set()
+                
+                for post in user_posts:
+                    location_name = post.get("location_name")
+                    if location_name and location_name not in location_names_set:
+                        location_names_set.add(location_name)
+                        
+                        # Get all images from this location (from all users)
+                        location_posts = await db.posts.find({
+                            "location_name": location_name
+                        }).sort("created_at", -1).limit(20).to_list(20)
+                        
+                        for loc_post in location_posts:
+                            media_type = loc_post.get("media_type", "image")
+                            media_url = loc_post.get("media_url") or loc_post.get("image_url")
+                            if media_url:
+                                location_images.append({
+                                    "post_id": str(loc_post["_id"]),
+                                    "media_url": media_url,
+                                    "media_type": media_type,
+                                    "location_name": location_name
+                                })
+                
+                result.append({
+                    "id": user_id,
+                    "username": user["full_name"],
+                    "full_name": user["full_name"],
+                    "profile_picture": user.get("profile_picture"),
+                    "level": user.get("level", 1),
+                    "location_images": location_images[:50],  # Limit to 50 images
+                })
+    
+    # Limit results
+    return result[:limit]
 
 @app.get("/api/search/locations")
 async def search_locations(
@@ -1385,7 +1454,7 @@ async def search_locations(
 ):
     """
     Search locations/restaurants by name and return preview with photos
-    Returns locations with sample photos from posts
+    Returns locations with ALL images from posts (not just sample)
     """
     if not q or not q.strip():
         return []
@@ -1394,10 +1463,10 @@ async def search_locations(
     query = q.strip().lower()
     search_regex = {"$regex": query, "$options": "i"}
     
-    # Find posts with matching location_name
+    # Find ALL posts with matching location_name (not limited to 50)
     posts = await db.posts.find({
         "location_name": search_regex
-    }).sort("created_at", -1).limit(50).to_list(50)
+    }).sort("created_at", -1).to_list(None)
     
     # Group posts by location_name
     location_map = {}
@@ -1411,23 +1480,27 @@ async def search_locations(
                 "name": location_name,
                 "posts": [],
                 "total_posts": 0,
-                "sample_photos": []
+                "sample_photos": [],
+                "all_images": []  # Store all images for grid display
             }
         
         location_map[location_name]["posts"].append(post)
         location_map[location_name]["total_posts"] += 1
         
-        # Collect sample photos (up to 6 for better preview)
-        if len(location_map[location_name]["sample_photos"]) < 6:
-            media_type = post.get("media_type", "image")
-            if media_type == "image":
-                media_url = post.get("media_url") or post.get("image_url")
-                if media_url:
-                    location_map[location_name]["sample_photos"].append({
-                        "post_id": str(post["_id"]),
-                        "media_url": media_url,
-                        "media_type": media_type
-                    })
+        # Collect ALL images (not just 6)
+        media_type = post.get("media_type", "image")
+        media_url = post.get("media_url") or post.get("image_url")
+        if media_url:
+            image_data = {
+                "post_id": str(post["_id"]),
+                "media_url": media_url,
+                "media_type": media_type
+            }
+            location_map[location_name]["all_images"].append(image_data)
+            
+            # Also keep sample_photos for backward compatibility (first 6)
+            if len(location_map[location_name]["sample_photos"]) < 6 and media_type == "image":
+                location_map[location_name]["sample_photos"].append(image_data)
     
     # Convert to list and sort by total_posts
     result = []
@@ -1440,7 +1513,8 @@ async def search_locations(
             "name": location_data["name"],
             "total_posts": location_data["total_posts"],
             "average_rating": round(avg_rating, 1),
-            "sample_photos": location_data["sample_photos"][:6],  # Max 6 photos for better preview
+            "sample_photos": location_data["sample_photos"][:6],  # Keep for backward compatibility
+            "all_images": location_data["all_images"],  # All images for grid display
             "map_link": location_data["posts"][0].get("map_link") if location_data["posts"] else None
         })
     
