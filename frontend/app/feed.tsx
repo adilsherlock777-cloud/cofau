@@ -199,19 +199,27 @@ export default function FeedScreen() {
         >
           <View style={styles.headerTopRow}>
             <Text style={styles.cofauTitle}>Cofau</Text>
-            <TouchableOpacity
-              style={styles.notificationButton}
-              onPress={() => router.push("/notifications")}
-            >
-              <Ionicons name="notifications-outline" size={26} color="#fff" />
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={styles.headerIcons}>
+              <TouchableOpacity
+                style={styles.messageButton}
+                onPress={() => router.push("/chat")}
+              >
+                <Ionicons name="chatbubbles-outline" size={26} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => router.push("/notifications")}
+              >
+                <Ionicons name="notifications-outline" size={26} color="#fff" />
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </LinearGradient>
 
@@ -355,8 +363,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 32,
     fontWeight: "bold",
-    fontFamily: "serif",
+    fontFamily: "Lobster",
     letterSpacing: 1,
+  },
+
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  messageButton: {
+    padding: 8,
   },
 
   profileSectionContainer: {
