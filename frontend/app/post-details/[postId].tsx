@@ -1040,8 +1040,8 @@ export default function PostDetailsScreen() {
     try {
       setLoading(true);
 
-      // Fetch feed to find the post and get initial posts
-      const res = await axios.get(`${API_URL}/feed?limit=50&skip=0`, {
+      // Fetch feed to find the post and get initial posts (no limit - fetch all)
+      const res = await axios.get(`${API_URL}/feed?skip=0`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

@@ -81,7 +81,10 @@ export default function ExploreScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (user && token) fetchPosts(true);
+      if (user && token) {
+        console.log('🔄 Explore screen focused - refreshing posts');
+        fetchPosts(true);
+      }
     }, [user, token])
   );
 
@@ -99,7 +102,8 @@ export default function ExploreScreen() {
 
       const skip = refresh ? 0 : (page - 1) * 30;
 
-      const res = await axios.get(`${API_URL}/feed?limit=30&skip=${skip}`, {
+      // No limit parameter - fetch ALL posts
+      const res = await axios.get(`${API_URL}/feed?skip=${skip}`, {
         headers: { Authorization: `Bearer ${token || ''}` },
       });
 
@@ -118,7 +122,26 @@ export default function ExploreScreen() {
         };
       });
 
-      refresh ? setPosts(newPosts) : setPosts((p) => [...p, ...newPosts]);
+      // ✅ Sort by created_at descending (newest first)
+      const sortedNewPosts = newPosts.sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA; // Descending order (newest first)
+      });
+
+      if (refresh) {
+        setPosts(sortedNewPosts);
+      } else {
+        // When appending, combine and sort all posts
+        setPosts((p) => {
+          const combined = [...p, ...sortedNewPosts];
+          return combined.sort((a: any, b: any) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return dateB - dateA; // Descending order (newest first)
+          });
+        });
+      }
 
       setPage((prev) => prev + 1);
     } catch (err) {
@@ -160,7 +183,14 @@ export default function ExploreScreen() {
         };
       });
 
-      setSearchResults(searchPosts);
+      // ✅ Sort search results by created_at descending (newest first)
+      const sortedSearchPosts = searchPosts.sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA; // Descending order (newest first)
+      });
+
+      setSearchResults(sortedSearchPosts);
     } catch (err) {
       console.error("❌ Search error:", err);
       setSearchResults([]);

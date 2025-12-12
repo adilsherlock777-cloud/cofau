@@ -235,7 +235,10 @@ export default function AddPostScreen() {
       const levelUpdate = result.level_update;
       if (levelUpdate && levelUpdate.leveledUp) {
         showLevelUpAnimation(levelUpdate.level);
-        setTimeout(() => router.push('/feed'), 3000);
+        // Use replace instead of push to force refresh, and add small delay for DB to commit
+        setTimeout(() => {
+          router.replace('/feed');
+        }, 3000);
         return;
       }
 
@@ -244,16 +247,17 @@ export default function AddPostScreen() {
       if (earnedPoints > 0) {
         setPointsEarned(earnedPoints);
         setShowPointsAnimation(true);
-        // Navigate to feed after animation (3 seconds)
+        // Navigate to feed after animation (3 seconds) - use replace to force refresh
         setTimeout(() => {
           setShowPointsAnimation(false);
-          router.push('/feed');
+          router.replace('/feed');
         }, 3000);
       } else {
-        // Fallback if no points (shouldn't happen, but just in case)
-        Alert.alert('Success!', 'Post submitted successfully!', [
-          { text: 'OK', onPress: () => router.push('/feed') },
-        ]);
+        // Fallback if no points - use replace to force refresh
+        // Add small delay to ensure post is committed to database
+        setTimeout(() => {
+          router.replace('/feed');
+        }, 500);
       }
 
     } catch (error: any) {

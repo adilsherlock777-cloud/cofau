@@ -3,9 +3,9 @@ import { View, Image, Text, StyleSheet } from 'react-native';
 import UserAvatar from './UserAvatar';
 
 // Import badge images
-const ReviewerBadge = require('../assets/badges/reviewer.png');
-const TopReviewerBadge = require('../assets/badges/top_reviewer.png');
-const InfluencerBadge = require('../assets/badges/influencer.png');
+const ReviewerBadge = require('../assets/badges/reviewer.jpeg');
+const TopReviewerBadge = require('../assets/badges/top_reviewer.jpeg');
+const InfluencerBadge = require('../assets/badges/influencer.jpeg');
 
 /**
  * ProfileBadge Component
@@ -20,14 +20,15 @@ const InfluencerBadge = require('../assets/badges/influencer.png');
  * @param {number} dpSize - Size of the DP (default: 115)
  * @param {number} badgeSize - Size of the badge (default: 100)
  */
-export default function ProfileBadge({ 
-  profilePicture, 
-  username, 
-  level = 1, 
+export default function ProfileBadge({
+  profilePicture,
+  username,
+  level = 1,
   dpSize = 115,
-  badgeSize = 100
+  badgeSize = 100,
+  cameraIcon = null
 }) {
-  
+
   /**
    * Get category badge image based on user level
    * Level 1-4: Reviewer (blue checkmark)
@@ -51,13 +52,16 @@ export default function ProfileBadge({
 
   return (
     <View style={styles.container}>
-      {/* Profile Picture (no small badge on profile screen) */}
-      <UserAvatar
-        profilePicture={profilePicture}
-        username={username}
-        size={dpSize}
-        showLevelBadge={false} // Disable small badge completely
-      />
+      {/* Profile Picture Container (for camera icon positioning) */}
+      <View style={styles.avatarContainer}>
+        <UserAvatar
+          profilePicture={profilePicture}
+          username={username}
+          size={dpSize}
+          showLevelBadge={false} // Disable small badge completely
+        />
+        {cameraIcon}
+      </View>
 
       {/* Badge + Title Stack */}
       <View style={styles.badgeContainer}>
@@ -70,7 +74,7 @@ export default function ProfileBadge({
             resizeMode: 'contain',
           }}
         />
-        
+
         {/* Badge Title Text */}
         <Text style={styles.badgeTitle}>
           {getBadgeTitle()}
@@ -84,10 +88,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  avatarContainer: {
+    position: 'relative',
   },
   badgeContainer: {
     alignItems: 'center',
-    marginLeft: 16,
+    marginLeft: 90,
   },
   badgeTitle: {
     fontSize: 14,
