@@ -110,8 +110,11 @@ async def get_post_data_for_og(post_id: str):
         
         # Construct the absolute image URL
         # The stored media_url is typically /api/static/uploads/filename.jpg
-        # We need the full absolute URL using the configured BACKEND_URL
-        base_domain = settings.BACKEND_URL
+        # We need the full absolute URL: https://backend.cofau.com/api/static/uploads/filename.jpg
+        # Assuming your base domain is configured elsewhere, but for simplicity, we'll use a placeholder structure
+        
+        # NOTE: You MUST replace 'https://backend.cofau.com' with your actual domain/URL prefix
+        base_domain = "https://backend.cofau.com" 
         media_url = post_doc.get("media_url")
         full_image_url = f"{base_domain}{media_url}" if media_url else None
         
@@ -185,7 +188,7 @@ async def share_post_preview(request: Request, post_id: str):
     # Render the HTML template (og_preview.html)
     return templates.TemplateResponse(
         "og_preview.html", 
-        {"request": request, "post": post, "post_id": post_id, "base_url": settings.BACKEND_URL}
+        {"request": request, "post": post, "post_id": post_id}
     )
 
 # ======================================================
@@ -245,9 +248,34 @@ async def create_post(
     unique_id = str(ObjectId())
     filename = f"{unique_id}_{file.filename}"
     file_path = os.path.join(settings.UPLOAD_DIR, filename)
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    
+    # Ensure the upload directory exists
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    
+    # Save the file
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Verify file was saved
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=500, detail="Failed to save file")
+        
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            os.remove(file_path)
+            raise HTTPException(status_code=500, detail="File was saved but is empty")
+        
+        print(f"✅ File saved successfully: {file_path} (size: {file_size} bytes)")
+    except Exception as e:
+        print(f"❌ Error saving file: {str(e)}")
+        # Clean up if file was partially created
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
 
     # Detect media type
     media_type = "video" if file_ext in ["mp4", "mov"] else "image"
@@ -316,14 +344,19 @@ async def create_post(
     # FIX MEDIA PATH - Calculate relative path from static directory
     # file_path is absolute: /root/cofau/backend/static/uploads/filename.jpg
     # We need: uploads/filename.jpg for URL: /api/static/uploads/filename.jpg
-    if os.path.isabs(file_path):
-        # Get relative path from STATIC_DIR
-        relative_path = os.path.relpath(file_path, STATIC_DIR)
-    else:
-        # Fallback for relative paths
-        relative_path = file_path.replace(settings.UPLOAD_DIR + os.sep, "").replace(settings.UPLOAD_DIR + "/", "")
+    # IMPORTANT: Always use consistent format: /api/static/uploads/filename to match existing posts
     
-    media_url = f"/api/static/{relative_path}"
+    # Extract just the filename from the file_path
+    filename = os.path.basename(file_path)
+    
+    # Always use the consistent format: /api/static/uploads/filename
+    # This ensures backward compatibility with existing posts
+    media_url = f"/api/static/uploads/{filename}"
+    
+    # Debug logging
+    print(f"📁 File saved: {file_path}")
+    print(f"📁 Filename: {filename}")
+    print(f"📁 Media URL: {media_url}")
 
     # ======================================================
     # QUALITY SCORING - Analyze media quality for leaderboard
@@ -333,8 +366,9 @@ async def create_post(
         from utils.sightengine_quality import analyze_media_quality
         
         # Build full URL for Sightengine API
-        # Use the configured BACKEND_URL from settings
-        full_media_url = f"{settings.BACKEND_URL}{media_url}"
+        # Assuming backend is accessible at settings.BACKEND_URL or construct it
+        backend_url = os.getenv("BACKEND_URL", "https://backend.cofau.com")
+        full_media_url = f"{backend_url}{media_url}"
         
         # Analyze quality asynchronously
         quality_score = await analyze_media_quality(full_media_url, media_type)
@@ -358,7 +392,7 @@ async def create_post(
         "quality_score": quality_score,  # Add quality score for leaderboard
         "engagement_score": 0.0,  # Will be calculated dynamically
         "combined_score": quality_score * 0.6,  # Initial combined score (60% quality, 0% engagement)
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow(),  # Store as datetime object for proper MongoDB sorting (newest first)
     }
 
     result = await db.posts.insert_one(post_doc)
@@ -409,9 +443,13 @@ async def create_post(
 # FEED
 # ======================================================
 @app.get("/api/feed")
-async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
+async def get_feed(skip: int = 0, limit: int = None, current_user: dict = Depends(get_current_user)):
     db = get_database()
-    posts = await db.posts.find().sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # If no limit specified, return all posts (no limit)
+    if limit is None:
+        posts = await db.posts.find().sort("created_at", -1).skip(skip).to_list(None)
+    else:
+        posts = await db.posts.find().sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
 
     result = []
     for post in posts:
@@ -460,7 +498,8 @@ async def get_feed(skip: int = 0, limit: int = 20, current_user: dict = Depends(
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "is_following": is_following,
-            "created_at": post["created_at"],
+            # Convert created_at to ISO string for frontend (handles both datetime objects and existing ISO strings)
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
 
     return result
@@ -1666,8 +1705,8 @@ async def get_user_stats(user_id: str):
     }
 
 @app.get("/api/users/{user_id}/posts")
-async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, limit: int = 20):
-    """Get user's posts, optionally filtered by media type"""
+async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, limit: int = None):
+    """Get user's posts, optionally filtered by media type. Returns all posts if limit is not specified."""
     db = get_database()
     
     # Build query
@@ -1677,8 +1716,11 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
     elif media_type == "video":
         query["media_type"] = "video"
     
-    # Get posts
-    posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Get posts - return all if limit is None
+    if limit is None:
+        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).to_list(None)
+    else:
+        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
     result = []
     for post in posts:
@@ -1705,19 +1747,25 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
     return result
 
 @app.get("/api/users/{user_id}/collaborations")
-async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = 20):
-    """Get user's collaborations (posts where user is tagged or mentioned)"""
+async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = None):
+    """Get user's collaborations (posts where user is tagged or mentioned). Returns all if limit is not specified."""
     db = get_database()
     
     # For now, return posts where the user has commented
     comments = await db.comments.find({"user_id": user_id}).to_list(None)
     post_ids = list(set([comment["post_id"] for comment in comments]))
     
-    # Get posts
-    posts = await db.posts.find({
-        "_id": {"$in": [ObjectId(pid) for pid in post_ids if ObjectId.is_valid(pid)]},
-        "user_id": {"$ne": user_id}  # Exclude own posts
-    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Get posts - return all if limit is None
+    if limit is None:
+        posts = await db.posts.find({
+            "_id": {"$in": [ObjectId(pid) for pid in post_ids if ObjectId.is_valid(pid)]},
+            "user_id": {"$ne": user_id}  # Exclude own posts
+        }).sort("created_at", -1).skip(skip).to_list(None)
+    else:
+        posts = await db.posts.find({
+            "_id": {"$in": [ObjectId(pid) for pid in post_ids if ObjectId.is_valid(pid)]},
+            "user_id": {"$ne": user_id}  # Exclude own posts
+        }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
     result = []
     for post in posts:
@@ -1788,7 +1836,7 @@ async def share_preview(post_id: str):
     if not post:
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
 
-    BASE_URL = settings.BACKEND_URL
+    BASE_URL = "https://backend.cofau.com"
 
     title = post.get("review_text", "Cofau Post")
     rating = post.get("rating", 0)

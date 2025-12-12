@@ -17,7 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import LevelBadge from '../components/LevelBadge';
 import UserAvatar from '../components/UserAvatar';
@@ -90,6 +90,16 @@ export default function ProfileScreen() {
     fetchProfileData();
   }, [token, userId]); // Re-fetch when userId changes
 
+  // Refresh profile data when screen comes into focus (e.g., after creating a post)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (token && userData) {
+        console.log('🔄 Profile screen focused - refreshing posts');
+        fetchUserPosts();
+      }
+    }, [token, userData, activeTab])
+  );
+
   useEffect(() => {
     // Fetch follow status when viewing another user's profile
     if (!isOwnProfile && userData?.id && token) {
@@ -129,6 +139,8 @@ export default function ProfileScreen() {
           headers: { Authorization: `Bearer ${token}` },
         });
 
+
+     
         if (userId === (meResponse.data.user?.id || meResponse.data.id)) {
           user = meResponse.data.user || meResponse.data;
           setIsOwnProfile(true);
@@ -146,6 +158,8 @@ export default function ProfileScreen() {
             const feedResponse = await axios.get(`${API_URL}/feed`, {
               headers: { Authorization: `Bearer ${token}` },
             });
+
+            console.log('feedResponse', feedResponse.data);
 
             const userPost = feedResponse.data.find(
               (post: any) => post.user_id === userId
@@ -206,13 +220,15 @@ export default function ProfileScreen() {
     if (!userData) return;
 
     try {
-      let endpoint = `${API_URL}/users/${userData.id}/posts?limit=50`;
+      // No limit - fetch ALL posts
+      let endpoint = `${API_URL}/users/${userData.id}/posts`;
 
       if (activeTab === 'posts') {
         // Show all posts (both photo and video)
         // No filter needed
       } else if (activeTab === 'contributions') {
-        endpoint = `${API_URL}/users/${userData.id}/collaborations?limit=50`;
+        // No limit - fetch ALL collaborations
+        endpoint = `${API_URL}/users/${userData.id}/collaborations`;
       } else if (activeTab === 'people') {
         // For people tab, fetch followers or following
         await fetchPeople();
@@ -230,7 +246,14 @@ export default function ProfileScreen() {
         full_image_url: fixUrl(post.media_url || post.full_image_url),
       }));
 
-      setUserPosts(postsWithFullUrls);
+      // ✅ Sort by created_at descending (newest first)
+      const sorted = postsWithFullUrls.sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA; // Descending order (newest first)
+      });
+
+      setUserPosts(sorted);
     } catch (err) {
       console.error('❌ Error fetching user posts:', err);
       setUserPosts([]);
@@ -757,7 +780,7 @@ export default function ProfileScreen() {
     );
   }
 
-  const badge = getBadgeInfo();
+  // const badge = getBadgeInfo();
 
   return (
     <View style={styles.container}>
@@ -807,35 +830,28 @@ export default function ProfileScreen() {
 
         {/* Profile Identity Section */}
         <View style={styles.identitySection}>
-          <View style={styles.profilePictureContainer}>
-            {/* @ts-ignore */}
-            <ProfileBadge
-              profilePicture={userData.profile_picture}
-              username={userData.full_name || userData.username}
-              level={userData.level || 1}
-              dpSize={110}
-            />
-            {isOwnProfile && (
-              <TouchableOpacity
-                style={styles.cameraIcon}
-                onPress={handleProfilePicturePress}
-                disabled={uploadingImage}
-              >
-                {uploadingImage ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="camera" size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {badge && (
-            <View style={styles.badgeContainer}>
-              <Text style={styles.badgeIcon}>{badge.icon}</Text>
-              <Text style={styles.badgeLabel}>{badge.name}</Text>
-            </View>
-          )}
+          {/* @ts-ignore */}
+          <ProfileBadge
+            profilePicture={userData.profile_picture}
+            username={userData.full_name || userData.username}
+            level={userData.level || 1}
+            dpSize={110}
+            cameraIcon={
+              isOwnProfile ? (
+                <TouchableOpacity
+                  style={styles.cameraIcon}
+                  onPress={handleProfilePicturePress}
+                  disabled={uploadingImage}
+                >
+                  {uploadingImage ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="camera" size={20} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              ) : null
+            }
+          />
         </View>
 
         {/* Stats Section */}
@@ -1423,10 +1439,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 20,
-  },
-  profilePictureContainer: {
-    position: 'relative',
-    marginRight: 20,
   },
   cameraIcon: {
     position: 'absolute',

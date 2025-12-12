@@ -61,8 +61,8 @@ export default function FeedScreen() {
       loadUnreadCount();
       // Refresh user data when screen comes into focus to show updated points
       refreshUser();
-      // Refresh feed when returning to screen (e.g., from comments) to update counts
-      fetchFeed();
+      // Force refresh feed when returning to screen to show new posts
+      fetchFeed(true);
     }, [token])
   );
 
@@ -80,13 +80,18 @@ export default function FeedScreen() {
   /* -----------------------------------------------------
       ✅ FETCH FEED & NORMALIZE DP / MEDIA
   ----------------------------------------------------- */
-  const fetchFeed = async () => {
+  const fetchFeed = async (forceRefresh = false) => {
     try {
       setError(null);
       setLoading(true);
 
-      const response = await axios.get(`${BACKEND}/api/feed`);
+      // Add cache-busting parameter to force fresh data
+      // No limit parameter - fetch ALL posts
+      const timestamp = forceRefresh ? `?_t=${Date.now()}` : '';
+      const response = await axios.get(`${BACKEND}/api/feed${timestamp}`);
       const data = response.data;
+
+      console.log(`📥 Feed fetched: ${data.length} posts (forceRefresh: ${forceRefresh})`);
 
       const transformed = data.map((post: any) => ({
         id: post.id,
@@ -123,7 +128,15 @@ export default function FeedScreen() {
         created_at: post.created_at,
       }));
 
-      setFeedPosts(transformed);
+      // ✅ Sort by created_at descending (newest first)
+      const sorted = transformed.sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA; // Descending order (newest first)
+      });
+
+      setFeedPosts(sorted);
+      console.log(`✅ Feed updated with ${transformed.length} posts`);
     } catch (err: any) {
       // Only show error if it's not a 401 (expected when not authenticated)
       if (err?.response?.status !== 401) {
@@ -141,7 +154,7 @@ export default function FeedScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchFeed();
+    fetchFeed(true);
   };
 
   const getRatingLabel = (rating: number) => {
@@ -169,26 +182,6 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cofau</Text>
-
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={() => router.push("/notifications")}
-        >
-          <Ionicons name="notifications-outline" size={26} color="#fff" />
-
-          {unreadCount > 0 && (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         refreshControl={
@@ -196,44 +189,80 @@ export default function FeedScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* TOP HEADER WITH GRADIENT */}
+        <LinearGradient
+          colors={['#E94A37', '#F2CF68', '#1B7C82']}
+          locations={[0, 0.35, 0.9]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.topHeader}
+        >
+          <View style={styles.headerTopRow}>
+            <Text style={styles.cofauTitle}>Cofau</Text>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => router.push("/notifications")}
+            >
+              <Ionicons name="notifications-outline" size={26} color="#fff" />
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
-        {/* USER HEADER */}
+        {/* USER PROFILE SECTION WITH WHITE BACKGROUND */}
         {user && (
-          <TouchableOpacity 
-            style={styles.userCard}
-            onPress={() => router.push("/add-post")}
-            activeOpacity={0.7}
-          >
-            <View style={styles.userRow}>
-              <View style={styles.avatarContainer}>
+          <View style={styles.profileSectionContainer}>
+            <View style={styles.profileSection}>
+              {/* Large Profile Picture */}
+              <View style={styles.largeAvatarContainer}>
                 <UserAvatar
                   profilePicture={user.profile_picture}
                   username={user.full_name || user.username}
-                  size={50}
+                  size={70}
                   level={user.level}
                   showLevelBadge={false}
                   style={{}}
                 />
                 <TouchableOpacity
-                  style={styles.cameraIcon}
+                  style={styles.addButton}
                   onPress={() => router.push("/add-post")}
                 >
-                  <Ionicons name="camera" size={18} color="#fff" />
+                  <Ionicons name="add" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{user.full_name}</Text>
+              {/* Level Progress Container */}
+              <View style={styles.levelProgressContainer}>
                 <Text style={styles.levelText}>Level {user.level}</Text>
-
-                <RatingBar
-                  current={user.currentPoints || 0}
-                  total={user.requiredPoints || 1250}
-                  label=""
-                />
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBackground} />
+                  <LinearGradient
+                    colors={['#FF6B35', '#F7B801']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${((user.currentPoints || 0) / (user.requiredPoints || 1250)) * 100}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={styles.namePointsRow}>
+                  <Text style={styles.userNameText}>{user.full_name || user.username}</Text>
+                  <Text style={styles.pointsText}>
+                    {user.currentPoints || 0}/{user.requiredPoints || 1250}
+                  </Text>
+                </View>
               </View>
             </View>
-          </TouchableOpacity>
+          </View>
         )}
 
         {/* STORIES */}
@@ -253,7 +282,7 @@ export default function FeedScreen() {
             <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
             <Text style={styles.errorText}>{error}</Text>
 
-            <TouchableOpacity style={styles.retryBtn} onPress={fetchFeed}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => fetchFeed(true)}>
               <Text style={styles.retryBtnText}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -308,18 +337,42 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
 
-  header: {
-    backgroundColor: "#3B5998",
-    paddingVertical: 18,
+  scrollView: { flex: 1 },
+
+  topHeader: {
+    paddingTop: 50,
+    paddingBottom: 16,
     paddingHorizontal: 16,
+  },
+
+  headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
-  headerTitle: { color: "#fff", fontWeight: "bold", fontSize: 20 },
+  cofauTitle: {
+    color: "#fff",
+    fontSize: 32,
+    fontWeight: "bold",
+    fontFamily: "serif",
+    letterSpacing: 1,
+  },
 
-  notificationButton: { padding: 8, position: "relative" },
+  profileSectionContainer: {
+    backgroundColor: "#fff",
+    paddingTop: 20,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: "#E5E5E5",
+    borderTopWidth: 0,
+  },
+
+  notificationButton: {
+    padding: 8,
+    position: "relative",
+  },
 
   notificationBadge: {
     position: "absolute",
@@ -333,55 +386,102 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  notificationBadgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  notificationBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
 
-  scrollView: { flex: 1 },
-
-  userCard: {
+  profileSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
     backgroundColor: "#fff",
-    marginHorizontal: 0,
-    marginTop: 0,
-    marginBottom: 0,
-    borderRadius: 0,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
   },
 
-  userRow: { flexDirection: "row", alignItems: "center" },
-
-  avatarContainer: {
+  largeAvatarContainer: {
     position: "relative",
+    marginRight: 20,
   },
 
-  cameraIcon: {
+  addButton: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: "#4dd0e1",
-    borderRadius: 12,
-    width: 24,
-    height: 24,
+    backgroundColor: "#000",
+    borderRadius: 20,
+    width: 32,
+    height: 32,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#fff",
   },
 
-  userInfo: { marginLeft: 16, flex: 1 },
-
-  uploadButton: {
-    padding: 8,
+  levelProgressContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
   },
 
-  userName: { fontSize: 18, fontWeight: "bold", color: "#333" },
+  namePointsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+
+  userNameText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
 
   levelText: {
-    marginTop: 4,
     fontSize: 14,
     fontWeight: "600",
     color: "#333",
+    marginBottom: 8,
   },
+
+  progressBarContainer: {
+    width: "100%",
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    position: "relative",
+    marginBottom: 4,
+  },
+
+  progressBarBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#E5E5E5",
+    borderRadius: 4,
+  },
+
+  progressBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    bottom: 0,
+    height: "100%",
+    borderRadius: 4,
+    zIndex: 1,
+  },
+
+  pointsText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+  },
+
 
   loadingContainer: { padding: 40, alignItems: "center" },
   loadingText: { marginTop: 12, color: "#666" },
