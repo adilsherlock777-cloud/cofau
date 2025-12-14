@@ -12,15 +12,11 @@ import {
   Linking,
   FlatList,
   Dimensions,
-  Modal,
-  Share,
   ScrollView,
-  Animated,
-  PanResponder,
   Platform,
-  ActionSheetIOS,
+  SafeAreaView,
 } from "react-native";
-import { Ionicons, Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
@@ -28,7 +24,9 @@ import SharePreviewModal from "../../components/SharePreviewModal";
 import axios from "axios";
 import { Image } from "expo-image";
 import { Video, ResizeMode } from "expo-av";
-import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import MaskedView from "@react-native-masked-view/masked-view";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
 
 const BACKEND =
@@ -37,29 +35,58 @@ const API_URL = `${BACKEND}/api`;
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 /* ---------------------------------------------------------
-   🔥 UNIVERSAL URL NORMALIZER (FINAL VERSION)
+   🔥 UNIVERSAL URL NORMALIZER
 ----------------------------------------------------------*/
 const normalizeUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
-
   if (url.startsWith("http")) return url;
-
   let cleaned = url.trim();
-
-  // remove duplicate slashes
   cleaned = cleaned.replace(/([^:]\/)\/+/g, "$1");
-
-  // ensure leading slash
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
-
-  const finalUrl = `${BACKEND}${cleaned}`;
-  return finalUrl;
+  return `${BACKEND}${cleaned}`;
 };
 
 /* ---------------------------------------------------------
-   POST ITEM COMPONENT (Instagram-style full screen)
+   🔥 GRADIENT ICON COMPONENTS (Cofau Theme)
 ----------------------------------------------------------*/
-function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetRef }: any) {
+const GradientHeart = ({ size = 28 }) => (
+  <MaskedView
+    maskElement={
+      <View style={{ backgroundColor: 'transparent' }}>
+        <Ionicons name="heart" size={size} color="#000" />
+      </View>
+    }
+  >
+    <LinearGradient
+      colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size }}
+    />
+  </MaskedView>
+);
+
+const GradientBookmark = ({ size = 26 }) => (
+  <MaskedView
+    maskElement={
+      <View style={{ backgroundColor: 'transparent' }}>
+        <Ionicons name="bookmark" size={size} color="#000" />
+      </View>
+    }
+  >
+    <LinearGradient
+      colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size }}
+    />
+  </MaskedView>
+);
+
+/* ---------------------------------------------------------
+   POST ITEM COMPONENT
+----------------------------------------------------------*/
+function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
@@ -69,25 +96,15 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showBottomSheet, setShowBottomSheet] = useState(false);
-  const [showMenuModal, setShowMenuModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState("");
-  const [submittingReport, setSubmittingReport] = useState(false);
-  const [showDetails, setShowDetails] = useState(false); // Tap for Details state
-  const [isMuted, setIsMuted] = useState(true); // Video mute state
+  const [showDetails, setShowDetails] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef(null);
-  
-  // Bottom sheet animation
-  const bottomSheetY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const panY = useRef(0);
 
   const isVideo = (post.media_type || "").toLowerCase() === "video";
   const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url);
   const imageUrl = normalizeMediaUrl(post.image_url || post.media_url);
   const profilePic = normalizeProfilePicture(post.user_profile_picture);
 
-  // Ensure we have a valid URL for display (fallback to normalizeUrl if needed)
   const getDisplayUrl = () => {
     if (isVideo) {
       return mediaUrl || normalizeUrl(post.media_url || post.image_url);
@@ -97,138 +114,8 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
 
   const displayUrl = getDisplayUrl();
 
-  // Pan responder for swipe up gesture on the media
-  // Only responds to upward swipes from the very bottom (bottom 15% of screen)
-  // This allows FlatList to handle vertical scrolling for changing posts
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to upward swipes from very bottom area (bottom 15%)
-        // And only if bottom sheet is not already open
-        const isFromBottom = gestureState.y0 > SCREEN_HEIGHT * 0.85;
-        const isUpwardSwipe = gestureState.dy < -10;
-        const isVerticalSwipe = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-        return !showBottomSheet && isFromBottom && isUpwardSwipe && isVerticalSwipe;
-      },
-      onPanResponderTerminationRequest: () => true,
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy < 0 && !showBottomSheet) {
-          // Swiping up
-          const newY = Math.max(0, SCREEN_HEIGHT + gestureState.dy);
-          bottomSheetY.setValue(newY);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy < -100 && !showBottomSheet) {
-          // Swiped up significantly, show bottom sheet
-          openBottomSheet();
-        } else {
-          // Snap back
-          closeBottomSheet();
-        }
-      },
-    })
-  ).current;
-
-  // Pan responder for bottom sheet to close it
-  // Handles vertical swipes on the bottom sheet
-  const bottomSheetPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt, gestureState) => {
-        // Allow starting from anywhere on the bottom sheet
-        return showBottomSheet;
-      },
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Respond to vertical swipes
-        const isVerticalSwipe = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-        const hasMovement = Math.abs(gestureState.dy) > 5;
-        return showBottomSheet && isVerticalSwipe && hasMovement;
-      },
-      onPanResponderGrant: () => {
-        // Store initial position
-        panY.current = 0;
-      },
-      onPanResponderTerminationRequest: () => true,
-      onPanResponderMove: (_, gestureState) => {
-        if (showBottomSheet) {
-          // Allow both up and down movement
-          const newY = Math.max(0, gestureState.dy);
-          panY.current = gestureState.dy;
-          bottomSheetY.setValue(newY);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 150 && showBottomSheet) {
-          // Swiped down significantly, close bottom sheet
-          closeBottomSheet();
-        } else if (gestureState.dy < -50 && showBottomSheet) {
-          // Swiped up, snap back to fully open
-          Animated.spring(bottomSheetY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 50,
-            friction: 8,
-          }).start();
-        } else if (showBottomSheet) {
-          // Snap back to open position
-          Animated.spring(bottomSheetY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 50,
-            friction: 8,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
-  const openBottomSheet = () => {
-    setShowBottomSheet(true);
-    Animated.spring(bottomSheetY, {
-      toValue: 0,
-      tension: 50,
-      friction: 8,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeBottomSheet = useCallback(() => {
-    Animated.timing(bottomSheetY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowBottomSheet(false);
-      panY.current = 0;
-    });
-  }, []);
-
-  // Register close function with parent
-  useEffect(() => {
-    if (onCloseBottomSheetRef && post.id === currentPostId) {
-      onCloseBottomSheetRef(closeBottomSheet);
-    }
-    return () => {
-      if (onCloseBottomSheetRef) {
-        onCloseBottomSheetRef(null);
-      }
-    };
-  }, [onCloseBottomSheetRef, post.id, currentPostId, closeBottomSheet]);
-
-  // Debug URLs for share modal
-  useEffect(() => {
-    if (showShareModal) {
-      console.log("🔍 Share Modal Debug:");
-      console.log("  Post ID:", post.id);
-      console.log("  Is Video:", isVideo);
-      console.log("  Original media_url:", post.media_url);
-      console.log("  Original image_url:", post.image_url);
-      console.log("  Normalized mediaUrl:", mediaUrl);
-      console.log("  Normalized imageUrl:", imageUrl);
-      console.log("  Display URL:", displayUrl);
-    }
-  }, [showShareModal, post.id, isVideo, mediaUrl, imageUrl, displayUrl]);
+  // Calculate bottom nav height based on safe area
+  const BOTTOM_NAV_HEIGHT = 60 + bottomInset;
 
   useEffect(() => {
     if (showComments) {
@@ -236,17 +123,8 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
     }
   }, [showComments, post.id]);
 
-  // Close bottom sheet when post changes (user scrolled to different post)
-  useEffect(() => {
-    if (showBottomSheet) {
-      closeBottomSheet();
-    }
-  }, [post.id]);
-
-  // Ensure video plays when component mounts or post changes
   useEffect(() => {
     if (isVideo && videoRef.current && post.id === currentPostId) {
-      // Small delay to ensure video is ready
       const timer = setTimeout(() => {
         if (videoRef.current) {
           (videoRef.current as any).playAsync?.().catch((error: any) => {
@@ -274,21 +152,17 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
   const handleLikeToggle = async () => {
     const prevLiked = isLiked;
     const prevCount = likesCount;
-
     setIsLiked(!prevLiked);
     setLikesCount(prevLiked ? prevCount - 1 : prevCount + 1);
-
     try {
       if (prevLiked) {
         await axios.delete(`${API_URL}/posts/${post.id}/like`, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        await axios.post(
-          `${API_URL}/posts/${post.id}/like`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.post(`${API_URL}/posts/${post.id}/like`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
     } catch (e) {
       setIsLiked(prevLiked);
@@ -298,20 +172,16 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
 
   const handleSaveToggle = async () => {
     const prevSaved = isSaved;
-
     setIsSaved(!prevSaved);
-
     try {
       if (prevSaved) {
         await axios.delete(`${API_URL}/posts/${post.id}/save`, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        await axios.post(
-          `${API_URL}/posts/${post.id}/save`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await axios.post(`${API_URL}/posts/${post.id}/save`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
     } catch (e) {
       setIsSaved(prevSaved);
@@ -320,20 +190,16 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
 
   const handleSubmitComment = async () => {
     if (!commentText.trim()) return;
-
     setSubmittingComment(true);
-
     try {
       const formData = new FormData();
       formData.append("comment_text", commentText.trim());
-
       await axios.post(`${API_URL}/posts/${post.id}/comment`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
         },
       });
-
       setCommentText("");
       fetchComments();
     } catch (e) {
@@ -348,11 +214,9 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-
     const mins = Math.floor(diff / 60000);
     const hrs = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-
     if (mins < 1) return "Just now";
     if (mins < 60) return `${mins}m ago`;
     if (hrs < 24) return `${hrs}h ago`;
@@ -360,36 +224,10 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
     return date.toLocaleDateString();
   };
 
-  const handleSharePost = async () => {
-    try {
-      const postUrl = `${BACKEND}/post/${post.id}`;
-      const shareText = `${post.username} shared a post on Cofau!\n\n${post.review_text || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${postUrl}`;
-
-      const shareOptions = {
-        message: shareText,
-        url: postUrl,
-        title: `Check out ${post.username}'s post on Cofau`,
-      };
-
-      const result = await Share.share(shareOptions);
-
-      if (result.action === Share.sharedAction) {
-        setShowShareModal(false);
-        console.log("Post shared successfully");
-      } else if (result.action === Share.dismissedAction) {
-        console.log("Share dismissed");
-      }
-    } catch (error) {
-      console.error("❌ Error sharing post:", error);
-      Alert.alert("Error", "Unable to share post. Please try again.");
-    }
-  };
-
   return (
     <View style={styles.postItem}>
-      {/* AUTO-HEIGHT MEDIA CONTAINER - Responsive */}
-      <View style={styles.responsiveMediaContainer} {...panResponder.panHandlers}>
-        {/* Responsive Media */}
+      {/* MEDIA CONTAINER */}
+      <View style={styles.responsiveMediaContainer}>
         <TouchableOpacity 
           style={styles.mediaWrapper}
           activeOpacity={1}
@@ -410,23 +248,7 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                 isLooping
                 isMuted={isMuted}
                 useNativeControls={false}
-                onLoad={() => {
-                  console.log("✅ Video loaded in post details");
-                }}
-                onError={(error) => {
-                  console.error("❌ Video playback error:", error);
-                  console.error("❌ Video URL:", mediaUrl || displayUrl);
-                }}
-                onPlaybackStatusUpdate={(status) => {
-                  if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
-                    // Video finished, restart it
-                    if (videoRef.current) {
-                      (videoRef.current as any).replayAsync?.();
-                    }
-                  }
-                }}
               />
-              {/* Mute/Unmute Indicator */}
               <View style={styles.muteIndicatorReels}>
                 <Ionicons 
                   name={isMuted ? "volume-mute" : "volume-high"} 
@@ -444,9 +266,16 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
           )}
         </TouchableOpacity>
 
-        {/* User Info at Top - Always Visible */}
+        {/* User Info at Top with Back Button */}
         {!showDetails && (
           <View style={styles.topUserInfoBar}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            
             <TouchableOpacity
               style={styles.topUserRow}
               onPress={() => router.push(`/profile?userId=${post.user_id}`)}
@@ -455,7 +284,7 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                 profilePicture={profilePic}
                 username={post.username}
                 level={post.user_level}
-                size={36}
+                size={44}
                 showLevelBadge
                 style={{}}
               />
@@ -467,63 +296,56 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
           </View>
         )}
 
-        {/* Glass Morphism Bottom Overlay - Rating, Location, Name */}
+        {/* Glass Bottom Overlay - Evenly Distributed Items */}
         {!showDetails && (
           <TouchableOpacity 
-            style={styles.glassBottomOverlay}
+            style={[styles.glassBottomOverlay, { bottom: BOTTOM_NAV_HEIGHT + 10 }]}
             activeOpacity={0.9}
             onPress={() => setShowDetails(true)}
           >
-            {/* Glass Effect Background */}
             <View style={styles.glassBackground} />
-            
-            {/* Content Row */}
             <View style={styles.glassContentRow}>
-              {/* Rating with Icon */}
-              {post.rating && (
-                <View style={styles.glassInfoItem}>
-                  <Ionicons name="star" size={18} color="#FFD700" style={styles.glassIcon} />
-                  <Text style={styles.glassInfoText}>{post.rating}/10</Text>
-                </View>
-              )}
-
-              {/* Location with Icon */}
-              {post.location_name && (
-                <View style={styles.glassInfoItem}>
-                  <Ionicons name="location" size={18} color="#4dd0e1" style={styles.glassIcon} />
-                  <Text style={styles.glassInfoText} numberOfLines={1} ellipsizeMode="tail">
-                    {post.location_name}
-                  </Text>
-                </View>
-              )}
-
-              {/* Username */}
+              {/* Rating */}
               <View style={styles.glassInfoItem}>
-                <Ionicons name="person" size={18} color="#FF6B6B" style={styles.glassIcon} />
-                <Text style={styles.glassInfoText} numberOfLines={1} ellipsizeMode="tail">
-                  {post.username}
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.glassInfoText}>{post.rating || "N/A"}/10</Text>
+              </View>
+              
+              {/* Location */}
+              <View style={styles.glassInfoItem}>
+                <Ionicons name="location" size={16} color="#FFD700" />
+                <Text style={styles.glassInfoText} numberOfLines={1}>
+                  {post.location_name || "N/A"}
                 </Text>
               </View>
-
-              {/* Chevron Up Icon */}
-              <Ionicons name="chevron-up" size={20} color="#FFF" style={styles.glassChevron} />
+              
+              {/* Username */}
+              <View style={styles.glassInfoItem}>
+                <Ionicons name="person" size={16} color="#FFD700" />
+                <Text style={styles.glassInfoText} numberOfLines={1}>
+                  {post.username || "N/A"}
+                </Text>
+              </View>
+              
+              {/* Chevron */}
+              <View style={styles.glassChevronContainer}>
+                <Ionicons name="chevron-up" size={18} color="#FFF" />
+              </View>
             </View>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* EXPANDED DETAILS VIEW - Instagram Style */}
+      {/* EXPANDED DETAILS VIEW */}
       {showDetails && (
         <View style={styles.expandedDetailsOverlay}>
-          {/* Shrunk Video/Image with Gradient */}
+          {/* Shrunk Media */}
           <View style={styles.shrunkMediaContainer}>
             <TouchableOpacity 
               style={styles.shrunkMediaWrapper}
               activeOpacity={1}
               onPress={() => {
-                if (isVideo) {
-                  setIsMuted(!isMuted);
-                }
+                if (isVideo) setIsMuted(!isMuted);
               }}
             >
               {isVideo ? (
@@ -537,15 +359,7 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                     isLooping
                     isMuted={isMuted}
                     useNativeControls={false}
-                    onLoad={() => {
-                      console.log("✅ Video loaded in expanded details");
-                    }}
-                    onError={(error) => {
-                      console.error("❌ Video playback error in expanded:", error);
-                      console.error("❌ Video URL:", mediaUrl || displayUrl);
-                    }}
                   />
-                  {/* Mute indicator for shrunk video */}
                   <View style={styles.muteIndicatorShrunk}>
                     <Ionicons 
                       name={isMuted ? "volume-mute" : "volume-high"} 
@@ -563,7 +377,7 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
               )}
             </TouchableOpacity>
 
-            {/* Close Details Button - Modern Style */}
+            {/* Close Button */}
             <TouchableOpacity 
               style={styles.modernCloseButton}
               onPress={() => setShowDetails(false)}
@@ -574,39 +388,46 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
 
           {/* Details Content */}
           <ScrollView style={styles.detailsContent} showsVerticalScrollIndicator={false}>
-            {/* User Info */}
-            <TouchableOpacity
-              style={styles.detailsUserRow}
-              onPress={() => {
-                setShowDetails(false);
-                router.push(`/profile?userId=${post.user_id}`);
-              }}
-            >
-              <UserAvatar
-                profilePicture={profilePic}
-                username={post.username}
-                level={post.user_level}
-                size={50}
-                showLevelBadge
-                style={{}}
-              />
-              <View style={styles.detailsUserInfo}>
-                <Text style={styles.detailsUsername}>{post.username}</Text>
-                <Text style={styles.detailsTimestamp}>{formatTime(post.created_at)}</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Action Buttons */}
-            <View style={styles.detailsActions}>
-              <TouchableOpacity 
-                style={styles.detailsActionBtn}
-                onPress={handleLikeToggle}
+            {/* User Info Row with Dropdown Button */}
+            <View style={styles.detailsUserRowContainer}>
+              <TouchableOpacity
+                style={styles.detailsUserRow}
+                onPress={() => {
+                  setShowDetails(false);
+                  router.push(`/profile?userId=${post.user_id}`);
+                }}
               >
-                <Ionicons
-                  name={isLiked ? "heart" : "heart-outline"}
-                  size={28}
-                  color={isLiked ? "#FF6B6B" : "#000"}
+                <UserAvatar
+                  profilePicture={profilePic}
+                  username={post.username}
+                  level={post.user_level}
+                  size={50}
+                  showLevelBadge
+                  style={{}}
                 />
+                <View style={styles.detailsUserInfo}>
+                  <Text style={styles.detailsUsername}>{post.username}</Text>
+                  <Text style={styles.detailsTimestamp}>{formatTime(post.created_at)}</Text>
+                </View>
+              </TouchableOpacity>
+              
+              {/* Dropdown/Collapse Button */}
+              <TouchableOpacity 
+                style={styles.dropdownButton}
+                onPress={() => setShowDetails(false)}
+              >
+                <Ionicons name="chevron-down" size={28} color="#999" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Action Buttons with Cofau Theme */}
+            <View style={styles.detailsActions}>
+              <TouchableOpacity style={styles.detailsActionBtn} onPress={handleLikeToggle}>
+                {isLiked ? (
+                  <GradientHeart size={28} />
+                ) : (
+                  <Ionicons name="heart-outline" size={28} color="#000" />
+                )}
                 <Text style={styles.detailsActionText}>{likesCount}</Text>
               </TouchableOpacity>
 
@@ -629,68 +450,60 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                 <Text style={styles.detailsActionText}>Share</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.detailsActionBtn}
-                onPress={handleSaveToggle}
-              >
-                <Ionicons
-                  name={isSaved ? "bookmark" : "bookmark-outline"}
-                  size={26}
-                  color={isSaved ? "#4dd0e1" : "#000"}
-                />
+              <TouchableOpacity style={styles.detailsActionBtn} onPress={handleSaveToggle}>
+                {isSaved ? (
+                  <GradientBookmark size={26} />
+                ) : (
+                  <Ionicons name="bookmark-outline" size={26} color="#000" />
+                )}
                 <Text style={styles.detailsActionText}>Save</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Clean Info Row - Rating, Location, Name */}
-            {(post.rating || post.location_name) && (
-              <View style={styles.detailsInfoRow}>
-                {post.rating && (
-                  <View style={styles.detailsInfoItem}>
-                    <Ionicons name="star" size={16} color="#FFD700" />
-                    <Text style={styles.detailsInfoValue}>{post.rating}/10</Text>
-                  </View>
-                )}
-                
-                {post.location_name && (
-                  <TouchableOpacity
-                    style={styles.detailsInfoItem}
-                    onPress={() => {
-                      if (post.map_link) {
-                        Linking.openURL(post.map_link);
-                      } else if (post.location_name) {
-                        const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
-                        Linking.openURL(searchUrl);
-                      }
-                    }}
-                  >
-                    <Ionicons name="location" size={16} color="#4dd0e1" />
-                    <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
-                      {post.location_name}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                
-                {post.location_name && (
-                  <View style={styles.detailsInfoItem}>
-                    <Ionicons name="business" size={16} color="#666" />
-                    <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
-                      {post.location_name}
-                    </Text>
-                  </View>
-                )}
+            {/* RATING Section */}
+            {post.rating && (
+              <View style={styles.detailsCard}>
+                <View style={styles.detailsCardHeader}>
+                  <Ionicons name="star" size={20} color="#FFD700" />
+                  <Text style={styles.detailsCardLabel}>RATING</Text>
+                </View>
+                <Text style={styles.detailsRatingValue}>{post.rating}/10</Text>
               </View>
             )}
 
-            {/* Review Text */}
+            {/* REVIEW Section */}
             {post.review_text && (
               <View style={styles.detailsCard}>
-                <Text style={styles.detailsCardLabel}>Reviews</Text>
-                <View style={styles.detailsReviewRow}>
-                  <Ionicons name="bulb" size={24} color="#FF9500" />
-                  <Text style={styles.detailsReviewText}>{post.review_text}</Text>
+                <View style={styles.detailsCardHeader}>
+                  <Ionicons name="create" size={20} color="#FFD700" />
+                  <Text style={styles.detailsCardLabel}>REVIEW</Text>
                 </View>
+                <Text style={styles.detailsReviewText}>{post.review_text}</Text>
               </View>
+            )}
+
+            {/* LOCATION Section */}
+            {post.location_name && (
+              <TouchableOpacity 
+                style={styles.detailsCard}
+                onPress={() => {
+                  if (post.map_link) {
+                    Linking.openURL(post.map_link);
+                  } else if (post.location_name) {
+                    const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                    Linking.openURL(searchUrl);
+                  }
+                }}
+              >
+                <View style={styles.detailsCardHeader}>
+                  <Ionicons name="location" size={20} color="#FFD700" />
+                  <Text style={styles.detailsCardLabel}>LOCATION</Text>
+                </View>
+                <View style={styles.locationRow}>
+                  <Text style={styles.detailsLocationText}>{post.location_name}</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                </View>
+              </TouchableOpacity>
             )}
 
             {/* Comments Section */}
@@ -715,15 +528,12 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                       <View style={styles.commentContent}>
                         <Text style={styles.commentUsername}>{c.username}</Text>
                         <Text style={styles.commentText}>{c.comment_text}</Text>
-                        <Text style={styles.commentTime}>
-                          {formatTime(c.created_at)}
-                        </Text>
+                        <Text style={styles.commentTime}>{formatTime(c.created_at)}</Text>
                       </View>
                     </View>
                   ))
                 )}
 
-                {/* Comment Input */}
                 <View style={styles.commentInputContainer}>
                   <TextInput
                     value={commentText}
@@ -731,12 +541,8 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
                     placeholder="Add a comment…"
                     style={styles.commentInput}
                   />
-
                   <TouchableOpacity
-                    style={[
-                      styles.sendButton,
-                      !commentText.trim() && { backgroundColor: "#ccc" },
-                    ]}
+                    style={[styles.sendButton, !commentText.trim() && { backgroundColor: "#ccc" }]}
                     disabled={!commentText.trim() || submittingComment}
                     onPress={handleSubmitComment}
                   >
@@ -750,237 +556,44 @@ function PostItem({ post, onPostPress, currentPostId, token, onCloseBottomSheetR
               </View>
             )}
 
-            <View style={{ height: 60 }} />
+            <View style={{ height: 100 }} />
           </ScrollView>
         </View>
       )}
 
-      {/* BOTTOM SHEET MODAL */}
-      {showBottomSheet && (
-        <View style={styles.bottomSheetOverlay} pointerEvents="box-none">
-          <View style={styles.bottomSheetBackdrop} pointerEvents="auto">
-            <TouchableOpacity 
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={closeBottomSheet}
-            />
-          </View>
-          <Animated.View
-            style={[
-              styles.bottomSheetContainer,
-              {
-                transform: [{ translateY: bottomSheetY }],
-              },
-            ]}
-            pointerEvents="box-none"
-          >
-            {/* Glass Effect Background */}
-            <BlurView
-              intensity={80}
-              tint="light"
-              style={StyleSheet.absoluteFill}
-            />
-            
-            {/* Glass Overlay for better effect */}
-            <View style={styles.bottomSheetGlassOverlay} />
-            
-            {/* Centered Handle - Draggable Area */}
-            <View 
-              style={styles.bottomSheetHandleContainer}
-              {...bottomSheetPanResponder.panHandlers}
-            >
-              <View style={styles.bottomSheetHandle} />
+      {/* Bottom Navigation Bar */}
+      {!showDetails && (
+        <View style={[styles.bottomNavBar, { paddingBottom: bottomInset || 10 }]}>
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}>
+            <Ionicons name="home-outline" size={24} color="#fff" />
+            <Text style={styles.navLabelWhite}>Home</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}>
+            <Ionicons name="compass-outline" size={24} color="#fff" />
+            <Text style={styles.navLabelWhite}>Explore</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.centerNavButton} onPress={() => router.push("/leaderboard")}>
+            <View style={styles.centerNavButtonInner}>
+              <Ionicons name="trophy" size={26} color="#333" />
             </View>
-            
-            <ScrollView
-              style={styles.bottomSheetScroll}
-              showsVerticalScrollIndicator={false}
-              bounces={true}
-              nestedScrollEnabled={true}
-            >
-              {/* User Info */}
-              <TouchableOpacity
-                style={styles.bottomSheetUserRow}
-                onPress={() => {
-                  closeBottomSheet();
-                  router.push(`/profile?userId=${post.user_id}`);
-                }}
-              >
-                <UserAvatar
-                  profilePicture={profilePic}
-                  username={post.username}
-                  level={post.user_level}
-                  size={50}
-                  showLevelBadge
-                  style={{}}
-                />
-                <View style={styles.bottomSheetUserInfo}>
-                  <Text style={styles.bottomSheetUsername}>{post.username}</Text>
-                  <Text style={styles.bottomSheetTimestamp}>{formatTime(post.created_at)}</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Action Buttons */}
-              <View style={styles.bottomSheetActions}>
-                <TouchableOpacity 
-                  style={styles.bottomSheetActionBtn}
-                  onPress={handleLikeToggle}
-                >
-                  <Ionicons
-                    name={isLiked ? "heart" : "heart-outline"}
-                    size={28}
-                    color={isLiked ? "#FF6B6B" : "#000"}
-                  />
-                  <Text style={styles.bottomSheetActionText}>{likesCount}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.bottomSheetActionBtn}
-                  onPress={() => setShowComments(!showComments)}
-                >
-                  <Ionicons name="chatbubble-outline" size={26} color="#000" />
-                  <Text style={styles.bottomSheetActionText}>{post.comments_count || comments.length}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.bottomSheetActionBtn}
-                  onPress={() => {
-                    closeBottomSheet();
-                    setShowShareModal(true);
-                  }}
-                >
-                  <Ionicons name="share-outline" size={26} color="#000" />
-                  <Text style={styles.bottomSheetActionText}>Share</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.bottomSheetActionBtn}
-                  onPress={handleSaveToggle}
-                >
-                  <Ionicons
-                    name={isSaved ? "bookmark" : "bookmark-outline"}
-                    size={26}
-                    color={isSaved ? "#4dd0e1" : "#000"}
-                  />
-                  <Text style={styles.bottomSheetActionText}>Save</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Clean Info Row - Rating, Location, Name */}
-              {(post.rating || post.location_name) && (
-                <View style={styles.detailsInfoRow}>
-                  {post.rating && (
-                    <View style={styles.detailsInfoItem}>
-                      <Ionicons name="star" size={16} color="#FFD700" />
-                      <Text style={styles.detailsInfoValue}>{post.rating}/10</Text>
-                    </View>
-                  )}
-                  
-                  {post.location_name && (
-                    <TouchableOpacity
-                      style={styles.detailsInfoItem}
-                      onPress={() => {
-                        if (post.map_link) {
-                          Linking.openURL(post.map_link);
-                        } else if (post.location_name) {
-                          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
-                          Linking.openURL(searchUrl);
-                        }
-                      }}
-                    >
-                      <Ionicons name="location" size={16} color="#4dd0e1" />
-                      <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
-                        {post.location_name}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  
-                  {post.location_name && (
-                    <View style={styles.detailsInfoItem}>
-                      <Ionicons name="business" size={16} color="#666" />
-                      <Text style={styles.detailsInfoValue} numberOfLines={1} ellipsizeMode="tail">
-                        {post.location_name}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Review Text */}
-              {post.review_text && (
-                <View style={styles.bottomSheetCard}>
-                  <Text style={styles.bottomSheetCardLabel}>Reviews</Text>
-                  <View style={styles.bottomSheetReviewRow}>
-                    <Ionicons name="bulb" size={24} color="#FF9500" />
-                    <Text style={styles.bottomSheetReviewText}>{post.review_text}</Text>
-                  </View>
-                </View>
-              )}
-
-              {/* Comments Section */}
-              {showComments && (
-                <View style={styles.bottomSheetCommentsSection}>
-                  <Text style={styles.bottomSheetCommentsTitle}>
-                    Comments ({comments.length})
-                  </Text>
-
-                  {comments.length === 0 ? (
-                    <Text style={styles.noComments}>No comments yet</Text>
-                  ) : (
-                    comments.map((c: any) => (
-                      <View key={c.id} style={styles.commentItem}>
-                        <UserAvatar
-                          profilePicture={c.profile_pic}
-                          username={c.username}
-                          size={36}
-                          level={c.level || 1}
-                          style={{}}
-                        />
-                        <View style={styles.commentContent}>
-                          <Text style={styles.commentUsername}>{c.username}</Text>
-                          <Text style={styles.commentText}>{c.comment_text}</Text>
-                          <Text style={styles.commentTime}>
-                            {formatTime(c.created_at)}
-                          </Text>
-                        </View>
-                      </View>
-                    ))
-                  )}
-
-                  {/* Comment Input */}
-                  <View style={styles.commentInputContainer}>
-                    <TextInput
-                      value={commentText}
-                      onChangeText={setCommentText}
-                      placeholder="Add a comment…"
-                      style={styles.commentInput}
-                    />
-
-                    <TouchableOpacity
-                      style={[
-                        styles.sendButton,
-                        !commentText.trim() && { backgroundColor: "#ccc" },
-                      ]}
-                      disabled={!commentText.trim() || submittingComment}
-                      onPress={handleSubmitComment}
-                    >
-                      {submittingComment ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Ionicons name="send" size={20} color="#fff" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              <View style={{ height: 60 }} />
-            </ScrollView>
-          </Animated.View>
+            <Text style={styles.navLabelWhite}>Leaderboard</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}>
+            <Ionicons name="restaurant-outline" size={24} color="#fff" />
+            <Text style={styles.navLabelWhite}>Happening</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}>
+            <Ionicons name="person-outline" size={24} color="#fff" />
+            <Text style={styles.navLabelWhite}>Profile</Text>
+          </TouchableOpacity>
         </View>
       )}
 
-      {/* Share Modal - Using SharePreviewModal Component */}
+      {/* Share Modal */}
       <SharePreviewModal
         visible={showShareModal}
         onClose={() => setShowShareModal(false)}
@@ -994,6 +607,7 @@ export default function PostDetailsScreen() {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
   const { token, user } = useAuth() as any;
+  const insets = useSafeAreaInsets();
 
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1003,58 +617,35 @@ export default function PostDetailsScreen() {
   const [initialPostIndex, setInitialPostIndex] = useState(0);
   const [currentVisiblePost, setCurrentVisiblePost] = useState<any>(null);
   const flatListRef = useRef<FlatList<any> | null>(null);
-  const bottomSheetCloseRef = useRef<(() => void) | null>(null);
 
   const LIMIT = 10;
 
-  // Close bottom sheet when scrolling between posts
-  const handleScrollBegin = useCallback(() => {
-    if (bottomSheetCloseRef.current) {
-      bottomSheetCloseRef.current();
-      bottomSheetCloseRef.current = null;
-    }
-  }, []);
-
-  // Track currently visible post
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
-      const visiblePost = viewableItems[0].item;
-      setCurrentVisiblePost(visiblePost);
+      setCurrentVisiblePost(viewableItems[0].item);
     }
   }, []);
 
-  const viewabilityConfig = {
-    itemVisiblePercentThreshold: 50,
-  };
+  const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
 
-  /* ---------------------------------------------------------
-     LOAD INITIAL POST AND FEED
-  ----------------------------------------------------------*/
   useEffect(() => {
-    if (postId && token) {
-      loadInitialPost();
-    }
+    if (postId && token) loadInitialPost();
   }, [postId, token]);
 
   const loadInitialPost = async () => {
     try {
       setLoading(true);
-
-      // Fetch feed to find the post and get initial posts (no limit - fetch all)
       const res = await axios.get(`${API_URL}/feed?skip=0`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Find the current post index
       const currentIndex = res.data.findIndex((p: any) => p.id === postId);
-
       if (currentIndex === -1) {
         Alert.alert("Error", "Post not found");
         router.back();
         return;
       }
 
-      // Normalize all posts
       const normalized = res.data.map((p: any) => ({
         ...p,
         media_url: normalizeUrl(p.media_url),
@@ -1063,21 +654,14 @@ export default function PostDetailsScreen() {
         user_profile_picture: normalizeUrl(p.user_profile_picture),
       }));
 
-      // Start from the current post
       const postsFromCurrent = normalized.slice(currentIndex);
-
       setPosts(postsFromCurrent);
       setInitialPostIndex(0);
-      // Set the current visible post
       setCurrentVisiblePost(postsFromCurrent[0]);
       setSkip(postsFromCurrent.length);
 
-      // Scroll to the current post after a short delay
       setTimeout(() => {
-        flatListRef.current?.scrollToIndex({
-          index: 0,
-          animated: false,
-        });
+        flatListRef.current?.scrollToIndex({ index: 0, animated: false });
       }, 100);
     } catch (e) {
       console.log("❌ Post fetch error", e);
@@ -1087,15 +671,10 @@ export default function PostDetailsScreen() {
     }
   };
 
-  /* ---------------------------------------------------------
-     LOAD MORE POSTS (infinite scroll)
-  ----------------------------------------------------------*/
   const loadMorePosts = async () => {
     if (loadingMore || !hasMore) return;
-
     try {
       setLoadingMore(true);
-
       const res = await axios.get(`${API_URL}/feed?limit=${LIMIT}&skip=${skip}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1105,7 +684,6 @@ export default function PostDetailsScreen() {
         return;
       }
 
-      // Normalize new posts
       const normalized = res.data.map((p: any) => ({
         ...p,
         media_url: normalizeUrl(p.media_url),
@@ -1114,16 +692,12 @@ export default function PostDetailsScreen() {
         user_profile_picture: normalizeUrl(p.user_profile_picture),
       }));
 
-      // Filter out duplicates
       const existingIds = new Set(posts.map((p: any) => p.id));
       const newPosts = normalized.filter((p: any) => !existingIds.has(p.id));
 
       setPosts((prev) => [...prev, ...newPosts]);
       setSkip((prev) => prev + newPosts.length);
-
-      if (newPosts.length < LIMIT) {
-        setHasMore(false);
-      }
+      if (newPosts.length < LIMIT) setHasMore(false);
     } catch (e) {
       console.log("❌ Load more error", e);
     } finally {
@@ -1131,42 +705,18 @@ export default function PostDetailsScreen() {
     }
   };
 
-  /* ---------------------------------------------------------
-     HANDLE POST PRESS (navigate to that post)
-  ----------------------------------------------------------*/
-  const handlePostPress = useCallback(
-    (newPostId: string) => {
-      if (newPostId === postId) return; // Already viewing this post
-
-      // Always navigate to new post detail page
-      router.push(`/post-details/${newPostId}`);
-    },
-    [postId, router]
-  );
-
-  /* ---------------------------------------------------------
-     RENDER POST ITEM
-  ----------------------------------------------------------*/
   const renderPostItem = useCallback(
-    ({ item, index }: any) => {
-      return (
-        <PostItem
-          post={item}
-          onPostPress={handlePostPress}
-          currentPostId={postId}
-          token={token}
-          onCloseBottomSheetRef={(closeFn: (() => void) | null) => {
-            bottomSheetCloseRef.current = closeFn;
-          }}
-        />
-      );
-    },
-    [postId, token, handlePostPress]
+    ({ item }: any) => (
+      <PostItem
+        post={item}
+        currentPostId={postId}
+        token={token}
+        bottomInset={insets.bottom}
+      />
+    ),
+    [postId, token, insets.bottom]
   );
 
-  /* ---------------------------------------------------------
-     RENDER FOOTER (loading indicator)
-  ----------------------------------------------------------*/
   const renderFooter = () => {
     if (!loadingMore) return null;
     return (
@@ -1176,108 +726,24 @@ export default function PostDetailsScreen() {
     );
   };
 
-  /* ---------------------------------------------------------
-     REPORT POST HANDLERS
-  ----------------------------------------------------------*/
-  const submitReport = async () => {
-    if (!currentVisiblePost) return;
-    
-    try {
-      const formData = new FormData();
-      formData.append("description", "User reported this post");
-
-      await fetch(`${API_URL}/posts/${currentVisiblePost.id}/report`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      Alert.alert("Thank you", "Your report has been submitted.");
-    } catch (e) {
-      console.error("Report error:", e);
-      Alert.alert("Error", "Could not report this post. Try again.");
-    }
-  };
-
-  const handleReportMenu = () => {
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ["Report Post", "Cancel"],
-          destructiveButtonIndex: 0,
-          cancelButtonIndex: 1,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 0) submitReport();
-        }
-      );
-    } else {
-      Alert.alert("Post Options", "Choose an action", [
-        { text: "Report Post", style: "destructive", onPress: submitReport },
-        { text: "Cancel", style: "cancel" },
-      ]);
-    }
-  };
-
-  /* ---------------------------------------------------------
-     LOADING UI
-  ----------------------------------------------------------*/
   if (loading)
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4dd0e1" />
-        <Text>Loading post...</Text>
+        <Text style={{ color: "#fff", marginTop: 10 }}>Loading post...</Text>
       </View>
     );
 
   if (posts.length === 0)
     return (
       <View style={styles.loadingContainer}>
-        <Text>Post not found</Text>
+        <Text style={{ color: "#fff" }}>Post not found</Text>
       </View>
     );
 
   return (
     <View style={styles.container}>
-      {/* HEADER OVERLAY WITH BACK BUTTON, USERNAME, AND 3-DOTS */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerBackButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={28} color="#fff" />
-        </TouchableOpacity>
-        
-        {currentVisiblePost && (
-          <>
-            <TouchableOpacity
-              onPress={() => {
-                if (currentVisiblePost?.user_id) {
-                  router.push(`/profile?userId=${currentVisiblePost.user_id}`);
-                }
-              }}
-              style={{ flexDirection: "row", alignItems: "center" }}
-            >
-              <Text style={styles.headerUsernameTop} numberOfLines={1}>
-                {currentVisiblePost.user?.fullName || currentVisiblePost.username}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.headerOptionsButton}
-              onPress={handleReportMenu}
-            >
-              <Feather name="more-vertical" size={24} color="#FFF" />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-
-      {/* FLATLIST FOR CONTINUOUS SCROLLING */}
       <FlatList
-        // @ts-ignore - FlatList ref type issue
         ref={flatListRef}
         data={posts}
         renderItem={renderPostItem}
@@ -1290,8 +756,6 @@ export default function PostDetailsScreen() {
         snapToInterval={SCREEN_HEIGHT}
         decelerationRate="fast"
         initialScrollIndex={initialPostIndex}
-        onScrollBeginDrag={handleScrollBegin}
-        onMomentumScrollBegin={handleScrollBegin}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         getItemLayout={(data: any, index: number) => ({
@@ -1300,14 +764,9 @@ export default function PostDetailsScreen() {
           index,
         })}
         onScrollToIndexFailed={(info: any) => {
-          // Handle scroll to index failure
-          const wait = new Promise((resolve) => setTimeout(resolve, 500));
-          wait.then(() => {
-            flatListRef.current?.scrollToIndex({
-              index: info.index,
-              animated: false,
-            });
-          });
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+          }, 500);
         }}
       />
     </View>
@@ -1318,7 +777,10 @@ export default function PostDetailsScreen() {
    STYLES
 ----------------------------------------------------------*/
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#000" 
+  },
 
   loadingContainer: {
     flex: 1,
@@ -1327,60 +789,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
 
-  header: {
-    position: "absolute",
-    top: 50,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "transparent",
-  },
-  
-  headerBackButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: 10,
-    marginRight: 12,
-  },
-  
-  headerUsernameTop: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-    textShadowColor: "rgba(0, 0, 0, 0.8)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  
-  headerOptionsButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: 10,
-    marginLeft: 12,
-  },
-
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-  },
-
   postItem: {
     width: SCREEN_WIDTH,
-    minHeight: SCREEN_HEIGHT,
+    height: SCREEN_HEIGHT,
     backgroundColor: "#000",
-    position: "relative",
   },
 
   responsiveMediaContainer: {
     width: SCREEN_WIDTH,
-    minHeight: SCREEN_HEIGHT * 0.7,
-    maxHeight: SCREEN_HEIGHT,
+    height: SCREEN_HEIGHT,
     backgroundColor: "#000",
     position: "relative",
     justifyContent: "center",
@@ -1397,64 +814,155 @@ const styles = StyleSheet.create({
   responsiveMedia: {
     width: "100%",
     height: "100%",
-    maxHeight: SCREEN_HEIGHT,
   },
 
-  instagramScroll: {
-    flex: 1,
-  },
-
-  // Full screen media container
-  fullScreenMediaContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    backgroundColor: "#000",
-    position: "relative",
-  },
-
-  // Instagram-style image viewer - centered with proper aspect ratio
-  fullScreenImage: {
-    width: "100%",
-    height: "100%",
-  },
-  fullScreenVideo: {
-    width: "100%",
-    height: "100%",
-  },
   muteIndicatorReels: {
     position: "absolute",
-    top: 20,
+    top: 100,
     right: 20,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     borderRadius: 20,
     padding: 8,
     zIndex: 50,
   },
-  // Tap for Details Button
-  tapForDetailsButton: {
+
+  /* Top User Info Bar */
+  topUserInfoBar: {
     position: "absolute",
-    bottom: 100,
-    alignSelf: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: Platform.OS === "ios" ? 50 : 40,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    zIndex: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 60,
   },
-  tapForDetailsText: {
+
+  backButton: {
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 20,
+    padding: 8,
+    marginRight: 12,
+  },
+
+  topUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+
+  topUserDetails: {
+    marginLeft: 12,
+    flex: 1,
+  },
+
+  topUsername: {
     fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
+    fontWeight: "700",
+    color: "#FFF",
   },
-  // Expanded Details Overlay
+
+  topTimestamp: {
+    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginTop: 2,
+  },
+
+  /* Glass Bottom Overlay - Evenly Distributed */
+  glassBottomOverlay: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 10,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+
+  glassBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(40, 40, 40, 0.9)",
+    borderRadius: 20,
+  },
+
+  glassContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+
+  glassInfoItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+
+  glassInfoText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  glassChevronContainer: {
+    width: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  /* Bottom Navigation Bar */
+  bottomNavBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-end",
+    paddingTop: 8,
+    backgroundColor: "#000",
+    zIndex: 20,
+  },
+
+  navItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 60,
+  },
+
+  navLabelWhite: {
+    fontSize: 9,
+    color: "#fff",
+    marginTop: 4,
+  },
+
+  centerNavButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -25,
+  },
+
+  centerNavButtonInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#333",
+  },
+
+  /* Expanded Details Overlay */
   expandedDetailsOverlay: {
     position: "absolute",
     top: 0,
@@ -1464,20 +972,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     zIndex: 70,
   },
+
   shrunkMediaContainer: {
     width: "100%",
-    aspectRatio: 4 / 5,
+    height: SCREEN_HEIGHT * 0.45,
     backgroundColor: "#000",
     position: "relative",
   },
+
   shrunkMediaWrapper: {
     width: "100%",
     height: "100%",
   },
+
   shrunkVideo: {
     width: "100%",
     height: "100%",
   },
+
   muteIndicatorShrunk: {
     position: "absolute",
     top: 16,
@@ -1486,40 +998,65 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 6,
   },
-  closeDetailsButton: {
+
+  modernCloseButton: {
     position: "absolute",
-    top: 16,
-    left: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: 20,
-    padding: 8,
-    zIndex: 10,
+    top: Platform.OS === "ios" ? 50 : 40,
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 25,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   detailsContent: {
     flex: 1,
     backgroundColor: "#FFF",
   },
-  detailsUserRow: {
+
+  /* User Row with Dropdown Button */
+  detailsUserRowContainer: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
+
+  detailsUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+
   detailsUserInfo: {
     marginLeft: 12,
     flex: 1,
   },
+
   detailsUsername: {
     fontSize: 16,
     fontWeight: "600",
     color: "#000",
   },
+
   detailsTimestamp: {
     fontSize: 13,
     color: "#999",
     marginTop: 2,
   },
+
+  dropdownButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   detailsActions: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -1527,310 +1064,75 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
+
   detailsActionBtn: {
     alignItems: "center",
     gap: 4,
   },
+
   detailsActionText: {
     fontSize: 13,
     color: "#666",
     fontWeight: "500",
   },
+
+  /* Details Cards */
   detailsCard: {
+    backgroundColor: "#F8F8F8",
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
   },
-  detailsCardLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-  },
-  detailsRatingRow: {
+
+  detailsCardHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    marginBottom: 10,
   },
-  detailsRatingText: {
+
+  detailsCardLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#888",
+    letterSpacing: 0.5,
+  },
+
+  detailsRatingValue: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#FFD700",
+    color: "#333",
   },
-  detailsReviewRow: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
-  },
+
   detailsReviewText: {
-    flex: 1,
     fontSize: 15,
     color: "#333",
     lineHeight: 22,
   },
-  detailsLocationRow: {
+
+  locationRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "space-between",
   },
+
   detailsLocationText: {
-    flex: 1,
     fontSize: 15,
-    color: "#007AFF",
+    color: "#333",
     fontWeight: "500",
+    flex: 1,
   },
+
   detailsCommentsSection: {
     padding: 16,
   },
+
   detailsCommentsTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#000",
     marginBottom: 12,
-  },
-
-  fullScreenVideo: {
-    width: "100%",
-    height: "100%",
-  },
-
-  // Header overlay on top of media
-  headerOverlay: {
-    position: "absolute",
-    top: 50,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    zIndex: 10,
-  },
-
-  userRowHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: "flex-start",
-  },
-
-  headerUsername: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 10,
-    color: "#fff",
-  },
-
-  // Swipe up indicator
-  swipeUpIndicator: {
-    position: "absolute",
-    bottom: 30,
-    alignSelf: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
-  },
-
-  swipeUpText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-
-  // Bottom Sheet Styles
-  bottomSheetOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
-
-  bottomSheetBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-
-  bottomSheetContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.85,
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-    borderBottomWidth: 0,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -3,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-
-  bottomSheetGlassOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-  },
-
-  bottomSheetHandleContainer: {
-    width: "100%",
-    alignItems: "center",
-    paddingTop: 12,
-    paddingBottom: 8,
-    paddingHorizontal: 20,
-    zIndex: 10,
-    // Make handle area more touchable
-    minHeight: 40,
-    justifyContent: "center",
-  },
-
-  bottomSheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    borderRadius: 2,
-  },
-
-  bottomSheetScroll: {
-    flex: 1,
-    paddingHorizontal: 20,
-    backgroundColor: "transparent",
-  },
-
-  bottomSheetUserRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-    marginBottom: 16,
-  },
-
-  bottomSheetUserInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-
-  bottomSheetUsername: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-  },
-
-  bottomSheetTimestamp: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 2,
-  },
-
-  bottomSheetActions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-    marginBottom: 20,
-  },
-
-  bottomSheetActionBtn: {
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-
-  bottomSheetActionText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#1a1a1a",
-    fontWeight: "600",
-  },
-
-  bottomSheetCard: {
-    marginBottom: 20,
-    backgroundColor: "#f9f9f9",
-    borderRadius: 16,
-    padding: 16,
-  },
-
-  bottomSheetCardLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#1a1a1a",
-    marginBottom: 12,
-  },
-
-  bottomSheetRatingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF9E6",
-    padding: 16,
-    borderRadius: 12,
-  },
-
-  bottomSheetRatingText: {
-    marginLeft: 12,
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#000",
-  },
-
-  bottomSheetReviewRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#FFF5E6",
-    padding: 16,
-    borderRadius: 12,
-  },
-
-  bottomSheetReviewText: {
-    marginLeft: 12,
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#333",
-    flex: 1,
-  },
-
-  bottomSheetLocationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF0F0",
-    padding: 16,
-    borderRadius: 12,
-  },
-
-  bottomSheetLocationText: {
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
-    flex: 1,
-  },
-
-  bottomSheetCommentsSection: {
-    marginTop: 8,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-  },
-
-  bottomSheetCommentsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 16,
-    color: "#1a1a1a",
   },
 
   noComments: {
@@ -1878,10 +1180,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 16,
     paddingTop: 16,
-    paddingBottom: 20,
     borderTopWidth: 0.5,
     borderColor: "#DBDBDB",
-    backgroundColor: "#FFF",
   },
 
   commentInput: {
@@ -1903,463 +1203,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#4dd0e1",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
 
   footerLoader: {
     padding: 20,
     alignItems: "center",
-  },
-
-  // Share Modal Styles
-  shareModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  shareModalContent: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    width: "90%",
-    maxWidth: 400,
-    padding: 20,
-    alignItems: "center",
-  },
-
-  shareModalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-    marginBottom: 20,
-  },
-
-  shareModalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#000",
-  },
-
-  sharePostImageContainer: {
-    width: "100%",
-    height: 300,
-    borderRadius: 15,
-    overflow: "hidden",
-    marginBottom: 20,
-    backgroundColor: "#000",
-  },
-
-  sharePostImage: {
-    width: "100%",
-    height: "100%",
-  },
-
-  sharePostDetails: {
-    width: "100%",
-    marginBottom: 20,
-  },
-
-  shareDetailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    paddingVertical: 8,
-  },
-
-  shareDetailText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "500",
-  },
-
-  shareLinkText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: "#888",
-    textDecorationLine: "underline",
-  },
-
-  shareButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#4dd0e1",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-    width: "100%",
-  },
-
-  shareButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-
-  // Reels-style mute indicator
-  muteIndicatorReels: {
-    position: "absolute",
-    top: 20,
-    right: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderRadius: 20,
-    padding: 8,
-  },
-
-  // Top User Info Bar
-  topUserInfoBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    zIndex: 10,
-  },
-
-  topUserRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  topUserDetails: {
-    marginLeft: 12,
-    flex: 1,
-  },
-
-  topUsername: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFF",
-    textShadowColor: "rgba(0, 0, 0, 0.75)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-
-  topTimestamp: {
-    fontSize: 11,
-    color: "rgba(255, 255, 255, 0.9)",
-    marginTop: 2,
-    textShadowColor: "rgba(0, 0, 0, 0.75)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-
-  // Glass Morphism Bottom Overlay
-  glassBottomOverlay: {
-    position: "absolute",
-    bottom: 20,
-    left: 16,
-    right: 16,
-    zIndex: 10,
-    borderRadius: 24,
-    overflow: "hidden",
-  },
-
-  glassBackground: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-    // Enhanced glass morphism effect
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
-    // Backdrop blur simulation with gradient overlay
-    opacity: 0.95,
-  },
-
-  glassContentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    gap: 12,
-  },
-
-  glassInfoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 4,
-    maxWidth: "30%",
-  },
-
-  glassIcon: {
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-
-  glassInfoText: {
-    color: "#FFF",
-    fontSize: 13,
-    fontWeight: "700",
-    textShadowColor: "rgba(0, 0, 0, 0.6)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    flexShrink: 1,
-    letterSpacing: 0.2,
-  },
-
-  glassChevron: {
-    marginLeft: "auto",
-    textShadowColor: "rgba(0, 0, 0, 0.6)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-
-  // Expanded Details View Styles
-  expandedDetailsOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#fff",
-    zIndex: 1000,
-  },
-
-  shrunkMediaContainer: {
-    width: "100%",
-    height: SCREEN_HEIGHT * 0.5,
-    backgroundColor: "#000",
-    position: "relative",
-  },
-
-  shrunkMediaWrapper: {
-    width: "100%",
-    height: "100%",
-    position: "relative",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  shrunkVideo: {
-    width: "100%",
-    height: "100%",
-  },
-
-  muteIndicatorShrunk: {
-    position: "absolute",
-    top: 15,
-    right: 15,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderRadius: 15,
-    padding: 6,
-  },
-
-  modernCloseButton: {
-    position: "absolute",
-    top: 50,
-    right: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-
-  detailsContent: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-    paddingHorizontal: 0,
-    paddingTop: 0,
-  },
-
-  detailsUserRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#DBDBDB",
-  },
-
-  detailsUserInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-
-  detailsUsername: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#262626",
-  },
-
-  detailsTimestamp: {
-    fontSize: 12,
-    color: "#8E8E8E",
-    marginTop: 2,
-  },
-
-  detailsActions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 12,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#DBDBDB",
-    marginBottom: 0,
-  },
-
-  detailsActionBtn: {
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-
-  detailsActionText: {
-    marginTop: 4,
-    fontSize: 11,
-    color: "#262626",
-    fontWeight: "600",
-  },
-
-  detailsInfoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 16,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#DBDBDB",
-  },
-
-  detailsInfoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-
-  detailsInfoValue: {
-    fontSize: 14,
-    color: "#262626",
-    fontWeight: "500",
-  },
-
-  detailsCard: {
-    marginBottom: 12,
-    backgroundColor: "#FFF",
-    borderRadius: 0,
-    padding: 20,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#DBDBDB",
-  },
-
-  detailsCardLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#262626",
-    marginBottom: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-
-  detailsRatingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFBF0",
-    padding: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FFD700",
-  },
-
-  detailsRatingText: {
-    marginLeft: 12,
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#FF6B00",
-  },
-
-  detailsReviewRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#F8F8F8",
-    padding: 18,
-    borderRadius: 12,
-  },
-
-  detailsReviewText: {
-    marginLeft: 12,
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#262626",
-    flex: 1,
-    fontWeight: "400",
-  },
-
-  detailsLocationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F0F8FF",
-    padding: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#4dd0e1",
-  },
-
-  detailsLocationText: {
-    marginLeft: 12,
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#262626",
-    flex: 1,
-  },
-
-  detailsCommentsSection: {
-    marginTop: 0,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    backgroundColor: "#FFF",
-    borderTopWidth: 0.5,
-    borderTopColor: "#DBDBDB",
-  },
-
-  detailsCommentsTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 16,
-    color: "#262626",
   },
 });
