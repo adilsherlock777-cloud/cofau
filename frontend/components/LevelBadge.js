@@ -4,42 +4,35 @@ import { View, Text, StyleSheet } from 'react-native';
 /**
  * LevelBadge Component
  * Small circular badge showing level number
- * Positioned at bottom-right of profile picture
- * Matches Instagram notification badge style
+ * Positioned at bottom-left of profile picture (like Image 3 reference)
  */
 export default function LevelBadge({ level, size = 'small' }) {
   if (!level || level < 1) return null;
 
   // Determine badge color based on level band
   const getBadgeColor = (level) => {
-    if (level >= 1 && level <= 4) return '#4CAF50'; // Green for Reviewer
-    if (level >= 5 && level <= 8) return '#FF9800'; // Orange for Top Reviewer
-    if (level >= 9 && level <= 12) return '#E91E63'; // Pink for Influencer
-    return '#4CAF50'; // Default
+    if (level >= 1 && level <= 4) return '#1B7C82'; // Green for Reviewer
+    if (level >= 5 && level <= 8) return '#F2CF68'; // Orange for Top Reviewer
+    if (level >= 9 && level <= 12) return '#E94A37'; // Pink for Influencer
+    return '#FF4444'; // Default
   };
 
-  // Size configurations - kept small like Instagram badges
+  // Size configurations
   const sizeConfig = {
     small: {
-      container: 21,
-      fontSize: 10,
-      borderWidth: 1.5,
-      bottom: 0,
-      right: 0,
-    },
-    medium: {
-      container: 20,
-      fontSize: 10,
-      borderWidth: 2,
-      bottom: 2,
-      right: 2,
-    },
-    large: {
-      container: 24,
+      container: 22,
       fontSize: 11,
       borderWidth: 2,
-      bottom: 2,
-      right: 2,
+    },
+    medium: {
+      container: 26,
+      fontSize: 12,
+      borderWidth: 2,
+    },
+    large: {
+      container: 30,
+      fontSize: 14,
+      borderWidth: 2.5,
     },
   };
 
@@ -56,8 +49,6 @@ export default function LevelBadge({ level, size = 'small' }) {
           borderRadius: config.container / 2,
           backgroundColor: badgeColor,
           borderWidth: config.borderWidth,
-          bottom: config.bottom,
-          right: config.right,
         },
       ]}
     >
@@ -70,16 +61,14 @@ export default function LevelBadge({ level, size = 'small' }) {
 
 const styles = StyleSheet.create({
   badge: {
-    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 2,
-    elevation: 3,
-    zIndex: 10,
+    elevation: 4,
   },
   levelText: {
     color: '#fff',
