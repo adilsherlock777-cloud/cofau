@@ -1,6 +1,7 @@
 import { Slot, useRouter, useSegments } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context"; // ✅ changed import
+import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
 import { StyleSheet, Platform } from "react-native";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { LevelProvider } from "../context/LevelContext";
@@ -13,7 +14,12 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
-  // Setup push notification listeners
+  // ✅ Fonts FIRST
+  const [fontsLoaded] = useFonts({
+    Lobster: require("../assets/fonts/Lobster-Regular.ttf"),
+  });
+
+  // ✅ Effects MUST come before conditional returns
   useEffect(() => {
     if (isAuthenticated) {
       const cleanup = setupNotificationListeners(router);
@@ -22,36 +28,20 @@ function RootLayoutNav() {
   }, [isAuthenticated, router]);
 
   useEffect(() => {
-    console.log("🔄 _layout: Auth state changed");
-    console.log("   - loading:", loading);
-    console.log("   - isAuthenticated:", isAuthenticated);
-    console.log("   - token:", token ? "Present" : "None");
-    console.log("   - user:", user?.email || "None");
-    console.log("   - segments:", segments);
-
-    if (loading) {
-      console.log("⏳ _layout: Still loading, skipping navigation");
-      return;
-    }
+    if (loading) return;
 
     const inAuthGroup = segments[0] === "auth";
-    const inShareGroup = segments[0] === "share"; // Share pages are public
-    console.log("   - inAuthGroup:", inAuthGroup);
-    console.log("   - inShareGroup:", inShareGroup);
+    const inShareGroup = segments[0] === "share";
 
-    setTimeout(() => {
-      // Allow public access to share pages (for social media previews)
-      if (!isAuthenticated && !inAuthGroup && !inShareGroup) {
-        console.log("🔐 Redirect → /auth/login");
-        router.replace("/auth/login");
-      } else if (isAuthenticated && inAuthGroup) {
-        console.log("✅ Redirect → /feed");
-        router.replace("/feed");
-      } else {
-        console.log("✅ No redirect needed");
-      }
-    }, 100);
-  }, [isAuthenticated, loading, segments, user]);
+    if (!isAuthenticated && !inAuthGroup && !inShareGroup) {
+      router.replace("/auth/login");
+    } else if (isAuthenticated && inAuthGroup) {
+      router.replace("/feed");
+    }
+  }, [isAuthenticated, loading, segments]);
+
+  // ✅ NOW it is safe to return conditionally
+  if (!fontsLoaded) return null;
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
@@ -62,11 +52,12 @@ function RootLayoutNav() {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingBottom: 10, // 👈 ensures your bottom nav stays above Android bar
+    paddingBottom: 10,
   },
 });
 

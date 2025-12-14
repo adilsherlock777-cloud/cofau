@@ -73,7 +73,7 @@ export default function UserAvatar({
         </View>
       )}
 
-      {/* Level Badge */}
+      {/* Level Badge - positioned at bottom-left */}
       {showLevelBadge && level && (
         <View style={styles.badgeContainer}>
           <LevelBadge level={level} size="small" />
@@ -97,8 +97,7 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    bottom: -2,
+    right: -2,
   },
 });
-
