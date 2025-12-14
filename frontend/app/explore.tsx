@@ -14,6 +14,8 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost, reportPost } from "../utils/api";
 
 // =======================
@@ -59,6 +61,28 @@ const isVideoFile = (url: string, media_type: string) => {
     lower.includes(".mov") ||
     lower.includes(".mkv") ||
     lower.includes(".webm")
+  );
+};
+
+// ------------------------------------------------------------
+// 🔥 GRADIENT HEART COMPONENT (Cofau Theme)
+// ------------------------------------------------------------
+const GradientHeart = ({ size = 18 }) => {
+  return (
+    <MaskedView
+      maskElement={
+        <View style={{ backgroundColor: 'transparent' }}>
+          <Ionicons name="heart" size={size} color="#000" />
+        </View>
+      }
+    >
+      <LinearGradient
+        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ width: size, height: size }}
+      />
+    </MaskedView>
   );
 };
 
@@ -214,6 +238,7 @@ export default function ExploreScreen() {
           </View>
         )}
 
+        {/* Like Button with Gradient Heart */}
         <TouchableOpacity
           style={styles.likeBtn}
           onPress={(e) => {
@@ -221,11 +246,11 @@ export default function ExploreScreen() {
             handleLike(item.id, item.is_liked);
           }}
         >
-          <Ionicons
-            name={item.is_liked ? "heart" : "heart-outline"}
-            size={20}
-            color={item.is_liked ? "#FF4D4D" : "#ffffff"}
-          />
+          {item.is_liked ? (
+            <GradientHeart size={18} />
+          ) : (
+            <Ionicons name="heart-outline" size={18} color="#ffffff" />
+          )}
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -255,30 +280,43 @@ export default function ExploreScreen() {
   // ==================================
   return (
     <View style={styles.container}>
-      {/* Search bar */}
-      <View style={[styles.searchBox, styles.searchBoxWithMargin]}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name or location..."
-          placeholderTextColor="#999"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          returnKeyType="search"
-          onSubmitEditing={performSearch}
-        />
-        <TouchableOpacity onPress={performSearch}>
-          <Ionicons name="search" size={20} color="#777" />
-        </TouchableOpacity>
+      {/* Header Container - Gradient + Overlapping Search */}
+      <View style={styles.headerContainer}>
+        <LinearGradient
+          colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientHeader}
+        >
+          <Text style={styles.headerTitle}>Cofau</Text>
+        </LinearGradient>
+        
+        {/* Search bar - Overlapping gradient edge */}
+        <View style={styles.searchBoxWrapper}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search"
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+              onSubmitEditing={performSearch}
+            />
+          </View>
+        </View>
       </View>
 
-      {/* Grid */}
+      {/* Grid - No gap from search bar */}
       <FlatList
         data={posts}
         renderItem={renderGridItem}
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         columnWrapperStyle={{
           gap: SPACING,
           paddingHorizontal: SPACING,
@@ -296,26 +334,40 @@ export default function ExploreScreen() {
         }
       />
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation - With Labels */}
       <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.push("/feed")}>
-          <Ionicons name="home-outline" size={28} color="#000" />
+        {/* Home */}
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}>
+          <Ionicons name="home-outline" size={24} color="#333" />
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/explore")}>
-          <Ionicons name="compass" size={28} color="#000" />
+        
+        {/* Explore */}
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}>
+          <Ionicons name="compass" size={24} color="#333" />
           <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/leaderboard")}>
-          <Ionicons name="trophy-outline" size={28} color="#000" />
+        
+        {/* Center - Leaderboard (Trophy) */}
+        <TouchableOpacity 
+          style={styles.centerButton} 
+          onPress={() => router.push("/leaderboard")}
+        >
+          <View style={styles.centerButtonInner}>
+            <Ionicons name="trophy" size={28} color="#333" />
+          </View>
           <Text style={styles.navLabel}>Leaderboard</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/happening")}>
-          <Ionicons name="restaurant-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Restaurant</Text>
+        
+        {/* Happening */}
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}>
+          <Ionicons name="restaurant-outline" size={24} color="#333" />
+          <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/profile")}>
-          <Ionicons name="person-outline" size={28} color="#000" />
+        
+        {/* Profile */}
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}>
+          <Ionicons name="person-outline" size={24} color="#333" />
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -327,34 +379,79 @@ export default function ExploreScreen() {
 //  STYLES
 // =======================
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
-  searchBox: {
-    margin: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "#f2f2f2",
-    flexDirection: "row",
-    alignItems: "center",
+  container: { 
+    flex: 1, 
+    backgroundColor: "#fff" 
+  },
+  
+  center: { 
+    flex: 1, 
+    justifyContent: "center", 
+    alignItems: "center" 
   },
 
-  searchBoxWithMargin: {
-    marginTop: 20,
+  /* Header Container */
+  headerContainer: {
+    position: "relative",
+    marginBottom: 30,
+  },
+
+  /* Gradient Header - With Rounded Bottom Corners */
+  gradientHeader: {
+    paddingTop: 50,
+    paddingBottom: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+
+  headerTitle: {
+    fontFamily: "Lobster",
+    fontSize: 32,
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: 1,
+  },
+
+  /* Search Bar - Overlapping gradient edge */
+  searchBoxWrapper: {
+    position: "absolute",
+    bottom: -25,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+
+  searchBox: {
+    backgroundColor: "#fff",
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+
+  searchIcon: {
+    marginRight: 10,
   },
 
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: "#333",
-    marginRight: 10,
   },
 
+  /* Grid Tiles */
   tile: {
     width: TILE_SIZE,
     height: TILE_SIZE,
-    borderRadius: 6,
+    borderRadius: 4,
     overflow: "hidden",
     backgroundColor: "#eaeaea",
     position: "relative",
@@ -380,54 +477,57 @@ const styles = StyleSheet.create({
     top: 6,
     right: 6,
     backgroundColor: "rgba(0,0,0,0.35)",
-    padding: 4,
+    padding: 6,
     borderRadius: 20,
   },
 
-  searchInfo: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#f8f8f8",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
-  },
-
-  searchInfoText: {
-    fontSize: 14,
-    color: "#666",
-  },
-
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-
-  emptyText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#666",
-  },
-
-  emptySubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: "#999",
-  },
+  /* Bottom Navigation with Labels */
   navBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderColor: "#E0E0E0",
+    alignItems: "flex-end",
+    paddingTop: 10,
+    paddingBottom: 20,
     backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E5E5",
   },
+
+  navItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 60,
+  },
+
   navLabel: {
-    fontSize: 10,
-    color: "#000",
+    fontSize: 9,
+    color: "#333",
     marginTop: 4,
+  },
+
+  centerButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -25,
+  },
+
+  centerButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#333",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });
