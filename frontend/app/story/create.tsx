@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   headerTitle: {
     fontSize: 22,
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#EEE',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   storyImage: {
     width: '100%',

@@ -113,7 +113,7 @@ export default function FeedCard({
           <UserAvatar
             profilePicture={dpRaw}
             username={post.username}
-            size={48}
+            size={36}
             level={post.user_level}
             showLevelBadge
           />
@@ -192,7 +192,7 @@ export default function FeedCard({
           <View style={styles.detailBox}>
             <Text style={styles.detailLabel}>REVIEW</Text>
             <View style={styles.reviewRow}>
-              <Ionicons name="create-outline" size={18} color="#FFD700" />
+              <Ionicons name="create" size={18} color="#FFD700" />
               <Text style={styles.reviewText}>{post.description}</Text>
             </View>
           </View>
@@ -209,7 +209,7 @@ export default function FeedCard({
 
             <View style={styles.locationRow}>
               <Ionicons
-                name="location-outline"
+                name="location"
                 size={18}
                 color="#FFD700" // ✅ GOLD ICON
               />
@@ -277,13 +277,13 @@ export default function FeedCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
-    marginBottom: 20,
-    elevation: 4,
+    marginBottom: -10,
+    elevation: 6,
   },
 
   userHeader: {
     flexDirection: "row",
-    padding: 16,
+    padding: 8,
     alignItems: "center",
     justifyContent: "space-between",
   },
@@ -291,11 +291,11 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 6,
   },
 
   username: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     color: "#333",
   },
@@ -306,22 +306,30 @@ const styles = StyleSheet.create({
   },
 
   detailsContainer: {
-    padding: 8,
+    padding: 10,
   },
 
   detailBox: {
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 14,
+    padding: 8,
     marginBottom: 10,
+    borderColor: "#DADCE0",
+    shadowColor: "#000", 
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1.5,
   },
 
   detailLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#888",
-    marginBottom: 6,
+    fontWeight: "480",
+    color: "#5F6368",
+    marginBottom: 4,
     letterSpacing: 0.5,
+    textTransform: "uppercase", 
   },
 
   ratingRow: {
@@ -331,12 +339,13 @@ const styles = StyleSheet.create({
   },
 
   ratingText: {
-    fontSize: 18,
-    color: "#333",
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#202124",
   },
 
   ratingNumber: {
-    fontWeight: "700",
+    fontWeight: "600",
     fontSize: 18,
   },
 
@@ -346,8 +355,9 @@ const styles = StyleSheet.create({
   },
 
   reviewText: {
-    fontSize: 15,
-    color: "#333",
+    fontSize: 16,
+    fontWeight: "600", 
+    color: "#202124",
     flex: 1,
   },
 
@@ -366,9 +376,9 @@ const styles = StyleSheet.create({
   },
 
   locationText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#333",
+    color: "#202124",
   },
 
   actions: {
@@ -389,12 +399,13 @@ const styles = StyleSheet.create({
 
   actionCount: {
     fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
+    color: "#202124",
+    fontWeight: "600",
   },
 
   likedCount: {
-    color: "#E94A37",
+    color: "#090302ff",
+    fontWeight: "600", 
   },
   optionsButton: {
     padding: 8,

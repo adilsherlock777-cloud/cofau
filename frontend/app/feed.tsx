@@ -159,7 +159,7 @@ export default function FeedScreen() {
                 <UserAvatar
                   profilePicture={user.profile_picture}
                   username={user.username}
-                  size={90}
+                  size={82}
                   showLevelBadge={false}
                 />
                 <TouchableOpacity
@@ -203,7 +203,7 @@ export default function FeedScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 90 }} // ✅ space for bottom nav
+        contentContainerStyle={{ paddingBottom: 90 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -231,34 +231,49 @@ export default function FeedScreen() {
           ))}
       </ScrollView>
 
-      {/* ================= BOTTOM TABS (ONLY ADDITION) ================= */}
+      {/* ================= BOTTOM TABS ================= */}
       <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.push("/feed")}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/feed")}
+        >
           <Ionicons name="home" size={28} color="#000" />
-          <Text style={styles.navLabel}>Home</Text>
+          <Text style={styles.navLabelActive}>Home</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/explore")}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/explore")}
+        >
           <Ionicons name="compass-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/leaderboard")}>
-          <Ionicons name="trophy-outline" size={28} color="#000" />
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/leaderboard")}
+        >
+          <Ionicons name="trophy" size={28} color="#000" />
           <Text style={styles.navLabel}>Leaderboard</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/happening")}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/happening")}
+        >
           <Ionicons name="restaurant-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Restaurant</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/profile")}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/profile")}
+        >
           <Ionicons name="person-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </View> 
   );
 }
 
@@ -272,7 +287,7 @@ const styles = StyleSheet.create({
 
   headerContainer: {
     position: "relative",
-    marginBottom: 12,
+    marginBottom: 4,
   },
 
   gradientHeader: {
@@ -310,7 +325,7 @@ const styles = StyleSheet.create({
 
   headerIcons: {
     flexDirection: "row",
-    gap: 16,
+    gap: 20,
   },
 
   badge: {
@@ -328,20 +343,20 @@ const styles = StyleSheet.create({
 
   badgeText: {
     color: "#fff",
-    fontSize: 10,
+    fontSize: 5,
     fontWeight: "700",
   },
 
-  /* ===== LEVEL CARD WITH OVERLAPPING DP (IMAGE 2) ===== */
   levelCardWrapper: {
-    marginHorizontal: 20,
-    marginTop: -35,
+    marginHorizontal: 15,
+    marginTop: -40,
+    marginBottom: 4,
   },
 
   levelCard: {
     backgroundColor: "#fff",
     borderRadius: 15,
-    paddingVertical: 15,
+    paddingVertical: 24,
     paddingLeft: 102,
     paddingRight: 12,
     flexDirection: "row",
@@ -349,17 +364,19 @@ const styles = StyleSheet.create({
     elevation: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0,
     shadowRadius: 10,
     position: "relative",
+    borderWidth: 0.8,  
+    borderColor: "#090000ff",
   },
 
   dpContainer: {
     position: "absolute",
-    left: 5.5,
-    top: "50%",
+    left: 8,
+    top: "127%",
     transform: [{ translateY: -50 }],
-    zIndex: 8,
+    zIndex: 6,
   },
 
   dpAddButton: {
@@ -381,10 +398,10 @@ const styles = StyleSheet.create({
   },
 
   levelLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   progressContainer: {
@@ -418,29 +435,53 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
-    marginTop: 12,
-    color: "#666",
+    marginTop: 22,
+    color: "#d51010ff",
   },
 
   postContainer: {
     marginBottom: 20,
   },
 
-  /* ✅ ONLY ADDED: BOTTOM NAV */
   navBar: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 8,
     borderTopWidth: 1,
-    borderColor: "#E0E0E0",
-    backgroundColor: "#fff",
+    borderTopColor: "#E8E8E8",
+    backgroundColor: "#FFFFFF",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+
+  navItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
 
   navLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: "#000",
-    marginTop: 4,
+    marginTop: 2,
     textAlign: "center",
+    fontWeight: "500",
+  },
+   
+  navLabelActive: {
+    fontSize: 11,
+    color: "#000",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "700",
   },
 });

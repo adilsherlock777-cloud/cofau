@@ -49,6 +49,7 @@ export default function AddPostScreen() {
     'Vegetarian/Vegan',
     'Non vegetarian',
     'Biryani',
+    'Desserts',
     'SeaFood',
     'Chinese',
     'Arabic',
