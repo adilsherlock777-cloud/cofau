@@ -21,6 +21,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
 import SharePreviewModal from "../../components/SharePreviewModal";
+import ReportModal from "../../components/ReportModal";
 import axios from "axios";
 import { Image } from "expo-image";
 import { Video, ResizeMode } from "expo-av";
@@ -30,7 +31,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
 
 const BACKEND =
-  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+  process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${BACKEND}/api`;
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -98,6 +99,8 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const videoRef = useRef(null);
 
   const isVideo = (post.media_type || "").toLowerCase() === "video";
@@ -293,8 +296,46 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                 <Text style={styles.topTimestamp}>{formatTime(post.created_at)}</Text>
               </View>
             </TouchableOpacity>
+
+            {/* Three Dots Menu */}
+            <TouchableOpacity
+              style={styles.optionsButton}
+              onPress={() => setShowOptionsMenu(!showOptionsMenu)}
+            >
+              <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+            </TouchableOpacity>
           </View>
         )}
+
+        {/* Options Menu Modal */}
+        {showOptionsMenu && (
+          <>
+            <TouchableOpacity
+              style={styles.optionsMenuBackdrop}
+              activeOpacity={1}
+              onPress={() => setShowOptionsMenu(false)}
+            />
+            <View style={styles.optionsMenuOverlay}>
+              <TouchableOpacity
+                style={styles.optionsMenuItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  setShowReportModal(true);
+                }}
+              >
+                <Ionicons name="flag-outline" size={20} color="#E94A37" />
+                <Text style={styles.optionsMenuText}>Report Post</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* Report Modal */}
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          postId={post.id}
+        />
 
         {/* Glass Bottom Overlay - Evenly Distributed Items */}
         {!showDetails && (
@@ -839,6 +880,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
   },
 
   backButton: {
@@ -869,6 +911,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "rgba(255, 255, 255, 0.9)",
     marginTop: 2,
+  },
+
+  optionsButton: {
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 20,
+    padding: 8,
+    marginLeft: 12,
+  },
+
+  optionsMenuBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+  },
+
+  optionsMenuOverlay: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 100 : 90,
+    right: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+    minWidth: 150,
+  },
+
+  optionsMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    gap: 12,
+  },
+
+  optionsMenuText: {
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "500",
   },
 
   /* Glass Bottom Overlay - Evenly Distributed */

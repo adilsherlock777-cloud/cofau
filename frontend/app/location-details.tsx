@@ -18,7 +18,7 @@ import { Image } from "expo-image";
 //  CONFIG
 // =======================
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+  process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE_URL}/api`;
 
 const SCREEN_WIDTH = Dimensions.get("window").width;

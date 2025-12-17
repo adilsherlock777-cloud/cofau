@@ -14,7 +14,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com/api';
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com/api';
 
 export default function HappeningPlaces() {
   const router = useRouter();
@@ -32,15 +32,15 @@ export default function HappeningPlaces() {
     try {
       setLoading(true);
       console.log('🔍 Fetching top locations from:', `${API_URL}/locations/top`);
-      
+
       const response = await axios.get(`${API_URL}/locations/top`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { limit: 5 },
       });
-      
+
       console.log('📊 TOP LOCATIONS RESPONSE:', response.data);
       console.log('📊 Number of locations:', response.data.length);
-      
+
       setTopLocations(response.data);
     } catch (error) {
       console.error('❌ Error fetching top locations:', error.response?.data || error.message);
@@ -88,7 +88,7 @@ export default function HappeningPlaces() {
           <Text style={styles.headerTitle}>Happening Places Near You</Text>
           <Text style={styles.headerSubtitle}>Top rated restaurants this week</Text>
         </LinearGradient>
-        
+
         <View style={styles.emptyState}>
           <Ionicons name="location-outline" size={64} color="#CCC" />
           <Text style={styles.emptyTitle}>No locations yet</Text>
@@ -139,26 +139,75 @@ export default function HappeningPlaces() {
 
             {/* Image Thumbnails - Max 5 images */}
             <View style={styles.imageRow}>
-              {location.images.slice(0, 5).map((imageUrl, imgIndex) => {
-                // Fix URL if needed
-                const fixedUrl = imageUrl?.startsWith('http') 
-                  ? imageUrl 
-                  : `https://backend.cofau.com${imageUrl?.startsWith('/') ? imageUrl : '/' + imageUrl}`;
-                
-                return (
-                  <View key={imgIndex} style={styles.imageThumbnail}>
-                    <Image
-                      source={{ uri: fixedUrl }}
-                      style={styles.thumbnailImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                );
-              })}
+              {location.images && location.images.length > 0 ? (
+                location.images.slice(0, 5).map((imageUrl, imgIndex) => {
+                  // Fix URL if needed
+                  const fixedUrl = imageUrl?.startsWith('http')
+                    ? imageUrl
+                    : `https://api.cofau.com${imageUrl?.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+
+                  return (
+                    <View key={imgIndex} style={styles.imageThumbnail}>
+                      <Image
+                        source={{ uri: fixedUrl }}
+                        style={styles.thumbnailImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.imageThumbnail}>
+                  <Ionicons name="image-outline" size={24} color="#CCC" />
+                </View>
+              )}
             </View>
           </View>
         </TouchableOpacity>
       ))}
+
+      {/* Bottom Navigation Footer */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/feed")}
+        >
+          <Ionicons name="home" size={24} color="#000" />
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/explore")}
+        >
+          <Ionicons name="compass-outline" size={24} color="#000" />
+          <Text style={styles.navLabel}>Explore</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/leaderboard")}
+        >
+          <Ionicons name="trophy-outline" size={24} color="#000" />
+          <Text style={styles.navLabel}>Leaderboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/happening")}
+        >
+          <Ionicons name="restaurant" size={24} color="#667eea" />
+          <Text style={[styles.navLabel, styles.activeNavLabel]}>Restaurant</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/profile")}
+        >
+          <Ionicons name="person-outline" size={24} color="#000" />
+          <Text style={styles.navLabel}>Profile</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -280,5 +329,31 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 8,
     textAlign: 'center',
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    backgroundColor: '#FFF',
+    marginTop: 20,
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  navLabel: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  activeNavLabel: {
+    color: '#667eea',
+    fontWeight: '600',
   },
 });

@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 100, // Extra space for bottom nav
   },
   infoSection: {
     flexDirection: 'row',

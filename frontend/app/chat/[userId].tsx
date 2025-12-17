@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 
-const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 
 // Convert https → wss or http → ws
 const WS_BASE = API_BASE.replace(/^https?/, (match) => match === "https" ? "wss" : "ws");

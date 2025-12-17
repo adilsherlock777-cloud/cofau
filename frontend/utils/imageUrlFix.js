@@ -11,7 +11,7 @@ import { Platform } from 'react-native';
 // Get backend URL from environment or fallback
 export const BACKEND_URL = 
   Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
-  'https://backend.cofau.com';
+  'https://api.cofau.com';
 
 // Enable more verbose logging for debugging
 const DEBUG_URLS = true;

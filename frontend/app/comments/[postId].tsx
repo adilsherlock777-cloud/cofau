@@ -35,7 +35,7 @@ const normalizeDP = (input: any) => {
   if (!input) return null;
   if (input.startsWith("http")) return input;
 
-  const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+  const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
   if (!input.startsWith("/")) return `${BASE}/${input}`;
 
   return `${BASE}${input}`;

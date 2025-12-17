@@ -11,6 +11,8 @@ import {
   Linking,
   ActivityIndicator,
   Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,10 +37,35 @@ export default function AddPostScreen() {
 
   const [locationName, setLocationName] = useState('');  // NEW
   const [mapsLink, setMapsLink] = useState('');          // UPDATED
+  const [category, setCategory] = useState('');          // CATEGORY
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [showPointsAnimation, setShowPointsAnimation] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
+
+  // Categories list
+  const CATEGORIES = [
+    'Vegetarian/Vegan',
+    'Non vegetarian',
+    'Biryani',
+    'SeaFood',
+    'Chinese',
+    'Arabic',
+    'BBQ/Tandoor',
+    'Fast Food',
+    'Salad',
+    'Karnataka Style',
+    'Kerala Style',
+    'Andhra Style',
+    'North Indian Style',
+    'Mangaluru Style',
+    'Italian',
+    'Japanese',
+    'Korean',
+    'Mexican',
+    'Drinks / sodas',
+  ];
 
   // ------------------------------ MEDIA PICKERS ------------------------------
 
@@ -220,6 +247,7 @@ export default function AddPostScreen() {
         review_text: review.trim(),
         map_link: mapsLink.trim(),         // FINAL MAP LINK
         location_name: locationName.trim(), // LOCATION NAME
+        category: category || undefined,    // CATEGORY (optional)
         file: fileToUpload,
         media_type: mediaType,
       };
@@ -350,6 +378,31 @@ export default function AddPostScreen() {
           />
         </View>
 
+        {/* CATEGORY (OPTIONAL) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Category (Optional)</Text>
+          <TouchableOpacity 
+            style={styles.categoryButton}
+            onPress={() => setShowCategoryModal(true)}
+          >
+            <View style={styles.categoryButtonContent}>
+              <Ionicons name="fast-food-outline" size={20} color="#666" />
+              <Text style={[styles.categoryButtonText, category && styles.categoryButtonTextSelected]}>
+                {category || 'Select Category'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#666" />
+            </View>
+          </TouchableOpacity>
+          {category && (
+            <TouchableOpacity 
+              style={styles.clearCategoryButton}
+              onPress={() => setCategory('')}
+            >
+              <Text style={styles.clearCategoryText}>Clear Category</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* FREE GOOGLE MAPS LOCATION */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
@@ -421,6 +474,53 @@ export default function AddPostScreen() {
           router.push('/feed');
         }}
       />
+
+      {/* Category Selection Modal */}
+      <Modal
+        visible={showCategoryModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCategoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.categoryModal}>
+            <View style={styles.categoryModalHeader}>
+              <Text style={styles.categoryModalTitle}>Select Category</Text>
+              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <FlatList
+              data={CATEGORIES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.categoryItem,
+                    category === item && styles.categoryItemSelected
+                  ]}
+                  onPress={() => {
+                    setCategory(item);
+                    setShowCategoryModal(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.categoryItemText,
+                    category === item && styles.categoryItemTextSelected
+                  ]}>
+                    {item}
+                  </Text>
+                  {category === item && (
+                    <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+                  )}
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={styles.categoryList}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -544,4 +644,87 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   postButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+
+  // Category Styles
+  categoryButton: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  categoryButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  categoryButtonText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#999',
+  },
+  categoryButtonTextSelected: {
+    color: '#333',
+    fontWeight: '600',
+  },
+  clearCategoryButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  clearCategoryText: {
+    fontSize: 14,
+    color: '#E94A37',
+    fontWeight: '600',
+  },
+
+  // Category Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  categoryModal: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+  },
+  categoryModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  categoryModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  categoryList: {
+    padding: 12,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F9F9F9',
+  },
+  categoryItemSelected: {
+    backgroundColor: '#E8F8F7',
+    borderWidth: 2,
+    borderColor: '#4ECDC4',
+  },
+  categoryItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  categoryItemTextSelected: {
+    fontWeight: '600',
+    color: '#4ECDC4',
+  },
 });

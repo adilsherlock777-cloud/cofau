@@ -145,3 +145,42 @@ def add_post_points(current_points: int) -> int:
     This function is kept for backward compatibility.
     """
     return current_points + 25
+
+def recalculate_points_from_post_count(post_count: int) -> dict:
+    """
+    Recalculate user points and level based on post count.
+    Formula: total_points = post_count × 25
+    
+    Args:
+        post_count: Number of posts the user has
+        
+    Returns:
+        dict with:
+        - level: New level
+        - currentPoints: New current points (points towards NEXT level)
+        - requiredPoints: Points required for next level
+        - title: New title
+        - total_points: Total accumulated points
+    """
+    # Calculate total points: each post = 25 points
+    new_total_points = post_count * 25
+    
+    # Calculate level from total points
+    level_info = get_level_from_total_points(new_total_points)
+    new_level = level_info["level"]
+    
+    # Calculate currentPoints (progress towards NEXT level)
+    # This is: total_points - threshold_for_current_level
+    if new_level > 1:
+        threshold_for_current = LEVEL_TABLE[new_level - 2]["required_points"]
+        current_points = new_total_points - threshold_for_current
+    else:
+        current_points = new_total_points
+    
+    return {
+        "level": new_level,
+        "currentPoints": current_points,
+        "requiredPoints": level_info["requiredPoints"],
+        "title": level_info["title"],
+        "total_points": new_total_points,
+    }

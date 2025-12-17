@@ -26,7 +26,7 @@ from routers.moderation import router as moderation_router
 from routers.leaderboard import router as leaderboard_router
 
 # Import utils
-from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost
+from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
 from utils.moderation import check_image_moderation, save_moderation_result
 from utils.scheduler import start_scheduler, stop_scheduler
 
@@ -110,11 +110,11 @@ async def get_post_data_for_og(post_id: str):
         
         # Construct the absolute image URL
         # The stored media_url is typically /api/static/uploads/filename.jpg
-        # We need the full absolute URL: https://backend.cofau.com/api/static/uploads/filename.jpg
+        # We need the full absolute URL: https://api.cofau.com/api/static/uploads/filename.jpg
         # Assuming your base domain is configured elsewhere, but for simplicity, we'll use a placeholder structure
         
-        # NOTE: You MUST replace 'https://backend.cofau.com' with your actual domain/URL prefix
-        base_domain = "https://backend.cofau.com" 
+        # NOTE: You MUST replace 'https://api.cofau.com' with your actual domain/URL prefix
+        base_domain = "https://api.cofau.com" 
         media_url = post_doc.get("media_url")
         full_image_url = f"{base_domain}{media_url}" if media_url else None
         
@@ -235,6 +235,7 @@ async def create_post(
     review_text: str = Form(...),
     map_link: str = Form(None),
     location_name: str = Form(None),
+    category: str = Form(None),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -367,7 +368,7 @@ async def create_post(
         
         # Build full URL for Sightengine API
         # Assuming backend is accessible at settings.BACKEND_URL or construct it
-        backend_url = os.getenv("BACKEND_URL", "https://backend.cofau.com")
+        backend_url = os.getenv("BACKEND_URL", "https://api.cofau.com")
         full_media_url = f"{backend_url}{media_url}"
         
         # Analyze quality asynchronously
@@ -386,6 +387,7 @@ async def create_post(
         "review_text": review_text,
         "map_link": clean_map_link,
         "location_name": location_name.strip() if location_name else None,
+        "category": category.strip() if category else None,  # Add category
         "likes_count": 0,
         "comments_count": 0,
         "popular_photos": [],
@@ -406,8 +408,10 @@ async def create_post(
             post_id=post_id
         )
 
-    # Level update
-    level_update = calculateUserLevelAfterPost(current_user)
+    # Level update: recalculate based on total post count × 25 points per post
+    user_id = str(current_user["_id"])
+    total_posts_count = await db.posts.count_documents({"user_id": user_id})
+    level_update = recalculate_points_from_post_count(total_posts_count)
 
     await db.users.update_one(
         {"_id": current_user["_id"]},
@@ -420,6 +424,8 @@ async def create_post(
             "title": level_update["title"]
         }}
     )
+    
+    print(f"✅ Points updated for user {user_id}: {total_posts_count} posts × 25 = {level_update['total_points']} points, Level {level_update['level']}")
 
     # Notify followers
     followers = await db.follows.find({"followingId": str(current_user["_id"])}).to_list(None)
@@ -493,6 +499,7 @@ async def get_feed(skip: int = 0, limit: int = None, current_user: dict = Depend
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),  # Add location_name
+            "category": post.get("category"),  # Add category
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
@@ -756,7 +763,33 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
     if result.deleted_count == 0:
         raise HTTPException(status_code=400, detail="Failed to delete post")
     
-    return {"message": "Post deleted successfully"}
+    # Recalculate user points based on remaining posts
+    # Formula: total_points = number_of_posts × 25
+    user_id = str(current_user["_id"])
+    remaining_posts_count = await db.posts.count_documents({"user_id": user_id})
+    
+    # Recalculate level and points
+    level_update = recalculate_points_from_post_count(remaining_posts_count)
+    
+    # Update user's level and points
+    await db.users.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {
+            "total_points": level_update["total_points"],
+            "points": level_update["total_points"],
+            "level": level_update["level"],
+            "currentPoints": level_update["currentPoints"],
+            "requiredPoints": level_update["requiredPoints"],
+            "title": level_update["title"]
+        }}
+    )
+    
+    print(f"✅ Points recalculated for user {user_id}: {remaining_posts_count} posts × 25 = {level_update['total_points']} points, Level {level_update['level']}")
+    
+    return {
+        "message": "Post deleted successfully",
+        "level_update": level_update
+    }
 
 @app.get("/api/users/{user_id}/saved-posts")
 async def get_saved_posts(user_id: str, skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
@@ -1910,7 +1943,7 @@ async def share_preview(post_id: str):
     if not post:
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
 
-    BASE_URL = "https://backend.cofau.com"
+    BASE_URL = "https://api.cofau.com"
 
     title = post.get("review_text", "Cofau Post")
     rating = post.get("rating", 0)

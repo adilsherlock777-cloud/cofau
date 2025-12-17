@@ -5,7 +5,7 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
 
-const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE}/api`;
 
 // Fix URL helper for profile pics

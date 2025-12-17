@@ -26,18 +26,40 @@ async def get_top_locations(
         
         print("🔍 Fetching top locations...")
         
-        # Fetch all posts with non-empty location_name
-        posts = await db.posts.find({
-            "location_name": {"$exists": True, "$ne": None, "$ne": ""}
+        # Fetch all posts with location data (check multiple fields)
+        # Try location_name first, then check map_link for location data
+        posts_with_location = await db.posts.find({
+            "$or": [
+                {"location_name": {"$exists": True, "$ne": None, "$ne": ""}},
+                {"map_link": {"$exists": True, "$ne": None, "$ne": ""}},
+            ]
         }).to_list(None)
         
-        print(f"📊 Found {len(posts)} posts with location_name")
+        print(f"📊 Found {len(posts_with_location)} posts with location data")
         
         # Group posts by location_name
         location_data = defaultdict(lambda: {"uploads": 0, "images": [], "posts": []})
         
-        for post in posts:
+        for post in posts_with_location:
+            # Try location_name first
             location = post.get("location_name", "").strip()
+            
+            # If no location_name, try to extract from map_link
+            if not location and post.get("map_link"):
+                map_link = post.get("map_link", "")
+                # Try to extract location name from Google Maps URL
+                # Example: https://maps.google.com/?q=Restaurant+Name
+                if "q=" in map_link:
+                    try:
+                        import urllib.parse
+                        parsed = urllib.parse.urlparse(map_link)
+                        params = urllib.parse.parse_qs(parsed.query)
+                        if "q" in params:
+                            location = params["q"][0].replace("+", " ").strip()
+                    except:
+                        pass
+            
+            # Skip if still no location
             if not location:
                 continue
             
@@ -48,8 +70,9 @@ async def get_top_locations(
             location_data[location]["uploads"] += 1
             
             # Add post image if available and not already at limit (max 5 images)
-            if post.get("media_url") and len(location_data[location]["images"]) < 5:
-                location_data[location]["images"].append(post["media_url"])
+            media_url = post.get("media_url") or post.get("image_url")
+            if media_url and len(location_data[location]["images"]) < 5:
+                location_data[location]["images"].append(media_url)
             
             # Store post ID
             location_data[location]["posts"].append(str(post["_id"]))

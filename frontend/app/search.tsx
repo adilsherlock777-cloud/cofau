@@ -22,7 +22,7 @@ import { searchUsers, searchLocations, reportPost, reportUser } from '../utils/a
 import { normalizeMediaUrl, normalizeProfilePicture } from '../utils/imageUrlFix';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 
 export default function SearchScreen() {
   const router = useRouter();

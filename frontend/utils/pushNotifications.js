@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import axios from 'axios';
 import Constants from 'expo-constants';
 
-const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com'}/api`;
+const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api`;
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
