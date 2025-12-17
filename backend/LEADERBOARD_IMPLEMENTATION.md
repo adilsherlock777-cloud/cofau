@@ -227,7 +227,7 @@ await run_job_now()
 from utils.sightengine_quality import analyze_media_quality
 
 # Build full URL for Sightengine API
-backend_url = os.getenv("BACKEND_URL", "https://backend.cofau.com")
+backend_url = os.getenv("BACKEND_URL", "https://api.cofau.com")
 full_media_url = f"{backend_url}{media_url}"
 
 # Analyze quality
@@ -290,7 +290,7 @@ Add to `.env`:
 ```env
 SIGHTENGINE_API_USER=your_api_user
 SIGHTENGINE_API_SECRET=your_api_secret
-BACKEND_URL=https://backend.cofau.com
+BACKEND_URL=https://api.cofau.com
 ```
 
 ### 3. Start Server
@@ -322,7 +322,7 @@ from utils.sightengine_quality import analyze_media_quality
 
 # Test with an image URL
 score = await analyze_media_quality(
-    "https://backend.cofau.com/api/static/uploads/test.jpg",
+    "https://api.cofau.com/api/static/uploads/test.jpg",
     "image"
 )
 print(f"Quality Score: {score}")
@@ -349,14 +349,14 @@ await run_job_now()
 **Get Current Leaderboard**:
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  https://backend.cofau.com/api/leaderboard/current
+  https://api.cofau.com/api/leaderboard/current
 ```
 
 **Regenerate Leaderboard**:
 ```bash
 curl -X POST \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  https://backend.cofau.com/api/leaderboard/regenerate
+  https://api.cofau.com/api/leaderboard/regenerate
 ```
 
 ## Monitoring & Logs
@@ -378,7 +378,7 @@ curl -X POST \
 
 ### Quality Scoring Logs:
 ```
-✅ Quality score calculated: 87.5 for https://backend.cofau.com/api/static/uploads/...
+✅ Quality score calculated: 87.5 for https://api.cofau.com/api/static/uploads/...
 ```
 
 ### Error Handling:

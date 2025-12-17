@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
   TextInput,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -22,7 +23,7 @@ import { likePost, unlikePost, reportPost } from "../utils/api";
 //  CONFIG
 // =======================
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_BACKEND_URL || "https://backend.cofau.com";
+  process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE_URL}/api`;
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -99,6 +100,32 @@ export default function ExploreScreen() {
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  // Categories list
+  const CATEGORIES = [
+    'All',
+    'Vegetarian/Vegan',
+    'Non vegetarian',
+    'Biryani',
+    'SeaFood',
+    'Chinese',
+    'Arabic',
+    'BBQ/Tandoor',
+    'Fast Food',
+    'Salad',
+    'Karnataka Style',
+    'Kerala Style',
+    'Andhra Style',
+    'North Indian Style',
+    'Mangaluru Style',
+    'Italian',
+    'Japanese',
+    'Korean',
+    'Mexican',
+    'Drinks / sodas',
+  ];
 
   useFocusEffect(
     useCallback(() => {
@@ -106,8 +133,13 @@ export default function ExploreScreen() {
         console.log('🔄 Explore screen focused - refreshing posts');
         fetchPosts(true);
       }
-    }, [user, token])
+    }, [user, token, selectedCategory])
   );
+
+  // Filter posts by category
+  const filteredPosts = selectedCategory && selectedCategory !== 'All'
+    ? posts.filter(post => post.category === selectedCategory)
+    : posts;
 
   // ================================
   // 🔥 Fetch Explore Posts
@@ -309,9 +341,33 @@ export default function ExploreScreen() {
         </View>
       </View>
 
+      {/* Category Filter Button */}
+      <View style={styles.filterContainer}>
+        <TouchableOpacity 
+          style={styles.filterButton}
+          onPress={() => setShowCategoryModal(true)}
+        >
+          <Ionicons name="filter" size={20} color="#fff" />
+          <Text style={styles.filterButtonText}>
+            {selectedCategory && selectedCategory !== 'All' ? selectedCategory : 'Filter by Category'}
+          </Text>
+          {selectedCategory && selectedCategory !== 'All' && (
+            <TouchableOpacity 
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedCategory('');
+              }}
+              style={styles.clearFilterButton}
+            >
+              <Ionicons name="close-circle" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      </View>
+
       {/* Grid - No gap from search bar */}
       <FlatList
-        data={posts}
+        data={filteredPosts}
         renderItem={renderGridItem}
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
@@ -371,8 +427,89 @@ export default function ExploreScreen() {
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Category Filter Modal */}
+      <Modal
+        visible={showCategoryModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCategoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.categoryModal}>
+            <View style={styles.categoryModalHeader}>
+              <Text style={styles.categoryModalTitle}>Filter by Category</Text>
+              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <FlatList
+              data={CATEGORIES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.categoryItem,
+                    (selectedCategory === item || (item === 'All' && !selectedCategory)) && styles.categoryItemSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedCategory(item === 'All' ? '' : item);
+                    setShowCategoryModal(false);
+                  }}
+                >
+                  <View style={styles.categoryItemContent}>
+                    <Ionicons 
+                      name={getCategoryIcon(item)} 
+                      size={24} 
+                      color={(selectedCategory === item || (item === 'All' && !selectedCategory)) ? "#4ECDC4" : "#666"} 
+                    />
+                    <Text style={[
+                      styles.categoryItemText,
+                      (selectedCategory === item || (item === 'All' && !selectedCategory)) && styles.categoryItemTextSelected
+                    ]}>
+                      {item}
+                    </Text>
+                  </View>
+                  {(selectedCategory === item || (item === 'All' && !selectedCategory)) && (
+                    <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+                  )}
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={styles.categoryList}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
+}
+
+// Helper function to get icons for categories
+function getCategoryIcon(category: string): any {
+  const icons: { [key: string]: string } = {
+    'All': 'grid-outline',
+    'Vegetarian/Vegan': 'leaf-outline',
+    'Non vegetarian': 'restaurant-outline',
+    'Biryani': 'restaurant',
+    'SeaFood': 'fish-outline',
+    'Chinese': 'restaurant-outline',
+    'Arabic': 'restaurant-outline',
+    'BBQ/Tandoor': 'flame-outline',
+    'Fast Food': 'fast-food-outline',
+    'Salad': 'nutrition-outline',
+    'Karnataka Style': 'location-outline',
+    'Kerala Style': 'location-outline',
+    'Andhra Style': 'location-outline',
+    'North Indian Style': 'location-outline',
+    'Mangaluru Style': 'location-outline',
+    'Italian': 'pizza-outline',
+    'Japanese': 'restaurant-outline',
+    'Korean': 'restaurant-outline',
+    'Mexican': 'restaurant-outline',
+    'Drinks / sodas': 'wine-outline',
+  };
+  return icons[category] || 'restaurant-outline';
 }
 
 // =======================
@@ -529,5 +666,92 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 5,
+  },
+
+  // Filter Button
+  filterContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4ECDC4",
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  filterButtonText: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  clearFilterButton: {
+    padding: 2,
+  },
+
+  // Category Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  categoryModal: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+  },
+  categoryModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5E5",
+  },
+  categoryModalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  categoryList: {
+    padding: 12,
+  },
+  categoryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: "#F9F9F9",
+  },
+  categoryItemSelected: {
+    backgroundColor: "#E8F8F7",
+    borderWidth: 2,
+    borderColor: "#4ECDC4",
+  },
+  categoryItemContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  categoryItemText: {
+    fontSize: 16,
+    color: "#333",
+    flex: 1,
+  },
+  categoryItemTextSelected: {
+    fontWeight: "600",
+    color: "#4ECDC4",
   },
 });

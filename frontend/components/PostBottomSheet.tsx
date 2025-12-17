@@ -36,7 +36,7 @@ import {
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://backend.cofau.com';
+const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${BACKEND}/api`;
 
 // Collapsed height (just the bottom bar)

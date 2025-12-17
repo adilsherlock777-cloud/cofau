@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import MaskedView from "@react-native-masked-view/masked-view";
 
 import UserAvatar from "./UserAvatar";
 import SharePreviewModal from "./SharePreviewModal";
+import ReportModal from "./ReportModal";
 import { useAuth } from "../context/AuthContext";
 import {
   likePost,
@@ -50,7 +51,7 @@ export default function FeedCard({
   post,
   onLikeUpdate,
   onStoryCreated,
-  showOptionsMenu = true,
+  showOptionsMenuProp = true,
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -58,6 +59,8 @@ export default function FeedCard({
   const [isLiked, setIsLiked] = useState(post.is_liked || false);
   const [likesCount, setLikes] = useState(post.likes || 0);
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const mediaUrl = normalizeMediaUrl(post.media_url);
   const isVideo =
@@ -116,21 +119,58 @@ export default function FeedCard({
           />
           <Text style={styles.username}>{post.username}</Text>
         </TouchableOpacity>
+
+        {/* Three Dots Menu */}
+        <TouchableOpacity
+          style={styles.optionsButton}
+          onPress={() => setShowOptionsMenu(!showOptionsMenu)}
+        >
+          <Ionicons name="ellipsis-vertical" size={24} color="#333" />
+        </TouchableOpacity>
       </View>
 
+      {/* Options Menu Modal */}
+      {showOptionsMenu && (
+        <View style={styles.optionsMenuOverlay}>
+          <TouchableOpacity
+            style={styles.optionsMenuItem}
+            onPress={() => {
+              setShowOptionsMenu(false);
+              setShowReportModal(true);
+            }}
+          >
+            <Ionicons name="flag-outline" size={20} color="#E94A37" />
+            <Text style={styles.optionsMenuText}>Report Post</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        postId={post.id}
+      />
+
       {/* MEDIA */}
-      {!!mediaUrl &&
-        (isVideo ? (
-          <Video
-            source={{ uri: mediaUrl }}
-            style={styles.image}
-            resizeMode="cover"
-            shouldPlay
-            isLooping
-          />
-        ) : (
-          <Image source={{ uri: mediaUrl }} style={styles.image} />
-        ))}
+      {!!mediaUrl && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => router.push(`/post-details/${post.id}`)}
+        >
+          {isVideo ? (
+            <Video
+              source={{ uri: mediaUrl }}
+              style={styles.image}
+              resizeMode="cover"
+              shouldPlay
+              isLooping
+            />
+          ) : (
+            <Image source={{ uri: mediaUrl }} style={styles.image} />
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* DETAILS */}
       <View style={styles.detailsContainer}>
@@ -245,6 +285,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: 16,
     alignItems: "center",
+    justifyContent: "space-between",
   },
 
   userInfo: {
@@ -354,5 +395,42 @@ const styles = StyleSheet.create({
 
   likedCount: {
     color: "#E94A37",
+  },
+  optionsButton: {
+    padding: 8,
+    marginLeft: 'auto',
+  },
+  optionsMenuBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+  },
+  optionsMenuOverlay: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+    minWidth: 150,
+  },
+  optionsMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  optionsMenuText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
   },
 });

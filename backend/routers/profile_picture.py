@@ -66,7 +66,7 @@ async def upload_profile_image(
         old_profile_pic_clean = old_profile_pic.split("?")[0].split("#")[0]
         
         # Handle different URL formats:
-        # 1. Full URL: https://backend.cofau.com/api/static/uploads/xxx.jpg
+        # 1. Full URL: https://api.cofau.com/api/static/uploads/xxx.jpg
         # 2. Relative with /api/static/uploads/: /api/static/uploads/xxx.jpg
         # 3. Relative with /legacy-static/: /legacy-static/uploads/profile_pictures/xxx.jpg
         # 4. Just filename: xxx.jpg
@@ -242,7 +242,7 @@ async def delete_profile_image(current_user: dict = Depends(get_current_user)):
         old_profile_pic_clean = old_profile_pic.split("?")[0].split("#")[0]
         
         # Handle different URL formats:
-        # 1. Full URL: https://backend.cofau.com/api/static/uploads/xxx.jpg
+        # 1. Full URL: https://api.cofau.com/api/static/uploads/xxx.jpg
         # 2. Relative with /api/static/uploads/: /api/static/uploads/xxx.jpg
         # 3. Relative with /legacy-static/: /legacy-static/uploads/profile_pictures/xxx.jpg
         # 4. Just filename: xxx.jpg
