@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     alignItems: 'center',
-    marginLeft: 90,
+    marginLeft: 80,
   },
   badgeTitle: {
     fontSize: 14,

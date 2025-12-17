@@ -167,7 +167,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     borderBottomWidth: 1,
     borderBottomColor: "#EEE",
-    marginTop: -14,
+    marginTop: -12,
+    marginBottom: -8,
   },
 
   loadingContainer: {
@@ -177,7 +178,7 @@ const styles = StyleSheet.create({
 
   contentContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
   },
 
   storyItem: {
