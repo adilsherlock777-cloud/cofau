@@ -282,6 +282,28 @@ async def create_post(
     media_type = "video" if file_ext in ["mp4", "mov"] else "image"
 
     # ======================================================
+    # VIDEO TRANSCODING - Convert iPhone videos to web-compatible MP4
+    # ======================================================
+    if media_type == "video":
+        from utils.video_transcode import should_transcode_video, transcode_video_to_mp4, get_transcoded_filename
+        
+        if should_transcode_video(filename):
+            print(f"🎬 iPhone/MOV video detected - transcoding to web-compatible MP4...")
+            try:
+                # Transcode video to MP4 (H.264)
+                transcoded_path = await transcode_video_to_mp4(file_path)
+                
+                # Update file_path and filename to point to the transcoded file
+                file_path = transcoded_path
+                filename = os.path.basename(transcoded_path)
+                
+                print(f"✅ Video transcoded successfully: {filename}")
+            except Exception as e:
+                print(f"❌ Video transcoding failed: {str(e)}")
+                # Continue with original file if transcoding fails
+                print(f"⚠️  Using original file (may not play on all devices)")
+
+    # ======================================================
     # CONTENT MODERATION - Check for banned content
     # ======================================================
     moderation_result = None
@@ -347,16 +369,16 @@ async def create_post(
     # We need: uploads/filename.jpg for URL: /api/static/uploads/filename.jpg
     # IMPORTANT: Always use consistent format: /api/static/uploads/filename to match existing posts
     
-    # Extract just the filename from the file_path
-    filename = os.path.basename(file_path)
+    # Extract just the filename from the file_path (updated after transcoding if applicable)
+    final_filename = os.path.basename(file_path)
     
     # Always use the consistent format: /api/static/uploads/filename
     # This ensures backward compatibility with existing posts
-    media_url = f"/api/static/uploads/{filename}"
+    media_url = f"/api/static/uploads/{final_filename}"
     
     # Debug logging
     print(f"📁 File saved: {file_path}")
-    print(f"📁 Filename: {filename}")
+    print(f"📁 Filename: {final_filename}")
     print(f"📁 Media URL: {media_url}")
 
     # ======================================================

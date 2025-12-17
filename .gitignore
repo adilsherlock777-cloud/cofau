@@ -43,6 +43,15 @@ yarn-error.log*
 dump.rdb
 logs/
 
+# Uploaded media files
+backend/static/uploads/*.mp4
+backend/static/uploads/*.mov
+backend/static/uploads/*.jpg
+backend/static/uploads/*.jpeg
+backend/static/uploads/*.png
+backend/static/uploads/*.gif
+backend/static/uploads/*.webp
+
 # System files
 .DS_Store
 *.pem
