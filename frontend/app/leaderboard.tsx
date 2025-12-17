@@ -32,17 +32,49 @@ export default function LeaderboardScreen() {
   const fetchLeaderboard = async () => {
     try {
       setError(null);
+      setLoading(true);
+      
+      if (!token) {
+        setError("Please log in to view the leaderboard");
+        setLoading(false);
+        return;
+      }
+      
       const response = await axios.get(`${BACKEND_URL}/api/leaderboard/current`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        timeout: 10000, // 10 second timeout
       });
       
-      setLeaderboardData(response.data);
+      // Ensure response has expected structure
+      const data = response.data || {};
+      setLeaderboardData({
+        from_date: data.from_date || new Date().toISOString(),
+        to_date: data.to_date || new Date().toISOString(),
+        generated_at: data.generated_at || new Date().toISOString(),
+        entries: data.entries || [],
+        total_posts_analyzed: data.total_posts_analyzed || 0,
+        config: data.config || {},
+      });
+      
       console.log("✅ Leaderboard data loaded:", response.data);
     } catch (err: any) {
       console.error("❌ Error fetching leaderboard:", err);
-      setError(err.response?.data?.detail || "Failed to load leaderboard");
+      
+      let errorMessage = "Failed to load leaderboard";
+      if (err.response) {
+        // Server responded with error
+        errorMessage = err.response.data?.detail || err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        // Request made but no response
+        errorMessage = "Network error. Please check your connection.";
+      } else {
+        // Something else happened
+        errorMessage = err.message || "An unexpected error occurred";
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -189,17 +221,21 @@ export default function LeaderboardScreen() {
                   <View style={styles.scoreItem}>
                     <Ionicons name="star" size={16} color="#FFD700" />
                     <Text style={styles.scoreLabel}>Quality</Text>
-                    <Text style={styles.scoreValue}>{entry.quality_score.toFixed(0)}</Text>
+                    <Text style={styles.scoreValue}>
+                      {(entry.quality_score || 0).toFixed(0)}
+                    </Text>
                   </View>
                   <View style={styles.scoreItem}>
                     <Ionicons name="heart" size={16} color="#FF6B6B" />
                     <Text style={styles.scoreLabel}>Likes</Text>
-                    <Text style={styles.scoreValue}>{entry.likes_count}</Text>
+                    <Text style={styles.scoreValue}>{entry.likes_count || 0}</Text>
                   </View>
                   <View style={styles.scoreItem}>
                     <Ionicons name="trophy" size={16} color="#4dd0e1" />
                     <Text style={styles.scoreLabel}>Score</Text>
-                    <Text style={styles.scoreValue}>{entry.combined_score.toFixed(1)}</Text>
+                    <Text style={styles.scoreValue}>
+                      {(entry.combined_score || 0).toFixed(1)}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>

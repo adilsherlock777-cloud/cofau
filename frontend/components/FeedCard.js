@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -52,21 +52,55 @@ export default function FeedCard({
   onLikeUpdate,
   onStoryCreated,
   showOptionsMenuProp = true,
+  shouldPlay = false,
 }) {
   const router = useRouter();
   const { user } = useAuth();
+  const videoRef = useRef(null);
 
   const [isLiked, setIsLiked] = useState(post.is_liked || false);
   const [likesCount, setLikes] = useState(post.likes || 0);
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
 
   const mediaUrl = normalizeMediaUrl(post.media_url);
+  const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
   const isVideo =
     post.media_type === "video" || mediaUrl?.toLowerCase().endsWith(".mp4");
 
   const dpRaw = normalizeProfilePicture(post.user_profile_picture);
+
+  // Load video when it becomes visible (shouldPlay = true)
+  useEffect(() => {
+    if (!isVideo) return;
+
+    // When video becomes visible, mark it as loaded
+    if (shouldPlay && !videoLoaded) {
+      setVideoLoaded(true);
+    }
+  }, [shouldPlay, isVideo, videoLoaded]);
+
+  // Control video playback based on shouldPlay prop
+  useEffect(() => {
+    if (!isVideo || !videoRef.current || !videoLoaded) return;
+
+    const playVideo = async () => {
+      try {
+        if (shouldPlay) {
+          await videoRef.current.playAsync();
+        } else {
+          await videoRef.current.pauseAsync();
+        }
+      } catch (error) {
+        // Ignore playback errors
+        console.log("Video playback control error:", error);
+      }
+    };
+
+    playVideo();
+  }, [shouldPlay, isVideo, videoLoaded]);
 
   const handleLike = async () => {
     const prev = isLiked;
@@ -160,11 +194,13 @@ export default function FeedCard({
         >
           {isVideo ? (
             <Video
+              ref={videoRef}
               source={{ uri: mediaUrl }}
               style={styles.image}
               resizeMode="cover"
-              shouldPlay
+              shouldPlay={false}
               isLooping
+              isMuted={true}
             />
           ) : (
             <Image source={{ uri: mediaUrl }} style={styles.image} />
@@ -300,9 +336,32 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
+  videoContainer: {
+    position: "relative",
+    width: "100%",
+    aspectRatio: 1,
+    backgroundColor: "#000",
+  },
   image: {
     width: "100%",
     aspectRatio: 1,
+  },
+  playIconOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  playIconBackground: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   detailsContainer: {

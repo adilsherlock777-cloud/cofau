@@ -23,7 +23,7 @@ import LevelBadge from '../components/LevelBadge';
 import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
-import { sendCompliment, getFollowers, getFollowing } from '../utils/api';
+import { sendCompliment, getFollowers } from '../utils/api';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${BACKEND_URL}/api`;
@@ -61,11 +61,9 @@ export default function ProfileScreen() {
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'posts' | 'people' | 'contributions' | 'favourite'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'favourite'>('posts');
   const [complimentsCount, setComplimentsCount] = useState(0);
   const [hasComplimented, setHasComplimented] = useState(false);
-  const [peopleList, setPeopleList] = useState<any[]>([]);
-  const [peopleTab, setPeopleTab] = useState<'followers' | 'following'>('followers');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editedBio, setEditedBio] = useState('');
   const [editedName, setEditedName] = useState('');
@@ -80,6 +78,10 @@ export default function ProfileScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedPostForDelete, setSelectedPostForDelete] = useState<any>(null);
   const [deletingPost, setDeletingPost] = useState(false);
+  const [followersModalVisible, setFollowersModalVisible] = useState(false);
+  const [followersList, setFollowersList] = useState<any[]>([]);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [followingStatus, setFollowingStatus] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     if (!token) {
@@ -220,31 +222,55 @@ export default function ProfileScreen() {
     if (!userData) return;
 
     try {
-      // No limit - fetch ALL posts
-      let endpoint = `${API_URL}/users/${userData.id}/posts`;
-
-      if (activeTab === 'posts') {
-        // Show all posts (both photo and video)
-        // No filter needed
-      } else if (activeTab === 'contributions') {
-        // No limit - fetch ALL collaborations
-        endpoint = `${API_URL}/users/${userData.id}/collaborations`;
-      } else if (activeTab === 'people') {
-        // For people tab, fetch followers or following
-        await fetchPeople();
-        return;
-      }
+      // Fetch ALL posts
+      const endpoint = `${API_URL}/users/${userData.id}/posts`;
 
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const posts = response.data || [];
 
-      // ✅ Normalize URLs for all posts
-      const postsWithFullUrls = posts.map((post: any) => ({
-        ...post,
-        full_image_url: fixUrl(post.media_url || post.full_image_url),
-      }));
+      // ✅ Normalize URLs for all posts and preserve location_name
+      const postsWithFullUrls = posts.map((post: any) => {
+        const mediaUrl = post.media_url || post.full_image_url;
+        const normalizedUrl = fixUrl(mediaUrl);
+        const isVideo = 
+          post.media_type === 'video' ||
+          normalizedUrl?.toLowerCase().endsWith('.mp4') ||
+          normalizedUrl?.toLowerCase().endsWith('.mov') ||
+          normalizedUrl?.toLowerCase().endsWith('.avi') ||
+          normalizedUrl?.toLowerCase().endsWith('.webm');
+        
+        // Extract location from map_link if location_name is missing
+        let locationName = post.location_name || post.location || post.place_name;
+        if (!locationName && post.map_link) {
+          try {
+            // Extract location from Google Maps URL: query=LocationName
+            const url = new URL(post.map_link);
+            const queryParam = url.searchParams.get('query');
+            if (queryParam) {
+              locationName = decodeURIComponent(queryParam);
+            }
+          } catch (e) {
+            // If URL parsing fails, try regex extraction
+            const match = post.map_link.match(/query=([^&]+)/);
+            if (match) {
+              locationName = decodeURIComponent(match[1]);
+            }
+          }
+        }
+        
+        return {
+          ...post,
+          full_image_url: normalizedUrl,
+          media_url: normalizedUrl,
+          isVideo: isVideo,
+          // ✅ Explicitly preserve location_name and related fields, with fallback from map_link
+          location_name: locationName || null,
+          location: locationName || null,
+          place_name: locationName || null,
+        };
+      });
 
       // ✅ Sort by created_at descending (newest first)
       const sorted = postsWithFullUrls.sort((a: any, b: any) => {
@@ -289,28 +315,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const fetchPeople = async () => {
-    if (!userData?.id) return;
-
-    try {
-      let people;
-      if (peopleTab === 'followers') {
-        people = await getFollowers(userData.id);
-      } else {
-        people = await getFollowing(userData.id);
-      }
-      setPeopleList(people || []);
-    } catch (err) {
-      console.error('❌ Error fetching people:', err);
-      setPeopleList([]);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'people' && userData) {
-      fetchPeople();
-    }
-  }, [activeTab, peopleTab, userData]);
 
   const fetchFollowStatus = async () => {
     if (!userData?.id || !token) return;
@@ -367,6 +371,96 @@ export default function ProfileScreen() {
       Alert.alert('Error', 'Failed to update follow status. Please try again.');
     } finally {
       setFollowLoading(false);
+    }
+  };
+
+  const fetchFollowers = async () => {
+    if (!userData?.id || !token) return;
+
+    setLoadingFollowers(true);
+    try {
+      const followers = await getFollowers(userData.id);
+      
+      console.log('📋 Raw followers data:', followers);
+      console.log('📋 Followers count:', followers?.length || 0);
+      
+      // Handle both array and object responses
+      const followersArray = Array.isArray(followers) ? followers : (followers?.followers || []);
+      
+      // Normalize profile pictures
+      const normalizedFollowers = followersArray.map((follower: any) => ({
+        ...follower,
+        id: follower.id || follower.user_id || follower._id,
+        user_id: follower.user_id || follower.id,
+        full_name: follower.full_name || follower.username || follower.name,
+        username: follower.username || follower.full_name || follower.name,
+        profile_picture: fixUrl(follower.profile_picture || follower.profile_picture_url),
+        level: follower.level || 1,
+      }));
+      
+      console.log('📋 Normalized followers:', normalizedFollowers);
+      setFollowersList(normalizedFollowers);
+      
+      // Fetch follow status for each follower
+      const statusPromises = normalizedFollowers.map(async (follower: any) => {
+        try {
+          const response = await axios.get(
+            `${API_URL}/users/${follower.id || follower.user_id}/follow-status`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          return { id: follower.id || follower.user_id, isFollowing: response.data.isFollowing || false };
+        } catch {
+          return { id: follower.id || follower.user_id, isFollowing: false };
+        }
+      });
+      
+      const statuses = await Promise.all(statusPromises);
+      const statusMap: { [key: string]: boolean } = {};
+      statuses.forEach((s) => {
+        statusMap[s.id] = s.isFollowing;
+      });
+      setFollowingStatus(statusMap);
+    } catch (err) {
+      console.error('❌ Error fetching followers:', err);
+      Alert.alert('Error', 'Failed to load followers. Please try again.');
+    } finally {
+      setLoadingFollowers(false);
+    }
+  };
+
+  const handleFollowerFollowToggle = async (followerId: string) => {
+    if (!token) return;
+
+    const currentStatus = followingStatus[followerId] || false;
+    const previousStatus = currentStatus;
+
+    // Optimistic update
+    setFollowingStatus((prev) => ({
+      ...prev,
+      [followerId]: !currentStatus,
+    }));
+
+    try {
+      const endpoint = currentStatus ? 'unfollow' : 'follow';
+      await axios.post(
+        `${API_URL}/users/${followerId}/${endpoint}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      console.log(`✅ ${currentStatus ? 'Unfollowed' : 'Followed'} follower successfully`);
+    } catch (err) {
+      console.error('❌ Error toggling follower follow:', err);
+      // Revert optimistic update
+      setFollowingStatus((prev) => ({
+        ...prev,
+        [followerId]: previousStatus,
+      }));
+      Alert.alert('Error', 'Failed to update follow status. Please try again.');
     }
   };
 
@@ -868,12 +962,21 @@ export default function ProfileScreen() {
             </Text>
             <Text style={styles.statLabel}>Compliment</Text>
           </View>
-          <View style={styles.statBox}>
+          <TouchableOpacity 
+            style={styles.statBox}
+            onPress={() => {
+              if (userData?.id) {
+                setFollowersModalVisible(true);
+                fetchFollowers();
+              }
+            }}
+            activeOpacity={0.7}
+          >
             <Text style={styles.statValue}>
               {userStats?.followers_count || 0}
             </Text>
             <Text style={styles.statLabel}>People</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Edit Profile / Follow Button */}
@@ -966,29 +1069,16 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'people' && styles.activeTab]}
-            onPress={() => setActiveTab('people')}
+            style={[styles.tab, activeTab === 'videos' && styles.activeTab]}
+            onPress={() => setActiveTab('videos')}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'people' && styles.activeTabText,
+                activeTab === 'videos' && styles.activeTabText,
               ]}
             >
-              People
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'contributions' && styles.activeTab]}
-            onPress={() => setActiveTab('contributions')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'contributions' && styles.activeTabText,
-              ]}
-            >
-              Contributions
+              Videos
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1006,74 +1096,53 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Content Grid / People List / Favourite */}
-        {activeTab === 'people' ? (
-          <View>
-            {/* Followers/Following Toggle */}
-            <View style={styles.peopleToggle}>
-              <TouchableOpacity
-                style={[styles.peopleToggleButton, peopleTab === 'followers' && styles.peopleToggleActive]}
-                onPress={() => setPeopleTab('followers')}
-              >
-                <Text style={[styles.peopleToggleText, peopleTab === 'followers' && styles.peopleToggleTextActive]}>
-                  Followers ({userStats?.followers_count || 0})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.peopleToggleButton, peopleTab === 'following' && styles.peopleToggleActive]}
-                onPress={() => setPeopleTab('following')}
-              >
-                <Text style={[styles.peopleToggleText, peopleTab === 'following' && styles.peopleToggleTextActive]}>
-                  Following ({userStats?.following_count || 0})
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* People List */}
-            <FlatList
-              data={peopleList}
-              renderItem={({ item }: any) => (
-                <TouchableOpacity
-                  style={styles.peopleItem}
-                  onPress={() => router.push(`/profile?userId=${item.id}`)}
-                >
-                  <UserAvatar
-                    profilePicture={fixUrl(item.profile_picture)}
-                    username={item.full_name}
-                    size={50}
-                    level={item.level || 1}
-                    showLevelBadge={false}
-                    style={{}}
-                  />
-                  <View style={styles.peopleInfo}>
-                    <Text style={styles.peopleName}>{item.full_name}</Text>
-                    {item.badge && (
-                      <Text style={styles.peopleBadge}>{item.badge}</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )}
-              keyExtractor={(item: any) => item.id}
-              ListEmptyComponent={() => (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="people-outline" size={64} color="#ccc" />
-                  <Text style={styles.emptyText}>
-                    {peopleTab === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
-                  </Text>
-                </View>
-              )}
-            />
-          </View>
+        {/* Content Grid / Videos / Favourite */}
+        {activeTab === 'videos' ? (
+          <FlatList
+            data={userPosts.filter((post: any) => post.isVideo)}
+            renderItem={renderGridItem}
+            keyExtractor={(item: any) => item.id}
+            numColumns={3}
+            scrollEnabled={false}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="videocam-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>No videos yet</Text>
+              </View>
+            )}
+          />
         ) : activeTab === 'favourite' ? (
           <View>
             {/* Favourite Tab - Posts Grouped by Location */}
             {(() => {
+              // Filter posts that have location_name (check multiple possible field names)
+              const postsWithLocation = userPosts.filter((post: any) => {
+                // Check all possible location field names
+                const location = post.location_name || post.location || post.place_name;
+                // Ensure location exists and is not empty
+                const hasLocation = location && typeof location === 'string' && location.trim() !== '';
+                return hasLocation;
+              });
+
+              if (postsWithLocation.length === 0) {
+                return (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="location-outline" size={64} color="#ccc" />
+                    <Text style={styles.emptyText}>No posts with location yet</Text>
+                    <Text style={styles.emptySubtext}>
+                      Add location to your posts to see them here
+                    </Text>
+                  </View>
+                );
+              }
+
               // Group posts by location
-              const postsWithLocation = userPosts.filter(post => post.location_name);
               const locationGroups: { [key: string]: any[] } = {};
               
-              postsWithLocation.forEach(post => {
-                const locationName = post.location_name || 'Unknown Location';
+              postsWithLocation.forEach((post: any) => {
+                // Get location name from any of the possible fields
+                const locationName = (post.location_name || post.location || post.place_name || 'Unknown Location').trim();
+                
                 if (!locationGroups[locationName]) {
                   locationGroups[locationName] = [];
                 }
@@ -1081,15 +1150,6 @@ export default function ProfileScreen() {
               });
 
               const sortedLocations = Object.keys(locationGroups).sort();
-
-              if (sortedLocations.length === 0) {
-                return (
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="location-outline" size={64} color="#ccc" />
-                    <Text style={styles.emptyText}>No posts with location yet</Text>
-                  </View>
-                );
-              }
 
               return (
                 <View>
@@ -1104,24 +1164,49 @@ export default function ProfileScreen() {
 
                       {/* Location Posts Grid */}
                       <View style={styles.locationGrid}>
-                        {locationGroups[location].map((post, index) => (
-                          <TouchableOpacity
-                            key={post.id}
-                            style={styles.gridItem}
-                            onPress={() => router.push(`/post-details/${post.id}`)}
-                          >
-                            <Image
-                              source={{ uri: fixUrl(post.media_url) || '' }}
-                              style={styles.gridImage}
-                              resizeMode="cover"
-                            />
-                            {post.media_type === 'video' && (
-                              <View style={styles.videoIndicator}>
-                                <Ionicons name="play-circle" size={24} color="#fff" />
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                        ))}
+                        {locationGroups[location].map((post: any) => {
+                          const mediaUrl = fixUrl(post.full_image_url || post.media_url);
+                          const isVideo = post.isVideo || post.media_type === 'video' ||
+                            mediaUrl?.toLowerCase().endsWith('.mp4') ||
+                            mediaUrl?.toLowerCase().endsWith('.mov');
+                          
+                          return (
+                            <TouchableOpacity
+                              key={post.id}
+                              style={styles.gridItem}
+                              onPress={() => router.push(`/post-details/${post.id}`)}
+                              activeOpacity={0.8}
+                            >
+                              {mediaUrl && !isVideo ? (
+                                <Image source={{ uri: mediaUrl }} style={styles.gridImage} resizeMode="cover" />
+                              ) : mediaUrl && isVideo ? (
+                                <View style={styles.gridImageContainer}>
+                                  <Image
+                                    source={{ uri: mediaUrl }}
+                                    style={styles.gridImage}
+                                    resizeMode="cover"
+                                  />
+                                  <View style={styles.videoOverlay}>
+                                    <Ionicons name="play-circle" size={40} color="#fff" />
+                                  </View>
+                                </View>
+                              ) : (
+                                <View style={styles.gridPlaceholder}>
+                                  <Ionicons
+                                    name={isVideo ? 'play-circle-outline' : 'image-outline'}
+                                    size={40}
+                                    color="#ccc"
+                                  />
+                                </View>
+                              )}
+                              {post.rating && (
+                                <View style={styles.ratingBadge}>
+                                  <Text style={styles.ratingText}>{post.rating}</Text>
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
                       </View>
                     </View>
                   ))}
@@ -1131,7 +1216,7 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <FlatList
-            data={userPosts}
+            data={userPosts.filter((post: any) => !post.isVideo)}
             renderItem={renderGridItem}
             keyExtractor={(item: any) => item.id}
             numColumns={3}
@@ -1139,10 +1224,7 @@ export default function ProfileScreen() {
             ListEmptyComponent={() => (
               <View style={styles.emptyContainer}>
                 <Ionicons name="images-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyText}>
-                  {activeTab === 'posts' && 'No posts yet'}
-                  {activeTab === 'contributions' && 'No contributions yet'}
-                </Text>
+                <Text style={styles.emptyText}>No posts yet</Text>
               </View>
             )}
           />
@@ -1355,6 +1437,94 @@ export default function ProfileScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Followers Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={followersModalVisible}
+        onRequestClose={() => setFollowersModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Followers</Text>
+              <TouchableOpacity onPress={() => setFollowersModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            {loadingFollowers ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#4dd0e1" />
+                <Text style={styles.loadingText}>Loading followers...</Text>
+              </View>
+            ) : followersList.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="people-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>No followers yet</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={followersList}
+                keyExtractor={(item) => item.id || item.user_id || String(Math.random())}
+                renderItem={({ item }) => {
+                  const followerId = item.id || item.user_id;
+                  const isFollowingFollower = followingStatus[followerId] || false;
+                  
+                  return (
+                    <TouchableOpacity
+                      style={styles.followerItem}
+                      onPress={() => {
+                        setFollowersModalVisible(false);
+                        router.push(`/profile?userId=${followerId}`);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <UserAvatar
+                        profilePicture={item.profile_picture}
+                        username={item.full_name || item.username}
+                        size={50}
+                        level={item.level || 1}
+                        showLevelBadge={false}
+                        style={{}}
+                      />
+                      <View style={styles.followerInfo}>
+                        <Text style={styles.followerName}>
+                          {item.full_name || item.username || 'Unknown User'}
+                        </Text>
+                      </View>
+                      {!isOwnProfile && (
+                        <TouchableOpacity
+                          style={[
+                            styles.followerFollowButton,
+                            isFollowingFollower && styles.followerFollowingButton,
+                          ]}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleFollowerFollowToggle(followerId);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.followerFollowButtonText,
+                              isFollowingFollower && styles.followerFollowingButtonText,
+                            ]}
+                          >
+                            {isFollowingFollower ? 'Following' : 'Follow'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+                contentContainerStyle={styles.followersListContent}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -1738,6 +1908,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#ccc',
+  },
   logoutButtonModal: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2008,5 +2183,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 2,
+  },
+  followerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  followerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  followerName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  followersListContent: {
+    paddingBottom: 20,
+  },
+  followerFollowButton: {
+    backgroundColor: '#4dd0e1',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  followerFollowingButton: {
+    backgroundColor: '#28a745',
+  },
+  followerFollowButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  followerFollowingButtonText: {
+    color: '#fff',
   },
 });

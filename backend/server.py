@@ -240,6 +240,11 @@ async def create_post(
     current_user: dict = Depends(get_current_user),
 ):
     db = get_database()
+    
+    # Debug logging for category
+    print(f"📝 Creating post with category: '{category}' (type: {type(category)})")
+    if category:
+        print(f"📝 Category after strip: '{category.strip()}')")
 
     # Validate file
     file_ext = file.filename.split(".")[-1].lower()
@@ -282,26 +287,31 @@ async def create_post(
     media_type = "video" if file_ext in ["mp4", "mov"] else "image"
 
     # ======================================================
-    # VIDEO TRANSCODING - Convert iPhone videos to web-compatible MP4
+    # VIDEO OPTIMIZATION - Transcode to 720p H.264 and generate thumbnail
     # ======================================================
+    thumbnail_url = None
     if media_type == "video":
-        from utils.video_transcode import should_transcode_video, transcode_video_to_mp4, get_transcoded_filename
+        from utils.video_transcode import should_transcode_video, optimize_video_with_thumbnail
         
-        if should_transcode_video(filename):
-            print(f"🎬 iPhone/MOV video detected - transcoding to web-compatible MP4...")
-            try:
-                # Transcode video to MP4 (H.264)
-                transcoded_path = await transcode_video_to_mp4(file_path)
-                
-                # Update file_path and filename to point to the transcoded file
-                file_path = transcoded_path
-                filename = os.path.basename(transcoded_path)
-                
-                print(f"✅ Video transcoded successfully: {filename}")
-            except Exception as e:
-                print(f"❌ Video transcoding failed: {str(e)}")
-                # Continue with original file if transcoding fails
-                print(f"⚠️  Using original file (may not play on all devices)")
+        print(f"🎬 Video detected - optimizing to 720p H.264 and generating thumbnail...")
+        try:
+            # Optimize video to 720p and generate thumbnail
+            video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
+            
+            # Update file_path and filename to point to the optimized file
+            file_path = video_path
+            filename = os.path.basename(video_path)
+            
+            # Generate thumbnail URL
+            thumbnail_filename = os.path.basename(thumbnail_path)
+            thumbnail_url = f"/api/static/uploads/{thumbnail_filename}"
+            
+            print(f"✅ Video optimized to 720p: {filename}")
+            print(f"✅ Thumbnail generated: {thumbnail_filename}")
+        except Exception as e:
+            print(f"❌ Video optimization failed: {str(e)}")
+            # Continue with original file if optimization fails
+            print(f"⚠️  Using original file (video may be large and slow to load)")
 
     # ======================================================
     # CONTENT MODERATION - Check for banned content
@@ -404,6 +414,7 @@ async def create_post(
         "user_id": str(current_user["_id"]),
         "media_url": media_url,
         "image_url": media_url if media_type == "image" else None,  # Only set image_url for images
+        "thumbnail_url": thumbnail_url,  # Thumbnail for videos
         "media_type": media_type,
         "rating": rating,
         "review_text": review_text,
@@ -421,6 +432,9 @@ async def create_post(
 
     result = await db.posts.insert_one(post_doc)
     post_id = str(result.inserted_id)
+    
+    # Debug: Verify category was saved
+    print(f"✅ Post created with ID: {post_id}, category: '{post_doc.get('category')}'")
 
     # Save moderation result with post_id
     if moderation_result:
@@ -471,13 +485,28 @@ async def create_post(
 # FEED
 # ======================================================
 @app.get("/api/feed")
-async def get_feed(skip: int = 0, limit: int = None, current_user: dict = Depends(get_current_user)):
+async def get_feed(skip: int = 0, limit: int = None, category: str = None, current_user: dict = Depends(get_current_user)):
+    """Get feed posts, optionally filtered by category"""
     db = get_database()
+    
+    # Build query - filter by category if provided
+    query = {}
+    if category and category.strip() and category.lower() != 'all':
+        # Case-insensitive exact match for category
+        category_clean = category.strip()
+        # Use regex for case-insensitive matching, but escape special characters
+        import re
+        category_escaped = re.escape(category_clean)
+        query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
+        print(f"🔍 Filtering posts by category: '{category_clean}' (query: {query})")
+    
     # If no limit specified, return all posts (no limit)
     if limit is None:
-        posts = await db.posts.find().sort("created_at", -1).skip(skip).to_list(None)
+        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).to_list(None)
     else:
-        posts = await db.posts.find().sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    print(f"📊 Found {len(posts)} posts (category filter: {category if category else 'none'})")
 
     result = []
     for post in posts:
@@ -516,6 +545,7 @@ async def get_feed(skip: int = 0, limit: int = None, current_user: dict = Depend
             "user_level": user.get("level", 1),
             "media_url": media_url,
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "media_type": media_type,
             "rating": post.get("rating", 0),
             "review_text": post.get("review_text", ""),
@@ -962,6 +992,7 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -1008,6 +1039,7 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -1087,6 +1119,7 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -1132,6 +1165,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -1176,6 +1210,7 @@ async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: 
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
@@ -1648,19 +1683,37 @@ async def get_followers(user_id: str):
     """Get user's followers"""
     db = get_database()
     
-    follows = await db.follows.find({"following_id": user_id}).to_list(100)
+    # Try both field name formats (snake_case and camelCase)
+    follows = await db.follows.find({
+        "$or": [
+            {"following_id": user_id},
+            {"followingId": user_id}
+        ]
+    }).to_list(100)
+    
+    print(f"🔍 Found {len(follows)} follow relationships for user {user_id}")
     
     result = []
     for follow in follows:
-        user = await db.users.find_one({"_id": ObjectId(follow["follower_id"])})
+        # Get follower_id from either field name format
+        follower_id = follow.get("follower_id") or follow.get("followerId")
+        if not follower_id:
+            continue
+            
+        user = await db.users.find_one({"_id": ObjectId(follower_id)})
         if user:
             result.append({
                 "id": str(user["_id"]),
-                "full_name": user["full_name"],
+                "user_id": str(user["_id"]),
+                "full_name": user.get("full_name") or user.get("username") or "Unknown",
+                "username": user.get("username") or user.get("full_name") or "Unknown",
                 "profile_picture": user.get("profile_picture"),
-                "badge": user.get("badge")
+                "profile_picture_url": user.get("profile_picture"),
+                "badge": user.get("badge"),
+                "level": user.get("level", 1)
             })
     
+    print(f"✅ Returning {len(result)} followers")
     return result
 
 @app.get("/api/users/{user_id}/following")
@@ -1864,10 +1917,14 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
             "username": user["full_name"] if user else "Unknown",
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "media_type": post.get("media_type", "photo"),
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),  # ✅ Include location_name
+            "location": post.get("location_name"),  # For backward compatibility
+            "place_name": post.get("location_name"),  # For backward compatibility
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
             "created_at": post["created_at"]
@@ -1909,6 +1966,7 @@ async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = None
             "username": user["full_name"] if user else "Unknown",
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
             "rating": post["rating"],
             "review_text": post["review_text"],
             "likes_count": post["likes_count"],

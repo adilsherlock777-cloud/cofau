@@ -114,12 +114,16 @@ async def generate_leaderboard_snapshot():
     logger.info(f"🏆 Generating leaderboard for window: {from_date} to {to_date}")
     
     # 2. Fetch all posts within the window
-    posts = await db.posts.find({
-        "created_at": {
-            "$gte": from_date.isoformat(),
-            "$lte": to_date.isoformat()
-        }
-    }).to_list(None)
+    try:
+        posts = await db.posts.find({
+            "created_at": {
+                "$gte": from_date.isoformat(),
+                "$lte": to_date.isoformat()
+            }
+        }).to_list(None)
+    except Exception as e:
+        logger.error(f"❌ Error fetching posts from database: {e}")
+        posts = []
     
     if not posts:
         logger.warning("⚠️ No posts found in 3-day window")
@@ -135,33 +139,57 @@ async def generate_leaderboard_snapshot():
     # 4. Calculate scores for each post
     posts_with_scores = []
     for post in posts:
-        quality_score = post.get("quality_score", 50.0)  # Default if not set
-        likes_count = post.get("likes_count", 0)
-        
-        # Calculate engagement score
-        engagement_score = calculate_engagement_score(likes_count, max_likes)
-        
-        # Calculate combined score
-        combined_score = calculate_combined_score(quality_score, engagement_score)
-        
-        # Get user info
-        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-        
-        posts_with_scores.append({
-            "post_id": str(post["_id"]),
-            "user_id": post["user_id"],
-            "username": user.get("full_name", "Unknown") if user else "Unknown",
-            "user_profile_picture": user.get("profile_picture") if user else None,
-            "media_url": post.get("media_url", ""),
-            "media_type": post.get("media_type", "image"),
-            "caption": post.get("review_text", ""),
-            "location_name": post.get("location_name"),
-            "quality_score": quality_score,
-            "likes_count": likes_count,
-            "engagement_score": engagement_score,
-            "combined_score": combined_score,
-            "created_at": post.get("created_at")
-        })
+        try:
+            quality_score = post.get("quality_score", 50.0)  # Default if not set
+            likes_count = post.get("likes_count", 0)
+            
+            # Calculate engagement score
+            engagement_score = calculate_engagement_score(likes_count, max_likes)
+            
+            # Calculate combined score
+            combined_score = calculate_combined_score(quality_score, engagement_score)
+            
+            # Get user info - handle both ObjectId and string user_id
+            user = None
+            user_id = post.get("user_id")
+            if user_id:
+                try:
+                    # Try as ObjectId first
+                    if isinstance(user_id, str):
+                        user = await db.users.find_one({"_id": ObjectId(user_id)})
+                    else:
+                        user = await db.users.find_one({"_id": user_id})
+                except Exception as e:
+                    logger.warning(f"⚠️ Error fetching user {user_id}: {e}")
+                    # Try finding by string ID
+                    try:
+                        user = await db.users.find_one({"_id": str(user_id)})
+                    except:
+                        pass
+            
+            # Get username - try multiple fields
+            username = "Unknown"
+            if user:
+                username = user.get("username") or user.get("full_name") or user.get("name") or "Unknown"
+            
+            posts_with_scores.append({
+                "post_id": str(post["_id"]),
+                "user_id": str(user_id) if user_id else "",
+                "username": username,
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "media_url": post.get("media_url", ""),
+                "media_type": post.get("media_type", "image"),
+                "caption": post.get("review_text") or post.get("caption") or post.get("description") or "",
+                "location_name": post.get("location_name") or post.get("location") or None,
+                "quality_score": quality_score,
+                "likes_count": likes_count,
+                "engagement_score": engagement_score,
+                "combined_score": combined_score,
+                "created_at": post.get("created_at")
+            })
+        except Exception as e:
+            logger.error(f"❌ Error processing post {post.get('_id')}: {e}")
+            continue  # Skip this post and continue with others
     
     # 5. Sort by combined score descending
     posts_with_scores.sort(key=lambda x: x["combined_score"], reverse=True)
@@ -209,44 +237,103 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
     Returns the most recent leaderboard snapshot.
     If no snapshot exists, generates a new one.
     """
-    db = get_database()
-    
-    # Get the most recent snapshot
-    snapshot = await db.leaderboard_snapshots.find_one(
-        {},
-        sort=[("generated_at", -1)]
-    )
-    
-    # If no snapshot exists or it's too old, generate a new one
-    if not snapshot:
-        logger.info("📊 No leaderboard snapshot found, generating new one...")
-        snapshot = await generate_leaderboard_snapshot()
+    try:
+        db = get_database()
         
+        # Get the most recent snapshot
+        snapshot = await db.leaderboard_snapshots.find_one(
+            {},
+            sort=[("generated_at", -1)]
+        )
+        
+        # If no snapshot exists or it's too old, generate a new one
+        if not snapshot:
+            logger.info("📊 No leaderboard snapshot found, generating new one...")
+            snapshot = await generate_leaderboard_snapshot()
+            
+            if not snapshot:
+                return {
+                    "from_date": datetime.utcnow().isoformat(),
+                    "to_date": datetime.utcnow().isoformat(),
+                    "generated_at": datetime.utcnow().isoformat(),
+                    "window_days": LEADERBOARD_WINDOW_DAYS,
+                    "total_posts_analyzed": 0,
+                    "entries": [],
+                    "config": {
+                        "quality_weight": QUALITY_WEIGHT,
+                        "engagement_weight": ENGAGEMENT_WEIGHT,
+                        "leaderboard_size": LEADERBOARD_SIZE
+                    }
+                }
+        else:
+            # Check if snapshot is from current window
+            try:
+                to_date_str = snapshot.get("to_date")
+                if to_date_str:
+                    # Handle both ISO format strings and datetime objects
+                    if isinstance(to_date_str, str):
+                        snapshot_date = datetime.fromisoformat(to_date_str.replace('Z', '+00:00'))
+                    else:
+                        snapshot_date = to_date_str
+                    
+                    current_date = datetime.utcnow()
+                    
+                    # If snapshot is more than 3 days old, regenerate
+                    if (current_date - snapshot_date).days > LEADERBOARD_WINDOW_DAYS:
+                        logger.info("📊 Leaderboard snapshot is outdated, regenerating...")
+                        new_snapshot = await generate_leaderboard_snapshot()
+                        if new_snapshot:
+                            snapshot = new_snapshot
+                else:
+                    # If to_date is missing, regenerate
+                    logger.info("📊 Leaderboard snapshot missing to_date, regenerating...")
+                    new_snapshot = await generate_leaderboard_snapshot()
+                    if new_snapshot:
+                        snapshot = new_snapshot
+            except Exception as e:
+                logger.error(f"❌ Error checking snapshot date: {e}")
+                # If date parsing fails, regenerate
+                logger.info("📊 Error parsing snapshot date, regenerating...")
+                new_snapshot = await generate_leaderboard_snapshot()
+                if new_snapshot:
+                    snapshot = new_snapshot
+        
+        # Ensure snapshot is not None before accessing
         if not snapshot:
             return {
-                "message": "No posts available for leaderboard",
-                "entries": []
+                "from_date": datetime.utcnow().isoformat(),
+                "to_date": datetime.utcnow().isoformat(),
+                "generated_at": datetime.utcnow().isoformat(),
+                "window_days": LEADERBOARD_WINDOW_DAYS,
+                "total_posts_analyzed": 0,
+                "entries": [],
+                "config": {
+                    "quality_weight": QUALITY_WEIGHT,
+                    "engagement_weight": ENGAGEMENT_WEIGHT,
+                    "leaderboard_size": LEADERBOARD_SIZE
+                }
             }
-    else:
-        # Check if snapshot is from current window
-        snapshot_date = datetime.fromisoformat(snapshot["to_date"])
-        current_date = datetime.utcnow()
         
-        # If snapshot is more than 3 days old, regenerate
-        if (current_date - snapshot_date).days > LEADERBOARD_WINDOW_DAYS:
-            logger.info("📊 Leaderboard snapshot is outdated, regenerating...")
-            snapshot = await generate_leaderboard_snapshot()
-    
-    # Format response
-    return {
-        "from_date": snapshot.get("from_date"),
-        "to_date": snapshot.get("to_date"),
-        "generated_at": snapshot.get("generated_at"),
-        "window_days": snapshot.get("window_days", LEADERBOARD_WINDOW_DAYS),
-        "total_posts_analyzed": snapshot.get("total_posts_analyzed", 0),
-        "entries": snapshot.get("entries", []),
-        "config": snapshot.get("config", {})
-    }
+        # Format response
+        return {
+            "from_date": snapshot.get("from_date", datetime.utcnow().isoformat()),
+            "to_date": snapshot.get("to_date", datetime.utcnow().isoformat()),
+            "generated_at": snapshot.get("generated_at", datetime.utcnow().isoformat()),
+            "window_days": snapshot.get("window_days", LEADERBOARD_WINDOW_DAYS),
+            "total_posts_analyzed": snapshot.get("total_posts_analyzed", 0),
+            "entries": snapshot.get("entries", []),
+            "config": snapshot.get("config", {
+                "quality_weight": QUALITY_WEIGHT,
+                "engagement_weight": ENGAGEMENT_WEIGHT,
+                "leaderboard_size": LEADERBOARD_SIZE
+            })
+        }
+    except Exception as e:
+        logger.error(f"❌ Error in get_current_leaderboard: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch leaderboard: {str(e)}"
+        )
 
 
 @router.get("/history")
