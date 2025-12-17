@@ -6,15 +6,16 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
-import Constants from 'expo-constants';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
+const API_URL = `${API_BASE_URL}/api`;
 
 export default function HappeningPlaces() {
   const router = useRouter();
@@ -28,23 +29,51 @@ export default function HappeningPlaces() {
     }
   }, [token]);
 
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (token) {
+        console.log('🔄 HappeningPlaces screen focused - refreshing locations');
+        fetchTopLocations();
+      }
+    }, [token])
+  );
+
   const fetchTopLocations = async () => {
+    if (!token) {
+      console.warn('⚠️ No token available for fetching locations');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      console.log('🔍 Fetching top locations from:', `${API_URL}/locations/top`);
+      const endpoint = `${API_URL}/locations/top`;
+      console.log('🔍 Fetching top locations from:', endpoint);
+      console.log('🔑 Using token:', token ? 'Present' : 'Missing');
 
-      const response = await axios.get(`${API_URL}/locations/top`, {
+      const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
         params: { limit: 5 },
       });
 
       console.log('📊 TOP LOCATIONS RESPONSE:', response.data);
-      console.log('📊 Number of locations:', response.data.length);
+      console.log('📊 Response type:', typeof response.data);
+      console.log('📊 Number of locations:', Array.isArray(response.data) ? response.data.length : 'Not an array');
 
-      setTopLocations(response.data);
+      // Ensure we have an array
+      const locations = Array.isArray(response.data) ? response.data : [];
+      setTopLocations(locations);
+
+      if (locations.length === 0) {
+        console.log('⚠️ No locations returned from API');
+      }
     } catch (error) {
       console.error('❌ Error fetching top locations:', error.response?.data || error.message);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error headers:', error.response?.headers);
       console.error('❌ Full error:', error);
+      setTopLocations([]);
     } finally {
       setLoading(false);
     }
@@ -102,69 +131,85 @@ export default function HappeningPlaces() {
 
   return (
     <View style={styles.container}>
-      {/* Header with Gradient Background */}
-      <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.headerGradient}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.headerTitle}>Happening Places Near You</Text>
-        <Text style={styles.headerSubtitle}>Top rated restaurants this week</Text>
-      </LinearGradient>
-
-      {/* Location Cards */}
-      {topLocations.map((location, index) => (
-        <TouchableOpacity
-          key={location.location || location.location_name || index}
-          style={styles.card}
-          onPress={() => handleLocationPress(location)}
-          activeOpacity={0.8}
+        {/* Header with Gradient Background */}
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.headerGradient}
         >
-          <View style={styles.cardContent}>
-            {/* Rank Number */}
-            <View style={styles.rankContainer}>
-              <Text style={styles.rankNumber}>{index + 1}</Text>
-            </View>
+          <Text style={styles.headerTitle}>Happening Places Near You</Text>
+          <Text style={styles.headerSubtitle}>Top rated restaurants this week</Text>
+        </LinearGradient>
 
-            {/* Location Info */}
-            <View style={styles.locationInfo}>
-              <Text style={styles.locationName} numberOfLines={1}>
-                {location.location || location.location_name}
-              </Text>
-              <Text style={styles.uploadCount}>
-                {formatUploadCount(location.uploads)} uploaded
-              </Text>
-            </View>
+        {/* Location Cards */}
+        {topLocations.map((location, index) => (
+          <TouchableOpacity
+            key={location.location || location.location_name || index}
+            style={styles.card}
+            onPress={() => handleLocationPress(location)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.cardContent}>
+              {/* Rank Number */}
+              <View style={styles.rankContainer}>
+                <Text style={styles.rankNumber}>{index + 1}</Text>
+              </View>
 
-            {/* Image Thumbnails - Max 5 images */}
-            <View style={styles.imageRow}>
-              {location.images && location.images.length > 0 ? (
-                location.images.slice(0, 5).map((imageUrl, imgIndex) => {
-                  // Fix URL if needed
-                  const fixedUrl = imageUrl?.startsWith('http')
-                    ? imageUrl
-                    : `https://api.cofau.com${imageUrl?.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+              {/* Location Info */}
+              <View style={styles.locationInfo}>
+                <Text style={styles.locationName} numberOfLines={1}>
+                  {location.location || location.location_name}
+                </Text>
+                <Text style={styles.uploadCount}>
+                  {formatUploadCount(location.uploads)} {location.uploads === 1 ? 'post' : 'posts'}
+                </Text>
+              </View>
 
-                  return (
-                    <View key={imgIndex} style={styles.imageThumbnail}>
-                      <Image
-                        source={{ uri: fixedUrl }}
-                        style={styles.thumbnailImage}
-                        resizeMode="cover"
-                      />
-                    </View>
-                  );
-                })
-              ) : (
-                <View style={styles.imageThumbnail}>
-                  <Ionicons name="image-outline" size={24} color="#CCC" />
-                </View>
-              )}
+              {/* Image Thumbnails - Max 5 images */}
+              <View style={styles.imageRow}>
+                {location.images && location.images.length > 0 ? (
+                  location.images.slice(0, 5).map((imageUrl, imgIndex) => {
+                    // Fix URL if needed
+                    const fixUrl = (url) => {
+                      if (!url) return null;
+                      if (url.startsWith('http')) return url;
+                      // Handle relative URLs
+                      const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+                      return `${API_BASE_URL}${cleanUrl}`;
+                    };
+
+                    const fixedUrl = fixUrl(imageUrl);
+                    if (!fixedUrl) return null;
+
+                    return (
+                      <View key={imgIndex} style={styles.imageThumbnail}>
+                        <Image
+                          source={{ uri: fixedUrl }}
+                          style={styles.thumbnailImage}
+                          resizeMode="cover"
+                          onError={(error) => {
+                            console.error(`❌ Image load error for ${fixedUrl}:`, error);
+                          }}
+                        />
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={styles.imageThumbnail}>
+                    <Ionicons name="image-outline" size={24} color="#CCC" />
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
-      ))}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {/* Bottom Navigation Footer */}
       <View style={styles.bottomNav}>
@@ -214,34 +259,46 @@ export default function HappeningPlaces() {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 16,
-    marginBottom: 0,
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 16,
+    paddingBottom: 100,
   },
   loadingContainer: {
-    padding: 20,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   headerGradient: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: 12,
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#FFF',
     marginBottom: 4,
+    textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.95)',
+    textAlign: 'center',
   },
   card: {
     backgroundColor: '#FFF',
     marginHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 12,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -252,16 +309,16 @@ const styles = StyleSheet.create({
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 16,
   },
   rankContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#667eea',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   rankNumber: {
     fontSize: 16,
@@ -271,28 +328,28 @@ const styles = StyleSheet.create({
   locationInfo: {
     flex: 1,
     marginRight: 12,
+    justifyContent: 'center',
   },
   locationName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   uploadCount: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#666',
   },
   imageRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
-    marginRight: 8,
   },
   imageThumbnail: {
-    width: 50,
-    height: 50,
+    width: 48,
+    height: 48,
     borderRadius: 8,
     overflow: 'hidden',
-    marginRight: 4,
     backgroundColor: '#f0f0f0',
   },
   thumbnailImage: {
@@ -331,6 +388,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -339,7 +400,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
     backgroundColor: '#FFF',
-    marginTop: 20,
   },
   navItem: {
     alignItems: 'center',

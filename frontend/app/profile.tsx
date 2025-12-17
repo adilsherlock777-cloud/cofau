@@ -1607,11 +1607,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     marginBottom: 10,
+    paddingHorizontal: 0,
   },
   tab: {
     flex: 1,
     paddingVertical: 15,
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -1626,9 +1628,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   gridItem: {
-    width: (SCREEN_WIDTH - 6) / 3,
-    height: (SCREEN_WIDTH - 6) / 3,
-    margin: 1,
+    width: (SCREEN_WIDTH - 2) / 3,
+    height: (SCREEN_WIDTH - 2) / 3,
+    margin: 0.5,
     position: 'relative',
   },
   gridImage: {
