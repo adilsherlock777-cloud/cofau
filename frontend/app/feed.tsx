@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -48,6 +48,11 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isScrollingRef = useRef(false);
 
   useEffect(() => {
     fetchFeed();
@@ -105,11 +110,96 @@ export default function FeedScreen() {
       );
 
       setFeedPosts(mapped);
+      // Reset visible video when feed refreshes
+      setVisibleVideoId(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
+  // Track post positions for viewability detection
+  const handlePostLayout = useCallback((postId: string, event: any) => {
+    const { y, height } = event.nativeEvent.layout;
+    postPositionsRef.current.set(postId, { y, height });
+  }, []);
+
+  // Find which video should be playing based on scroll position
+  const findVisibleVideo = useCallback((scrollY: number, viewportHeight: number): string | null => {
+    const viewportTop = scrollY;
+    const viewportBottom = scrollY + viewportHeight;
+    const viewportCenter = scrollY + viewportHeight / 2;
+
+    interface VideoCandidate {
+      id: string;
+      distance: number;
+    }
+    let closestVideo: VideoCandidate | null = null;
+
+    const positions = Array.from(postPositionsRef.current.entries());
+    for (const [postId, position] of positions) {
+      const post = feedPosts.find((p) => String(p.id) === String(postId));
+      if (!post) continue;
+
+      const isVideo =
+        post.media_type === "video" ||
+        post.media_url?.toLowerCase().endsWith(".mp4");
+
+      if (!isVideo) continue;
+
+      const postTop = position.y;
+      const postBottom = position.y + position.height;
+      const postCenter = position.y + position.height / 2;
+
+      // Check if post is in viewport
+      const isInViewport =
+        (postTop >= viewportTop && postTop <= viewportBottom) ||
+        (postBottom >= viewportTop && postBottom <= viewportBottom) ||
+        (postTop <= viewportTop && postBottom >= viewportBottom);
+
+      if (isInViewport) {
+        const distance = Math.abs(postCenter - viewportCenter);
+        const candidate: VideoCandidate = { id: String(postId), distance };
+        if (!closestVideo || distance < closestVideo.distance) {
+          closestVideo = candidate;
+        }
+      }
+    }
+
+    return closestVideo?.id ?? null;
+  }, [feedPosts]);
+
+  // Handle scroll events
+  const handleScroll = useCallback((event: any) => {
+    isScrollingRef.current = true;
+    
+    // Extract values immediately before event is nullified
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const viewportHeight = event.nativeEvent.layoutMeasurement.height;
+    
+    // Clear existing timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    // Set timeout to detect when scrolling stops
+    scrollTimeoutRef.current = setTimeout(() => {
+      isScrollingRef.current = false;
+      
+      const visibleId = findVisibleVideo(scrollY, viewportHeight);
+      
+      setVisibleVideoId(visibleId);
+    }, 150); // Wait 150ms after scrolling stops
+  }, [findVisibleVideo]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -161,6 +251,8 @@ export default function FeedScreen() {
                   username={user.username}
                   size={90}
                   showLevelBadge={false}
+                  level={user.level}
+                  style={{}}
                 />
                 <TouchableOpacity
                   style={styles.dpAddButton}
@@ -203,6 +295,7 @@ export default function FeedScreen() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{ paddingBottom: 90 }} // ✅ space for bottom nav
         refreshControl={
           <RefreshControl
@@ -211,9 +304,11 @@ export default function FeedScreen() {
           />
         }
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* ================= STORIES ================= */}
-        <StoriesBar />
+        <StoriesBar refreshTrigger={refreshing} />
 
         {/* ================= FEED ================= */}
         {loading && (
@@ -224,11 +319,27 @@ export default function FeedScreen() {
         )}
 
         {!loading &&
-          feedPosts.map((post) => (
-            <View key={post.id} style={styles.postContainer}>
-              <FeedCard post={post} onLikeUpdate={fetchFeed} />
-            </View>
-          ))}
+          feedPosts.map((post) => {
+            const isVideo =
+              post.media_type === "video" ||
+              post.media_url?.toLowerCase().endsWith(".mp4");
+            const shouldPlay = isVideo && visibleVideoId === post.id && !isScrollingRef.current;
+            
+            return (
+              <View
+                key={post.id}
+                style={styles.postContainer}
+                onLayout={(e) => handlePostLayout(String(post.id), e)}
+              >
+                <FeedCard
+                  post={post}
+                  onLikeUpdate={fetchFeed}
+                  onStoryCreated={() => {}}
+                  shouldPlay={shouldPlay}
+                />
+              </View>
+            );
+          })}
       </ScrollView>
 
       {/* ================= BOTTOM TABS (ONLY ADDITION) ================= */}

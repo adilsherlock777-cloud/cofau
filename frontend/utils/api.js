@@ -33,8 +33,11 @@ export const createPost = async (postData) => {
     if (postData.location_name) {
       formData.append('location_name', postData.location_name);
     }
+    if (postData.category) {
+      formData.append('category', postData.category);  // ✅ Add category
+    }
     if (postData.media_type) {
-      formData.append('media_type', postData.media_type);   // 👈 NEW
+      formData.append('media_type', postData.media_type);
     }
 
     // Append file - handle both web and native
@@ -60,6 +63,8 @@ export const createPost = async (postData) => {
       rating: postData.rating,
       review_text: postData.review_text,
       map_link: postData.map_link,
+      location_name: postData.location_name,
+      category: postData.category,
       media_type: postData.media_type,
       file: postData.file?.name || postData.file?.uri || 'unknown'
     });

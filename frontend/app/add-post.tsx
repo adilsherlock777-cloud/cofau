@@ -252,6 +252,9 @@ export default function AddPostScreen() {
         media_type: mediaType,
       };
 
+      console.log('📤 Sending post with category:', category);
+      console.log('📤 Full post data:', postData);
+
       const result = await createPost(postData);
 
       setLoading(false);

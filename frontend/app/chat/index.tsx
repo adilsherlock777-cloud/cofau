@@ -89,6 +89,7 @@ export default function ChatListScreen() {
         keyExtractor={(item) => item.other_user_id}
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={styles.sep} />}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={() => (
           <View style={{ padding: 20 }}>
             <Text style={{ textAlign: "center", color: "#999" }}>
@@ -103,6 +104,10 @@ export default function ChatListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
+  listContent: {
+    paddingTop: 60, // ✅ Add top padding so first chat is visible
+    paddingBottom: 20,
+  },
   item: { flexDirection: "row", alignItems: "center", padding: 12 },
   name: { fontSize: 15, fontWeight: "600" },
   preview: { fontSize: 13, color: "#555", marginTop: 2 },

@@ -133,14 +133,20 @@ export default function ExploreScreen() {
         console.log('🔄 Explore screen focused - refreshing posts');
         fetchPosts(true);
       }
-      
     }, [user, token, selectedCategory])
   );
 
-  // Filter posts by category
-  const filteredPosts = selectedCategory && selectedCategory !== 'All'
-    ? posts.filter(post => post.category === selectedCategory)
-    : posts;
+  // Refetch posts when category changes
+  useEffect(() => {
+    if (user && token) {
+      console.log('🔄 Category changed, refetching posts:', selectedCategory);
+      fetchPosts(true);
+    }
+  }, [selectedCategory]);
+
+  // Posts are already filtered by backend when category is selected
+  // No need for client-side filtering since backend handles it
+  const filteredPosts = posts;
 
   // ================================
   // 🔥 Fetch Explore Posts
@@ -156,8 +162,14 @@ export default function ExploreScreen() {
 
       const skip = refresh ? 0 : (page - 1) * 30;
 
-      // No limit parameter - fetch ALL posts
-      const res = await axios.get(`${API_URL}/feed?skip=${skip}`, {
+      // Build URL with category filter if selected
+      let feedUrl = `${API_URL}/feed?skip=${skip}`;
+      if (selectedCategory && selectedCategory !== 'All') {
+        feedUrl += `&category=${encodeURIComponent(selectedCategory)}`;
+      }
+
+      // No limit parameter - fetch ALL posts (or filtered by category)
+      const res = await axios.get(feedUrl, {
         headers: { Authorization: `Bearer ${token || ''}` },
       });
 
@@ -173,6 +185,8 @@ export default function ExploreScreen() {
           full_thumbnail_url: thumb,
           is_liked: post.is_liked_by_user || false,
           _isVideo: isVideoFile(fullUrl || '', post.media_type),
+          // ✅ Ensure category is preserved and trimmed
+          category: post.category ? post.category.trim() : null,
         };
       });
 
