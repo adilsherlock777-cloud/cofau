@@ -61,7 +61,7 @@ export default function ProfileScreen() {
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'posts' | 'people' | 'contributions'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'people' | 'contributions' | 'favourite'>('posts');
   const [complimentsCount, setComplimentsCount] = useState(0);
   const [hasComplimented, setHasComplimented] = useState(false);
   const [peopleList, setPeopleList] = useState<any[]>([]);
@@ -991,9 +991,22 @@ export default function ProfileScreen() {
               Contributions
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'favourite' && styles.activeTab]}
+            onPress={() => setActiveTab('favourite')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'favourite' && styles.activeTabText,
+              ]}
+            >
+              Favourite
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Content Grid / People List */}
+        {/* Content Grid / People List / Favourite */}
         {activeTab === 'people' ? (
           <View>
             {/* Followers/Following Toggle */}
@@ -1050,6 +1063,71 @@ export default function ProfileScreen() {
                 </View>
               )}
             />
+          </View>
+        ) : activeTab === 'favourite' ? (
+          <View>
+            {/* Favourite Tab - Posts Grouped by Location */}
+            {(() => {
+              // Group posts by location
+              const postsWithLocation = userPosts.filter(post => post.location_name);
+              const locationGroups: { [key: string]: any[] } = {};
+              
+              postsWithLocation.forEach(post => {
+                const locationName = post.location_name || 'Unknown Location';
+                if (!locationGroups[locationName]) {
+                  locationGroups[locationName] = [];
+                }
+                locationGroups[locationName].push(post);
+              });
+
+              const sortedLocations = Object.keys(locationGroups).sort();
+
+              if (sortedLocations.length === 0) {
+                return (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="location-outline" size={64} color="#ccc" />
+                    <Text style={styles.emptyText}>No posts with location yet</Text>
+                  </View>
+                );
+              }
+
+              return (
+                <View>
+                  {sortedLocations.map(location => (
+                    <View key={location} style={styles.locationGroup}>
+                      {/* Location Header */}
+                      <View style={styles.locationHeader}>
+                        <Ionicons name="location" size={20} color="#007AFF" />
+                        <Text style={styles.locationName}>{location}</Text>
+                        <Text style={styles.locationCount}>({locationGroups[location].length})</Text>
+                      </View>
+
+                      {/* Location Posts Grid */}
+                      <View style={styles.locationGrid}>
+                        {locationGroups[location].map((post, index) => (
+                          <TouchableOpacity
+                            key={post.id}
+                            style={styles.gridItem}
+                            onPress={() => router.push(`/post-details/${post.id}`)}
+                          >
+                            <Image
+                              source={{ uri: fixUrl(post.media_url) || '' }}
+                              style={styles.gridImage}
+                              resizeMode="cover"
+                            />
+                            {post.media_type === 'video' && (
+                              <View style={styles.videoIndicator}>
+                                <Ionicons name="play-circle" size={24} color="#fff" />
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
           </View>
         ) : (
           <FlatList
@@ -1557,6 +1635,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  videoIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 12,
+  },
   gridImageContainer: {
     width: '100%',
     height: '100%',
@@ -1890,5 +1976,35 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  locationGroup: {
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
+  },
+  locationCount: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 4,
+  },
+  locationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
   },
 });
