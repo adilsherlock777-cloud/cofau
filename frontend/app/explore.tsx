@@ -133,6 +133,7 @@ export default function ExploreScreen() {
         console.log('🔄 Explore screen focused - refreshing posts');
         fetchPosts(true);
       }
+      
     }, [user, token, selectedCategory])
   );
 
