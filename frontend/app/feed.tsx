@@ -408,8 +408,8 @@ const styles = StyleSheet.create({
     paddingTop: 65,
     paddingBottom: 65,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 30,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
   },
 
   headerRow: {
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   },
 
   levelCardWrapper: {
-    marginHorizontal: 22,
+    marginHorizontal: 26,
     marginTop: -40,
     marginBottom: 4,
   },
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 15,
     paddingVertical: 26,
-    paddingLeft: 102,
+    paddingLeft: 100,
     paddingRight: 10,
     flexDirection: "row",
     alignItems: "center",
