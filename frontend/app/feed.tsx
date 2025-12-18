@@ -49,6 +49,7 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
+  const [showFixedLine, setShowFixedLine] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -177,6 +178,13 @@ export default function FeedScreen() {
     const scrollY = event.nativeEvent.contentOffset.y;
     const viewportHeight = event.nativeEvent.layoutMeasurement.height;
     
+    // Show fixed line when scrolled down more than 100px
+    if (scrollY > 100) {
+      setShowFixedLine(true);
+    } else {
+      setShowFixedLine(false);
+    }
+    
     // Clear existing timeout
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
@@ -203,97 +211,11 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      {/* ================= HEADER WITH GRADIENT ================= */}
-      <View style={styles.headerContainer}>
-        <LinearGradient
-          colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gradientHeader}
-        >
-          {/* Top row with icons */}
-          <View style={styles.headerRow}>
-            {/* Left Message Icon */}
-            <TouchableOpacity
-              style={styles.leftIcon}
-              onPress={() => router.push("/chat")}
-            >
-              <Ionicons name="chatbubble-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-
-            <Text style={styles.cofauTitle}>Cofau</Text>
-
-            <View style={styles.headerIcons}>
-              <TouchableOpacity onPress={() => router.push("/notifications")}>
-                <Ionicons name="notifications" size={24} color="#fff" />
-                {unreadCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* ===== LEVEL CARD WITH OVERLAPPING DP (IMAGE 2 STYLE) ===== */}
-        {user && (
-          <View style={styles.levelCardWrapper}>
-            {/* Level card - white background */}
-            <View style={styles.levelCard}>
-              {/* Profile picture - positioned to overlap on the left */}
-              <View style={styles.dpContainer}>
-                <UserAvatar
-                  profilePicture={user.profile_picture}
-                  username={user.username}
-                  size={82}
-                  showLevelBadge={false}
-                  level={user.level}
-                  style={{}}
-                />
-                <TouchableOpacity
-                  style={styles.dpAddButton}
-                  onPress={() => router.push("/add-post")}
-                >
-                  <Ionicons name="add" size={16} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.levelContent}>
-                <Text style={styles.levelLabel}>Level {user.level}</Text>
-
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <LinearGradient
-                      colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${Math.min(
-                            ((user.currentPoints || 0) /
-                              (user.requiredPoints || 1250)) *
-                              100,
-                            100
-                          )}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    {user.currentPoints || 0}/{user.requiredPoints || 1250}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-
+      {/* Fixed Line Below Status Bar - Shows only when scrolled */}
+      {showFixedLine && (
+        <View style={styles.fixedLine} />
+      )}
+      
       <ScrollView
         ref={scrollViewRef}
         contentContainerStyle={{ paddingBottom: 90 }}
@@ -307,6 +229,97 @@ export default function FeedScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
+        {/* ================= HEADER WITH GRADIENT - NOW SCROLLABLE ================= */}
+        <View style={styles.headerContainer}>
+          <LinearGradient
+            colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientHeader}
+          >
+            {/* Top row with icons */}
+            <View style={styles.headerRow}>
+              {/* Left Message Icon */}
+              <TouchableOpacity
+                style={styles.leftIcon}
+                onPress={() => router.push("/chat")}
+              >
+                <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+
+              <Text style={styles.cofauTitle}>Cofau</Text>
+
+              <View style={styles.headerIcons}>
+                <TouchableOpacity onPress={() => router.push("/notifications")}>
+                  <Ionicons name="notifications" size={24} color="#fff" />
+                  {unreadCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* ===== LEVEL CARD WITH OVERLAPPING DP - OVERLAPS GRADIENT ===== */}
+          {user && (
+            <View style={styles.levelCardWrapper}>
+              {/* Level card - white background with more rounded edges */}
+              <View style={styles.levelCard}>
+                {/* Profile picture - positioned to overlap on the left */}
+                <View style={styles.dpContainer}>
+                  <UserAvatar
+                    profilePicture={user.profile_picture}
+                    username={user.username}
+                    size={72}
+                    showLevelBadge={false}
+                    level={user.level}
+                    style={{}}
+                  />
+                  <TouchableOpacity
+                    style={styles.dpAddButton}
+                    onPress={() => router.push("/add-post")}
+                  >
+                    <Ionicons name="add" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.levelContent}>
+                  <Text style={styles.levelLabel}>Level {user.level}</Text>
+
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <LinearGradient
+                        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[
+                          styles.progressFill,
+                          {
+                            width: `${Math.min(
+                              ((user.currentPoints || 0) /
+                                (user.requiredPoints || 1250)) *
+                                100,
+                              100
+                            )}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.progressText}>
+                      {user.currentPoints || 0}/{user.requiredPoints || 1250}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
         {/* ================= STORIES ================= */}
         <StoriesBar refreshTrigger={refreshing} />
 
@@ -399,6 +412,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
 
+  // Fixed line below status bar - appears on scroll
+  fixedLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    zIndex: 1000,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+
   headerContainer: {
     position: "relative",
     marginBottom: 4,
@@ -469,9 +500,9 @@ const styles = StyleSheet.create({
 
   levelCard: {
     backgroundColor: "#fff",
-    borderRadius: 15,
-    paddingVertical: 26,
-    paddingLeft: 100,
+    borderRadius: 25,
+    paddingVertical: 20,
+    paddingLeft: 95,
     paddingRight: 10,
     flexDirection: "row",
     alignItems: "center",
@@ -487,9 +518,9 @@ const styles = StyleSheet.create({
 
   dpContainer: {
     position: "absolute",
-    left: 8,
-    top: "155%",
-    transform: [{ translateY: -50 }],
+    left: 5,
+    top: "124%",
+    transform: [{ translateY: -41 }],
     zIndex: 6,
   },
 
@@ -584,14 +615,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   
-  centerNavItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: -30,  // This moves it up
-  },
-  // ✅ NEW: Center elevated item
+  // ✅ Center elevated item
   centerNavItem: {
     alignItems: "center",
     justifyContent: "center",
@@ -600,7 +624,7 @@ const styles = StyleSheet.create({
     marginTop: -30,
   },
 
-  // ✅ NEW: Circle background for center icon
+  // ✅ Circle background for center icon
   centerIconCircle: {
     width: 56,
     height: 56,
