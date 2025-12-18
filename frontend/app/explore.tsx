@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   categoryModalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    color: "#fff",
   },
   categoryList: {
     padding: 12,
@@ -760,9 +760,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9F9F9",
   },
   categoryItemSelected: {
-    backgroundColor: "#E8F8F7",
+    backgroundColor: "#1B7C82",
     borderWidth: 2,
-    borderColor: "#4ECDC4",
+    borderColor: "#FFF",
   },
   categoryItemContent: {
     flexDirection: "row",
@@ -777,6 +777,6 @@ const styles = StyleSheet.create({
   },
   categoryItemTextSelected: {
     fontWeight: "600",
-    color: "#4ECDC4",
+    color: "#FFF",
   },
 });
