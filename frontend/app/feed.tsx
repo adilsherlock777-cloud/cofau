@@ -226,7 +226,7 @@ export default function FeedScreen() {
 
             <View style={styles.headerIcons}>
               <TouchableOpacity onPress={() => router.push("/notifications")}>
-                <Ionicons name="notifications-outline" size={24} color="#fff" />
+                <Ionicons name="notifications" size={24} color="#fff" />
                 {unreadCount > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -296,7 +296,7 @@ export default function FeedScreen() {
 
       <ScrollView
         ref={scrollViewRef}
-        contentContainerStyle={{ paddingBottom: 90 }} // ✅ space for bottom nav
+        contentContainerStyle={{ paddingBottom: 90 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -342,7 +342,7 @@ export default function FeedScreen() {
           })}
       </ScrollView>
 
-      {/* ================= BOTTOM TABS ================= */}
+      {/* ================= BOTTOM TABS (UPDATED) ================= */}
       <View style={styles.navBar}>
         <TouchableOpacity 
           style={styles.navItem}
@@ -360,20 +360,23 @@ export default function FeedScreen() {
           <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
 
+        {/* ✅ ELEVATED CENTER BUTTON */}
         <TouchableOpacity 
-          style={styles.navItem}
+          style={styles.centerNavItem}
           onPress={() => router.push("/leaderboard")}
         >
-          <Ionicons name="trophy" size={28} color="#000" />
-          <Text style={styles.navLabel}>Leaderboard</Text>
+          <View style={styles.centerIconCircle}>
+            <Ionicons name="camera" size={28} color="#000" />
+          </View>
+          <Text style={styles.navLabel}>Top Posts</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => router.push("/happening")}
         >
-          <Ionicons name="restaurant-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Restaurant</Text>
+          <Ionicons name="location-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -402,10 +405,10 @@ const styles = StyleSheet.create({
   },
 
   gradientHeader: {
-    paddingTop: 60,
-    paddingBottom: 60,
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 30,
+    paddingTop: 65,
+    paddingBottom: 65,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 20,
     borderBottomRightRadius: 30,
   },
 
@@ -459,7 +462,7 @@ const styles = StyleSheet.create({
   },
 
   levelCardWrapper: {
-    marginHorizontal: 15,
+    marginHorizontal: 22,
     marginTop: -40,
     marginBottom: 4,
   },
@@ -467,9 +470,9 @@ const styles = StyleSheet.create({
   levelCard: {
     backgroundColor: "#fff",
     borderRadius: 15,
-    paddingVertical: 24,
+    paddingVertical: 26,
     paddingLeft: 102,
-    paddingRight: 12,
+    paddingRight: 10,
     flexDirection: "row",
     alignItems: "center",
     elevation: 10,
@@ -485,7 +488,7 @@ const styles = StyleSheet.create({
   dpContainer: {
     position: "absolute",
     left: 8,
-    top: "127%",
+    top: "155%",
     transform: [{ translateY: -50 }],
     zIndex: 6,
   },
@@ -509,23 +512,23 @@ const styles = StyleSheet.create({
   },
 
   levelLabel: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "700",
     color: "#333",
-    marginBottom: 6,
+    marginBottom: 2,
   },
 
   progressContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
 
   progressBar: {
     flex: 1,
     height: 8,
     backgroundColor: "#E8E8E8",
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: "hidden",
   },
 
@@ -559,6 +562,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 8,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#E8E8E8",
     backgroundColor: "#FFFFFF",
@@ -567,7 +571,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     elevation: 8,
-    shadowColor: "#000",
+    shadowColor: "#f7f3f3ff",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -578,6 +582,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
+  },
+  
+  centerNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -30,  // This moves it up
+  },
+  // ✅ NEW: Center elevated item
+  centerNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -30,
+  },
+
+  // ✅ NEW: Circle background for center icon
+  centerIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF", 
+    borderWidth: 2, 
+    borderColor: "#000", 
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+    elevation: 8,
+    shadowColor: "#f0ebebff",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
 
   navLabel: {

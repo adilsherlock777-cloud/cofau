@@ -196,7 +196,7 @@ export default function FeedCard({
             <Video
               ref={videoRef}
               source={{ uri: mediaUrl }}
-              style={styles.image}
+              style={styles.video}
               resizeMode="cover"
               shouldPlay={false}
               isLooping
@@ -331,7 +331,8 @@ const styles = StyleSheet.create({
   },
 
   username: {
-    fontSize: 15,
+    fontSize: 14,
+    alignItems: "top",
     fontWeight: "600",
     color: "#333",
   },
@@ -339,13 +340,19 @@ const styles = StyleSheet.create({
   videoContainer: {
     position: "relative",
     width: "100%",
-    aspectRatio: 1,
+    aspectRatio: 2,
     backgroundColor: "#000",
   },
   image: {
     width: "100%",
-    aspectRatio: 1,
+    aspectRatio: 1, 
   },
+
+  video: {
+    width: "100%",
+    aspectRatio: 9 / 16,  
+  },
+
   playIconOverlay: {
     position: "absolute",
     top: 0,
@@ -365,13 +372,14 @@ const styles = StyleSheet.create({
   },
 
   detailsContainer: {
-    padding: 10,
+    padding: 8,
+    paddingBottom: 0,
   },
 
   detailBox: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 8,
+    borderRadius: 0,
+    padding: 14,
     marginBottom: 10,
     borderColor: "#DADCE0",
     shadowColor: "#000", 
@@ -379,13 +387,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    borderWidth: 1.5,
+    borderWidth: 0,
   },
 
   detailLabel: {
-    fontSize: 12,
-    fontWeight: "480",
-    color: "#5F6368",
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#666",
     marginBottom: 4,
     letterSpacing: 0.5,
     textTransform: "uppercase", 
@@ -398,14 +406,14 @@ const styles = StyleSheet.create({
   },
 
   ratingText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
     color: "#202124",
   },
 
   ratingNumber: {
-    fontWeight: "600",
-    fontSize: 18,
+    fontWeight: "700",
+    fontSize: 15,
   },
 
   reviewRow: {
@@ -414,29 +422,35 @@ const styles = StyleSheet.create({
   },
 
   reviewText: {
-    fontSize: 16,
-    fontWeight: "600", 
+    fontSize: 15,
+    fontWeight: "680", 
     color: "#202124",
     flex: 1,
   },
 
   locationBox: {
-    shadowColor: "#050505d0",
-    shadowOffset: { width: 25, height: 35 },
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 4,
+    borderWidth: 0.5,
+    borderColor: "#000",        // ✅ Change from #DADCE0 to cyan (more noticeable)
+    shadowColor: "#000",        // ✅ Add cyan shadow
+    shadowOffset: { width: 7, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 18,
-    elevation: 5,
+    shadowRadius: 3,
+    elevation: 2,
   },
 
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
 
   locationText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
     color: "#202124",
   },
 
@@ -459,7 +473,7 @@ const styles = StyleSheet.create({
   actionCount: {
     fontSize: 14,
     color: "#202124",
-    fontWeight: "600",
+    fontWeight: "700",
   },
 
   likedCount: {
@@ -496,7 +510,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    gap: 12,
+    gap: 8,
   },
   optionsMenuText: {
     fontSize: 16,

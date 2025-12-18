@@ -103,7 +103,7 @@ export default function StoriesBar({ refreshTrigger }) {
             <UserAvatar
               profilePicture={normalizeProfilePicture(user.profile_picture)}
               username={user.full_name}
-              size={79}
+              size={78}
               showLevelBadge={false}
             />
 
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
 
   storyUsername: {
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 10,
     color: "#333",
     textAlign: "center",
   },
