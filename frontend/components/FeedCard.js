@@ -430,15 +430,15 @@ const styles = StyleSheet.create({
 
   locationBox: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 12,
-    marginBottom: 4,
+    marginBottom: 1,
     borderWidth: 0.5,
-    borderColor: "#000",        // ✅ Change from #DADCE0 to cyan (more noticeable)
-    shadowColor: "#000",        // ✅ Add cyan shadow
-    shadowOffset: { width: 7, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    borderColor: "#0e0e0dff",        // ✅ Change from #DADCE0 to cyan (more noticeable)
+    shadowColor: "#F2CF68",        // ✅ Add cyan shadow
+    shadowOffset: { width: 10, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 0.8,
     elevation: 2,
   },
 

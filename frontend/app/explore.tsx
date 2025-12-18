@@ -339,7 +339,7 @@ export default function ExploreScreen() {
           <Text style={styles.headerTitle}>Cofau</Text>
         </LinearGradient>
         
-        {/* Search bar - Overlapping gradient edge */}
+        {/* Search bar with inline category filter */}
         <View style={styles.searchBoxWrapper}>
           <View style={styles.searchBox}>
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -352,32 +352,18 @@ export default function ExploreScreen() {
               returnKeyType="search"
               onSubmitEditing={performSearch}
             />
+            {/* ✅ Category Filter Button Inside Search Bar */}
+            <TouchableOpacity 
+              style={styles.inlineFilterButton}
+              onPress={() => setShowCategoryModal(true)}
+            >
+              <Ionicons name="options-outline" size={18} color="#FFFF" />
+              <Text style={styles.inlineFilterText}>
+                {selectedCategory && selectedCategory !== 'All' ? selectedCategory.substring(0, 8) + '...' : 'Category'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </View>
-
-      {/* Category Filter Button */}
-      <View style={styles.filterContainer}>
-        <TouchableOpacity 
-          style={styles.filterButton}
-          onPress={() => setShowCategoryModal(true)}
-        >
-          <Ionicons name="filter" size={20} color="#fff" />
-          <Text style={styles.filterButtonText}>
-            {selectedCategory && selectedCategory !== 'All' ? selectedCategory : 'Filter by Category'}
-          </Text>
-          {selectedCategory && selectedCategory !== 'All' && (
-            <TouchableOpacity 
-              onPress={(e) => {
-                e.stopPropagation();
-                setSelectedCategory('');
-              }}
-              style={styles.clearFilterButton}
-            >
-              <Ionicons name="close-circle" size={18} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
       </View>
 
       {/* Grid - No gap from search bar */}
@@ -405,40 +391,52 @@ export default function ExploreScreen() {
         }
       />
 
-      {/* Bottom Navigation - With Labels */}
+      {/* Bottom Navigation - Updated Style */}
       <View style={styles.navBar}>
         {/* Home */}
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}>
-          <Ionicons name="home-outline" size={24} color="#333" />
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/feed")}
+        >
+          <Ionicons name="home-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
         
         {/* Explore */}
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}>
-          <Ionicons name="compass" size={24} color="#333" />
-          <Text style={styles.navLabel}>Explore</Text>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/explore")}
+        >
+          <Ionicons name="compass" size={28} color="#000" />
+          <Text style={styles.navLabelActive}>Explore</Text>
         </TouchableOpacity>
         
-        {/* Center - Leaderboard (Trophy) */}
+        {/* Center - Top Posts with Camera Icon */}
         <TouchableOpacity 
-          style={styles.centerButton} 
+          style={styles.centerNavItem}
           onPress={() => router.push("/leaderboard")}
         >
-          <View style={styles.centerButtonInner}>
-            <Ionicons name="trophy" size={28} color="#333" />
+          <View style={styles.centerIconCircle}>
+            <Ionicons name="camera" size={28} color="#000" />
           </View>
-          <Text style={styles.navLabel}>Leaderboard</Text>
+          <Text style={styles.navLabel}>Top Posts</Text>
         </TouchableOpacity>
         
         {/* Happening */}
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}>
-          <Ionicons name="restaurant-outline" size={24} color="#333" />
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/happening")}
+        >
+          <Ionicons name="location-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
         
         {/* Profile */}
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}>
-          <Ionicons name="person-outline" size={24} color="#333" />
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push("/profile")}
+        >
+          <Ionicons name="person-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -599,6 +597,27 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
+  // ✅ Inline filter button inside search bar
+  inlineFilterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1B7C82",
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 15,
+    marginLeft: 8,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#000",
+  },
+
+  inlineFilterText: {
+    fontSize: 12,
+    color: "#FFF",
+    fontWeight: "600",
+    maxWidth: 60,
+  },
+
   /* Grid Tiles */
   tile: {
     width: TILE_SIZE,
@@ -633,7 +652,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
 
-  /* Bottom Navigation with Labels */
+  /* Bottom Navigation - Updated */
   navBar: {
     position: "absolute",
     bottom: 0,
@@ -641,78 +660,69 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: "row",
     justifyContent: "space-around",
-    alignItems: "flex-end",
-    paddingTop: 10,
-    paddingBottom: 20,
-    backgroundColor: "#fff",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#E5E5E5",
+    borderTopColor: "#E8E8E8",
+    backgroundColor: "#FFFFFF",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
 
   navItem: {
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 60,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
 
   navLabel: {
-    fontSize: 9,
-    color: "#333",
-    marginTop: 4,
+    fontSize: 11,
+    color: "#000",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "500",
   },
 
-  centerButton: {
+  navLabelActive: {
+    fontSize: 11,
+    color: "#000",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "700",
+  },
+
+  // ✅ Center elevated item
+  centerNavItem: {
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -25,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -30,
   },
 
-  centerButtonInner: {
+  // ✅ Circle background for center icon
+  centerIconCircle: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: "#333",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-
-  // Filter Button
-  filterContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  filterButton: {
-    flexDirection: "row",
+    borderColor: "#000",
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#4ECDC4",
-    borderRadius: 25,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    gap: 10,
+    marginBottom: 4,
+    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  filterButtonText: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  clearFilterButton: {
-    padding: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
 
-  // Category Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
