@@ -8,12 +8,17 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
+import axios from "axios";
+import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
 
 const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
+const API_URL = `${API_BASE}/api`;
 
 // Convert https → wss or http → ws
 const WS_BASE = API_BASE.replace(/^https?/, (match) => match === "https" ? "wss" : "ws");
@@ -23,6 +28,7 @@ interface Message {
   from_user: string;
   to_user: string;
   message: string;
+  post_id?: string | null;
   created_at: string;
 }
 
@@ -33,10 +39,27 @@ export default function ChatScreen() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [postData, setPostData] = useState<{ [key: string]: any }>({});
+  const [loadingPosts, setLoadingPosts] = useState<{ [key: string]: boolean }>({});
   const wsRef = useRef<WebSocket | null>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
 
   const currentUserId = user?.id || user?._id;
+
+  // Fetch post data when post_id is present
+  const fetchPost = async (postId: string) => {
+    if (postData[postId] || loadingPosts[postId]) return;
+    
+    setLoadingPosts((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const response = await axios.get(`${API_URL}/posts/${postId}`);
+      setPostData((prev) => ({ ...prev, [postId]: response.data }));
+    } catch (error) {
+      console.error("Error fetching post:", error);
+    } finally {
+      setLoadingPosts((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
 
   useEffect(() => {
     if (!token || !userId) return;
@@ -58,9 +81,20 @@ export default function ChatScreen() {
         const data = JSON.parse(event.data);
 
         if (data.type === "history") {
-          setMessages(data.messages || []);
+          const historyMessages = data.messages || [];
+          setMessages(historyMessages);
+          // Fetch posts for messages with post_id
+          historyMessages.forEach((msg: Message) => {
+            if (msg.post_id) {
+              fetchPost(msg.post_id);
+            }
+          });
         } else if (data.type === "message") {
           setMessages((prev) => [...prev, data]);
+          // Fetch post if this message has a post_id
+          if (data.post_id) {
+            fetchPost(data.post_id);
+          }
         }
 
         setTimeout(() => {
@@ -155,6 +189,9 @@ export default function ChatScreen() {
 
   const renderItem = ({ item }: { item: Message }) => {
     const isMe = item.from_user === currentUserId;
+    const post = item.post_id ? postData[item.post_id] : null;
+    const isLoadingPost = item.post_id ? loadingPosts[item.post_id] : false;
+
     return (
       <View
         style={[
@@ -163,7 +200,56 @@ export default function ChatScreen() {
         ]}
       >
         <Text style={styles.msg}>{item.message}</Text>
-        <Text style={styles.time}>
+        
+        {/* Post Preview */}
+        {item.post_id && (
+          <TouchableOpacity
+            style={styles.postPreview}
+            onPress={() => router.push(`/post-details/${item.post_id}`)}
+            activeOpacity={0.7}
+          >
+            {isLoadingPost ? (
+              <View style={styles.postLoadingContainer}>
+                <ActivityIndicator size="small" color={isMe ? "#fff" : "#666"} />
+              </View>
+            ) : post ? (
+              <>
+                <Image
+                  source={{ uri: normalizeMediaUrl(post.thumbnail_url || post.media_url || post.image_url) }}
+                  style={styles.postImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.postInfo}>
+                  <Text style={[styles.postUsername, isMe && styles.postUsernameRight]}>
+                    {post.username || "User"}
+                  </Text>
+                  {post.review_text && (
+                    <Text
+                      style={[styles.postText, isMe && styles.postTextRight]}
+                      numberOfLines={2}
+                    >
+                      {post.review_text}
+                    </Text>
+                  )}
+                  {post.rating && (
+                    <Text style={[styles.postRating, isMe && styles.postRatingRight]}>
+                      ⭐ {post.rating}/10
+                    </Text>
+                  )}
+                </View>
+              </>
+            ) : (
+              <View style={styles.postErrorContainer}>
+                <Ionicons name="image-outline" size={24} color={isMe ? "#fff" : "#666"} />
+                <Text style={[styles.postErrorText, isMe && styles.postErrorTextRight]}>
+                  Post unavailable
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+        
+        <Text style={[styles.time, isMe && styles.timeRight]}>
           {new Date(item.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -230,8 +316,67 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: "75%", padding: 10, borderRadius: 15, marginVertical: 4 },
   bubbleLeft: { alignSelf: "flex-start", backgroundColor: "#f2f2f2" },
   bubbleRight: { alignSelf: "flex-end", backgroundColor: "#4dd0e1" },
-  msg: { fontSize: 15 },
+  msg: { fontSize: 15, marginBottom: 4 },
   time: { fontSize: 10, marginTop: 4, color: "#555", textAlign: "right" },
+  timeRight: { color: "rgba(255,255,255,0.8)" },
+  postPreview: {
+    marginTop: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  postImage: {
+    width: "100%",
+    height: 200,
+    backgroundColor: "#f0f0f0",
+  },
+  postInfo: {
+    padding: 10,
+  },
+  postUsername: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 4,
+  },
+  postUsernameRight: {
+    color: "#fff",
+  },
+  postText: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 4,
+  },
+  postTextRight: {
+    color: "rgba(255,255,255,0.9)",
+  },
+  postRating: {
+    fontSize: 12,
+    color: "#666",
+  },
+  postRatingRight: {
+    color: "rgba(255,255,255,0.8)",
+  },
+  postLoadingContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  postErrorContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  postErrorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#666",
+  },
+  postErrorTextRight: {
+    color: "rgba(255,255,255,0.8)",
+  },
   inputRow: {
     flexDirection: "row",
     padding: 10,

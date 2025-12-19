@@ -410,4 +410,23 @@ export const shareStory = async (storyId) => {
   }
 };
 
+/**
+ * Share a post to users via chat
+ * @param {string} postId - Post ID to share
+ * @param {Array<string>} userIds - Array of user IDs to share with
+ * @returns {Promise} - API response
+ */
+export const sharePostToUsers = async (postId, userIds) => {
+  try {
+    const response = await axios.post(`${API_URL}/chat/share-post`, {
+      post_id: postId,
+      user_ids: userIds,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error sharing post:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export default api;
