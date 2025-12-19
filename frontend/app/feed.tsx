@@ -245,7 +245,7 @@ export default function FeedScreen() {
                 style={styles.leftIcon}
                 onPress={() => router.push("/chat")}
               >
-                <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+                <Ionicons name="chatbox-ellipses" size={23} color="#fff" />
               </TouchableOpacity>
 
               <Text style={styles.cofauTitle}>Cofau</Text>
@@ -284,7 +284,7 @@ export default function FeedScreen() {
                     style={styles.dpAddButton}
                     onPress={() => router.push("/add-post")}
                   >
-                    <Ionicons name="add" size={16} color="#fff" />
+                    <Ionicons name="add" size={19} color="#0f0303ff" />
                   </TouchableOpacity>
                 </View>
 
@@ -439,8 +439,13 @@ const styles = StyleSheet.create({
     paddingTop: 65,
     paddingBottom: 65,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",                // ADD THIS
+    shadowOffset: { width: 4, height: 4 },  // ADD THIS
+    shadowOpacity: 0.15,                // ADD THIS
+    shadowRadius: 8,                    // ADD THIS
+    elevation: 6, 
   },
 
   headerRow: {
@@ -466,6 +471,9 @@ const styles = StyleSheet.create({
     color: "#fff",
     letterSpacing: 1,
     zIndex: -1,
+    textShadowColor: "rgba(0, 0, 0, 0.15)",      // ADD THIS
+    textShadowOffset: { width: 6, height: 4 },   // ADD THIS
+    textShadowRadius: 4, 
   },
 
   headerIcons: {
@@ -531,11 +539,11 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: "#4dd0e1",
+    backgroundColor: "#f2f4f5ff",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#fff",
+    borderWidth: 0.5,
+    borderColor: "#050202ff",
   },
 
   levelContent: {

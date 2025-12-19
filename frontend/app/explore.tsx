@@ -548,20 +548,29 @@ const styles = StyleSheet.create({
 
   /* Gradient Header - With Rounded Bottom Corners */
   gradientHeader: {
-    paddingTop: 50,
-    paddingBottom: 40,
+    paddingTop: 65,
+    paddingBottom: 55,
     alignItems: "center",
     justifyContent: "center",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
+    shadowColor: "#000",                
+    shadowOffset: { width: 0, height: 4 },   
+    shadowOpacity: 0.15,                  
+    shadowRadius: 8,                    
+    elevation: 6,    
   },
 
   headerTitle: {
     fontFamily: "Lobster",
-    fontSize: 32,
+    fontSize: 36,
     color: "#fff",
     textAlign: "center",
     letterSpacing: 1,
+    zIndex: -1,
+    textShadowColor: "rgba(0, 0, 0, 0.15)",      
+    textShadowOffset: { width: 4, height: 6 },   
+    textShadowRadius: 4, 
   },
 
   /* Search Bar - Overlapping gradient edge */

@@ -215,7 +215,7 @@ export default function FeedCard({
           <View style={styles.detailBox}>
             <Text style={styles.detailLabel}>RATING</Text>
             <View style={styles.ratingRow}>
-              <Ionicons name="star" size={18} color="#FFD700" />
+              <Ionicons name="star" size={19} color="#FFD700" />
               <Text style={styles.ratingText}>
                 <Text style={styles.ratingNumber}>{post.rating}</Text>/10
               </Text>
@@ -228,7 +228,7 @@ export default function FeedCard({
           <View style={styles.detailBox}>
             <Text style={styles.detailLabel}>REVIEW</Text>
             <View style={styles.reviewRow}>
-              <Ionicons name="create" size={18} color="#FFD700" />
+              <Ionicons name="create" size={19} color="#FFD700" />
               <Text style={styles.reviewText}>{post.description}</Text>
             </View>
           </View>
@@ -246,7 +246,7 @@ export default function FeedCard({
             <View style={styles.locationRow}>
               <Ionicons
                 name="location"
-                size={18}
+                size={19}
                 color="#FFD700" // ✅ GOLD ICON
               />
 
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
   },
 
   locationText: {

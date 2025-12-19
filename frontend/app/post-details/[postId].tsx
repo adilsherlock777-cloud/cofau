@@ -15,6 +15,7 @@ import {
   ScrollView,
   Platform,
   SafeAreaView,
+  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -103,6 +104,21 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const videoRef = useRef(null);
 
+  // Pan responder for swipe down gesture
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return gestureState.dy > 5;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dy > 50) {
+          setShowDetails(false);
+        }
+      },
+    })
+  ).current;
+
   const isVideo = (post.media_type || "").toLowerCase() === "video";
   const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url);
   const imageUrl = normalizeMediaUrl(post.image_url || post.media_url);
@@ -118,7 +134,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const displayUrl = getDisplayUrl();
 
   // Calculate bottom nav height based on safe area
-  const BOTTOM_NAV_HEIGHT = 60 + bottomInset;
+  const BOTTOM_NAV_HEIGHT = 130;
 
   useEffect(() => {
     if (showComments) {
@@ -377,260 +393,196 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
         )}
       </View>
 
-      {/* EXPANDED DETAILS VIEW */}
+      {/* GLASS OVERLAY DETAILS - Full screen with transparent bottom sheet */}
       {showDetails && (
-        <View style={styles.expandedDetailsOverlay}>
-          {/* Shrunk Media */}
-          <View style={styles.shrunkMediaContainer}>
-            <TouchableOpacity 
-              style={styles.shrunkMediaWrapper}
-              activeOpacity={1}
-              onPress={() => {
-                if (isVideo) setIsMuted(!isMuted);
-              }}
+        <View style={styles.detailsGlassOverlay}>
+          {/* Semi-transparent backdrop - tap to close */}
+          <TouchableOpacity 
+            style={styles.overlayBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDetails(false)}
+          />
+          
+          {/* Bottom sheet with glass effect */}
+          <View style={styles.bottomSheetDetails}>
+            <View style={styles.glassDetailsBackground} />
+            
+            {/* Drag Handle - swipeable */}
+            <View 
+              style={styles.dragHandleContainer}
+              {...panResponder.panHandlers}
             >
-              {isVideo ? (
-                <>
-                  <Video
-                    ref={videoRef}
-                    source={{ uri: mediaUrl || displayUrl || '' }}
-                    style={styles.shrunkVideo}
-                    resizeMode={ResizeMode.COVER}
-                    shouldPlay={true}
-                    isLooping
-                    isMuted={isMuted}
-                    useNativeControls={false}
+              <View style={styles.dragHandle} />
+            </View>
+            
+            {/* Scrollable Details Content */}
+            <ScrollView 
+              style={styles.detailsScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* User Info Row without dropdown button */}
+              <View style={styles.detailsUserRowContainer}>
+                <TouchableOpacity
+                  style={styles.detailsUserRow}
+                  onPress={() => {
+                    setShowDetails(false);
+                    router.push(`/profile?userId=${post.user_id}`);
+                  }}
+                >
+                  <UserAvatar
+                    profilePicture={profilePic}
+                    username={post.username}
+                    level={post.user_level}
+                    size={50}
+                    showLevelBadge
+                    style={{}}
                   />
-                  <View style={styles.muteIndicatorShrunk}>
-                    <Ionicons 
-                      name={isMuted ? "volume-mute" : "volume-high"} 
-                      size={20} 
-                      color="rgba(255,255,255,0.9)" 
-                    />
+                  <View style={styles.detailsUserInfo}>
+                    <Text style={styles.detailsUsername}>{post.username}</Text>
+                    <Text style={styles.detailsTimestamp}>{formatTime(post.created_at)}</Text>
                   </View>
-                </>
-              ) : (
-                <Image
-                  source={{ uri: imageUrl || displayUrl || '' }}
-                  style={styles.shrunkVideo}
-                  contentFit="cover"
-                />
+                </TouchableOpacity>
+              </View>
+
+              {/* Action Buttons with Cofau Theme */}
+              <View style={styles.detailsActions}>
+                <TouchableOpacity style={styles.detailsActionBtn} onPress={handleLikeToggle}>
+                  {isLiked ? (
+                    <GradientHeart size={20} />
+                  ) : (
+                    <Ionicons name="heart-outline" size={20} color="#000" />
+                  )}
+                  <Text style={styles.detailsActionText}>{likesCount}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.detailsActionBtn}
+                  onPress={() => setShowComments(!showComments)}
+                >
+                  <Ionicons name="chatbubble-outline" size={20} color="#000" />
+                  <Text style={styles.detailsActionText}>{post.comments_count || comments.length}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.detailsActionBtn}
+                  onPress={() => {
+                    setShowDetails(false);
+                    setShowShareModal(true);
+                  }}
+                >
+                  <Ionicons name="share-outline" size={20} color="#000" />
+                  <Text style={styles.detailsActionText}>{post.shares_count || 0}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.detailsActionBtn} onPress={handleSaveToggle}>
+                  {isSaved ? (
+                    <GradientBookmark size={20} />
+                  ) : (
+                    <Ionicons name="bookmark-outline" size={20} color="#000" />
+                  )}
+                  <Text style={styles.detailsActionText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* RATING Section */}
+              {post.rating && (
+                <View style={styles.detailsCard}>
+                  <View style={styles.detailsCardHeader}>
+                    <Ionicons name="star" size={20} color="#FFD700" />
+                    <Text style={styles.detailsCardLabel}>RATING</Text>
+                  </View>
+                  <Text style={styles.detailsRatingValue}>{post.rating}/10</Text>
+                </View>
               )}
-            </TouchableOpacity>
 
-            {/* Close Button */}
-            <TouchableOpacity 
-              style={styles.modernCloseButton}
-              onPress={() => setShowDetails(false)}
-            >
-              <Ionicons name="close" size={26} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Details Content */}
-          <ScrollView style={styles.detailsContent} showsVerticalScrollIndicator={false}>
-            {/* User Info Row with Dropdown Button */}
-            <View style={styles.detailsUserRowContainer}>
-              <TouchableOpacity
-                style={styles.detailsUserRow}
-                onPress={() => {
-                  setShowDetails(false);
-                  router.push(`/profile?userId=${post.user_id}`);
-                }}
-              >
-                <UserAvatar
-                  profilePicture={profilePic}
-                  username={post.username}
-                  level={post.user_level}
-                  size={50}
-                  showLevelBadge
-                  style={{}}
-                />
-                <View style={styles.detailsUserInfo}>
-                  <Text style={styles.detailsUsername}>{post.username}</Text>
-                  <Text style={styles.detailsTimestamp}>{formatTime(post.created_at)}</Text>
+              {/* REVIEW Section */}
+              {post.review_text && (
+                <View style={styles.detailsCard}>
+                  <View style={styles.detailsCardHeader}>
+                    <Ionicons name="create" size={20} color="#FFD700" />
+                    <Text style={styles.detailsCardLabel}>REVIEW</Text>
+                  </View>
+                  <Text style={styles.detailsReviewText}>{post.review_text}</Text>
                 </View>
-              </TouchableOpacity>
-              
-              {/* Dropdown/Collapse Button */}
-              <TouchableOpacity 
-                style={styles.dropdownButton}
-                onPress={() => setShowDetails(false)}
-              >
-                <Ionicons name="chevron-down" size={28} color="#999" />
-              </TouchableOpacity>
-            </View>
+              )}
 
-            {/* Action Buttons with Cofau Theme */}
-            <View style={styles.detailsActions}>
-              <TouchableOpacity style={styles.detailsActionBtn} onPress={handleLikeToggle}>
-                {isLiked ? (
-                  <GradientHeart size={28} />
-                ) : (
-                  <Ionicons name="heart-outline" size={28} color="#000" />
-                )}
-                <Text style={styles.detailsActionText}>{likesCount}</Text>
-              </TouchableOpacity>
+              {/* LOCATION Section */}
+              {post.location_name && (
+                <TouchableOpacity 
+                  style={styles.detailsCard}
+                  onPress={() => {
+                    if (post.map_link) {
+                      Linking.openURL(post.map_link);
+                    } else if (post.location_name) {
+                      const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                      Linking.openURL(searchUrl);
+                    }
+                  }}
+                >
+                  <View style={styles.detailsCardHeader}>
+                    <Ionicons name="location" size={20} color="#FFD700" />
+                    <Text style={styles.detailsCardLabel}>LOCATION</Text>
+                  </View>
+                  <View style={styles.locationRow}>
+                    <Text style={styles.detailsLocationText}>{post.location_name}</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
+                  </View>
+                </TouchableOpacity>
+              )}
 
-              <TouchableOpacity 
-                style={styles.detailsActionBtn}
-                onPress={() => setShowComments(!showComments)}
-              >
-                <Ionicons name="chatbubble-outline" size={26} color="#000" />
-                <Text style={styles.detailsActionText}>{post.comments_count || comments.length}</Text>
-              </TouchableOpacity>
+              {/* Comments Section */}
+              {showComments && (
+                <View style={styles.detailsCommentsSection}>
+                  <Text style={styles.detailsCommentsTitle}>
+                    Comments ({comments.length})
+                  </Text>
 
-              <TouchableOpacity 
-                style={styles.detailsActionBtn}
-                onPress={() => {
-                  setShowDetails(false);
-                  setShowShareModal(true);
-                }}
-              >
-                <Ionicons name="share-outline" size={26} color="#000" />
-                <Text style={styles.detailsActionText}>Share</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.detailsActionBtn} onPress={handleSaveToggle}>
-                {isSaved ? (
-                  <GradientBookmark size={26} />
-                ) : (
-                  <Ionicons name="bookmark-outline" size={26} color="#000" />
-                )}
-                <Text style={styles.detailsActionText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* RATING Section */}
-            {post.rating && (
-              <View style={styles.detailsCard}>
-                <View style={styles.detailsCardHeader}>
-                  <Ionicons name="star" size={20} color="#FFD700" />
-                  <Text style={styles.detailsCardLabel}>RATING</Text>
-                </View>
-                <Text style={styles.detailsRatingValue}>{post.rating}/10</Text>
-              </View>
-            )}
-
-            {/* REVIEW Section */}
-            {post.review_text && (
-              <View style={styles.detailsCard}>
-                <View style={styles.detailsCardHeader}>
-                  <Ionicons name="create" size={20} color="#FFD700" />
-                  <Text style={styles.detailsCardLabel}>REVIEW</Text>
-                </View>
-                <Text style={styles.detailsReviewText}>{post.review_text}</Text>
-              </View>
-            )}
-
-            {/* LOCATION Section */}
-            {post.location_name && (
-              <TouchableOpacity 
-                style={styles.detailsCard}
-                onPress={() => {
-                  if (post.map_link) {
-                    Linking.openURL(post.map_link);
-                  } else if (post.location_name) {
-                    const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
-                    Linking.openURL(searchUrl);
-                  }
-                }}
-              >
-                <View style={styles.detailsCardHeader}>
-                  <Ionicons name="location" size={20} color="#FFD700" />
-                  <Text style={styles.detailsCardLabel}>LOCATION</Text>
-                </View>
-                <View style={styles.locationRow}>
-                  <Text style={styles.detailsLocationText}>{post.location_name}</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
-                </View>
-              </TouchableOpacity>
-            )}
-
-            {/* Comments Section */}
-            {showComments && (
-              <View style={styles.detailsCommentsSection}>
-                <Text style={styles.detailsCommentsTitle}>
-                  Comments ({comments.length})
-                </Text>
-
-                {comments.length === 0 ? (
-                  <Text style={styles.noComments}>No comments yet</Text>
-                ) : (
-                  comments.map((c: any) => (
-                    <View key={c.id} style={styles.commentItem}>
-                      <UserAvatar
-                        profilePicture={c.profile_pic}
-                        username={c.username}
-                        size={36}
-                        level={c.level || 1}
-                        style={{}}
-                      />
-                      <View style={styles.commentContent}>
-                        <Text style={styles.commentUsername}>{c.username}</Text>
-                        <Text style={styles.commentText}>{c.comment_text}</Text>
-                        <Text style={styles.commentTime}>{formatTime(c.created_at)}</Text>
+                  {comments.length === 0 ? (
+                    <Text style={styles.noComments}>No comments yet</Text>
+                  ) : (
+                    comments.map((c: any) => (
+                      <View key={c.id} style={styles.commentItem}>
+                        <UserAvatar
+                          profilePicture={c.profile_pic}
+                          username={c.username}
+                          size={36}
+                          level={c.level || 1}
+                          style={{}}
+                        />
+                        <View style={styles.commentContent}>
+                          <Text style={styles.commentUsername}>{c.username}</Text>
+                          <Text style={styles.commentText}>{c.comment_text}</Text>
+                          <Text style={styles.commentTime}>{formatTime(c.created_at)}</Text>
+                        </View>
                       </View>
-                    </View>
-                  ))
-                )}
+                    ))
+                  )}
 
-                <View style={styles.commentInputContainer}>
-                  <TextInput
-                    value={commentText}
-                    onChangeText={setCommentText}
-                    placeholder="Add a comment…"
-                    style={styles.commentInput}
-                  />
-                  <TouchableOpacity
-                    style={[styles.sendButton, !commentText.trim() && { backgroundColor: "#ccc" }]}
-                    disabled={!commentText.trim() || submittingComment}
-                    onPress={handleSubmitComment}
-                  >
-                    {submittingComment ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Ionicons name="send" size={20} color="#fff" />
-                    )}
-                  </TouchableOpacity>
+                  <View style={styles.commentInputContainer}>
+                    <TextInput
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      placeholder="Add a comment…"
+                      style={styles.commentInput}
+                    />
+                    <TouchableOpacity
+                      style={[styles.sendButton, !commentText.trim() && { backgroundColor: "#ccc" }]}
+                      disabled={!commentText.trim() || submittingComment}
+                      onPress={handleSubmitComment}
+                    >
+                      {submittingComment ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Ionicons name="send" size={20} color="#fff" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            )}
+              )}
 
-            <View style={{ height: 100 }} />
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Bottom Navigation Bar */}
-      {!showDetails && (
-        <View style={[styles.bottomNavBar, { paddingBottom: bottomInset || 10 }]}>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}>
-            <Ionicons name="home-outline" size={24} color="#fff" />
-            <Text style={styles.navLabelWhite}>Home</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}>
-            <Ionicons name="compass-outline" size={24} color="#fff" />
-            <Text style={styles.navLabelWhite}>Explore</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.centerNavButton} onPress={() => router.push("/leaderboard")}>
-            <View style={styles.centerNavButtonInner}>
-              <Ionicons name="trophy" size={26} color="#333" />
-            </View>
-            <Text style={styles.navLabelWhite}>Leaderboard</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}>
-            <Ionicons name="restaurant-outline" size={24} color="#fff" />
-            <Text style={styles.navLabelWhite}>Happening</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}>
-            <Ionicons name="person-outline" size={24} color="#fff" />
-            <Text style={styles.navLabelWhite}>Profile</Text>
-          </TouchableOpacity>
+              <View style={{ height: 100 }} />
+            </ScrollView>
+          </View>
         </View>
       )}
 
@@ -960,10 +912,10 @@ const styles = StyleSheet.create({
   /* Glass Bottom Overlay - Evenly Distributed */
   glassBottomOverlay: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: 20,
+    right: 20,
     zIndex: 10,
-    borderRadius: 20,
+    borderRadius: 25,
     overflow: "hidden",
   },
 
@@ -973,8 +925,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(40, 40, 40, 0.9)",
+    backgroundColor: "rgba(120, 120, 120, 0.65)",
     borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    backdropFilter: "blur(20px)",
   },
 
   glassContentRow: {
@@ -990,13 +945,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 8,
   },
 
   glassInfoText: {
     color: "#FFF",
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
   },
 
   glassChevronContainer: {
@@ -1005,110 +960,71 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  /* Bottom Navigation Bar */
-  bottomNavBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "flex-end",
-    paddingTop: 8,
-    backgroundColor: "#000",
-    zIndex: 20,
-  },
-
-  navItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 60,
-  },
-
-  navLabelWhite: {
-    fontSize: 9,
-    color: "#fff",
-    marginTop: 4,
-  },
-
-  centerNavButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -25,
-  },
-
-  centerNavButtonInner: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#333",
-  },
-
-  /* Expanded Details Overlay */
-  expandedDetailsOverlay: {
+  /* NEW: Glass Overlay Details - Full screen with bottom sheet */
+  detailsGlassOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#FFF",
     zIndex: 70,
   },
 
-  shrunkMediaContainer: {
-    width: "100%",
-    height: SCREEN_HEIGHT * 0.45,
-    backgroundColor: "#000",
-    position: "relative",
-  },
-
-  shrunkMediaWrapper: {
-    width: "100%",
-    height: "100%",
-  },
-
-  shrunkVideo: {
-    width: "100%",
-    height: "100%",
-  },
-
-  muteIndicatorShrunk: {
+  overlayBackdrop: {
     position: "absolute",
-    top: 16,
-    right: 16,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderRadius: 16,
-    padding: 6,
   },
 
-  modernCloseButton: {
+  bottomSheetDetails: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 50 : 40,
-    right: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderRadius: 25,
-    width: 44,
-    height: 44,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: SCREEN_HEIGHT * 0.7,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    overflow: "hidden",
+  },
+
+  glassDetailsBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    backdropFilter: "blur(20px)",
+  },
+
+  dragHandleContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 50,
     alignItems: "center",
-    justifyContent: "center",
   },
 
-  detailsContent: {
+  dragHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    borderRadius: 3,
+  },
+
+  detailsScrollContent: {
     flex: 1,
-    backgroundColor: "#FFF",
   },
 
-  /* User Row with Dropdown Button */
+  /* User Row without dropdown button */
   detailsUserRowContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
+    justifyContent: "flex-start",
   },
 
   detailsUserRow: {
@@ -1134,19 +1050,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  dropdownButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#F5F5F5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   detailsActions: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
@@ -1164,11 +1071,14 @@ const styles = StyleSheet.create({
 
   /* Details Cards */
   detailsCard: {
-    backgroundColor: "#F8F8F8",
+    backgroundColor: "rgba(255, 255, 255, 0.3)", 
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+    backdropFilter: "blur(10px)",  
   },
 
   detailsCardHeader: {
@@ -1186,14 +1096,15 @@ const styles = StyleSheet.create({
   },
 
   detailsRatingValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "700",
     color: "#333",
   },
 
   detailsReviewText: {
-    fontSize: 15,
+    fontSize: 16,
     color: "#333",
+    fontWeight: "700",
     lineHeight: 22,
   },
 
@@ -1204,9 +1115,9 @@ const styles = StyleSheet.create({
   },
 
   detailsLocationText: {
-    fontSize: 15,
+    fontSize: 18,
     color: "#333",
-    fontWeight: "500",
+    fontWeight: "700",
     flex: 1,
   },
 
