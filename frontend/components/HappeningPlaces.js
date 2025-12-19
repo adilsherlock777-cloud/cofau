@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,20 @@ import {
   Image,
   ActivityIndicator,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
+export const options = {
+  headerShown: false,
+};
+
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${API_BASE_URL}/api`;
 
 export default function HappeningPlaces() {
@@ -22,6 +28,7 @@ export default function HappeningPlaces() {
   const { token } = useAuth();
   const [topLocations, setTopLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showFixedLine, setShowFixedLine] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -29,11 +36,12 @@ export default function HappeningPlaces() {
     }
   }, [token]);
 
-  // Refresh when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       if (token) {
-        console.log('🔄 HappeningPlaces screen focused - refreshing locations');
+        console.log(
+          '🔄 HappeningPlaces screen focused - refreshing locations'
+        );
         fetchTopLocations();
       }
     }, [token])
@@ -50,29 +58,21 @@ export default function HappeningPlaces() {
       setLoading(true);
       const endpoint = `${API_URL}/locations/top`;
       console.log('🔍 Fetching top locations from:', endpoint);
-      console.log('🔑 Using token:', token ? 'Present' : 'Missing');
 
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
-        params: { limit: 5 },
+        params: { limit: 10 },
       });
 
-      console.log('📊 TOP LOCATIONS RESPONSE:', response.data);
-      console.log('📊 Response type:', typeof response.data);
-      console.log('📊 Number of locations:', Array.isArray(response.data) ? response.data.length : 'Not an array');
-
-      // Ensure we have an array
-      const locations = Array.isArray(response.data) ? response.data : [];
+      const locations = Array.isArray(response.data)
+        ? response.data
+        : [];
       setTopLocations(locations);
-
-      if (locations.length === 0) {
-        console.log('⚠️ No locations returned from API');
-      }
     } catch (error) {
-      console.error('❌ Error fetching top locations:', error.response?.data || error.message);
-      console.error('❌ Error status:', error.response?.status);
-      console.error('❌ Error headers:', error.response?.headers);
-      console.error('❌ Full error:', error);
+      console.error(
+        '❌ Error fetching top locations:',
+        error.response?.data || error.message
+      );
       setTopLocations([]);
     } finally {
       setLoading(false);
@@ -81,313 +81,506 @@ export default function HappeningPlaces() {
 
   const formatUploadCount = (count) => {
     if (count >= 1000) {
-      return `${Math.floor(count / 1000)}K`;
+      return `${(count / 1000).toFixed(1)}K`;
     }
     return count.toString();
   };
 
   const handleLocationPress = (location) => {
-    console.log('📍 Location pressed:', location);
-    const locationName = location.location || location.location_name;
+    const locationName =
+      location.location || location.location_name;
     if (locationName) {
       router.push({
         pathname: '/location-details',
-        params: { locationName: encodeURIComponent(locationName) }
+        params: { locationName: encodeURIComponent(locationName) },
       });
     }
   };
 
+  const fixUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `${API_BASE_URL}${cleanUrl}`;
+  };
+
+  // Handle scroll to show/hide fixed line
+  const handleScroll = useCallback((event) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    
+    if (scrollY > 100) {
+      setShowFixedLine(true);
+    } else {
+      setShowFixedLine(false);
+    }
+  }, []);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#4dd0e1" />
-      </View>
-    );
-  }
-
-  if (!loading && topLocations.length === 0) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#667eea', '#764ba2']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.headerGradient}
-        >
-          <Text style={styles.headerTitle}>Happening Places Near You</Text>
-          <Text style={styles.headerSubtitle}>Top rated restaurants this week</Text>
-        </LinearGradient>
-
-        <View style={styles.emptyState}>
-          <Ionicons name="location-outline" size={64} color="#CCC" />
-          <Text style={styles.emptyTitle}>No locations yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Start posting with location tags to see popular places here!
-          </Text>
-        </View>
+        <ActivityIndicator size="large" color="#4dd0e1" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header with Gradient Background */}
-        <LinearGradient
-          colors={['#667eea', '#764ba2']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.headerGradient}
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <View style={styles.container}>
+        {/* Fixed Line - Shows only when scrolled */}
+        {showFixedLine && (
+          <View style={styles.fixedLine} />
+        )}
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
-          <Text style={styles.headerTitle}>Happening Places Near You</Text>
-          <Text style={styles.headerSubtitle}>Top rated restaurants this week</Text>
-        </LinearGradient>
+          {/* Header Container - Gradient with Premium Finish */}
+          <View style={styles.headerContainer}>
+            <LinearGradient
+              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientHeader}
+            >
+              <Text style={styles.headerTitle}>Cofau</Text>
+            </LinearGradient>
+          </View>
 
-        {/* Location Cards */}
-        {topLocations.map((location, index) => (
-          <TouchableOpacity
-            key={location.location || location.location_name || index}
-            style={styles.card}
-            onPress={() => handleLocationPress(location)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.cardContent}>
-              {/* Rank Number */}
-              <View style={styles.rankContainer}>
-                <Text style={styles.rankNumber}>{index + 1}</Text>
-              </View>
+          {/* Title Box */}
+          <View style={styles.titleBox}>
+            <Text style={styles.titleMain}>Happening place</Text>
+            <Text style={styles.titleSub}>
+              Most Visited Places Around you
+            </Text>
+          </View>
 
-              {/* Location Info */}
-              <View style={styles.locationInfo}>
-                <Text style={styles.locationName} numberOfLines={1}>
-                  {location.location || location.location_name}
-                </Text>
-                <Text style={styles.uploadCount}>
-                  {formatUploadCount(location.uploads)} {location.uploads === 1 ? 'post' : 'posts'}
-                </Text>
-              </View>
-
-              {/* Image Thumbnails - Max 5 images */}
-              <View style={styles.imageRow}>
-                {location.images && location.images.length > 0 ? (
-                  location.images.slice(0, 5).map((imageUrl, imgIndex) => {
-                    // Fix URL if needed
-                    const fixUrl = (url) => {
-                      if (!url) return null;
-                      if (url.startsWith('http')) return url;
-                      // Handle relative URLs
-                      const cleanUrl = url.startsWith('/') ? url : `/${url}`;
-                      return `${API_BASE_URL}${cleanUrl}`;
-                    };
-
-                    const fixedUrl = fixUrl(imageUrl);
-                    if (!fixedUrl) return null;
-
-                    return (
-                      <View key={imgIndex} style={styles.imageThumbnail}>
-                        <Image
-                          source={{ uri: fixedUrl }}
-                          style={styles.thumbnailImage}
-                          resizeMode="cover"
-                          onError={(error) => {
-                            console.error(`❌ Image load error for ${fixedUrl}:`, error);
-                          }}
-                        />
-                      </View>
-                    );
-                  })
-                ) : (
-                  <View style={styles.imageThumbnail}>
-                    <Ionicons name="image-outline" size={24} color="#CCC" />
-                  </View>
-                )}
-              </View>
+          {/* Empty State */}
+          {topLocations.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="location-outline"
+                size={64}
+                color="#CCC"
+              />
+              <Text style={styles.emptyTitle}>
+                No locations yet
+              </Text>
+              <Text style={styles.emptySubtext}>
+                Start posting with location tags to see popular
+                places here!
+              </Text>
             </View>
+          )}
+
+          {/* Location Cards */}
+          {topLocations.map((location, index) => {
+            const images = location.images || [];
+            const remainingCount = images.length > 7 ? images.length - 7 : 0;
+
+            return (
+              <TouchableOpacity
+                key={
+                  location.location ||
+                  location.location_name ||
+                  index
+                }
+                style={styles.card}
+                onPress={() => handleLocationPress(location)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.rankNumber}>
+                    <LinearGradient
+                      colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                      start={{ x: 3, y: 3 }}
+                      end={{ x: 0, y: 3 }}
+                      style={styles.rankGradient}
+                    >
+                      <Text style={styles.rankNumberText}>
+                        {index + 1}
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                  <View style={styles.locationInfo}>
+                    <Text
+                      style={styles.locationName}
+                      numberOfLines={1}
+                    >
+                      {location.location ||
+                        location.location_name}
+                    </Text>
+                    <Text style={styles.uploadCount}>
+                      (
+                      {formatUploadCount(
+                        location.uploads
+                      )}{' '}
+                      uploaded)
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.imageGrid}>
+                  {images.length > 0 ? (
+                    <>
+                      {/* Show first 7 images */}
+                      {images
+                        .slice(0, 7)
+                        .map((imageUrl, imgIndex) => {
+                          const fixedUrl =
+                            fixUrl(imageUrl);
+                          if (!fixedUrl) return null;
+
+                          return (
+                            <Image
+                              key={imgIndex}
+                              source={{ uri: fixedUrl }}
+                              style={styles.gridImage}
+                              resizeMode="cover"
+                            />
+                          );
+                        })}
+
+                      {/* Show 8th image with blur overlay if more than 7 images */}
+                      {remainingCount > 0 && images[7] && (
+                        <View style={styles.blurredImageContainer}>
+                          <Image
+                            source={{ uri: fixUrl(images[7]) }}
+                            style={styles.gridImage}
+                            resizeMode="cover"
+                            blurRadius={10}
+                          />
+                          <View style={styles.overlayCount}>
+                            <Text style={styles.overlayCountText}>
+                              +{remainingCount}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    <View
+                      style={styles.noImagePlaceholder}
+                    >
+                      <Ionicons
+                        name="image-outline"
+                        size={32}
+                        color="#CCC"
+                      />
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Bottom Navigation - Same as Explore */}
+        <View style={styles.navBar}>
+          {/* Home */}
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => router.push('/feed')}
+          >
+            <Ionicons
+              name="home-outline"
+              size={28}
+              color="#000"
+            />
+            <Text style={styles.navLabel}>Home</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
 
-      {/* Bottom Navigation Footer */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/feed")}
-        >
-          <Ionicons name="home" size={24} color="#000" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
+          {/* Explore */}
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => router.push('/explore')}
+          >
+            <Ionicons
+              name="compass-outline"
+              size={28}
+              color="#000"
+            />
+            <Text style={styles.navLabel}>
+              Explore
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/explore")}
-        >
-          <Ionicons name="compass-outline" size={24} color="#000" />
-          <Text style={styles.navLabel}>Explore</Text>
-        </TouchableOpacity>
+          {/* Center - Top Posts with Camera Icon */}
+          <TouchableOpacity
+            style={styles.centerNavItem}
+            onPress={() => router.push('/leaderboard')}
+          >
+            <View style={styles.centerIconCircle}>
+              <Ionicons
+                name="camera"
+                size={28}
+                color="#000"
+              />
+            </View>
+            <Text style={styles.navLabel}>
+              Top Posts
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/leaderboard")}
-        >
-          <Ionicons name="trophy-outline" size={24} color="#000" />
-          <Text style={styles.navLabel}>Leaderboard</Text>
-        </TouchableOpacity>
+          {/* Happening */}
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => router.push('/happening')}
+          >
+            <Ionicons
+              name="location"
+              size={28}
+              color="#000"
+            />
+            <Text style={styles.navLabelActive}>
+              Happening
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/happening")}
-        >
-          <Ionicons name="restaurant" size={24} color="#667eea" />
-          <Text style={[styles.navLabel, styles.activeNavLabel]}>Restaurant</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/profile")}
-        >
-          <Ionicons name="person-outline" size={24} color="#000" />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
+          {/* Profile */}
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => router.push('/profile')}
+          >
+            <Ionicons
+              name="person-outline"
+              size={28}
+              color="#000"
+            />
+            <Text style={styles.navLabel}>
+              Profile
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </>
   );
 }
+
+/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 16,
-    paddingBottom: 100,
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
   },
-  headerGradient: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
+
+  // Fixed line below status bar - appears on scroll
+  fixedLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
   },
+
+  /* Header Container */
+  headerContainer: {
+    marginBottom: -30,
+  },
+
+  /* Gradient Header - PREMIUM FINISH */
+  gradientHeader: {
+    paddingTop: 65,
+    paddingBottom: 55,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 4,
+    fontFamily: 'Lobster',
+    fontSize: 36,
+    color: '#fff',
     textAlign: 'center',
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 4, height: 6 },
+    textShadowRadius: 4,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.95)',
-    textAlign: 'center',
+
+  scrollView: { 
+    flex: 1 
   },
-  card: {
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  titleBox: {
     backgroundColor: '#FFF',
-    marginHorizontal: 16,
+    borderRadius: 35,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginHorizontal: 22,
     marginBottom: 12,
-    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  cardContent: {
+  titleMain: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+    fontStyle: 'lobster',
+    textDecorationLine: 'underline',
+  },
+  titleSub: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-  },
-  rankContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#667eea',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
+    marginBottom: 5,
+    paddingVertical: 4, 
   },
   rankNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  locationInfo: {
-    flex: 1,
-    marginRight: 12,
+    width: 25,
+    height: 25,
+    borderRadius: 16,
+    marginRight: 10,
     justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  rankGradient: {
+    width: 33,
+    height: 33,
+    borderRadius: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rankNumberText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  locationInfo: { 
+    flex: 1,
+    justifyContent: 'center', 
+    marginTop: 10,
   },
   locationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
   },
   uploadCount: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#666',
+    marginTop: 2,
   },
-  imageRow: {
+  imageGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  imageThumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  gridImage: {
+    width: 70,
+    height: 70,
     borderRadius: 12,
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+  blurredImageContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  overlayCount: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  overlayCountText: {
     color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 20,
+  },
+  noImagePlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFF',
-    marginHorizontal: 16,
-    marginTop: 0,
-    borderRadius: 12,
+    paddingVertical: 60,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
+    fontWeight: '600',
+    color: '#333',
     marginTop: 16,
   },
-  emptySubtitle: {
+  emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#666',
     marginTop: 8,
     textAlign: 'center',
+    paddingHorizontal: 40,
+    lineHeight: 20,
   },
-  bottomNav: {
+
+  /* Bottom Navigation - Same as Explore */
+  navBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -395,25 +588,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingBottom: 20,
+    paddingVertical: 8,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    backgroundColor: '#FFF',
+    borderTopColor: '#E8E8E8',
+    backgroundColor: '#FFFFFF',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
+
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
+
   navLabel: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 4,
+    fontSize: 11,
+    color: '#000',
+    marginTop: 2,
     textAlign: 'center',
+    fontWeight: '500',
   },
-  activeNavLabel: {
-    color: '#667eea',
-    fontWeight: '600',
+
+  navLabelActive: {
+    fontSize: 11,
+    color: '#000',
+    marginTop: 2,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+
+  // Center elevated item
+  centerNavItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -30,
+  },
+
+  // Circle background for center icon
+  centerIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
 });
