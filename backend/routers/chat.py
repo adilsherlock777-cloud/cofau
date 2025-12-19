@@ -1,5 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, status, Depends
-from typing import Dict, Set, List, Any
+from pydantic import BaseModel
+from typing import Dict, Set, List, Any, Optional
 from bson import ObjectId
 from datetime import datetime
 from database import get_database
@@ -117,6 +118,7 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                     "to_user": m["to_user"],
                     "message": m["message"],
                     "created_at": m["created_at"].isoformat() + "Z",
+                "post_id": str(m.get("post_id")) if m.get("post_id") else None,
                 }
                 for m in history
             ],
@@ -127,16 +129,24 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
             try:
                 data = await websocket.receive_json()
                 text = (data.get("message") or "").strip()
-                if not text:
+                post_id = data.get("post_id")  # Support post sharing via WebSocket
+                
+                # Allow empty message if post_id is provided (for post sharing)
+                if not text and not post_id:
                     continue
 
                 now = datetime.utcnow()
                 msg_doc = {
                     "from_user": current_user_id,
                     "to_user": other_user_id,
-                    "message": text,
+                    "message": text or (f"📷 Shared a post" if post_id else ""),
                     "created_at": now,
                 }
+                
+                # Add post_id if provided
+                if post_id:
+                    msg_doc["post_id"] = post_id
+                
                 result = await db.messages.insert_one(msg_doc)
                 msg_id = str(result.inserted_id)
                 msg_payload = {
@@ -144,9 +154,13 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                     "id": msg_id,
                     "from_user": current_user_id,
                     "to_user": other_user_id,
-                    "message": text,
+                    "message": msg_doc["message"],
                     "created_at": now.isoformat() + "Z",
                 }
+                
+                # Include post_id in payload if present
+                if post_id:
+                    msg_payload["post_id"] = post_id
                 
                 # Send to both users
                 await manager.send_personal_message(current_user_id, msg_payload)
@@ -202,6 +216,7 @@ async def get_conversation(other_user_id: str, current_user: dict = Depends(get_
             "from_user": m["from_user"],
             "to_user": m["to_user"],
             "message": m["message"],
+            "post_id": str(m.get("post_id")) if m.get("post_id") else None,
             "created_at": m["created_at"].isoformat() + "Z",
         }
         for m in msgs
@@ -238,3 +253,84 @@ async def get_chat_list(current_user: dict = Depends(get_current_user)):
 
     chat_list.sort(key=lambda x: x["created_at"], reverse=True)
     return chat_list
+
+class SharePostRequest(BaseModel):
+    post_id: str
+    user_ids: List[str]
+
+@router.post("/share-post")
+async def share_post_to_users(
+    request: SharePostRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Share a post to multiple users via chat"""
+    db = get_database()
+    current_user_id = str(current_user["_id"])
+    
+    # Verify post exists
+    post = await db.posts.find_one({"_id": ObjectId(request.post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Get post details for the message
+    post_owner = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+    post_username = post_owner.get("username") if post_owner else "Unknown"
+    
+    # Create messages for each user
+    now = datetime.utcnow()
+    shared_count = 0
+    
+    for user_id in request.user_ids:
+        # Skip if trying to share to self
+        if user_id == current_user_id:
+            continue
+            
+        # Verify target user exists
+        target_user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if not target_user:
+            continue
+        
+        # Create message with post_id
+        msg_doc = {
+            "from_user": current_user_id,
+            "to_user": user_id,
+            "message": f"📷 {post_username} shared a post",
+            "post_id": request.post_id,
+            "created_at": now,
+        }
+        
+        await db.messages.insert_one(msg_doc)
+        
+        # Send via WebSocket if user is online
+        msg_payload = {
+            "type": "message",
+            "id": str(msg_doc.get("_id", "")),
+            "from_user": current_user_id,
+            "to_user": user_id,
+            "message": msg_doc["message"],
+            "post_id": request.post_id,
+            "created_at": now.isoformat() + "Z",
+        }
+        
+        await manager.send_personal_message(user_id, msg_payload)
+        
+        # Create notification
+        try:
+            await create_notification(
+                db=db,
+                notification_type="message",
+                from_user_id=current_user_id,
+                to_user_id=user_id,
+                post_id=request.post_id,
+                message=None,
+                send_push=True
+            )
+        except Exception as e:
+            print(f"⚠️ Error creating notification: {str(e)}")
+        
+        shared_count += 1
+    
+    return {
+        "message": f"Post shared to {shared_count} user(s)",
+        "shared_count": shared_count
+    }

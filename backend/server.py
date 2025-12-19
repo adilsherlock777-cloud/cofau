@@ -1932,6 +1932,63 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
     
     return result
 
+@app.get("/api/posts/{post_id}")
+async def get_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a single post by ID"""
+    db = get_database()
+    
+    try:
+        post = await db.posts.find_one({"_id": ObjectId(post_id)})
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        if not user:
+            raise HTTPException(status_code=404, detail="Post author not found")
+        
+        post_id_str = str(post["_id"])
+        current_user_id = str(current_user["_id"])
+        
+        # Check if liked
+        is_liked = await db.likes.find_one({
+            "post_id": post_id_str,
+            "user_id": current_user_id
+        }) is not None
+        
+        # Check if saved
+        is_saved = await db.saved_posts.find_one({
+            "post_id": post_id_str,
+            "user_id": current_user_id
+        }) is not None
+        
+        media_type = post.get("media_type", "image")
+        image_url = post.get("image_url") if media_type == "image" else None
+        
+        return {
+            "id": post_id_str,
+            "user_id": post["user_id"],
+            "username": user.get("username") or user.get("full_name") or "Unknown",
+            "user_profile_picture": user.get("profile_picture"),
+            "media_url": post.get("media_url", ""),
+            "image_url": image_url,
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
+            "created_at": post.get("created_at")
+        }
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail=f"Error fetching post: {str(e)}")
+
 @app.get("/api/users/{user_id}/collaborations")
 async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = None):
     """Get user's collaborations (posts where user is tagged or mentioned). Returns all if limit is not specified."""

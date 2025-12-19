@@ -19,6 +19,8 @@ import MaskedView from "@react-native-masked-view/masked-view";
 
 import UserAvatar from "./UserAvatar";
 import SharePreviewModal from "./SharePreviewModal";
+import ShareToUsersModal from "./ShareToUsersModal";
+import SimpleShareModal from "./SimpleShareModal";
 import ReportModal from "./ReportModal";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -27,6 +29,7 @@ import {
   savePost,
   unsavePost,
   reportPost,
+  sharePostToUsers,
 } from "../utils/api";
 import {
   normalizeMediaUrl,
@@ -63,6 +66,9 @@ export default function FeedCard({
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showSimpleShareModal, setShowSimpleShareModal] = useState(false);
+  const [showShareToUsersModal, setShowShareToUsersModal] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
 
   const mediaUrl = normalizeMediaUrl(post.media_url);
@@ -290,7 +296,30 @@ export default function FeedCard({
         </TouchableOpacity>
 
         {/* SHARE */}
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => {
+            // Show options: Share to Users (Cofau) or External (WhatsApp/Instagram)
+            Alert.alert(
+              "Share Post",
+              "Choose how you want to share",
+              [
+                {
+                  text: "Share to Cofau Users",
+                  onPress: () => setShowShareToUsersModal(true),
+                },
+                {
+                  text: "Share to WhatsApp/Instagram",
+                  onPress: () => setShowSimpleShareModal(true),
+                },
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                },
+              ]
+            );
+          }}
+        >
           <Ionicons name="paper-plane-outline" size={22} color="#666" />
           <Text style={styles.actionCount}>{post.shares || 0}</Text>
         </TouchableOpacity>
@@ -304,6 +333,29 @@ export default function FeedCard({
           />
         </TouchableOpacity>
       </View>
+
+      {/* Share to Users Modal (Cofau) */}
+      <ShareToUsersModal
+        visible={showShareToUsersModal}
+        onClose={() => setShowShareToUsersModal(false)}
+        post={post}
+        onShare={async (userIds) => {
+          try {
+            await sharePostToUsers(post.id, userIds);
+            Alert.alert("Success", `Post shared to ${userIds.length} user(s)`);
+          } catch (error) {
+            Alert.alert("Error", "Failed to share post. Please try again.");
+            console.error("Error sharing post:", error);
+          }
+        }}
+      />
+
+      {/* Simple Share Modal (WhatsApp/Instagram) */}
+      <SimpleShareModal
+        visible={showSimpleShareModal}
+        onClose={() => setShowSimpleShareModal(false)}
+        post={post}
+      />
     </View>
   );
 }
@@ -374,7 +426,7 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 10,
     borderColor: "#DADCE0",
-    shadowColor: "#000", 
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -388,7 +440,7 @@ const styles = StyleSheet.create({
     color: "#5F6368",
     marginBottom: 4,
     letterSpacing: 0.5,
-    textTransform: "uppercase", 
+    textTransform: "uppercase",
   },
 
   ratingRow: {
@@ -415,7 +467,7 @@ const styles = StyleSheet.create({
 
   reviewText: {
     fontSize: 16,
-    fontWeight: "600", 
+    fontWeight: "600",
     color: "#202124",
     flex: 1,
   },
@@ -464,7 +516,7 @@ const styles = StyleSheet.create({
 
   likedCount: {
     color: "#090302ff",
-    fontWeight: "600", 
+    fontWeight: "600",
   },
   optionsButton: {
     padding: 8,
