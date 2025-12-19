@@ -78,34 +78,49 @@ export default function FeedCard({
 
   const dpRaw = normalizeProfilePicture(post.user_profile_picture);
 
-  // Load video when it becomes visible (shouldPlay = true)
+  // Control video playback based on shouldPlay prop (iOS compatible)
   useEffect(() => {
-    if (!isVideo) return;
+    if (!isVideo || !videoRef.current) return;
 
-    // When video becomes visible, mark it as loaded
-    if (shouldPlay && !videoLoaded) {
-      setVideoLoaded(true);
-    }
-  }, [shouldPlay, isVideo, videoLoaded]);
-
-  // Control video playback based on shouldPlay prop
-  useEffect(() => {
-    if (!isVideo || !videoRef.current || !videoLoaded) return;
-
-    const playVideo = async () => {
+    const controlVideo = async () => {
       try {
+        // Get current status to check if video is loaded
+        const status = await videoRef.current.getStatusAsync();
+
         if (shouldPlay) {
-          await videoRef.current.playAsync();
+          // For iOS, ensure video is loaded before playing
+          if (status.isLoaded) {
+            await videoRef.current.playAsync();
+          } else {
+            // If not loaded, wait a bit and try again (iOS sometimes needs this)
+            setTimeout(async () => {
+              try {
+                const newStatus = await videoRef.current.getStatusAsync();
+                if (newStatus.isLoaded) {
+                  await videoRef.current.playAsync();
+                }
+              } catch (err) {
+                console.log("Video play retry error:", err);
+              }
+            }, 300);
+          }
         } else {
-          await videoRef.current.pauseAsync();
+          // Pause video when not visible
+          if (status.isLoaded) {
+            await videoRef.current.pauseAsync();
+          }
         }
       } catch (error) {
-        // Ignore playback errors
         console.log("Video playback control error:", error);
       }
     };
 
-    playVideo();
+    // Small delay to ensure video component is ready (especially on iOS)
+    const timer = setTimeout(() => {
+      controlVideo();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [shouldPlay, isVideo, videoLoaded]);
 
   const handleLike = async () => {
@@ -199,15 +214,60 @@ export default function FeedCard({
           onPress={() => router.push(`/post-details/${post.id}`)}
         >
           {isVideo ? (
-            <Video
-              ref={videoRef}
-              source={{ uri: mediaUrl }}
-              style={styles.video}
-              resizeMode="cover"
-              shouldPlay={false}
-              isLooping
-              isMuted={true}
-            />
+            <>
+              {shouldPlay ? (
+                <Video
+                  ref={videoRef}
+                  source={{ uri: mediaUrl }}
+                  style={styles.video}
+                  resizeMode="cover"
+                  shouldPlay={true}
+                  isLooping
+                  isMuted={true}
+                  useNativeControls={false}
+                  allowsExternalPlayback={false}
+                  playInSilentModeIOS={true}
+                  onLoad={(status) => {
+                    console.log("✅ Video loaded on iOS/Android", status);
+                    setVideoLoaded(true);
+                    // Ensure video plays after load (iOS needs explicit play)
+                    if (shouldPlay && videoRef.current) {
+                      setTimeout(async () => {
+                        try {
+                          const currentStatus = await videoRef.current.getStatusAsync();
+                          if (currentStatus.isLoaded && !currentStatus.isPlaying) {
+                            await videoRef.current.playAsync();
+                          }
+                        } catch (err) {
+                          console.log("Auto-play error:", err);
+                        }
+                      }, 200);
+                    }
+                  }}
+                  onError={(error) => {
+                    console.error("❌ Video error:", error);
+                    console.error("❌ Video URL:", mediaUrl);
+                    // Try to reload video on error (iOS sometimes needs this)
+                    if (videoRef.current) {
+                      setTimeout(() => {
+                        videoRef.current?.reloadAsync().catch(console.error);
+                      }, 1000);
+                    }
+                  }}
+                  onLoadStart={() => {
+                    console.log("📹 Video loading started:", mediaUrl);
+                  }}
+                  progressUpdateIntervalMillis={1000}
+                />
+              ) : (
+                <Image source={{ uri: thumbnailUrl || mediaUrl }} style={styles.image} />
+              )}
+              {!shouldPlay && (
+                <View style={styles.playIconOverlay}>
+                  <Ionicons name="play-circle-outline" size={60} color="#fff" />
+                </View>
+              )}
+            </>
           ) : (
             <Image source={{ uri: mediaUrl }} style={styles.image} />
           )}
@@ -397,12 +457,12 @@ const styles = StyleSheet.create({
   },
   image: {
     width: "100%",
-    aspectRatio: 1, 
+    aspectRatio: 1,
   },
 
   video: {
     width: "100%",
-    aspectRatio: 9 / 16,  
+    aspectRatio: 9 / 16,
   },
 
   playIconOverlay: {
