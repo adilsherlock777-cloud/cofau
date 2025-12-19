@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { BlurView } from 'expo-blur';
 
 export const options = {
   headerShown: false,
@@ -29,6 +28,7 @@ export default function HappeningPlaces() {
   const { token } = useAuth();
   const [topLocations, setTopLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showFixedLine, setShowFixedLine] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -104,6 +104,17 @@ export default function HappeningPlaces() {
     return `${API_BASE_URL}${cleanUrl}`;
   };
 
+  // Handle scroll to show/hide fixed line
+  const handleScroll = useCallback((event) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    
+    if (scrollY > 100) {
+      setShowFixedLine(true);
+    } else {
+      setShowFixedLine(false);
+    }
+  }, []);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -117,12 +128,19 @@ export default function HappeningPlaces() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.container}>
+        {/* Fixed Line - Shows only when scrolled */}
+        {showFixedLine && (
+          <View style={styles.fixedLine} />
+        )}
+
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
-          {/* Header Container - Gradient with Rounded Bottom Corners */}
+          {/* Header Container - Gradient with Premium Finish */}
           <View style={styles.headerContainer}>
             <LinearGradient
               colors={['#E94A37', '#F2CF68', '#1B7C82']}
@@ -139,7 +157,7 @@ export default function HappeningPlaces() {
           <View style={styles.titleBox}>
             <Text style={styles.titleMain}>Happening place</Text>
             <Text style={styles.titleSub}>
-              Most Visited Restaurants
+              Most Visited Places Around you
             </Text>
           </View>
 
@@ -181,8 +199,8 @@ export default function HappeningPlaces() {
                   <View style={styles.rankNumber}>
                     <LinearGradient
                       colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
+                      start={{ x: 3, y: 3 }}
+                      end={{ x: 0, y: 3 }}
                       style={styles.rankGradient}
                     >
                       <Text style={styles.rankNumberText}>
@@ -359,27 +377,53 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
 
-  /* Header Container */
-  headerContainer: {
-    marginBottom: -25,
+  // Fixed line below status bar - appears on scroll
+  fixedLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
   },
 
-  /* Gradient Header - With Rounded Bottom Corners */
+  /* Header Container */
+  headerContainer: {
+    marginBottom: -30,
+  },
+
+  /* Gradient Header - PREMIUM FINISH */
   gradientHeader: {
-    paddingTop: 50,
-    paddingBottom: 40,
+    paddingTop: 65,
+    paddingBottom: 55,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
 
   headerTitle: {
     fontFamily: 'Lobster',
-    fontSize: 32,
+    fontSize: 36,
     color: '#fff',
     textAlign: 'center',
     letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 4, height: 6 },
+    textShadowRadius: 4,
   },
 
   scrollView: { 
@@ -391,10 +435,10 @@ const styles = StyleSheet.create({
   titleBox: {
     backgroundColor: '#FFF',
     borderRadius: 35,
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
+    marginHorizontal: 22,
+    marginBottom: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#000',
@@ -446,9 +490,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   rankGradient: {
-    width: 35,
-    height: 35,
+    width: 33,
+    height: 33,
     borderRadius: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -460,12 +506,12 @@ const styles = StyleSheet.create({
   locationInfo: { 
     flex: 1,
     justifyContent: 'center', 
-    marginTop: 0,
+    marginTop: 10,
   },
   locationName: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#333',
+    color: '#000',
   },
   uploadCount: {
     fontSize: 12,
