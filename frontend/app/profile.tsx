@@ -14,6 +14,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
@@ -31,32 +32,21 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const fixUrl = (url?: string | null) => {
   if (!url) return null;
-
-  // Already absolute
   if (url.startsWith("http")) return url;
-
-  // Normalize slashes
   url = url.replace(/\/+/g, "/");
-
-  // ✅ Keep /api/static/... as is - backend serves static files at /api/static/
-  // If URL starts with /api/, prepend BACKEND_URL
   if (url.startsWith("/api/")) {
     return `${BACKEND_URL}${url}`;
   }
-
-  // For other relative URLs, prepend BACKEND_URL
   return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
 };
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { userId } = useLocalSearchParams(); // Get userId from query params
+  const { userId } = useLocalSearchParams();
   const auth = useAuth() as any;
   const { token, logout, user: currentUser } = auth;
 
   const [userData, setUserData] = useState<any>(null);
-
-  console.log("userDataProfile", userData);
   const [userStats, setUserStats] = useState<any>(null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,9 +80,8 @@ export default function ProfileScreen() {
       return;
     }
     fetchProfileData();
-  }, [token, userId]); // Re-fetch when userId changes
+  }, [token, userId]);
 
-  // Refresh profile data when screen comes into focus (e.g., after creating a post)
   useFocusEffect(
     React.useCallback(() => {
       if (token && userData) {
@@ -103,7 +92,6 @@ export default function ProfileScreen() {
   );
 
   useEffect(() => {
-    // Fetch follow status when viewing another user's profile
     if (!isOwnProfile && userData?.id && token) {
       fetchFollowStatus();
     }
@@ -121,7 +109,6 @@ export default function ProfileScreen() {
     try {
       let user: any;
 
-      // Determine the final user ID and ownership
       const finalUserId = userId ?? currentUser?.id;
       const isOwn = !userId || finalUserId === currentUser?.id;
       setIsOwnProfile(isOwn);
@@ -134,20 +121,16 @@ export default function ProfileScreen() {
       });
 
       if (userId && userId !== currentUser?.id) {
-        // Viewing another user's profile
         console.log('📡 Fetching other user profile:', userId);
 
         const meResponse = await axios.get(`${API_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-
-     
         if (userId === (meResponse.data.user?.id || meResponse.data.id)) {
           user = meResponse.data.user || meResponse.data;
           setIsOwnProfile(true);
         } else {
-          // Use the proper user profile endpoint to get complete user data including profile_picture
           try {
             const userResponse = await axios.get(`${API_URL}/users/${userId}`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -156,12 +139,9 @@ export default function ProfileScreen() {
             console.log('✅ Fetched user profile from /users endpoint:', user);
           } catch (userError: any) {
             console.log('⚠️ User endpoint failed, trying feed fallback:', userError.message);
-            // Fallback to feed if user endpoint fails
             const feedResponse = await axios.get(`${API_URL}/feed`, {
               headers: { Authorization: `Bearer ${token}` },
             });
-
-            console.log('feedResponse', feedResponse.data);
 
             const userPost = feedResponse.data.find(
               (post: any) => post.user_id === userId
@@ -170,7 +150,6 @@ export default function ProfileScreen() {
               user = {
                 id: userPost.user_id,
                 full_name: userPost.username,
-                // some feeds may send user_profile_picture or profile_picture_url
                 profile_picture:
                   userPost.user_profile_picture ||
                   userPost.profile_picture ||
@@ -184,7 +163,6 @@ export default function ProfileScreen() {
           }
         }
       } else {
-        // Viewing own profile
         console.log('📡 Fetching own profile from:', `${API_URL}/auth/me`);
         setIsOwnProfile(true);
         const response = await axios.get(`${API_URL}/auth/me`, {
@@ -193,7 +171,6 @@ export default function ProfileScreen() {
         user = response.data.user || response.data;
       }
 
-      // ✅ Always normalize profile picture URL from any possible backend field
       const rawProfilePicture =
         user.profile_image_url ||
         user.profile_picture ||
@@ -205,7 +182,6 @@ export default function ProfileScreen() {
       setEditedBio(user.bio || '');
       setEditedName(user.full_name || user.username || '');
 
-      // Fetch user stats
       const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
       setUserStats(statsResponse.data);
 
@@ -222,7 +198,6 @@ export default function ProfileScreen() {
     if (!userData) return;
 
     try {
-      // Fetch ALL posts
       const endpoint = `${API_URL}/users/${userData.id}/posts`;
 
       const response = await axios.get(endpoint, {
@@ -230,7 +205,6 @@ export default function ProfileScreen() {
       });
       const posts = response.data || [];
 
-      // ✅ Normalize URLs for all posts and preserve location_name
       const postsWithFullUrls = posts.map((post: any) => {
         const mediaUrl = post.media_url || post.full_image_url;
         const normalizedUrl = fixUrl(mediaUrl);
@@ -241,18 +215,15 @@ export default function ProfileScreen() {
           normalizedUrl?.toLowerCase().endsWith('.avi') ||
           normalizedUrl?.toLowerCase().endsWith('.webm');
         
-        // Extract location from map_link if location_name is missing
         let locationName = post.location_name || post.location || post.place_name;
         if (!locationName && post.map_link) {
           try {
-            // Extract location from Google Maps URL: query=LocationName
             const url = new URL(post.map_link);
             const queryParam = url.searchParams.get('query');
             if (queryParam) {
               locationName = decodeURIComponent(queryParam);
             }
           } catch (e) {
-            // If URL parsing fails, try regex extraction
             const match = post.map_link.match(/query=([^&]+)/);
             if (match) {
               locationName = decodeURIComponent(match[1]);
@@ -265,18 +236,16 @@ export default function ProfileScreen() {
           full_image_url: normalizedUrl,
           media_url: normalizedUrl,
           isVideo: isVideo,
-          // ✅ Explicitly preserve location_name and related fields, with fallback from map_link
           location_name: locationName || null,
           location: locationName || null,
           place_name: locationName || null,
         };
       });
 
-      // ✅ Sort by created_at descending (newest first)
       const sorted = postsWithFullUrls.sort((a: any, b: any) => {
         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateB - dateA; // Descending order (newest first)
+        return dateB - dateA;
       });
 
       setUserPosts(sorted);
@@ -315,7 +284,6 @@ export default function ProfileScreen() {
     }
   };
 
-
   const fetchFollowStatus = async () => {
     if (!userData?.id || !token) return;
 
@@ -340,7 +308,6 @@ export default function ProfileScreen() {
     const previousFollowState = isFollowing;
     const previousFollowerCount = userStats?.followers_count || 0;
 
-    // Optimistic UI update
     setIsFollowing(!isFollowing);
     setUserStats((prev: any) => ({
       ...prev,
@@ -362,7 +329,6 @@ export default function ProfileScreen() {
       console.log(`✅ ${isFollowing ? 'Unfollowed' : 'Followed'} successfully`);
     } catch (err) {
       console.error('❌ Error toggling follow:', err);
-      // Revert optimistic update on error
       setIsFollowing(previousFollowState);
       setUserStats((prev: any) => ({
         ...prev,
@@ -382,12 +348,9 @@ export default function ProfileScreen() {
       const followers = await getFollowers(userData.id);
       
       console.log('📋 Raw followers data:', followers);
-      console.log('📋 Followers count:', followers?.length || 0);
       
-      // Handle both array and object responses
       const followersArray = Array.isArray(followers) ? followers : (followers?.followers || []);
       
-      // Normalize profile pictures
       const normalizedFollowers = followersArray.map((follower: any) => ({
         ...follower,
         id: follower.id || follower.user_id || follower._id,
@@ -398,10 +361,8 @@ export default function ProfileScreen() {
         level: follower.level || 1,
       }));
       
-      console.log('📋 Normalized followers:', normalizedFollowers);
       setFollowersList(normalizedFollowers);
       
-      // Fetch follow status for each follower
       const statusPromises = normalizedFollowers.map(async (follower: any) => {
         try {
           const response = await axios.get(
@@ -436,7 +397,6 @@ export default function ProfileScreen() {
     const currentStatus = followingStatus[followerId] || false;
     const previousStatus = currentStatus;
 
-    // Optimistic update
     setFollowingStatus((prev) => ({
       ...prev,
       [followerId]: !currentStatus,
@@ -455,7 +415,6 @@ export default function ProfileScreen() {
       console.log(`✅ ${currentStatus ? 'Unfollowed' : 'Followed'} follower successfully`);
     } catch (err) {
       console.error('❌ Error toggling follower follow:', err);
-      // Revert optimistic update
       setFollowingStatus((prev) => ({
         ...prev,
         [followerId]: previousStatus,
@@ -636,17 +595,12 @@ export default function ProfileScreen() {
 
       const normalizedProfilePicture = fixUrl(apiProfilePicture);
 
-      console.log('🖼️ Normalized profile picture URL:', normalizedProfilePicture);
-
-      // ✅ Update state immediately for instant UI feedback
       setUserData((prev: any) => ({
         ...prev,
         profile_picture: normalizedProfilePicture,
         profile_picture_url: normalizedProfilePicture,
       }));
 
-      // Refresh profile data from server to ensure consistency and get fresh data
-      // This ensures the old image is deleted and new one is properly loaded
       setTimeout(() => {
         fetchProfileData();
       }, 500);
@@ -716,19 +670,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const getBadgeInfo = () => {
-    if (!userData) return null;
-
-    if (userData.points >= 100) {
-      return { name: 'TOP REVIEWER', icon: '🔥', color: '#FF6B6B' };
-    } else if (userData.level >= 5) {
-      return { name: 'EXPERT', icon: '⭐', color: '#FFD700' };
-    } else if (userData.level >= 3) {
-      return { name: 'RISING STAR', icon: '🌟', color: '#4dd0e1' };
-    }
-    return null;
-  };
-
   const handleDeletePost = async () => {
     if (!selectedPostForDelete || !token) return;
 
@@ -738,10 +679,8 @@ export default function ProfileScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Remove post from local state
       setUserPosts((prev) => prev.filter((p) => p.id !== selectedPostForDelete.id));
       
-      // Update stats
       if (userStats) {
         setUserStats((prev: any) => ({
           ...prev,
@@ -763,10 +702,8 @@ export default function ProfileScreen() {
     }
   };
 
-  // ✅ Grid item for both PHOTOS and VIDEOS - navigates to post details
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
-    // Check for video using media_type field or file extension
     const isVideo =
       item.media_type === 'video' ||
       mediaUrl?.toLowerCase().endsWith('.mp4') ||
@@ -854,98 +791,119 @@ export default function ProfileScreen() {
           <Text style={styles.errorText}>Unable to load profile.</Text>
         </View>
         <View style={styles.navBar}>
-          <TouchableOpacity onPress={() => router.push('/feed')}>
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
             <Ionicons name="home-outline" size={28} color="#000" />
+            <Text style={styles.navLabel}>Home</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/explore')}>
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
             <Ionicons name="compass-outline" size={28} color="#000" />
+            <Text style={styles.navLabel}>Explore</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/add-post')}>
-            <Ionicons name="add-circle-outline" size={28} color="#000" />
+          <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
+            <View style={styles.centerIconCircle}>
+              <Ionicons name="camera" size={28} color="#000" />
+            </View>
+            <Text style={styles.navLabel}>Top Posts</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/happening')}>
-            <Ionicons name="flame-outline" size={28} color="#000" />
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
+            <Ionicons name="location-outline" size={28} color="#000" />
+            <Text style={styles.navLabel}>Happening</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/profile')}>
-            <Ionicons name="person" size={28} color="#4dd0e1" />
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
+            <Ionicons name="person" size={28} color="#000" />
+            <Text style={styles.navLabel}>Profile</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  // const badge = getBadgeInfo();
-
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.username}>
-            {userData.full_name || userData.username || 'User'}
-          </Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={styles.infoButton}
-              onPress={() => setLevelDetailsModalVisible(true)}
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={24}
-                color="#FF6B6B"
-              />
-            </TouchableOpacity>
-            {isOwnProfile && (
-              <>
+        {/* ================= GRADIENT HEADER ================= */}
+        <View style={styles.headerContainer}>
+          <LinearGradient
+            colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientHeader}
+          >
+            {/* Top Row */}
+            <View style={styles.headerRow}>
+              {!isOwnProfile ? (
                 <TouchableOpacity
-                  style={styles.settingsButton}
-                  onPress={() => router.push('/saved-posts')}
+                  style={styles.backButton}
+                  onPress={() => router.back()}
                 >
-                  <Ionicons
-                    name="bookmark"
-                    size={24}
-                    color="#666"
-                  />
+                  <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.settingsButton}
-                  onPress={() => setSettingsModalVisible(true)}
-                >
-                  <Ionicons
-                    name="settings-outline"
-                    size={24}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
+              ) : (
+                <View style={styles.leftSpacer} />
+              )}
 
-        {/* Profile Identity Section */}
-        <View style={styles.identitySection}>
-          {/* @ts-ignore */}
-          <ProfileBadge
-            profilePicture={userData.profile_picture}
-            username={userData.full_name || userData.username}
-            level={userData.level || 1}
-            dpSize={110}
-            cameraIcon={
-              isOwnProfile ? (
+              <Text style={styles.cofauTitle}>
+                {isOwnProfile ? 'Cofau' : 'Abows'}
+              </Text>
+
+              <View style={styles.headerIcons}>
+                {!isOwnProfile && (
+                  <TouchableOpacity
+                    style={styles.headerIconButton}
+                    onPress={() => {}}
+                  >
+                    <Ionicons name="search-outline" size={24} color="#fff" />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  style={styles.cameraIcon}
-                  onPress={handleProfilePicturePress}
-                  disabled={uploadingImage}
+                  style={styles.headerIconButton}
+                  onPress={() => router.push('/cart')}
                 >
-                  {uploadingImage ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="camera" size={20} color="#fff" />
-                  )}
+                  <Ionicons name="cart-outline" size={24} color="#fff" />
                 </TouchableOpacity>
-              ) : null
-            }
-          />
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* ================= PROFILE CARD - OVERLAPS GRADIENT ================= */}
+          <View style={styles.profileCardWrapper}>
+            <View style={styles.profileCard}>
+              {/* Profile Picture */}
+              <View style={styles.profilePictureContainer}>
+                {/* @ts-ignore */}
+                <ProfileBadge
+                  profilePicture={userData.profile_picture}
+                  username={userData.full_name || userData.username}
+                  level={userData.level || 1}
+                  dpSize={90}
+                  cameraIcon={
+                    isOwnProfile ? (
+                      <TouchableOpacity
+                        style={styles.cameraIcon}
+                        onPress={handleProfilePicturePress}
+                        disabled={uploadingImage}
+                      >
+                        {uploadingImage ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Ionicons name="camera" size={16} color="#fff" />
+                        )}
+                      </TouchableOpacity>
+                    ) : null
+                  }
+                />
+              </View>
+
+              {/* Username */}
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileUsername}>
+                  {userData.username || userData.full_name || 'User'}
+                </Text>
+              </View>
+
+            </View>
+          </View>
         </View>
 
         {/* Stats Section */}
@@ -955,12 +913,6 @@ export default function ProfileScreen() {
               {userStats?.total_posts || 0}
             </Text>
             <Text style={styles.statLabel}>Posts</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>
-              {complimentsCount}
-            </Text>
-            <Text style={styles.statLabel}>Compliment</Text>
           </View>
           <TouchableOpacity 
             style={styles.statBox}
@@ -977,73 +929,144 @@ export default function ProfileScreen() {
             </Text>
             <Text style={styles.statLabel}>People</Text>
           </TouchableOpacity>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>
+              {complimentsCount}
+            </Text>
+            <Text style={styles.statLabel}>Compliments</Text>
+          </View>
         </View>
 
-        {/* Edit Profile / Follow Button */}
-        {isOwnProfile ? (
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => setEditModalVisible(true)}
-          >
-            <Ionicons name="pencil" size={20} color="#fff" />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.actionButtonsRow}>
-            {/* Follow / Unfollow Button */}
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                isFollowing ? styles.followingButton : styles.followButton,
-              ]}
-              onPress={handleFollowToggle}
-              disabled={followLoading}
-            >
-              {followLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons
-                    name={isFollowing ? "checkmark" : "person-add"}
-                    size={18}
+        {/* Action Buttons with Gradient */}
+        <View style={styles.actionButtonsContainer}>
+          {isOwnProfile ? (
+            <>
+              {/* Follow Button */}
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => setEditModalVisible(true)}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="person-add" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Follow</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Message Button */}
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => {}}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="chatbubble" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Message</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Compliment Button */}
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => setComplimentModalVisible(true)}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="heart" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Compliment</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Follow/Following Button */}
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={handleFollowToggle}
+                disabled={followLoading}
+              >
+                <LinearGradient
+                  colors={isFollowing ? ['#4CAF50', '#4CAF50', '#4CAF50'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  {followLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons 
+                        name={isFollowing ? "checkmark-circle" : "person-add"} 
+                        size={16} 
+                        color="#fff"
+                      />
+                      <Text style={styles.actionButtonText}>
+                        {isFollowing ? 'Following' : 'Follow'}
+                      </Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Message Button */}
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => router.push(`/chat/${userData.id}`)}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="chatbubble" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Message</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Compliment Button */}
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => setComplimentModalVisible(true)}
+                disabled={hasComplimented}
+              >
+                <LinearGradient
+                  colors={hasComplimented ? ['#95A3A4', '#95A3A4', '#95A3A4'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={[styles.actionButton, hasComplimented && { opacity: 0.7 }]}
+                >
+                  <Ionicons 
+                    name={hasComplimented ? "heart" : "heart"} 
+                    size={16} 
                     color="#fff"
                   />
                   <Text style={styles.actionButtonText}>
-                    {isFollowing ? "Following" : "Follow"}
+                    {hasComplimented ? 'Complimented' : 'Compliment'}
                   </Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Message Button */}
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: "#4dd0e1" }]}
-              onPress={() => router.push(`/chat/${userData.id}`)}
-            >
-              <Ionicons name="chatbubbles-outline" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Message</Text>
-            </TouchableOpacity>
-
-            {/* Compliment Button */}
-            <TouchableOpacity
-              style={[
-                styles.actionButton, 
-                { backgroundColor: hasComplimented ? "#999" : "#FF6B6B" }
-              ]}
-              onPress={() => setComplimentModalVisible(true)}
-              disabled={hasComplimented}
-            >
-              <Ionicons 
-                name={hasComplimented ? "heart" : "heart-outline"} 
-                size={18} 
-                color="#fff" 
-              />
-              <Text style={styles.actionButtonText}>
-                {hasComplimented ? "Complimented" : "Compliment"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
 
         {/* Bio Section */}
         <View style={styles.bioSection}>
@@ -1065,7 +1088,7 @@ export default function ProfileScreen() {
                 activeTab === 'posts' && styles.activeTabText,
               ]}
             >
-              Posts
+              Photos
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1081,22 +1104,9 @@ export default function ProfileScreen() {
               Videos
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'favourite' && styles.activeTab]}
-            onPress={() => setActiveTab('favourite')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'favourite' && styles.activeTabText,
-              ]}
-            >
-              Favourite
-            </Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Content Grid / Videos / Favourite */}
+        {/* Content Grid */}
         {activeTab === 'videos' ? (
           <FlatList
             data={userPosts.filter((post: any) => post.isVideo)}
@@ -1111,109 +1121,6 @@ export default function ProfileScreen() {
               </View>
             )}
           />
-        ) : activeTab === 'favourite' ? (
-          <View>
-            {/* Favourite Tab - Posts Grouped by Location */}
-            {(() => {
-              // Filter posts that have location_name (check multiple possible field names)
-              const postsWithLocation = userPosts.filter((post: any) => {
-                // Check all possible location field names
-                const location = post.location_name || post.location || post.place_name;
-                // Ensure location exists and is not empty
-                const hasLocation = location && typeof location === 'string' && location.trim() !== '';
-                return hasLocation;
-              });
-
-              if (postsWithLocation.length === 0) {
-                return (
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="location-outline" size={64} color="#ccc" />
-                    <Text style={styles.emptyText}>No posts with location yet</Text>
-                    <Text style={styles.emptySubtext}>
-                      Add location to your posts to see them here
-                    </Text>
-                  </View>
-                );
-              }
-
-              // Group posts by location
-              const locationGroups: { [key: string]: any[] } = {};
-              
-              postsWithLocation.forEach((post: any) => {
-                // Get location name from any of the possible fields
-                const locationName = (post.location_name || post.location || post.place_name || 'Unknown Location').trim();
-                
-                if (!locationGroups[locationName]) {
-                  locationGroups[locationName] = [];
-                }
-                locationGroups[locationName].push(post);
-              });
-
-              const sortedLocations = Object.keys(locationGroups).sort();
-
-              return (
-                <View>
-                  {sortedLocations.map(location => (
-                    <View key={location} style={styles.locationGroup}>
-                      {/* Location Header */}
-                      <View style={styles.locationHeader}>
-                        <Ionicons name="location" size={20} color="#007AFF" />
-                        <Text style={styles.locationName}>{location}</Text>
-                        <Text style={styles.locationCount}>({locationGroups[location].length})</Text>
-                      </View>
-
-                      {/* Location Posts Grid */}
-                      <View style={styles.locationGrid}>
-                        {locationGroups[location].map((post: any) => {
-                          const mediaUrl = fixUrl(post.full_image_url || post.media_url);
-                          const isVideo = post.isVideo || post.media_type === 'video' ||
-                            mediaUrl?.toLowerCase().endsWith('.mp4') ||
-                            mediaUrl?.toLowerCase().endsWith('.mov');
-                          
-                          return (
-                            <TouchableOpacity
-                              key={post.id}
-                              style={styles.gridItem}
-                              onPress={() => router.push(`/post-details/${post.id}`)}
-                              activeOpacity={0.8}
-                            >
-                              {mediaUrl && !isVideo ? (
-                                <Image source={{ uri: mediaUrl }} style={styles.gridImage} resizeMode="cover" />
-                              ) : mediaUrl && isVideo ? (
-                                <View style={styles.gridImageContainer}>
-                                  <Image
-                                    source={{ uri: mediaUrl }}
-                                    style={styles.gridImage}
-                                    resizeMode="cover"
-                                  />
-                                  <View style={styles.videoOverlay}>
-                                    <Ionicons name="play-circle" size={40} color="#fff" />
-                                  </View>
-                                </View>
-                              ) : (
-                                <View style={styles.gridPlaceholder}>
-                                  <Ionicons
-                                    name={isVideo ? 'play-circle-outline' : 'image-outline'}
-                                    size={40}
-                                    color="#ccc"
-                                  />
-                                </View>
-                              )}
-                              {post.rating && (
-                                <View style={styles.ratingBadge}>
-                                  <Text style={styles.ratingText}>{post.rating}</Text>
-                                </View>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
-          </View>
         ) : (
           <FlatList
             data={userPosts.filter((post: any) => !post.isVideo)}
@@ -1233,31 +1140,33 @@ export default function ProfileScreen() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation - Matching feed.tsx */}
       <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.push('/feed')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
           <Ionicons name="home-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/explore')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
           <Ionicons name="compass-outline" size={28} color="#000" />
           <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/leaderboard')}>
-          <Ionicons name="trophy-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Leaderboard</Text>
+        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
+          <View style={styles.centerIconCircle}>
+            <Ionicons name="camera" size={28} color="#000" />
+          </View>
+          <Text style={styles.navLabel}>Top Posts</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/happening')}>
-          <Ionicons name="restaurant-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Restaurant</Text>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
+          <Ionicons name="location-outline" size={28} color="#000" />
+          <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/profile')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
           <Ionicons name="person" size={28} color="#000" />
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Edit Profile Modal */}
+      {/* All Modals - unchanged */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1301,7 +1210,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Settings Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1318,6 +1226,28 @@ export default function ProfileScreen() {
             </View>
 
             <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => {
+                setSettingsModalVisible(false);
+                setLevelDetailsModalVisible(true);
+              }}
+            >
+              <Ionicons name="information-circle-outline" size={24} color="#666" />
+              <Text style={styles.settingsOptionText}>Level Details</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => {
+                setSettingsModalVisible(false);
+                router.push('/saved-posts');
+              }}
+            >
+              <Ionicons name="bookmark-outline" size={24} color="#666" />
+              <Text style={styles.settingsOptionText}>Saved Posts</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={styles.logoutButtonModal}
               activeOpacity={0.7}
               onPress={() => {
@@ -1327,24 +1257,17 @@ export default function ProfileScreen() {
                     'Are you sure you want to logout?'
                   );
                   if (confirmed) {
-                    console.log('✅ User confirmed logout (web)');
                     handleLogout();
-                  } else {
-                    console.log('❌ Logout cancelled (web)');
                   }
                 } else {
                   Alert.alert('Logout', 'Are you sure you want to logout?', [
                     {
                       text: 'Cancel',
                       style: 'cancel',
-                      onPress: () => console.log('❌ Logout cancelled'),
                     },
                     {
                       text: 'Logout',
-                      onPress: () => {
-                        console.log('✅ User confirmed logout');
-                        handleLogout();
-                      },
+                      onPress: () => handleLogout(),
                       style: 'destructive',
                     },
                   ]);
@@ -1358,7 +1281,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Compliment Modal */}
       <ComplimentModal
         visible={complimentModalVisible}
         onClose={() => setComplimentModalVisible(false)}
@@ -1368,7 +1290,8 @@ export default function ProfileScreen() {
           setSendingCompliment(true);
           try {
             await sendCompliment(userData.id, complimentType);
-            setHasComplimented(true); // Update state after successful compliment
+            setHasComplimented(true);
+            fetchComplimentsCount();
             Alert.alert('Success', 'Compliment sent successfully!');
             setComplimentModalVisible(false);
           } catch (error: any) {
@@ -1384,7 +1307,6 @@ export default function ProfileScreen() {
         loading={sendingCompliment}
       />
 
-      {/* Delete Post Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1441,7 +1363,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Followers Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1529,7 +1450,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Level Details Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1633,6 +1553,8 @@ export default function ProfileScreen() {
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1658,145 +1580,219 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
   },
-  header: {
+
+  reviewerBadgeContainer: {
+    position: 'absolute',
+    right: 16,
+    top: '50%',
+    transform: [{ translateY: -40 }],
+    alignItems: 'center',
+  },
+
+  headerContainer: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  gradientHeader: {
+    paddingTop: 65,
+    paddingBottom: 55,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  headerRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
   },
-  username: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
-  headerButtons: {
+  leftSpacer: {
+    width: 40,
+  },
+  cofauTitle: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontFamily: 'Lobster',
+    fontSize: 36,
+    color: '#fff',
+    letterSpacing: 1,
+    zIndex: -1,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 4, height: 6 },
+    textShadowRadius: 4,
+  },
+  headerIcons: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
   },
-  infoButton: {
-    padding: 5,
+
+  profileCardWrapper: {
+    marginHorizontal: 35,
+    marginTop: -40,
+    marginBottom: 5,
   },
-  settingsButton: {
-    padding: 5,
+  profileCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    paddingVertical: 70,
+    paddingLeft: 100,
+    paddingRight: 80,
+    justifyContent: 'center',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    position: 'relative',
+    borderWidth: 0,
   },
-  identitySection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  profilePictureContainer: {
+    position: 'absolute',
+    left: 15,
+    top: '400%',
+    transform: [{ translateY: -45 }],
+    zIndex: 10,
   },
   cameraIcon: {
     position: 'absolute',
     right: 0,
     bottom: 0,
     backgroundColor: '#4dd0e1',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+    borderRadius: 14,
+    width: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
-  badgeContainer: {
-    alignItems: 'center',
+  profileInfo: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 10,
   },
-  badgeIcon: {
-    fontSize: 40,
-    marginBottom: 5,
-  },
-  badgeLabel: {
-    fontSize: 12,
-    color: '#666',
+  profileUsername: {
+    fontSize: 17,
     fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+    marginTop: -10,
   },
+
   statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 8,
   },
   statBox: {
-    backgroundColor: '#f5f5f5',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     alignItems: 'center',
-    minWidth: 90,
+    minWidth: 100,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#333',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
   },
-  editButton: {
+
+  actionButtonsContainer: {
     flexDirection: 'row',
+    paddingHorizontal: 30,
+    gap: 10,
+    marginBottom: 16,
+  },
+  actionButtonWrapper: {
+    flex: 1,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    borderRadius: 20,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF6B6B',
-    marginHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    marginBottom: 20,
+    flexDirection: 'row',
+    gap: 6,
   },
-  followButton: {
-    backgroundColor: '#4dd0e1',
-  },
-  followingButton: {
-    backgroundColor: '#28a745',
-  },
-  editButtonText: {
+  actionButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
+
   bioSection: {
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   bioLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#333',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   bioText: {
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
   },
+
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
-    marginBottom: 10,
-    paddingHorizontal: 0,
+    marginBottom: 2,
   },
   tab: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginHorizontal: 4,
   },
   activeTab: {
     borderBottomWidth: 2,
     borderBottomColor: '#4dd0e1',
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#999',
   },
   activeTabText: {
     color: '#333',
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
+
   gridItem: {
     width: (SCREEN_WIDTH - 2) / 3,
     height: (SCREEN_WIDTH - 2) / 3,
@@ -1806,14 +1802,6 @@ const styles = StyleSheet.create({
   gridImage: {
     width: '100%',
     height: '100%',
-  },
-  videoIndicator: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 12,
   },
   gridImageContainer: {
     width: '100%',
@@ -1839,28 +1827,183 @@ const styles = StyleSheet.create({
   },
   ratingBadge: {
     position: 'absolute',
-    top: 5,
-    right: 5,
+    top: 8,
+    right: 8,
     backgroundColor: '#FFD700',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   ratingText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#333',
   },
   postMenuButton: {
     position: 'absolute',
     top: 8,
-    right: 8,
+    left: 8,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 15,
     width: 30,
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#999',
+  },
+
+  navBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
+    backgroundColor: '#FFFFFF',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  centerNavItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -30,
+  },
+  centerIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  navLabel: {
+    fontSize: 11,
+    color: '#000',
+    marginTop: 2,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  bottomSpacer: {
+    height: 20,
+  },
+
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    marginTop: 15,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  bioInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  saveButton: {
+    backgroundColor: '#4dd0e1',
+    paddingVertical: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  settingsOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingsOptionText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 16,
+  },
+  logoutButtonModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    paddingVertical: 15,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    backgroundColor: '#fff',
+  },
+  logoutText: {
+    color: '#FF6B6B',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   deleteConfirmText: {
     fontSize: 16,
@@ -1898,37 +2041,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#999',
-  },
-  emptySubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#ccc',
-  },
-  logoutButtonModal: {
+  followerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    paddingVertical: 15,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-    backgroundColor: '#fff',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  logoutText: {
-    color: '#FF6B6B',
+  followerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  followerName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontWeight: '500',
+    color: '#333',
+  },
+  followersListContent: {
+    paddingBottom: 20,
+  },
+  followerFollowButton: {
+    backgroundColor: '#4dd0e1',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  followerFollowingButton: {
+    backgroundColor: '#28a745',
+  },
+  followerFollowButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  followerFollowingButtonText: {
+    color: '#fff',
   },
   levelDetailsContent: {
     maxHeight: 400,
@@ -2010,214 +2157,5 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 22,
     marginBottom: 8,
-  },
-  bottomSpacer: {
-    height: 40,
-  },
-  navBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#fff',
-  },
-  navLabel: {
-    fontSize: 10,
-    color: '#000',
-    marginTop: 4,
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: 8,
-    paddingHorizontal: 20,
-    marginTop: 10,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4dd0e1',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  peopleToggle: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    marginBottom: 10,
-  },
-  peopleToggleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  peopleToggleActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#4dd0e1',
-  },
-  peopleToggleText: {
-    fontSize: 14,
-    color: '#999',
-  },
-  peopleToggleTextActive: {
-    color: '#333',
-    fontWeight: '600',
-  },
-  peopleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  peopleInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  peopleName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  peopleBadge: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    marginTop: 15,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  bioInput: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  saveButton: {
-    backgroundColor: '#4dd0e1',
-    paddingVertical: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  locationGroup: {
-    marginBottom: 24,
-    paddingHorizontal: 8,
-  },
-  locationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  locationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 8,
-    flex: 1,
-  },
-  locationCount: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  locationGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 2,
-  },
-  followerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  followerInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  followerName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  followersListContent: {
-    paddingBottom: 20,
-  },
-  followerFollowButton: {
-    backgroundColor: '#4dd0e1',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  followerFollowingButton: {
-    backgroundColor: '#28a745',
-  },
-  followerFollowButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  followerFollowingButtonText: {
-    color: '#fff',
   },
 });
