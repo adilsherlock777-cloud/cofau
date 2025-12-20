@@ -275,7 +275,7 @@ export default function FeedScreen() {
                   <UserAvatar
                     profilePicture={user.profile_picture}
                     username={user.username}
-                    size={72}
+                    size={80}
                     showLevelBadge={false}
                     level={user.level}
                     style={{}}
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: 50,
     backgroundColor: "#fff",
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
     borderBottomColor: "#E0E0E0",
     zIndex: 1000,
     shadowColor: "#000",
@@ -503,31 +503,32 @@ const styles = StyleSheet.create({
   levelCardWrapper: {
     marginHorizontal: 26,
     marginTop: -40,
-    marginBottom: 4,
+    marginBottom: 3.5,
+    borderBottomLeftRadius: 30,
   },
 
   levelCard: {
     backgroundColor: "#fff",
-    borderRadius: 25,
-    paddingVertical: 20,
-    paddingLeft: 95,
+    borderRadius: 23,
+    paddingVertical: 30,
+    paddingLeft: 100,
     paddingRight: 10,
     flexDirection: "row",
     alignItems: "center",
-    elevation: 10,
+    elevation: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0,
-    shadowRadius: 10,
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
     position: "relative",
-    borderWidth: 0.8,  
+    borderWidth: 0,  
     borderColor: "#090000ff",
   },
 
   dpContainer: {
     position: "absolute",
-    left: 5,
-    top: "124%",
+    left: 10,
+    top: "140%",
     transform: [{ translateY: -41 }],
     zIndex: 6,
   },
