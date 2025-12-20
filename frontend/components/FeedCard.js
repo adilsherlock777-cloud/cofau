@@ -545,13 +545,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     marginBottom: 1,
-    borderWidth: 0.5,
+    borderWidth: 0,
     borderColor: "#0e0e0dff",        // ✅ Change from #DADCE0 to cyan (more noticeable)
-    shadowColor: "#F2CF68",        // ✅ Add cyan shadow
-    shadowOffset: { width: 10, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 0.8,
-    elevation: 2,
+    shadowColor: "#000000ff",        // ✅ Add cyan shadow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 12,
   },
 
   locationRow: {
