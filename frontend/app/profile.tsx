@@ -1209,7 +1209,7 @@ export default function ProfileScreen() {
                 disabled={followLoading}
               >
                 <LinearGradient
-                  colors={isFollowing ? ['#4CAF50', '#4CAF50', '#4CAF50'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={isFollowing ? ['#1B7C82', '#1B7C82', '#1B7C82'] : ['#E94A37', '#F2CF68', '#1B7C82']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
@@ -1256,7 +1256,7 @@ export default function ProfileScreen() {
                 disabled={hasComplimented}
               >
                 <LinearGradient
-                  colors={hasComplimented ? ['#95A3A4', '#95A3A4', '#95A3A4'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={hasComplimented ? ['#1B7C82', '#1B7C82', '#1B7C82'] : ['#E94A37', '#F2CF68', '#1B7C82']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}

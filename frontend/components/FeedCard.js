@@ -545,12 +545,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     marginBottom: 1,
-    borderWidth: 0,
+    borderWidth: 0.2,
     borderColor: "#0e0e0dff",        // ✅ Change from #DADCE0 to cyan (more noticeable)
     shadowColor: "#000000ff",        // ✅ Add cyan shadow
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
     elevation: 12,
   },
 

@@ -103,12 +103,12 @@ export default function StoriesBar({ refreshTrigger }) {
             <UserAvatar
               profilePicture={normalizeProfilePicture(user.profile_picture)}
               username={user.full_name}
-              size={70}
+              size={80}
               showLevelBadge={false}
             />
 
             <View style={styles.addIconContainer}>
-              <Ionicons name="add" size={16} color="#fff" />
+              <Ionicons name="add" size={12} color="#000" />
             </View>
           </View>
 
@@ -138,7 +138,7 @@ export default function StoriesBar({ refreshTrigger }) {
                   <UserAvatar
                     profilePicture={normalizeProfilePicture(u.user.profile_picture)}
                     username={u.user.username}
-                    size={70}
+                    size={74}
                     showLevelBadge={false}
                   />
                 </View>
@@ -165,9 +165,9 @@ export default function StoriesBar({ refreshTrigger }) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#FFF",
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
     borderBottomColor: "#EEE",
-    marginTop: -8,
+    marginTop: -4.9,
     marginBottom: -8,
   },
 
@@ -178,12 +178,12 @@ const styles = StyleSheet.create({
 
   contentContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
 
   storyItem: {
     alignItems: "center",
-    marginRight: 16,
+    marginRight: 14,
     width: 70,
   },
 
@@ -195,8 +195,8 @@ const styles = StyleSheet.create({
   gradientRing: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    padding: 2,
+    borderRadius: 55,
+    padding: 4,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -212,30 +212,30 @@ const styles = StyleSheet.create({
 
   addIconContainer: {
     position: "absolute",
-    bottom: -2,
-    right: -2,
-    backgroundColor: "#4dd0e1",
+    bottom: 0,
+    right: 8,
+    backgroundColor: "#fff",
     borderRadius: 12,
-    width: 24,
-    height: 24,
+    width: 18,
+    height: 18,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#000",
     zIndex: 10,
   },
 
   /* ✅ Correct level badge placement */
   levelBadgeWrap: {
     position: "absolute",
-    bottom: 2,
-    right: 2,
-    zIndex: 20,
+    bottom: 5,
+    right: 4,
+    zIndex: 30,
   },
 
   storyUsername: {
     marginTop: 4,
-    fontSize: 10,
+    fontSize: 12,
     color: "#333",
     textAlign: "center",
   },
