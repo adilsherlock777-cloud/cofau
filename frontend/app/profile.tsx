@@ -25,6 +25,7 @@ import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
 import { sendCompliment, getFollowers } from '../utils/api';
+import MaskedView from '@react-native-masked-view/masked-view';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${BACKEND_URL}/api`;
@@ -104,6 +105,17 @@ export default function ProfileScreen() {
       checkIfComplimented();
     }
   }, [userData, activeTab]);
+
+  const GradientHeart = ({ size = 24 }) => (
+  <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
+    <LinearGradient
+      colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size }}
+    />
+  </MaskedView>
+);
 
   const fetchProfileData = async () => {
     try {
@@ -771,6 +783,202 @@ export default function ProfileScreen() {
       </TouchableOpacity>
     );
   };
+  
+  const renderListItem = ({ item }: { item: any }) => {
+  const mediaUrl = fixUrl(item.full_image_url || item.media_url);
+  const isVideo =
+    item.media_type === 'video' ||
+    mediaUrl?.toLowerCase().endsWith('.mp4') ||
+    mediaUrl?.toLowerCase().endsWith('.mov') ||
+    mediaUrl?.toLowerCase().endsWith('.avi') ||
+    mediaUrl?.toLowerCase().endsWith('.webm');
+
+  const handlePostPress = () => {
+    if (item.id) {
+      console.log('📱 Navigating to post details:', item.id);
+      router.push(`/post-details/${item.id}`);
+    } else {
+      console.warn('⚠️ Post ID is missing:', item);
+    }
+  };
+
+  const handleMenuPress = (e: any) => {
+    e.stopPropagation();
+    setSelectedPostForDelete(item);
+    setDeleteModalVisible(true);
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.listItem}
+      onPress={handlePostPress}
+      activeOpacity={0.8}
+    >
+      {/* Left Side - Image */}
+      <View style={styles.listImageContainer}>
+        {mediaUrl ? (
+          <Image 
+            source={{ uri: mediaUrl }} 
+            style={styles.listImage} 
+            resizeMode="cover" 
+          />
+        ) : (
+          <View style={styles.listImagePlaceholder}>
+            <Ionicons name="image-outline" size={40} color="#ccc" />
+          </View>
+        )}
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.listMenuButton}
+            onPress={handleMenuPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Right Side - Details */}
+<View style={styles.listDetails}>
+ {/* Likes - Gradient Heart */}
+<View style={styles.listDetailRow}>
+  <GradientHeart size={20} />
+  <Text style={styles.listDetailText}>
+    {item.likes_count || item.likes || 0}
+  </Text>
+</View>
+
+  {/* Rating */}
+  {item.rating && (
+    <View style={styles.listDetailRow}>
+      <Ionicons name="star" size={20} color="#F2CF68" />
+      <Text style={styles.listDetailText}>
+        {item.rating}/10
+      </Text>
+    </View>
+  )}
+
+  {/* Reviews - Show if review_text exists */}
+{item.review_text && (
+  <View style={styles.listDetailRow}>
+    <Ionicons name="create" size={20} color="#F2CF68" />
+    <Text style={styles.listDetailText} numberOfLines={1}>
+      {item.review_text}
+    </Text>
+  </View>
+)}
+
+  {/* Location */}
+  {(item.location_name || item.location || item.place_name) && (
+    <View style={styles.listDetailRow}>
+      <Ionicons name="location" size={20} color="#F2CF68" />
+      <Text style={styles.listDetailText} numberOfLines={2}>
+        {item.location_name || item.location || item.place_name}
+      </Text>
+    </View>
+  )}
+</View>
+    </TouchableOpacity>
+  );
+};
+
+  const renderVideoListItem = ({ item }: { item: any }) => {
+  const mediaUrl = fixUrl(item.full_image_url || item.media_url);
+
+  const handlePostPress = () => {
+    if (item.id) {
+      console.log('📱 Navigating to post details:', item.id);
+      router.push(`/post-details/${item.id}`);
+    } else {
+      console.warn('⚠️ Post ID is missing:', item);
+    }
+  };
+
+  const handleMenuPress = (e: any) => {
+    e.stopPropagation();
+    setSelectedPostForDelete(item);
+    setDeleteModalVisible(true);
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.listItem}
+      onPress={handlePostPress}
+      activeOpacity={0.8}
+    >
+      {/* Left Side - Video Thumbnail */}
+      <View style={styles.listImageContainer}>
+        {mediaUrl ? (
+          <View style={styles.videoThumbnailContainer}>
+            <Image 
+              source={{ uri: mediaUrl }} 
+              style={styles.listImage} 
+              resizeMode="cover" 
+            />
+            <View style={styles.videoPlayOverlay}>
+              <Ionicons name="play-circle" size={50} color="#fff" />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.listImagePlaceholder}>
+            <Ionicons name="videocam-outline" size={40} color="#ccc" />
+          </View>
+        )}
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.listMenuButton}
+            onPress={handleMenuPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Right Side - Details */}
+<View style={styles.listDetails}>
+   {/* Likes - Gradient Heart */}
+<View style={styles.listDetailRow}>
+  <GradientHeart size={20} />
+  <Text style={styles.listDetailText}>
+    {item.likes_count || item.likes || 0}
+  </Text>
+</View>
+
+  {/* Rating */}
+  {item.rating && (
+    <View style={styles.listDetailRow}>
+      <Ionicons name="star" size={20} color="#F2CF68" />
+      <Text style={styles.listDetailText}>
+        {item.rating}/10
+      </Text>
+    </View>
+  )}
+
+  {/* Reviews - Show if review_text exists */}
+{item.review_text && (
+  <View style={styles.listDetailRow}>
+    <Ionicons name="chatbubble-ellipses" size={20} color="#F2CF68" />
+    <Text style={styles.listDetailText} numberOfLines={1}>
+      {item.review_text}
+    </Text>
+  </View>
+)}
+
+  {/* Location */}
+  {(item.location_name || item.location || item.place_name) && (
+    <View style={styles.listDetailRow}>
+      <Ionicons name="location" size={20} color="#F2CF68" />
+      <Text style={styles.listDetailText} numberOfLines={2}>
+        {item.location_name || item.location || item.place_name}
+      </Text>
+    </View>
+  )}
+</View>
+    </TouchableOpacity>
+  );
+};
+   
 
   if (loading) {
     return (
@@ -860,7 +1068,7 @@ export default function ProfileScreen() {
                   style={styles.headerIconButton}
                   onPress={() => router.push('/cart')}
                 >
-                  <Ionicons name="cart-outline" size={24} color="#fff" />
+                  <Ionicons name="menu" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1106,36 +1314,35 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Content Grid */}
         {activeTab === 'videos' ? (
-          <FlatList
-            data={userPosts.filter((post: any) => post.isVideo)}
-            renderItem={renderGridItem}
-            keyExtractor={(item: any) => item.id}
-            numColumns={3}
-            scrollEnabled={false}
-            ListEmptyComponent={() => (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="videocam-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyText}>No videos yet</Text>
-              </View>
-            )}
-          />
-        ) : (
-          <FlatList
-            data={userPosts.filter((post: any) => !post.isVideo)}
-            renderItem={renderGridItem}
-            keyExtractor={(item: any) => item.id}
-            numColumns={3}
-            scrollEnabled={false}
-            ListEmptyComponent={() => (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="images-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyText}>No posts yet</Text>
-              </View>
-            )}
-          />
-        )}
+  <FlatList
+    key="videos-list"
+    data={userPosts.filter((post: any) => post.isVideo)}
+    renderItem={renderVideoListItem}
+    keyExtractor={(item: any) => item.id}
+    scrollEnabled={false}
+    ListEmptyComponent={() => (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="videocam-outline" size={64} color="#ccc" />
+        <Text style={styles.emptyText}>No videos yet</Text>
+      </View>
+    )}
+  />
+) : (
+  <FlatList
+    key="photos-list"
+    data={userPosts.filter((post: any) => !post.isVideo)}
+    renderItem={renderListItem}
+    keyExtractor={(item: any) => item.id}
+    scrollEnabled={false}
+    ListEmptyComponent={() => (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="images-outline" size={64} color="#ccc" />
+        <Text style={styles.emptyText}>No posts yet</Text>
+      </View>
+    )}
+  />
+)}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -1166,7 +1373,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* All Modals - unchanged */}
+      {/* Edit Profile Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1210,73 +1417,90 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* Settings Modal - Instagram Style */}
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent={false}
         visible={settingsModalVisible}
         onRequestClose={() => setSettingsModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Settings</Text>
+        <View style={styles.settingsModalContainer}>
+          <View style={styles.settingsModalContent}>
+            {/* Header */}
+            <View style={styles.settingsModalHeader}>
               <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
-                <Ionicons name="close" size={28} color="#000" />
+                <Ionicons name="close" size={28} color="#333" />
               </TouchableOpacity>
+              <Text style={styles.settingsModalTitle}>Menu</Text>
+              <View style={{ width: 28 }} />
             </View>
 
-            <TouchableOpacity
-              style={styles.settingsOption}
-              onPress={() => {
-                setSettingsModalVisible(false);
-                setLevelDetailsModalVisible(true);
-              }}
-            >
-              <Ionicons name="information-circle-outline" size={24} color="#666" />
-              <Text style={styles.settingsOptionText}>Level Details</Text>
-            </TouchableOpacity>
+            {/* Menu Options */}
+            <View style={styles.settingsMenuOptions}>
+              {/* Saved Posts */}
+              <TouchableOpacity
+                style={styles.settingsMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  router.push('/saved-posts');
+                }}
+              >
+                <View style={styles.settingsMenuIconContainer}>
+                  <Ionicons name="bookmark-outline" size={24} color="#333" />
+                </View>
+                <Text style={styles.settingsMenuText}>Saved</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.settingsOption}
-              onPress={() => {
-                setSettingsModalVisible(false);
-                router.push('/saved-posts');
-              }}
-            >
-              <Ionicons name="bookmark-outline" size={24} color="#666" />
-              <Text style={styles.settingsOptionText}>Saved Posts</Text>
-            </TouchableOpacity>
+              {/* Settings */}
+              <TouchableOpacity
+                style={styles.settingsMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  setLevelDetailsModalVisible(true);
+                }}
+              >
+                <View style={styles.settingsMenuIconContainer}>
+                  <Ionicons name="settings-outline" size={24} color="#333" />
+                </View>
+                <Text style={styles.settingsMenuText}>Settings</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.logoutButtonModal}
-              activeOpacity={0.7}
-              onPress={() => {
-                setSettingsModalVisible(false);
-                if (Platform.OS === 'web') {
-                  const confirmed = window.confirm(
-                    'Are you sure you want to logout?'
-                  );
-                  if (confirmed) {
-                    handleLogout();
+              {/* Logout */}
+              <TouchableOpacity
+                style={[styles.settingsMenuItem, styles.logoutMenuItem]}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  if (Platform.OS === 'web') {
+                    const confirmed = window.confirm(
+                      'Are you sure you want to logout?'
+                    );
+                    if (confirmed) {
+                      handleLogout();
+                    }
+                  } else {
+                    Alert.alert('Logout', 'Are you sure you want to logout?', [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel',
+                      },
+                      {
+                        text: 'Logout',
+                        onPress: () => handleLogout(),
+                        style: 'destructive',
+                      },
+                    ]);
                   }
-                } else {
-                  Alert.alert('Logout', 'Are you sure you want to logout?', [
-                    {
-                      text: 'Cancel',
-                      style: 'cancel',
-                    },
-                    {
-                      text: 'Logout',
-                      onPress: () => handleLogout(),
-                      style: 'destructive',
-                    },
-                  ]);
-                }
-              }}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#FF6B6B" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
+                }}
+              >
+                <View style={styles.settingsMenuIconContainer}>
+                  <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={[styles.settingsMenuText, styles.logoutMenuText]}>Logout</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1581,6 +1805,148 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // List Layout Styles
+listItem: {
+  flexDirection: 'row',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+  backgroundColor: '#fff',
+},
+listImageContainer: {
+  width: 200,
+  height: 220,
+  borderRadius: 12,
+  overflow: 'hidden',
+  position: 'relative',
+  marginRight: 16,
+},
+listImage: {
+  width: '100%',
+  height: '100%',
+},
+listImagePlaceholder: {
+  width: '100%',
+  height: '100%',
+  backgroundColor: '#f5f5f5',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+listMenuButton: {
+  position: 'absolute',
+  top: 8,
+  right: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  borderRadius: 15,
+  width: 30,
+  height: 30,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+listDetails: {
+  flex: 1,
+  justifyContent: 'center',
+  gap: 12,
+},
+listDetailRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+listDetailText: {
+  fontSize: 15,
+  color: '#333',
+  fontWeight: '600',
+  flex: 1,
+},
+
+videoThumbnailContainer: {
+  width: '100%',
+  height: '100%',
+  position: 'relative',
+},
+videoPlayOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+gradientHeartContainer: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  overflow: 'hidden',
+},
+gradientHeart: {
+  width: '100%',
+  height: '100%',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+    // Settings Modal Styles (Instagram-like) - ADD THESE
+  settingsModalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  settingsModalContent: {
+    flex: 1,
+    paddingTop: 60,
+  },
+  settingsModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingsModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  settingsMenuOptions: {
+    paddingTop: 20,
+  },
+  settingsMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  settingsMenuIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  settingsMenuText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  logoutMenuItem: {
+    marginTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  logoutMenuText: {
+    color: '#FF6B6B',
+  },
   reviewerBadgeContainer: {
     position: 'absolute',
     right: 16,
@@ -1652,9 +2018,9 @@ const styles = StyleSheet.create({
   profileCard: {
     backgroundColor: '#fff',
     borderRadius: 24,
-    paddingVertical: 70,
+    paddingVertical: 60,
     paddingLeft: 100,
-    paddingRight: 80,
+    paddingRight: 100,
     justifyContent: 'center',
     elevation: 12,
     shadowColor: '#000',
@@ -1710,21 +2076,21 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#333',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#666',
   },
 
   actionButtonsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 30,
-    gap: 10,
-    marginBottom: 16,
+    paddingHorizontal: 40,
+    gap: 14,
+    marginBottom: 8,
   },
   actionButtonWrapper: {
     flex: 1,
@@ -1733,20 +2099,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 4, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
-    borderRadius: 20,
+    borderRadius: 18,
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingVertical: 8,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -1755,6 +2121,7 @@ const styles = StyleSheet.create({
 
   bioSection: {
     paddingHorizontal: 20,
+    paddingVertical: 4,
     marginBottom: 16,
   },
   bioLabel: {
@@ -1766,7 +2133,7 @@ const styles = StyleSheet.create({
   bioText: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 40,
   },
 
   tabBar: {
@@ -1836,7 +2203,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
   postMenuButton: {
@@ -2083,7 +2450,7 @@ const styles = StyleSheet.create({
   levelInfoCard: {
     backgroundColor: '#f5f5f5',
     borderRadius: 12,
-    padding: 20,
+    padding: 15,
     marginBottom: 20,
   },
   levelInfoRow: {
@@ -2106,7 +2473,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4dd0e1',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 15,
+    borderRadius: 18,
   },
   levelBadgeText: {
     color: '#fff',
