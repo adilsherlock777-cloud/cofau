@@ -33,8 +33,9 @@ router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 # ======================================================
 
 # Score weights (must sum to 1.0)
-QUALITY_WEIGHT = 0.6  # 60% weight for quality score
-ENGAGEMENT_WEIGHT = 0.4  # 40% weight for engagement score
+QUALITY_WEIGHT = 0.5  # 50% weight for quality score
+ENGAGEMENT_WEIGHT = 0.3  # 30% weight for engagement score
+POST_COUNT_WEIGHT = 0.2  # 20% weight for post count (number of posts uploaded in 3 days)
 
 # Leaderboard window: 3 days
 LEADERBOARD_WINDOW_DAYS = 3
@@ -68,20 +69,42 @@ def calculate_engagement_score(likes_count: int, max_likes: int) -> float:
     return round(engagement_score, 2)
 
 
-def calculate_combined_score(quality_score: float, engagement_score: float) -> float:
+def calculate_post_count_score(post_count: int, max_post_count: int) -> float:
+    """
+    Calculate post count score (0-100) based on number of posts uploaded in 3-day window.
+    
+    Formula: (post_count / max_post_count) * 100
+    If max_post_count is 0, return 0.
+    
+    Args:
+        post_count: Number of posts uploaded by user in the 3-day window
+        max_post_count: Maximum posts uploaded by any user in the current 3-day window
+    
+    Returns:
+        float: Post count score between 0-100
+    """
+    if max_post_count == 0:
+        return 0.0
+    
+    post_count_score = (post_count / max_post_count) * 100
+    return round(post_count_score, 2)
+
+
+def calculate_combined_score(quality_score: float, engagement_score: float, post_count_score: float = 0.0) -> float:
     """
     Calculate combined score using weighted average.
     
-    Formula: (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score)
+    Formula: (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score) + (POST_COUNT_WEIGHT * post_count_score)
     
     Args:
         quality_score: Quality score from Sightengine (0-100)
         engagement_score: Normalized engagement score (0-100)
+        post_count_score: Normalized post count score (0-100)
     
     Returns:
         float: Combined score between 0-100
     """
-    combined = (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score)
+    combined = (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score) + (POST_COUNT_WEIGHT * post_count_score)
     return round(combined, 2)
 
 
@@ -131,23 +154,44 @@ async def generate_leaderboard_snapshot():
     
     logger.info(f"📊 Found {len(posts)} posts in window")
     
-    # 3. Find max likes for normalization
+    # 3. Count posts per user in the 3-day window
+    user_post_counts = {}
+    for post in posts:
+        user_id = str(post.get("user_id", ""))
+        if user_id:
+            user_post_counts[user_id] = user_post_counts.get(user_id, 0) + 1
+    
+    # Find max post count for normalization
+    max_post_count = max(user_post_counts.values()) if user_post_counts else 1
+    if max_post_count == 0:
+        max_post_count = 1  # Avoid division by zero
+    
+    logger.info(f"📊 Max posts by a user in window: {max_post_count}")
+    
+    # 4. Find max likes for normalization
     max_likes = max([post.get("likes_count", 0) for post in posts])
     if max_likes == 0:
         max_likes = 1  # Avoid division by zero
     
-    # 4. Calculate scores for each post
+    # 5. Calculate scores for each post
     posts_with_scores = []
     for post in posts:
         try:
             quality_score = post.get("quality_score", 50.0)  # Default if not set
             likes_count = post.get("likes_count", 0)
+            user_id = str(post.get("user_id", ""))
+            
+            # Get post count for this user
+            user_post_count = user_post_counts.get(user_id, 1)
             
             # Calculate engagement score
             engagement_score = calculate_engagement_score(likes_count, max_likes)
             
-            # Calculate combined score
-            combined_score = calculate_combined_score(quality_score, engagement_score)
+            # Calculate post count score
+            post_count_score = calculate_post_count_score(user_post_count, max_post_count)
+            
+            # Calculate combined score (now includes post count)
+            combined_score = calculate_combined_score(quality_score, engagement_score, post_count_score)
             
             # Get user info - handle both ObjectId and string user_id
             user = None
@@ -178,12 +222,15 @@ async def generate_leaderboard_snapshot():
                 "username": username,
                 "user_profile_picture": user.get("profile_picture") if user else None,
                 "media_url": post.get("media_url", ""),
+                "thumbnail_url": post.get("thumbnail_url"),  # Include thumbnail for better image display
                 "media_type": post.get("media_type", "image"),
                 "caption": post.get("review_text") or post.get("caption") or post.get("description") or "",
                 "location_name": post.get("location_name") or post.get("location") or None,
                 "quality_score": quality_score,
                 "likes_count": likes_count,
                 "engagement_score": engagement_score,
+                "post_count": user_post_count,  # Number of posts by this user in 3-day window
+                "post_count_score": post_count_score,  # Post count score (0-100)
                 "combined_score": combined_score,
                 "created_at": post.get("created_at")
             })
@@ -212,6 +259,7 @@ async def generate_leaderboard_snapshot():
         "config": {
             "quality_weight": QUALITY_WEIGHT,
             "engagement_weight": ENGAGEMENT_WEIGHT,
+            "post_count_weight": POST_COUNT_WEIGHT,
             "leaderboard_size": LEADERBOARD_SIZE
         }
     }
@@ -262,6 +310,7 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
                     "config": {
                         "quality_weight": QUALITY_WEIGHT,
                         "engagement_weight": ENGAGEMENT_WEIGHT,
+                        "post_count_weight": POST_COUNT_WEIGHT,
                         "leaderboard_size": LEADERBOARD_SIZE
                     }
                 }
@@ -269,21 +318,49 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
             # Check if snapshot is from current window
             try:
                 to_date_str = snapshot.get("to_date")
+                current_date = datetime.utcnow()
+                current_window_start = current_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
+                
                 if to_date_str:
                     # Handle both ISO format strings and datetime objects
                     if isinstance(to_date_str, str):
-                        snapshot_date = datetime.fromisoformat(to_date_str.replace('Z', '+00:00'))
+                        # Handle ISO format with or without timezone
+                        if 'Z' in to_date_str:
+                            snapshot_date = datetime.fromisoformat(to_date_str.replace('Z', '+00:00'))
+                        elif '+' in to_date_str or to_date_str.count('-') >= 3:
+                            snapshot_date = datetime.fromisoformat(to_date_str)
+                        else:
+                            # Assume UTC if no timezone
+                            snapshot_date = datetime.fromisoformat(to_date_str + '+00:00')
                     else:
                         snapshot_date = to_date_str
                     
-                    current_date = datetime.utcnow()
+                    # Check if snapshot covers current window
+                    # Calculate time difference
+                    time_diff = current_date - snapshot_date
+                    days_old = time_diff.days
+                    hours_old = time_diff.total_seconds() / 3600
                     
-                    # If snapshot is more than 3 days old, regenerate
-                    if (current_date - snapshot_date).days > LEADERBOARD_WINDOW_DAYS:
-                        logger.info("📊 Leaderboard snapshot is outdated, regenerating...")
+                    # Regenerate if snapshot is outdated:
+                    # 1. Snapshot's to_date is before current window start (snapshot is too old)
+                    # 2. Snapshot is more than 1 day old (ensures fresh data)
+                    # This ensures the leaderboard always shows the current 3-day window
+                    should_regenerate = (
+                        snapshot_date < current_window_start or 
+                        days_old >= 1  # Regenerate if at least 1 day old
+                    )
+                    
+                    if should_regenerate:
+                        logger.info(f"📊 Leaderboard snapshot is outdated (snapshot to_date: {snapshot_date.strftime('%Y-%m-%d %H:%M')}, current: {current_date.strftime('%Y-%m-%d %H:%M')}, days old: {days_old}), regenerating...")
                         new_snapshot = await generate_leaderboard_snapshot()
                         if new_snapshot:
                             snapshot = new_snapshot
+                            logger.info(f"✅ New snapshot generated with window: {new_snapshot.get('from_date')} to {new_snapshot.get('to_date')}")
+                        else:
+                            # If regeneration failed (no posts), use old snapshot but log warning
+                            logger.warning("⚠️ Regeneration failed (no posts in window), using old snapshot")
+                    else:
+                        logger.info(f"✅ Using existing snapshot (to_date: {snapshot_date.strftime('%Y-%m-%d %H:%M')}, current: {current_date.strftime('%Y-%m-%d %H:%M')}, days old: {days_old})")
                 else:
                     # If to_date is missing, regenerate
                     logger.info("📊 Leaderboard snapshot missing to_date, regenerating...")
@@ -291,7 +368,7 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
                     if new_snapshot:
                         snapshot = new_snapshot
             except Exception as e:
-                logger.error(f"❌ Error checking snapshot date: {e}")
+                logger.error(f"❌ Error checking snapshot date: {e}", exc_info=True)
                 # If date parsing fails, regenerate
                 logger.info("📊 Error parsing snapshot date, regenerating...")
                 new_snapshot = await generate_leaderboard_snapshot()
@@ -314,10 +391,45 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
                 }
             }
         
-        # Format response
+        # Format response - always use current window dates for display
+        # even if using an old snapshot (in case regeneration failed)
+        current_to_date = datetime.utcnow()
+        current_from_date = current_to_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
+        
+        # Use snapshot dates if they're recent, otherwise use current window
+        snapshot_to_date_str = snapshot.get("to_date")
+        if snapshot_to_date_str:
+            try:
+                if isinstance(snapshot_to_date_str, str):
+                    if 'Z' in snapshot_to_date_str:
+                        snapshot_to_date = datetime.fromisoformat(snapshot_to_date_str.replace('Z', '+00:00'))
+                    else:
+                        snapshot_to_date = datetime.fromisoformat(snapshot_to_date_str + '+00:00')
+                else:
+                    snapshot_to_date = snapshot_to_date_str
+                
+                # Only use snapshot dates if they're from today or yesterday
+                if (current_to_date - snapshot_to_date).days <= 1:
+                    # Use snapshot dates
+                    response_from_date = snapshot.get("from_date", current_from_date.isoformat())
+                    response_to_date = snapshot.get("to_date", current_to_date.isoformat())
+                else:
+                    # Use current window dates
+                    response_from_date = current_from_date.isoformat()
+                    response_to_date = current_to_date.isoformat()
+                    logger.info(f"📊 Using current window dates in response (snapshot was {((current_to_date - snapshot_to_date).days)} days old)")
+            except:
+                # If date parsing fails, use current window
+                response_from_date = current_from_date.isoformat()
+                response_to_date = current_to_date.isoformat()
+        else:
+            # No snapshot date, use current window
+            response_from_date = current_from_date.isoformat()
+            response_to_date = current_to_date.isoformat()
+        
         return {
-            "from_date": snapshot.get("from_date", datetime.utcnow().isoformat()),
-            "to_date": snapshot.get("to_date", datetime.utcnow().isoformat()),
+            "from_date": response_from_date,
+            "to_date": response_to_date,
             "generated_at": snapshot.get("generated_at", datetime.utcnow().isoformat()),
             "window_days": snapshot.get("window_days", LEADERBOARD_WINDOW_DAYS),
             "total_posts_analyzed": snapshot.get("total_posts_analyzed", 0),
@@ -432,22 +544,31 @@ async def get_post_score(post_id: str, current_user: dict = Depends(get_current_
     
     max_likes = max([p.get("likes_count", 0) for p in posts_in_window]) if posts_in_window else 1
     
+    # Count posts by this user in window
+    user_post_count = sum(1 for p in posts_in_window if str(p.get("user_id", "")) == str(post.get("user_id", "")))
+    max_post_count = max([sum(1 for p in posts_in_window if str(p.get("user_id", "")) == str(uid)) for uid in set(str(p.get("user_id", "")) for p in posts_in_window)]) if posts_in_window else 1
+    
     engagement_score = calculate_engagement_score(likes_count, max_likes)
-    combined_score = calculate_combined_score(quality_score, engagement_score)
+    post_count_score = calculate_post_count_score(user_post_count, max_post_count)
+    combined_score = calculate_combined_score(quality_score, engagement_score, post_count_score)
     
     return {
         "post_id": post_id,
         "quality_score": quality_score,
         "likes_count": likes_count,
         "engagement_score": engagement_score,
+        "post_count": user_post_count,
+        "post_count_score": post_count_score,
         "combined_score": combined_score,
         "breakdown": {
             "quality_contribution": round(quality_score * QUALITY_WEIGHT, 2),
-            "engagement_contribution": round(engagement_score * ENGAGEMENT_WEIGHT, 2)
+            "engagement_contribution": round(engagement_score * ENGAGEMENT_WEIGHT, 2),
+            "post_count_contribution": round(post_count_score * POST_COUNT_WEIGHT, 2)
         },
         "config": {
             "quality_weight": QUALITY_WEIGHT,
-            "engagement_weight": ENGAGEMENT_WEIGHT
+            "engagement_weight": ENGAGEMENT_WEIGHT,
+            "post_count_weight": POST_COUNT_WEIGHT
         }
     }
 

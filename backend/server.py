@@ -2087,35 +2087,64 @@ async def share_preview(post_id: str):
     location = post.get("location_name", "")
     description = f"Rated {rating}/10 {('- ' + location) if location else ''} on Cofau!"
 
-    image_url = post.get("image_url", "")
+    # Use media_url (full resolution) first, then image_url, then thumbnail_url
+    # For videos, prefer thumbnail_url for better preview
+    media_type = post.get("media_type", "image")
+    
+    if media_type == "video":
+        # For videos, use thumbnail_url if available, otherwise media_url
+        image_url = post.get("thumbnail_url") or post.get("media_url") or post.get("image_url", "")
+    else:
+        # For images, use media_url (full resolution) first
+        image_url = post.get("media_url") or post.get("image_url", "")
+    
+    # Ensure full URL
     if image_url and not image_url.startswith("http"):
         image_url = f"{BASE_URL}{image_url}"
+
+    # Use larger dimensions for better preview quality
+    # 1920x1080 is optimal for high-quality previews on WhatsApp and Instagram
+    image_width = "1920"
+    image_height = "1080"
 
     html = f"""
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="UTF-8">
         <title>{title}</title>
 
-        <!-- Open Graph Meta Tags -->
+        <!-- Open Graph Meta Tags - Enhanced for larger previews -->
         <meta property="og:title" content="{title}" />
         <meta property="og:description" content="{description}" />
         <meta property="og:image" content="{image_url}" />
         <meta property="og:image:secure_url" content="{image_url}" />
+        <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:url" content="{BASE_URL}/share/{post_id}" />
         <meta property="og:type" content="article" />
+        <meta property="og:site_name" content="Cofau" />
 
-        <!-- WhatsApp requires known dimensions -->
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        <!-- Increased dimensions for larger previews -->
+        <meta property="og:image:width" content="{image_width}" />
+        <meta property="og:image:height" content="{image_height}" />
 
-        <!-- Twitter (helps WhatsApp fallback) -->
+        <!-- Twitter Card (helps with previews) -->
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="{title}" />
+        <meta name="twitter:description" content="{description}" />
         <meta name="twitter:image" content="{image_url}" />
+        <meta name="twitter:image:width" content="{image_width}" />
+        <meta name="twitter:image:height" content="{image_height}" />
+
+        <!-- Additional meta for better compatibility -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
-    <body>
-        <h2>Preview for {title}</h2>
-        <img src="{image_url}" width="400" />
+    <body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #f5f5f5;">
+        <div style="max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h2 style="margin-top: 0; color: #333;">{title}</h2>
+            <p style="color: #666; margin: 10px 0;">{description}</p>
+            <img src="{image_url}" style="width: 100%; max-width: 800px; height: auto; border-radius: 8px; margin-top: 20px;" alt="{title}" />
+        </div>
     </body>
     </html>
     """

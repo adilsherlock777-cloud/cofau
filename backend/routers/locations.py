@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List
 from collections import defaultdict
+from datetime import datetime
 
 from database import get_database
 from routers.auth import get_current_user
@@ -27,18 +28,19 @@ async def get_top_locations(
         print("🔍 Fetching top locations...")
         
         # Fetch all posts with location data (check multiple fields)
-        # Try location_name first, then check map_link for location data
+        # Sort by created_at descending (latest first) to get newest posts first
         posts_with_location = await db.posts.find({
             "$or": [
                 {"location_name": {"$exists": True, "$ne": None, "$ne": ""}},
                 {"map_link": {"$exists": True, "$ne": None, "$ne": ""}},
             ]
-        }).to_list(None)
+        }).sort("created_at", -1).to_list(None)  # Sort by created_at descending (latest first)
         
         print(f"📊 Found {len(posts_with_location)} posts with location data")
         
         # Group posts by location_name
-        location_data = defaultdict(lambda: {"uploads": 0, "images": [], "posts": []})
+        # Store images with their creation dates for sorting
+        location_data = defaultdict(lambda: {"uploads": 0, "images": [], "images_with_dates": [], "posts": []})
         
         for post in posts_with_location:
             # Try location_name first
@@ -69,27 +71,50 @@ async def get_top_locations(
             # Increment upload count
             location_data[location]["uploads"] += 1
             
-            # Add post image if available and not already at limit (max 5 images)
+            # Add post image with creation date for sorting
             media_url = post.get("media_url") or post.get("image_url")
-            if media_url and len(location_data[location]["images"]) < 5:
-                location_data[location]["images"].append(media_url)
+            if media_url:
+                # Get creation date for sorting
+                created_at = post.get("created_at")
+                if isinstance(created_at, str):
+                    try:
+                        created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    except:
+                        created_at = None
+                elif created_at is None:
+                    created_at = None
+                
+                # Store image with date for later sorting
+                location_data[location]["images_with_dates"].append({
+                    "url": media_url,
+                    "created_at": created_at if created_at else datetime.utcnow()  # Use current time as fallback
+                })
             
             # Store post ID
             location_data[location]["posts"].append(str(post["_id"]))
         
         print(f"📍 Grouped into {len(location_data)} unique locations")
         
-        # Convert to list and sort by uploads (descending)
-        top_locations = [
-            {
+        # Convert to list and sort images by date (latest first), then sort locations by uploads
+        top_locations = []
+        for location, data in location_data.items():
+            # Sort images by created_at descending (latest first)
+            sorted_images = sorted(
+                data["images_with_dates"],
+                key=lambda x: x["created_at"],
+                reverse=True  # Latest first
+            )
+            
+            # Extract just the URLs, keeping the latest first order
+            images = [img["url"] for img in sorted_images[:8]]  # Get top 8 latest images
+            
+            top_locations.append({
                 "location": location,
                 "location_name": location,  # Alias for consistency
                 "uploads": data["uploads"],
-                "images": data["images"][:5],  # Max 5 images for display
+                "images": images,  # Already sorted by latest first
                 "post_ids": data["posts"],  # All post IDs for this location
-            }
-            for location, data in location_data.items()
-        ]
+            })
         
         # Sort by uploads count (descending)
         top_locations.sort(key=lambda x: x["uploads"], reverse=True)
