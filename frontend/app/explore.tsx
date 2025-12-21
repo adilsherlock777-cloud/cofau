@@ -352,16 +352,27 @@ export default function ExploreScreen() {
               returnKeyType="search"
               onSubmitEditing={performSearch}
             />
-            {/* ✅ Category Filter Button Inside Search Bar */}
-            <TouchableOpacity 
-              style={styles.inlineFilterButton}
-              onPress={() => setShowCategoryModal(true)}
-            >
-              <Ionicons name="options-outline" size={18} color="#FFFF" />
-              <Text style={styles.inlineFilterText}>
-                {selectedCategory && selectedCategory !== 'All' ? selectedCategory.substring(0, 8) + '...' : 'Category'}
-              </Text>
-            </TouchableOpacity>
+            {/* ✅ Category Filter Button Inside Search Bar with Gradient Border */}
+<TouchableOpacity 
+  onPress={() => setShowCategoryModal(true)}
+  activeOpacity={0.8}
+>
+  <LinearGradient
+    colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 0 }}
+    style={styles.gradientBorder}
+  >
+    <View style={styles.inlineFilterButton}>
+      <Ionicons name="options-outline" size={18} color="#FFF" />
+      <Text style={styles.inlineFilterText}>
+        {selectedCategory && selectedCategory !== 'All' 
+          ? selectedCategory.substring(0, 8) + '...' 
+          : 'Category'}
+      </Text>
+    </View>
+  </LinearGradient>
+</TouchableOpacity>
           </View>
         </View>
       </View>
@@ -606,18 +617,33 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
+  searchInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 25,
+    paddingLeft: 16,
+    paddingRight: 8,  // Reduced right padding to fit category button
+    paddingVertical: 8,  // Reduced vertical padding
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+
   // ✅ Inline filter button inside search bar
   inlineFilterButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#1B7C82",
+    borderRadius: 18,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    marginLeft: 0,
+    gap: 0,
+  },
+  gradientBorder: {
     borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 15,
-    marginLeft: 8,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: "#000",
+    padding: 2,  // This creates the border thickness
+    marginLeft: -60,
   },
 
   inlineFilterText: {

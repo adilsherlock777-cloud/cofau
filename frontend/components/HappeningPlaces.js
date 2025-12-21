@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -226,56 +227,84 @@ export default function HappeningPlaces() {
                   </View>
                 </View>
 
-                <View style={styles.imageGrid}>
-                  {images.length > 0 ? (
-                    <>
-                      {/* Show first 7 images */}
-                      {images
-                        .slice(0, 7)
-                        .map((imageUrl, imgIndex) => {
-                          const fixedUrl =
-                            fixUrl(imageUrl);
-                          if (!fixedUrl) return null;
+                  <View style={styles.imageGrid}>
+  {images.length > 0 ? (
+    <>
+      {/* First Row - 3 images */}
+      <View style={styles.imageRow}>
+        {images.slice(0, 3).map((imageUrl, imgIndex) => {
+          const fixedUrl = fixUrl(imageUrl);
+          if (!fixedUrl) return null;
+          return (
+            <Image
+              key={imgIndex}
+              source={{ uri: fixedUrl }}
+              style={styles.gridImageSquare}
+              resizeMode="cover"
+            />
+          );
+        })}
+      </View>
 
-                          return (
-                            <Image
-                              key={imgIndex}
-                              source={{ uri: fixedUrl }}
-                              style={styles.gridImage}
-                              resizeMode="cover"
-                            />
-                          );
-                        })}
+      {/* Second Row - 2 images OR 1 image + blurred overlay */}
+      <View style={styles.imageRow}>
+        {/* Show 3rd image */}
+        {images[2] && (
+          <Image
+            source={{ uri: fixUrl(images[2]) }}
+            style={styles.gridImageSquare}
+            resizeMode="cover"
+          />
+        )}
 
-                      {/* Show 8th image with blur overlay if more than 7 images */}
-                      {remainingCount > 0 && images[7] && (
-                        <View style={styles.blurredImageContainer}>
-                          <Image
-                            source={{ uri: fixUrl(images[7]) }}
-                            style={styles.gridImage}
-                            resizeMode="cover"
-                            blurRadius={10}
-                          />
-                          <View style={styles.overlayCount}>
-                            <Text style={styles.overlayCountText}>
-                              +{remainingCount}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-                    </>
-                  ) : (
-                    <View
-                      style={styles.noImagePlaceholder}
-                    >
-                      <Ionicons
-                        name="image-outline"
-                        size={32}
-                        color="#CCC"
-                      />
-                    </View>
-                  )}
-                </View>
+        {/* Show 4th image OR blurred 5th image with count */}
+        {images.length === 4 ? (
+          // Exactly 4 images - show 4th normally
+          <Image
+            source={{ uri: fixUrl(images[3]) }}
+            style={styles.gridImageSquare}
+            resizeMode="cover"
+          />
+        ) : images.length > 4 ? (
+          // More than 4 - show 5th blurred with total count
+          <View style={styles.blurredImageWrapper}>
+            <Image
+              source={{ uri: fixUrl(images[4]) }}
+              style={styles.gridImageSquare}
+              resizeMode="cover"
+              blurRadius={8}
+            />
+              <View style={styles.countButtonOverlay}>
+  <LinearGradient
+    colors={['#E94A37', '#F2CF68', '#1B7C82']}
+    start={{ x: 3, y: 3 }}
+    end={{ x: 0, y: 3 }}
+    style={styles.countButtonGradientBorder}
+  >
+    <View style={styles.countButtonInner}>
+      <Text style={styles.countButtonText}>
+  +{location.uploads || images.length}
+</Text>
+    </View>
+  </LinearGradient>
+</View>
+          </View>
+        ) : images[3] ? (
+          // Less than 4 but 4th exists
+          <Image
+            source={{ uri: fixUrl(images[3]) }}
+            style={styles.gridImageSquare}
+            resizeMode="cover"
+          />
+        ) : null}
+      </View>
+    </>
+  ) : (
+    <View style={styles.noImagePlaceholder}>
+      <Ionicons name="image-outline" size={32} color="#CCC" />
+    </View>
+  )}
+</View>
               </TouchableOpacity>
             );
           })}
@@ -466,12 +495,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 12,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 2,
   },
   cardHeader: {
@@ -509,25 +538,128 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   locationName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#000',
+    marginBottom: 2,
   },
   uploadCount: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+    fontSize: 13,
+    color: '#888',
+    marginTop: 0,
+    fontWeight: '400',
   },
   imageGrid: {
+    marginTop: 12,
+  },
+
+  imageRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 4,
+    marginBottom: 8,
   },
-  gridImage: {
-    width: 70,
-    height: 70,
+
+  gridImageLarge: {
+    width: 80,
+    height: 80,
     borderRadius: 12,
+    flex: 1,
   },
+
+  gridImageSquare: {
+    flex: 1,
+    height: 110,
+    borderRadius: 10,
+  },
+
+  gridImageSmall: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    flex: 1,
+  },
+
+  blurredImageWrapper: {
+    flex: 1,
+    height: 160,
+    position: 'relative',
+  },
+
+  countButtonOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  borderRadius: 12,
+},
+
+
+countButton: {
+  width: 75,
+  height: 50,
+  borderRadius: 15,
+  backgroundColor: '#FFFFFF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 3, height: 8 },
+  shadowOpacity: 0.6,
+  shadowRadius: 10,
+  elevation: 12,
+},
+countButtonGradientBorder: {
+  width: 75,
+  height: 40,
+  borderRadius: 25,
+  padding: 2.5,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+countButtonText: {
+  fontSize: 22,
+  fontWeight: '700',
+  color: '#fff',
+},
+
+
+noImagePlaceholder: {
+  width: '100%',
+  height: 120,
+  borderRadius: 12,
+  backgroundColor: '#F5F5F5',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E0E0E0',
+},
+
+moreImagesContainer: {
+   width: 100,
+   height: 100,
+   borderRadius: 12,
+   backgroundColor: 'rgba(0, 0, 0, 0.6)',
+   justifyContent: 'center',
+   alignItems: 'center',
+   flex: 1,
+},
+
+moreImagesOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  moreImagesText: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: '700',
+  },
+
   blurredImageContainer: {
     width: 70,
     height: 70,
