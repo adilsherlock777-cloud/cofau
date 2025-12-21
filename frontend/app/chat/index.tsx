@@ -1,6 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  TextInput,
+  Platform,
+} from "react-native";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
@@ -18,10 +28,22 @@ const fixUrl = (url?: string | null) => {
   return `${API_BASE}${url.startsWith("/") ? url : "/" + url}`;
 };
 
+interface ChatItem {
+  other_user_id: string;
+  other_user_name: string;
+  other_user_profile_picture?: string | null;
+  last_message?: string;
+  last_from_me?: boolean;
+  created_at?: string;
+  unread_count?: number;
+}
+
 export default function ChatListScreen() {
   const { token } = useAuth();
   const router = useRouter();
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<ChatItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<ChatItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -36,81 +58,292 @@ export default function ChatListScreen() {
           other_user_profile_picture: fixUrl(it.other_user_profile_picture),
         }));
         setItems(mapped);
+        setFilteredItems(mapped);
       })
       .catch((err) =>
         console.log("Chat list error", err?.response?.data || err?.message)
       );
   }, [token]);
 
-  const renderItem = ({ item }: any) => (
+  // Filter chats based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredItems(items);
+    } else {
+      const filtered = items.filter((item) =>
+        item.other_user_name
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase())
+      );
+      setFilteredItems(filtered);
+    }
+  }, [searchQuery, items]);
+
+  const formatTime = (timestamp?: string) => {
+    if (!timestamp) return "";
+    
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Now";
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}d`;
+    
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  };
+
+  const renderItem = ({ item }: { item: ChatItem }) => (
     <TouchableOpacity
-      style={styles.item}
+      style={styles.chatItem}
       onPress={() =>
         router.push({
           pathname: "/chat/[userId]",
           params: {
             userId: item.other_user_id,
             fullName: item.other_user_name || "User",
+            profilePicture: item.other_user_profile_picture || "", // Pass profile picture
           },
         })
       }
+      activeOpacity={0.7}
     >
-      <UserAvatar
-        profilePicture={item.other_user_profile_picture}
-        username={item.other_user_name}
-        size={45}
-      />
-
-      <View style={{ flex: 1, marginLeft: 10 }}>
-        <Text style={styles.name}>{item.other_user_name || "Unknown User"}</Text>
-
-        <Text numberOfLines={1} style={styles.preview}>
-          {item.last_from_me ? "You: " : ""}
-          {item.last_message || ""}
-        </Text>
+      <View style={styles.avatarContainer}>
+        <UserAvatar
+          profilePicture={item.other_user_profile_picture}
+          username={item.other_user_name}
+          size={56}
+        />
+        {item.unread_count && item.unread_count > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>
+              {item.unread_count > 99 ? "99+" : item.unread_count}
+            </Text>
+          </View>
+        )}
       </View>
 
-      {/* Time fix to avoid crash on invalid timestamps */}
-      <Text style={styles.time}>
-        {item.created_at
-          ? new Date(item.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : ""}
-      </Text>
+      <View style={styles.chatContent}>
+        <View style={styles.chatHeader}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {item.other_user_name || "Unknown User"}
+          </Text>
+          <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+        </View>
+
+        <Text numberOfLines={1} style={styles.lastMessage}>
+          {item.last_from_me ? "You: " : ""}
+          {item.last_message || "Say hello! 👋"}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
+      {/* Cofau Gradient Header - Matching Feed Exactly */}
+      <LinearGradient
+        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+        locations={[0, 0.5, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.gradientHeader}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Messages</Text>
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons
+            name="search"
+            size={20}
+            color="#999"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              style={styles.clearButton}
+            >
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </LinearGradient>
+
+      {/* Chat List */}
       <FlatList
-        data={items}
+        data={filteredItems}
         keyExtractor={(item) => item.other_user_id}
         renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={styles.sep} />}
         contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={() => (
-          <View style={{ padding: 20 }}>
-            <Text style={{ textAlign: "center", color: "#999" }}>
-              No chats yet.
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyTitle}>
+              {searchQuery ? "No chats found" : "No messages yet"}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {searchQuery
+                ? "Try searching for a different name"
+                : "Start a conversation with someone!"}
             </Text>
           </View>
         )}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: {
+    flex: 1,
+    backgroundColor: "#F8F9FA",
+  },
+  gradientHeader: {
+    paddingTop: Platform.OS === "ios" ? 60 : 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  headerContent: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  headerTitle: {
+    fontFamily: "Lobster",
+    fontSize: 36,
+    color: "#fff",
+    letterSpacing: 1,
+    textShadowColor: "rgba(0, 0, 0, 0.15)",
+    textShadowOffset: { width: 6, height: 4 },
+    textShadowRadius: 4,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  clearButton: {
+    padding: 4,
+  },
   listContent: {
-    paddingTop: 60, // ✅ Add top padding so first chat is visible
+    paddingTop: 8,
     paddingBottom: 20,
   },
-  item: { flexDirection: "row", alignItems: "center", padding: 12 },
-  name: { fontSize: 15, fontWeight: "600" },
-  preview: { fontSize: 13, color: "#555", marginTop: 2 },
-  time: { fontSize: 11, color: "#777" },
-  sep: { height: 1, backgroundColor: "#eee", marginLeft: 70 },
+  chatItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+  },
+  avatarContainer: {
+    position: "relative",
+    marginRight: 12,
+  },
+  unreadBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#FF3B30",
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  unreadText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  chatContent: {
+    flex: 1,
+  },
+  chatHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+    flex: 1,
+    marginRight: 8,
+  },
+  timeText: {
+    fontSize: 13,
+    color: "#8E8E93",
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: "#8E8E93",
+    lineHeight: 18,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#F0F0F0",
+    marginLeft: 84,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 100,
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#8E8E93",
+    textAlign: "center",
+  },
 });
