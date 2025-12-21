@@ -50,10 +50,11 @@ export default function SimpleShareModal({ visible, onClose, post }) {
             }
             message += `\nView on Cofau: ${shareUrl}`;
 
-            // Share with media URL - WhatsApp will generate preview from the URL
+            // Share with share URL - WhatsApp will fetch Open Graph meta tags for large preview
+            // The backend /share/{post_id} endpoint provides optimized OG tags with 1920x1080 dimensions
             const shareContent = {
                 message: message,
-                url: mediaUrl, // Media URL for preview
+                url: shareUrl, // Use share URL which has Open Graph meta tags for large preview
                 title: `${post.username} shared a post on Cofau`,
             };
 
@@ -88,10 +89,11 @@ export default function SimpleShareModal({ visible, onClose, post }) {
             }
             message += `\nView on Cofau: ${shareUrl}`;
 
-            // Share with media URL - Instagram can use this for preview
+            // Share with share URL - Instagram will fetch Open Graph meta tags for large preview
+            // The backend /share/{post_id} endpoint provides optimized OG tags with 1920x1080 dimensions
             const shareContent = {
                 message: message,
-                url: mediaUrl, // Media URL for preview
+                url: shareUrl, // Use share URL which has Open Graph meta tags for large preview
                 title: `${post.username} shared a post on Cofau`,
             };
 

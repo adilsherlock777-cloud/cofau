@@ -49,16 +49,30 @@ export default function LeaderboardScreen() {
       
       // Ensure response has expected structure
       const data = response.data || {};
+      
+      // Validate and format dates
+      const now = new Date();
+      const threeDaysAgo = new Date(now);
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      
+      const fromDate = data.from_date || threeDaysAgo.toISOString();
+      const toDate = data.to_date || now.toISOString();
+      
       setLeaderboardData({
-        from_date: data.from_date || new Date().toISOString(),
-        to_date: data.to_date || new Date().toISOString(),
-        generated_at: data.generated_at || new Date().toISOString(),
+        from_date: fromDate,
+        to_date: toDate,
+        generated_at: data.generated_at || now.toISOString(),
+        window_days: data.window_days || 3,
         entries: data.entries || [],
         total_posts_analyzed: data.total_posts_analyzed || 0,
         config: data.config || {},
       });
       
-      console.log("✅ Leaderboard data loaded:", response.data);
+      console.log("✅ Leaderboard data loaded:", {
+        from_date: fromDate,
+        to_date: toDate,
+        entries_count: data.entries?.length || 0,
+      });
     } catch (err: any) {
       console.error("❌ Error fetching leaderboard:", err);
       
@@ -87,8 +101,36 @@ export default function LeaderboardScreen() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    try {
+      if (!dateString) return '';
+      
+      // Parse the date string - handle ISO format with or without 'Z'
+      let date: Date;
+      
+      // If it's an ISO string without timezone, add UTC indicator
+      if (dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+')) {
+        // Assume UTC if no timezone specified
+        date = new Date(dateString + 'Z');
+      } else {
+        date = new Date(dateString);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error("Invalid date:", dateString);
+        return '';
+      }
+      
+      // Format as "Dec 10" - use UTC methods to avoid timezone issues
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[date.getUTCMonth()];
+      const day = date.getUTCDate();
+      
+      return `${month} ${day}`;
+    } catch (error) {
+      console.error("Error formatting date:", error, dateString);
+      return '';
+    }
   };
 
   if (loading) {
@@ -143,9 +185,10 @@ export default function LeaderboardScreen() {
         {/* Main Title */}
         <Text style={styles.mainTitle}>Community Leaderboards</Text>
         
-        {leaderboardData && (
+        {leaderboardData && leaderboardData.from_date && leaderboardData.to_date && (
           <Text style={styles.dateRange}>
             {formatDate(leaderboardData.from_date)} - {formatDate(leaderboardData.to_date)}
+            {leaderboardData.window_days && ` (${leaderboardData.window_days} days)`}
           </Text>
         )}
 
@@ -189,10 +232,16 @@ export default function LeaderboardScreen() {
                 </View>
 
                 <View style={styles.cardContent}>
-                  {/* Media Thumbnail */}
+                  {/* Media Thumbnail - Use thumbnail if available, otherwise use media_url */}
                   <Image
-                    source={{ uri: normalizeMediaUrl(entry.media_url) || '' }}
+                    source={{ 
+                      uri: normalizeMediaUrl(entry.thumbnail_url || entry.media_url) || '' 
+                    }}
                     style={styles.mediaThumbnail}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.log("Error loading thumbnail:", error);
+                    }}
                   />
 
                   {/* Entry Info */}
@@ -229,6 +278,11 @@ export default function LeaderboardScreen() {
                     <Ionicons name="heart" size={16} color="#FF6B6B" />
                     <Text style={styles.scoreLabel}>Likes</Text>
                     <Text style={styles.scoreValue}>{entry.likes_count || 0}</Text>
+                  </View>
+                  <View style={styles.scoreItem}>
+                    <Ionicons name="images" size={16} color="#9C27B0" />
+                    <Text style={styles.scoreLabel}>Posts</Text>
+                    <Text style={styles.scoreValue}>{entry.post_count || 0}</Text>
                   </View>
                   <View style={styles.scoreItem}>
                     <Ionicons name="trophy" size={16} color="#4dd0e1" />
@@ -410,6 +464,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#f0f0f0",
     marginRight: 12,
+    overflow: "hidden",
   },
   entryInfo: {
     flex: 1,
@@ -442,6 +497,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "rgba(0,0,0,0.1)",
+    flexWrap: "wrap",
   },
   scoreItem: {
     alignItems: "center",
