@@ -53,6 +53,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'favourite'>('posts');
+  const [expandedLocations, setExpandedLocations] = useState<{ [key: string]: boolean }>({});
   const [complimentsCount, setComplimentsCount] = useState(0);
   const [hasComplimented, setHasComplimented] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -713,7 +714,119 @@ export default function ProfileScreen() {
       setDeletingPost(false);
     }
   };
+  
+  const toggleLocation = (locationName: string) => {
+  setExpandedLocations((prev) => ({
+    ...prev,
+    [locationName]: !prev[locationName],
+  }));
+};
 
+  const renderFavouriteSection = () => {
+  // Group posts by location
+  const postsByLocation: { [key: string]: any[] } = {};
+  
+  userPosts.forEach((post) => {
+    const location = post.location_name || post.location || post.place_name || 'Unknown Location';
+    if (!postsByLocation[location]) {
+      postsByLocation[location] = [];
+    }
+    postsByLocation[location].push(post);
+  });
+
+  // Sort locations by number of posts (highest first)
+  const sortedLocations = Object.entries(postsByLocation).sort(
+    ([, postsA], [, postsB]) => postsB.length - postsA.length
+  );
+
+  if (sortedLocations.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="location-outline" size={64} color="#ccc" />
+        <Text style={styles.emptyText}>No favourite locations yet</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.favouriteContainer}>
+      {sortedLocations.map(([location, posts]) => {
+        const isExpanded = expandedLocations[location] || false;
+        
+        return (
+          <View key={location} style={styles.locationSection}>
+            {/* Location Header */}
+            <TouchableOpacity
+              style={styles.locationHeader}
+              onPress={() => toggleLocation(location)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.locationHeaderLeft}>
+                <Ionicons name="location" size={20} color="#F2CF68" />
+                <Text style={styles.locationName}>{location}</Text>
+              </View>
+              <View style={styles.locationHeaderRight}>
+                <Text style={styles.locationCount}>({posts.length})</Text>
+                <Ionicons 
+                  name={isExpanded ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#666" 
+                />
+              </View>
+            </TouchableOpacity>
+
+            {/* Posts Grid - Show when expanded */}
+            {isExpanded && (
+              <View style={styles.locationPostsGrid}>
+                {posts.map((post) => {
+                  const mediaUrl = fixUrl(post.full_image_url || post.media_url);
+                  const isVideo =
+                    post.media_type === 'video' ||
+                    mediaUrl?.toLowerCase().endsWith('.mp4') ||
+                    mediaUrl?.toLowerCase().endsWith('.mov') ||
+                    mediaUrl?.toLowerCase().endsWith('.avi') ||
+                    mediaUrl?.toLowerCase().endsWith('.webm');
+
+                  return (
+                    <TouchableOpacity
+                      key={post.id}
+                      style={styles.favouriteGridItem}
+                      onPress={() => router.push(`/post-details/${post.id}`)}
+                      activeOpacity={0.8}
+                    >
+                      {mediaUrl ? (
+                        <View style={styles.favouriteGridImageContainer}>
+                          <Image 
+                            source={{ uri: mediaUrl }} 
+                            style={styles.favouriteGridImage} 
+                            resizeMode="cover" 
+                          />
+                          {isVideo && (
+                            <View style={styles.videoOverlay}>
+                              <Ionicons name="play-circle" size={40} color="#fff" />
+                            </View>
+                          )}
+                        </View>
+                      ) : (
+                        <View style={styles.gridPlaceholder}>
+                          <Ionicons
+                            name={isVideo ? 'videocam-outline' : 'image-outline'}
+                            size={40}
+                            color="#ccc"
+                          />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+};
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
     const isVideo =
@@ -808,7 +921,8 @@ export default function ProfileScreen() {
     setDeleteModalVisible(true);
   };
 
-  return (
+ return (
+  <View style={styles.listItemWrapper}>
     <TouchableOpacity
       style={styles.listItem}
       onPress={handlePostPress}
@@ -827,59 +941,62 @@ export default function ProfileScreen() {
             <Ionicons name="image-outline" size={40} color="#ccc" />
           </View>
         )}
-        {isOwnProfile && (
-          <TouchableOpacity
-            style={styles.listMenuButton}
-            onPress={handleMenuPress}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Right Side - Details */}
-<View style={styles.listDetails}>
- {/* Likes - Gradient Heart */}
-<View style={styles.listDetailRow}>
-  <GradientHeart size={20} />
-  <Text style={styles.listDetailText}>
-    {item.likes_count || item.likes || 0}
-  </Text>
-</View>
+      <View style={styles.listDetails}>
+        {/* Likes - Gradient Heart */}
+        <View style={styles.listDetailRow}>
+          <GradientHeart size={20} />
+          <Text style={styles.listDetailText}>
+            {item.likes_count || item.likes || 0}
+          </Text>
+        </View>
 
-  {/* Rating */}
-  {item.rating && (
-    <View style={styles.listDetailRow}>
-      <Ionicons name="star" size={20} color="#F2CF68" />
-      <Text style={styles.listDetailText}>
-        {item.rating}/10
-      </Text>
-    </View>
-  )}
+        {/* Rating */}
+        {item.rating && (
+          <View style={styles.listDetailRow}>
+            <Ionicons name="star" size={20} color="#F2CF68" />
+            <Text style={styles.listDetailText}>
+              {item.rating}/10
+            </Text>
+          </View>
+        )}
 
-  {/* Reviews - Show if review_text exists */}
-{item.review_text && (
-  <View style={styles.listDetailRow}>
-    <Ionicons name="create" size={20} color="#F2CF68" />
-    <Text style={styles.listDetailText} numberOfLines={1}>
-      {item.review_text}
-    </Text>
-  </View>
-)}
+        {/* Reviews - Show if review_text exists */}
+        {item.review_text && (
+          <View style={styles.listDetailRow}>
+            <Ionicons name="create" size={20} color="#F2CF68" />
+            <Text style={styles.listDetailText} numberOfLines={1}>
+              {item.review_text}
+            </Text>
+          </View>
+        )}
 
-  {/* Location */}
-  {(item.location_name || item.location || item.place_name) && (
-    <View style={styles.listDetailRow}>
-      <Ionicons name="location" size={20} color="#F2CF68" />
-      <Text style={styles.listDetailText} numberOfLines={2}>
-        {item.location_name || item.location || item.place_name}
-      </Text>
-    </View>
-  )}
-</View>
+        {/* Location */}
+        {(item.location_name || item.location || item.place_name) && (
+          <View style={styles.listDetailRow}>
+            <Ionicons name="location" size={20} color="#F2CF68" />
+            <Text style={styles.listDetailText} numberOfLines={2}>
+              {item.location_name || item.location || item.place_name}
+            </Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
-  );
+
+    {/* Three Dots Menu - Top Right Corner */}
+    {isOwnProfile && (
+      <TouchableOpacity
+        style={styles.listMenuButtonTopRight}
+        onPress={handleMenuPress}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="ellipsis-horizontal" size={14} color="#666" />
+      </TouchableOpacity>
+    )}
+  </View>
+);
 };
 
   const renderVideoListItem = ({ item }: { item: any }) => {
@@ -901,81 +1018,85 @@ export default function ProfileScreen() {
   };
 
   return (
-    <TouchableOpacity
-      style={styles.listItem}
-      onPress={handlePostPress}
-      activeOpacity={0.8}
-    >
-      {/* Left Side - Video Thumbnail */}
-      <View style={styles.listImageContainer}>
-        {mediaUrl ? (
-          <View style={styles.videoThumbnailContainer}>
-            <Image 
-              source={{ uri: mediaUrl }} 
-              style={styles.listImage} 
-              resizeMode="cover" 
-            />
-            <View style={styles.videoPlayOverlay}>
-              <Ionicons name="play-circle" size={50} color="#fff" />
+    <View style={styles.listItemWrapper}>
+      <TouchableOpacity
+        style={styles.listItem}
+        onPress={handlePostPress}
+        activeOpacity={0.8}
+      >
+        {/* Left Side - Video Thumbnail */}
+        <View style={styles.listImageContainer}>
+          {mediaUrl ? (
+            <View style={styles.videoThumbnailContainer}>
+              <Image 
+                source={{ uri: mediaUrl }} 
+                style={styles.listImage} 
+                resizeMode="cover" 
+              />
+              <View style={styles.videoPlayOverlay}>
+                <Ionicons name="play-circle" size={50} color="#fff" />
+              </View>
             </View>
+          ) : (
+            <View style={styles.listImagePlaceholder}>
+              <Ionicons name="videocam-outline" size={40} color="#ccc" />
+            </View>
+          )}
+        </View>
+
+        {/* Right Side - Details */}
+        <View style={styles.listDetails}>
+          {/* Likes - Gradient Heart */}
+          <View style={styles.listDetailRow}>
+            <GradientHeart size={20} />
+            <Text style={styles.listDetailText}>
+              {item.likes_count || item.likes || 0}
+            </Text>
           </View>
-        ) : (
-          <View style={styles.listImagePlaceholder}>
-            <Ionicons name="videocam-outline" size={40} color="#ccc" />
-          </View>
-        )}
-        {isOwnProfile && (
-          <TouchableOpacity
-            style={styles.listMenuButton}
-            onPress={handleMenuPress}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Right Side - Details */}
-<View style={styles.listDetails}>
-   {/* Likes - Gradient Heart */}
-<View style={styles.listDetailRow}>
-  <GradientHeart size={20} />
-  <Text style={styles.listDetailText}>
-    {item.likes_count || item.likes || 0}
-  </Text>
-</View>
+          {/* Rating */}
+          {item.rating && (
+            <View style={styles.listDetailRow}>
+              <Ionicons name="star" size={20} color="#F2CF68" />
+              <Text style={styles.listDetailText}>
+                {item.rating}/10
+              </Text>
+            </View>
+          )}
 
-  {/* Rating */}
-  {item.rating && (
-    <View style={styles.listDetailRow}>
-      <Ionicons name="star" size={20} color="#F2CF68" />
-      <Text style={styles.listDetailText}>
-        {item.rating}/10
-      </Text>
+          {/* Reviews - Show if review_text exists */}
+          {item.review_text && (
+            <View style={styles.listDetailRow}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#F2CF68" />
+              <Text style={styles.listDetailText} numberOfLines={1}>
+                {item.review_text}
+              </Text>
+            </View>
+          )}
+
+          {/* Location */}
+          {(item.location_name || item.location || item.place_name) && (
+            <View style={styles.listDetailRow}>
+              <Ionicons name="location" size={20} color="#F2CF68" />
+              <Text style={styles.listDetailText} numberOfLines={2}>
+                {item.location_name || item.location || item.place_name}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {/* Three Dots Menu - Top Right Corner */}
+      {isOwnProfile && (
+        <TouchableOpacity
+          style={styles.listMenuButtonTopRight}
+          onPress={handleMenuPress}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="ellipsis-horizontal" size={18} color="#666" />
+        </TouchableOpacity>
+      )}
     </View>
-  )}
-
-  {/* Reviews - Show if review_text exists */}
-{item.review_text && (
-  <View style={styles.listDetailRow}>
-    <Ionicons name="chatbubble-ellipses" size={20} color="#F2CF68" />
-    <Text style={styles.listDetailText} numberOfLines={1}>
-      {item.review_text}
-    </Text>
-  </View>
-)}
-
-  {/* Location */}
-  {(item.location_name || item.location || item.place_name) && (
-    <View style={styles.listDetailRow}>
-      <Ionicons name="location" size={20} color="#F2CF68" />
-      <Text style={styles.listDetailText} numberOfLines={2}>
-        {item.location_name || item.location || item.place_name}
-      </Text>
-    </View>
-  )}
-</View>
-    </TouchableOpacity>
   );
 };
    
@@ -1051,26 +1172,16 @@ export default function ProfileScreen() {
                 <View style={styles.leftSpacer} />
               )}
 
-              <Text style={styles.cofauTitle}>
-                {isOwnProfile ? 'Cofau' : 'Abows'}
-              </Text>
+              <Text style={styles.cofauTitle}>Cofau</Text>
 
               <View style={styles.headerIcons}>
-                {!isOwnProfile && (
-                  <TouchableOpacity
-                    style={styles.headerIconButton}
-                    onPress={() => {}}
-                  >
-                    <Ionicons name="search-outline" size={24} color="#fff" />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.headerIconButton}
-                  onPress={() => router.push('/cart')}
-                >
-                  <Ionicons name="menu" size={24} color="#fff" />
-                </TouchableOpacity>
-              </View>
+  <TouchableOpacity
+    style={styles.headerIconButton}
+    onPress={() => setSettingsModalVisible(true)}
+  >
+    <Ionicons name="menu" size={24} color="#fff" />
+  </TouchableOpacity>
+</View>
             </View>
           </LinearGradient>
 
@@ -1147,60 +1258,43 @@ export default function ProfileScreen() {
 
         {/* Action Buttons with Gradient */}
         <View style={styles.actionButtonsContainer}>
-          {isOwnProfile ? (
-            <>
-              {/* Follow Button */}
-              <TouchableOpacity
-                style={styles.actionButtonWrapper}
-                onPress={() => setEditModalVisible(true)}
-              >
-                <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0, 0.35, 0.9]}
-                  style={styles.actionButton}
-                >
-                  <Ionicons name="person-add" size={16} color="#fff" />
-                  <Text style={styles.actionButtonText}>Follow</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+        {isOwnProfile ? (
+  <>
+    {/* Edit Profile Button */}
+    <TouchableOpacity
+      style={styles.actionButtonWrapper}
+      onPress={() => setEditModalVisible(true)}
+    >
+      <LinearGradient
+        colors={['#E94A37', '#F2CF68', '#1B7C82']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        locations={[0, 0.35, 0.9]}
+        style={styles.actionButton}
+      >
+        <Ionicons name="create" size={20} color="#fff" />
+        <Text style={styles.actionButtonText}>Edit Profile</Text>
+      </LinearGradient>
+    </TouchableOpacity>
 
-              {/* Message Button */}
-              <TouchableOpacity
-                style={styles.actionButtonWrapper}
-                onPress={() => {}}
-              >
-                <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0, 0.35, 0.9]}
-                  style={styles.actionButton}
-                >
-                  <Ionicons name="chatbubble" size={16} color="#fff" />
-                  <Text style={styles.actionButtonText}>Message</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* Compliment Button */}
-              <TouchableOpacity
-                style={styles.actionButtonWrapper}
-                onPress={() => setComplimentModalVisible(true)}
-              >
-                <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0, 0.35, 0.9]}
-                  style={styles.actionButton}
-                >
-                  <Ionicons name="heart" size={16} color="#fff" />
-                  <Text style={styles.actionButtonText}>Compliment</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </>
-          ) : (
+    {/* Message Button */}
+    <TouchableOpacity
+      style={styles.actionButtonWrapper}
+      onPress={() => router.push('/messages')}
+    >
+      <LinearGradient
+        colors={['#E94A37', '#F2CF68', '#1B7C82']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        locations={[0, 0.35, 0.9]}
+        style={styles.actionButton}
+      >
+        <Ionicons name="chatbubble" size={20} color="#fff" />
+        <Text style={styles.actionButtonText}>Messages</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  </>
+) : (
             <>
               {/* Follow/Following Button */}
               <TouchableOpacity
@@ -1284,35 +1378,48 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Tab Navigation */}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
-            onPress={() => setActiveTab('posts')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'posts' && styles.activeTabText,
-              ]}
-            >
-              Photos
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'videos' && styles.activeTab]}
-            onPress={() => setActiveTab('videos')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'videos' && styles.activeTabText,
-              ]}
-            >
-              Videos
-            </Text>
-          </TouchableOpacity>
-        </View>
+       {/* Tab Navigation */}
+<View style={styles.tabBar}>
+  <TouchableOpacity
+    style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
+    onPress={() => setActiveTab('posts')}
+  >
+    <Text
+      style={[
+        styles.tabText,
+        activeTab === 'posts' && styles.activeTabText,
+      ]}
+    >
+      Photos
+    </Text>
+  </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.tab, activeTab === 'videos' && styles.activeTab]}
+    onPress={() => setActiveTab('videos')}
+  >
+    <Text
+      style={[
+        styles.tabText,
+        activeTab === 'videos' && styles.activeTabText,
+      ]}
+    >
+      Videos
+    </Text>
+  </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.tab, activeTab === 'favourite' && styles.activeTab]}
+    onPress={() => setActiveTab('favourite')}
+  >
+    <Text
+      style={[
+        styles.tabText,
+        activeTab === 'favourite' && styles.activeTabText,
+      ]}
+    >
+      Favourite
+    </Text>
+  </TouchableOpacity>
+</View>
 
         {activeTab === 'videos' ? (
   <FlatList
@@ -1328,6 +1435,8 @@ export default function ProfileScreen() {
       </View>
     )}
   />
+) : activeTab === 'favourite' ? (
+  renderFavouriteSection()
 ) : (
   <FlatList
     key="photos-list"
@@ -1815,8 +1924,8 @@ listItem: {
   backgroundColor: '#fff',
 },
 listImageContainer: {
-  width: 200,
-  height: 220,
+  width: 160,
+  height: 180,
   borderRadius: 12,
   overflow: 'hidden',
   position: 'relative',
@@ -1835,15 +1944,29 @@ listImagePlaceholder: {
 },
 listMenuButton: {
   position: 'absolute',
-  top: 8,
-  right: 0,
+  top: 12,
+  right: 8,
   backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  borderRadius: 15,
-  width: 30,
+  borderRadius: 12,
+  width: 25,
   height: 30,
   justifyContent: 'center',
   alignItems: 'center',
 },
+
+listMenuButtonTopRight: {
+  position: 'absolute',
+  top: 12,                    
+  right: 8,                   
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  width: 20,
+  height: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 10,
+},
+
 listDetails: {
   flex: 1,
   justifyContent: 'center',
@@ -1888,6 +2011,69 @@ gradientHeart: {
   height: '100%',
   justifyContent: 'center',
   alignItems: 'center',
+},
+
+// Favourite Tab Styles
+favouriteContainer: {
+  paddingBottom: 20,
+},
+locationSection: {
+  marginBottom: 2,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+locationHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingVertical: 16,
+  paddingHorizontal: 20,
+  backgroundColor: '#fff',
+},
+locationHeaderLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+  flex: 1,
+},
+locationHeaderRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+locationName: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+  flex: 1,
+},
+locationCount: {
+  fontSize: 14,
+  color: '#666',
+  fontWeight: '500',
+},
+locationPostsGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  paddingHorizontal: 16,
+  paddingBottom: 16,
+  gap: 2,
+},
+favouriteGridItem: {
+  width: (SCREEN_WIDTH - 38) / 3,
+  height: (SCREEN_WIDTH - 38) / 3,
+  position: 'relative',
+  borderRadius: 8, 
+  overflow: 'hidden', 
+},
+favouriteGridImageContainer: {
+  width: '100%',
+  height: '100%',
+  position: 'relative',
+},
+favouriteGridImage: {
+  width: '100%',
+  height: '100%',
 },
 
     // Settings Modal Styles (Instagram-like) - ADD THESE
@@ -1994,7 +2180,7 @@ gradientHeart: {
     fontSize: 36,
     color: '#fff',
     letterSpacing: 1,
-    zIndex: -1,
+    zIndex: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.15)',
     textShadowOffset: { width: 4, height: 6 },
     textShadowRadius: 4,
@@ -2149,7 +2335,7 @@ gradientHeart: {
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#4dd0e1',
+    borderBottomColor: '#F2CF68',
   },
   tabText: {
     fontSize: 15,

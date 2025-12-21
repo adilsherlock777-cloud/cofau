@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     color: "#fff",
     letterSpacing: 1,
-    zIndex: -1,
+    zIndex: 1,
     textShadowColor: "rgba(0, 0, 0, 0.15)",      // ADD THIS
     textShadowOffset: { width: 6, height: 4 },   // ADD THIS
     textShadowRadius: 4, 
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   levelCardWrapper: {
     marginHorizontal: 26,
     marginTop: -40,
-    marginBottom: 3.5,
+    marginBottom: 1.5,
     borderBottomLeftRadius: 30,
   },
 
