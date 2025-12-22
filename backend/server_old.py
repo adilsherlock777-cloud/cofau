@@ -73,3 +73,7 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# Debug endpoint for checking data
+from routers import check_data
+app.include_router(check_data.router)
