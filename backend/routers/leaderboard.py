@@ -15,7 +15,7 @@ Scoring Algorithm:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional
 from bson import ObjectId
 import logging
@@ -108,38 +108,39 @@ def parse_datetime_safe(date_str: str) -> datetime:
     """
     Safely parse datetime string to datetime object.
     Handles various ISO format variations.
+    Returns timezone-naive datetime to match database format.
     
     Args:
         date_str: ISO format datetime string
     
     Returns:
-        datetime: Parsed datetime object (timezone-aware UTC)
+        datetime: Parsed datetime object (timezone-naive)
     """
     if isinstance(date_str, datetime):
-        # Already a datetime object
-        if date_str.tzinfo is None:
-            return date_str.replace(tzinfo=timezone.utc)
+        # Already a datetime object - remove timezone if present
+        if date_str.tzinfo is not None:
+            return date_str.replace(tzinfo=None)
         return date_str
     
     try:
         # Try parsing with different formats
         if 'Z' in date_str:
-            # Replace Z with +00:00 for proper parsing
-            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-        elif '+' in date_str or date_str.count('-') >= 3:
-            # Has timezone info
+            # Replace Z with empty string and parse
+            dt = datetime.fromisoformat(date_str.replace('Z', ''))
+        elif '+' in date_str:
+            # Has timezone info - parse and remove timezone
             dt = datetime.fromisoformat(date_str)
+            if dt.tzinfo is not None:
+                dt = dt.replace(tzinfo=None)
         else:
-            # No timezone, assume UTC
+            # No timezone
             dt = datetime.fromisoformat(date_str)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
         
         return dt
     except Exception as e:
         logger.error(f"Error parsing datetime '{date_str}': {e}")
         # Return current time as fallback
-        return datetime.now(timezone.utc)
+        return datetime.utcnow()
 
 
 # ======================================================
@@ -165,7 +166,7 @@ async def generate_leaderboard_snapshot():
     db = get_database()
     
     # 1. Determine 3-day rolling window (always shows last 3 days)
-    to_date = datetime.now(timezone.utc)
+    to_date = datetime.utcnow()
     from_date = to_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
     
     logger.info(f"🏆 Generating leaderboard for rolling 3-day window: {from_date.isoformat()} to {to_date.isoformat()}")
@@ -293,7 +294,7 @@ async def generate_leaderboard_snapshot():
     snapshot = {
         "from_date": from_date.isoformat(),
         "to_date": to_date.isoformat(),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
         "window_days": LEADERBOARD_WINDOW_DAYS,
         "total_posts_analyzed": len(posts),
         "entries": top_posts,
@@ -340,7 +341,7 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
         
         # Determine if we need to regenerate
         should_regenerate = False
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.utcnow()
         
         if not snapshot:
             logger.info("📊 No leaderboard snapshot found, generating new one...")
@@ -496,7 +497,7 @@ async def get_post_score(post_id: str, current_user: dict = Depends(get_current_
     likes_count = post.get("likes_count", 0)
     
     # Get max likes in current window for engagement calculation
-    to_date = datetime.now(timezone.utc)
+    to_date = datetime.utcnow()
     from_date = to_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
     
     posts_in_window = await db.posts.find({
