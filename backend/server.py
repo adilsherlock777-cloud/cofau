@@ -1961,6 +1961,12 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
             "user_id": current_user_id
         }) is not None
         
+        # Check if current user is following the post author
+        is_following = await db.follows.find_one({
+            "follower_id": current_user_id,
+            "following_id": post["user_id"]
+        }) is not None
+        
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
         
@@ -1982,6 +1988,7 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
+            "is_following": is_following,
             "created_at": post.get("created_at")
         }
     except Exception as e:

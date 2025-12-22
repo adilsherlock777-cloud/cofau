@@ -30,6 +30,9 @@ import {
   unsavePost,
   reportPost,
   sharePostToUsers,
+  addPostToStory,
+  followUser,
+  unfollowUser,
 } from "../utils/api";
 import {
   normalizeMediaUrl,
@@ -70,8 +73,13 @@ export default function FeedCard({
   const [showSimpleShareModal, setShowSimpleShareModal] = useState(false);
   const [showShareToUsersModal, setShowShareToUsersModal] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(post.is_following || false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const mediaUrl = normalizeMediaUrl(post.media_url);
+  
+  // Check if this is the current user's own post
+  const isOwnPost = user?.id === post.user_id;
   const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
   const isVideo =
     post.media_type === "video" || mediaUrl?.toLowerCase().endsWith(".mp4");
@@ -157,6 +165,28 @@ export default function FeedCard({
     }
   };
 
+  const handleFollowToggle = async () => {
+    if (!post.user_id || isOwnPost || followLoading) return;
+    
+    setFollowLoading(true);
+    const previousFollowState = isFollowing;
+    setIsFollowing(!isFollowing);
+    
+    try {
+      if (isFollowing) {
+        await unfollowUser(post.user_id);
+      } else {
+        await followUser(post.user_id);
+      }
+    } catch (error) {
+      console.error("Error toggling follow:", error);
+      setIsFollowing(previousFollowState);
+      Alert.alert("Error", "Failed to update follow status. Please try again.");
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   return (
     <View style={styles.card}>
       {/* HEADER */}
@@ -175,13 +205,28 @@ export default function FeedCard({
           <Text style={styles.username}>{post.username}</Text>
         </TouchableOpacity>
 
-        {/* Three Dots Menu */}
-        <TouchableOpacity
-          style={styles.optionsButton}
-          onPress={() => setShowOptionsMenu(!showOptionsMenu)}
-        >
-          <Ionicons name="ellipsis-vertical" size={24} color="#333" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {/* Follow Button - Only show if not following and not own post */}
+          {!isOwnPost && !isFollowing && (
+            <TouchableOpacity
+              style={styles.followButton}
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+            >
+              <Text style={styles.followButtonText}>
+                {followLoading ? "..." : "Follow"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Three Dots Menu */}
+          <TouchableOpacity
+            style={styles.optionsButton}
+            onPress={() => setShowOptionsMenu(!showOptionsMenu)}
+          >
+            <Ionicons name="ellipsis-vertical" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Options Menu Modal */}
@@ -359,11 +404,33 @@ export default function FeedCard({
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => {
-            // Show options: Share to Users (Cofau) or External (WhatsApp/Instagram)
+            // Show options: Add to Story, Share to Users (Cofau), or External (WhatsApp/Instagram)
             Alert.alert(
               "Share Post",
               "Choose how you want to share",
               [
+                {
+                  text: "Add to Story",
+                  onPress: async () => {
+                    try {
+                      const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url);
+                      await addPostToStory(
+                        post.id,
+                        mediaUrl,
+                        post.review_text || post.description || "",
+                        post.rating || 0,
+                        post.location_name || post.location || ""
+                      );
+                      Alert.alert("Success", "Post added to your story! 🎉");
+                      if (onStoryCreated) {
+                        onStoryCreated();
+                      }
+                    } catch (error) {
+                      Alert.alert("Error", error.response?.data?.detail || "Failed to add to story. Please try again.");
+                      console.error("Error adding to story:", error);
+                    }
+                  },
+                },
                 {
                   text: "Share to Cofau Users",
                   onPress: () => setShowShareToUsersModal(true),
@@ -440,6 +507,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  followButton: {
+    backgroundColor: "#4dd0e1",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+
+  followButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
 
   username: {

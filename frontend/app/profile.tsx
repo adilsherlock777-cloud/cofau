@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   FlatList,
   Dimensions,
   Platform,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -74,6 +75,7 @@ export default function ProfileScreen() {
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [followingStatus, setFollowingStatus] = useState<{ [key: string]: boolean }>({});
+  const sidebarAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!token) {
@@ -106,6 +108,37 @@ export default function ProfileScreen() {
       checkIfComplimented();
     }
   }, [userData, activeTab]);
+
+  // Animate sidebar when modal visibility changes
+  useEffect(() => {
+    console.log('🔄 Sidebar visibility changed:', settingsModalVisible, 'isOwnProfile:', isOwnProfile);
+    if (settingsModalVisible) {
+      console.log('✅ Opening sidebar menu');
+      sidebarAnimation.setValue(0); // Reset to start position
+      Animated.timing(sidebarAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        console.log('✅ Sidebar animation completed');
+      });
+    } else {
+      Animated.timing(sidebarAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [settingsModalVisible]);
+
+  // Debug: Log when component renders (MUST be before any early returns)
+  useEffect(() => {
+    console.log('🔍 Profile Screen Render:', {
+      isOwnProfile,
+      settingsModalVisible,
+      userData: userData ? 'loaded' : 'not loaded',
+    });
+  }, [isOwnProfile, settingsModalVisible, userData]);
 
   const GradientHeart = ({ size = 24 }) => (
   <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
@@ -1174,14 +1207,24 @@ export default function ProfileScreen() {
 
               <Text style={styles.cofauTitle}>Cofau</Text>
 
-              <View style={styles.headerIcons}>
-  <TouchableOpacity
-    style={styles.headerIconButton}
-    onPress={() => setSettingsModalVisible(true)}
-  >
-    <Ionicons name="menu" size={24} color="#fff" />
-  </TouchableOpacity>
-</View>
+              <View style={styles.headerIcons} pointerEvents="box-none">
+                {isOwnProfile ? (
+                  <TouchableOpacity
+                    style={styles.headerIconButton}
+                    onPress={() => {
+                      console.log('✅ Menu button pressed!');
+                      console.log('✅ isOwnProfile:', isOwnProfile);
+                      console.log('✅ Current settingsModalVisible:', settingsModalVisible);
+                      setSettingsModalVisible(true);
+                      console.log('✅ Called setSettingsModalVisible(true)');
+                    }}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="menu" size={24} color="#fff" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
           </LinearGradient>
 
@@ -1526,59 +1569,88 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Settings Modal - Instagram Style */}
+      {/* Sidebar Menu */}
       <Modal
-        animationType="slide"
-        transparent={false}
+        animationType="none"
+        transparent={true}
         visible={settingsModalVisible}
         onRequestClose={() => setSettingsModalVisible(false)}
       >
-        <View style={styles.settingsModalContainer}>
-          <View style={styles.settingsModalContent}>
+        <View style={styles.sidebarOverlay}>
+          {/* Backdrop - Clickable to close */}
+          <TouchableOpacity
+            style={styles.sidebarBackdrop}
+            activeOpacity={1}
+            onPress={() => setSettingsModalVisible(false)}
+          />
+          
+          {/* Sidebar Content */}
+          <Animated.View
+            style={[
+              styles.sidebarContainer,
+              {
+                transform: [
+                  {
+                    translateX: sidebarAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [SCREEN_WIDTH, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             {/* Header */}
-            <View style={styles.settingsModalHeader}>
-              <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Menu</Text>
+              <TouchableOpacity
+                onPress={() => setSettingsModalVisible(false)}
+                style={styles.sidebarCloseButton}
+              >
                 <Ionicons name="close" size={28} color="#333" />
               </TouchableOpacity>
-              <Text style={styles.settingsModalTitle}>Menu</Text>
-              <View style={{ width: 28 }} />
             </View>
 
             {/* Menu Options */}
-            <View style={styles.settingsMenuOptions}>
+            <ScrollView style={styles.sidebarContent}>
               {/* Saved Posts */}
               <TouchableOpacity
-                style={styles.settingsMenuItem}
+                style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
                   router.push('/saved-posts');
                 }}
+                activeOpacity={0.7}
               >
-                <View style={styles.settingsMenuIconContainer}>
+                <View style={styles.sidebarMenuIconContainer}>
                   <Ionicons name="bookmark-outline" size={24} color="#333" />
                 </View>
-                <Text style={styles.settingsMenuText}>Saved</Text>
+                <Text style={styles.sidebarMenuText}>Saved Posts</Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
               {/* Settings */}
               <TouchableOpacity
-                style={styles.settingsMenuItem}
+                style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
                   setLevelDetailsModalVisible(true);
                 }}
+                activeOpacity={0.7}
               >
-                <View style={styles.settingsMenuIconContainer}>
+                <View style={styles.sidebarMenuIconContainer}>
                   <Ionicons name="settings-outline" size={24} color="#333" />
                 </View>
-                <Text style={styles.settingsMenuText}>Settings</Text>
+                <Text style={styles.sidebarMenuText}>Settings</Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
+              {/* Divider */}
+              <View style={styles.sidebarDivider} />
+
               {/* Logout */}
               <TouchableOpacity
-                style={[styles.settingsMenuItem, styles.logoutMenuItem]}
+                style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
                   if (Platform.OS === 'web') {
@@ -1602,15 +1674,16 @@ export default function ProfileScreen() {
                     ]);
                   }
                 }}
+                activeOpacity={0.7}
               >
-                <View style={styles.settingsMenuIconContainer}>
+                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
                   <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
                 </View>
-                <Text style={[styles.settingsMenuText, styles.logoutMenuText]}>Logout</Text>
+                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Logout</Text>
                 <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
               </TouchableOpacity>
-            </View>
-          </View>
+            </ScrollView>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -1915,6 +1988,10 @@ const styles = StyleSheet.create({
   },
 
   // List Layout Styles
+listItemWrapper: {
+  position: 'relative',
+  marginBottom: 8,
+},
 listItem: {
   flexDirection: 'row',
   paddingVertical: 12,
@@ -2076,62 +2153,83 @@ favouriteGridImage: {
   height: '100%',
 },
 
-    // Settings Modal Styles (Instagram-like) - ADD THESE
-  settingsModalContainer: {
+  // Sidebar Styles
+  sidebarOverlay: {
     flex: 1,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  sidebarBackdrop: {
+    flex: 1,
+  },
+  sidebarContainer: {
+    width: SCREEN_WIDTH * 0.75,
+    maxWidth: 320,
+    height: '100%',
     backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  settingsModalContent: {
-    flex: 1,
-    paddingTop: 60,
-  },
-  settingsModalHeader: {
+  sidebarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingVertical: 20,
+    paddingTop: 60,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  settingsModalTitle: {
-    fontSize: 20,
+  sidebarTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
-  settingsMenuOptions: {
-    paddingTop: 20,
+  sidebarCloseButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  settingsMenuItem: {
+  sidebarContent: {
+    flex: 1,
+  },
+  sidebarMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f5f5f5',
   },
-  settingsMenuIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  sidebarMenuIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  settingsMenuText: {
+  logoutIconContainer: {
+    backgroundColor: '#fff5f5',
+  },
+  sidebarMenuText: {
     flex: 1,
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
   },
-  logoutMenuItem: {
-    marginTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
   logoutMenuText: {
     color: '#FF6B6B',
+  },
+  sidebarDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginVertical: 8,
   },
   reviewerBadgeContainer: {
     position: 'absolute',
@@ -2181,6 +2279,7 @@ favouriteGridImage: {
     color: '#fff',
     letterSpacing: 1,
     zIndex: 1,
+    pointerEvents: 'none', // Allow clicks to pass through
     textShadowColor: 'rgba(0, 0, 0, 0.15)',
     textShadowOffset: { width: 4, height: 6 },
     textShadowRadius: 4,
@@ -2188,12 +2287,15 @@ favouriteGridImage: {
   headerIcons: {
     flexDirection: 'row',
     gap: 12,
+    zIndex: 10,
   },
   headerIconButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 11,
+    elevation: 5,
   },
 
   profileCardWrapper: {

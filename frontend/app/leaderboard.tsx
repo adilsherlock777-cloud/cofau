@@ -186,10 +186,17 @@ export default function LeaderboardScreen() {
         <Text style={styles.mainTitle}>Community Leaderboards</Text>
         
         {leaderboardData && leaderboardData.from_date && leaderboardData.to_date && (
-          <Text style={styles.dateRange}>
-            {formatDate(leaderboardData.from_date)} - {formatDate(leaderboardData.to_date)}
-            {leaderboardData.window_days && ` (${leaderboardData.window_days} days)`}
-          </Text>
+          <View>
+            <Text style={styles.dateRange}>
+              {formatDate(leaderboardData.from_date)} - {formatDate(leaderboardData.to_date)}
+              {leaderboardData.window_days && ` (${leaderboardData.window_days} days)`}
+            </Text>
+            {leaderboardData.total_posts_analyzed !== undefined && leaderboardData.total_posts_analyzed > 0 && (
+              <Text style={styles.postsCountText}>
+                {leaderboardData.total_posts_analyzed} images analyzed
+              </Text>
+            )}
+          </View>
         )}
 
         {/* Empty State */}
@@ -278,11 +285,6 @@ export default function LeaderboardScreen() {
                     <Ionicons name="heart" size={16} color="#FF6B6B" />
                     <Text style={styles.scoreLabel}>Likes</Text>
                     <Text style={styles.scoreValue}>{entry.likes_count || 0}</Text>
-                  </View>
-                  <View style={styles.scoreItem}>
-                    <Ionicons name="images" size={16} color="#9C27B0" />
-                    <Text style={styles.scoreLabel}>Posts</Text>
-                    <Text style={styles.scoreValue}>{entry.post_count || 0}</Text>
                   </View>
                   <View style={styles.scoreItem}>
                     <Ionicons name="trophy" size={16} color="#4dd0e1" />
@@ -387,8 +389,17 @@ const styles = StyleSheet.create({
   dateRange: {
     fontSize: 14,
     color: "#fff",
-    marginBottom: 20,
+    marginBottom: 4,
     opacity: 0.8,
+    textAlign: "center",
+  },
+  postsCountText: {
+    fontSize: 12,
+    color: "#fff",
+    marginBottom: 20,
+    opacity: 0.7,
+    textAlign: "center",
+    fontStyle: "italic",
   },
   emptyContainer: {
     alignItems: "center",

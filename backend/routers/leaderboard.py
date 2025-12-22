@@ -33,9 +33,8 @@ router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 # ======================================================
 
 # Score weights (must sum to 1.0)
-QUALITY_WEIGHT = 0.5  # 50% weight for quality score
-ENGAGEMENT_WEIGHT = 0.3  # 30% weight for engagement score
-POST_COUNT_WEIGHT = 0.2  # 20% weight for post count (number of posts uploaded in 3 days)
+QUALITY_WEIGHT = 0.6  # 60% weight for quality score
+ENGAGEMENT_WEIGHT = 0.4  # 40% weight for engagement score (likes)
 
 # Leaderboard window: 3 days
 LEADERBOARD_WINDOW_DAYS = 3
@@ -69,42 +68,20 @@ def calculate_engagement_score(likes_count: int, max_likes: int) -> float:
     return round(engagement_score, 2)
 
 
-def calculate_post_count_score(post_count: int, max_post_count: int) -> float:
-    """
-    Calculate post count score (0-100) based on number of posts uploaded in 3-day window.
-    
-    Formula: (post_count / max_post_count) * 100
-    If max_post_count is 0, return 0.
-    
-    Args:
-        post_count: Number of posts uploaded by user in the 3-day window
-        max_post_count: Maximum posts uploaded by any user in the current 3-day window
-    
-    Returns:
-        float: Post count score between 0-100
-    """
-    if max_post_count == 0:
-        return 0.0
-    
-    post_count_score = (post_count / max_post_count) * 100
-    return round(post_count_score, 2)
-
-
-def calculate_combined_score(quality_score: float, engagement_score: float, post_count_score: float = 0.0) -> float:
+def calculate_combined_score(quality_score: float, engagement_score: float) -> float:
     """
     Calculate combined score using weighted average.
     
-    Formula: (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score) + (POST_COUNT_WEIGHT * post_count_score)
+    Formula: (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score)
     
     Args:
         quality_score: Quality score from Sightengine (0-100)
         engagement_score: Normalized engagement score (0-100)
-        post_count_score: Normalized post count score (0-100)
     
     Returns:
         float: Combined score between 0-100
     """
-    combined = (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score) + (POST_COUNT_WEIGHT * post_count_score)
+    combined = (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score)
     return round(combined, 2)
 
 
@@ -154,26 +131,12 @@ async def generate_leaderboard_snapshot():
     
     logger.info(f"📊 Found {len(posts)} posts in window")
     
-    # 3. Count posts per user in the 3-day window
-    user_post_counts = {}
-    for post in posts:
-        user_id = str(post.get("user_id", ""))
-        if user_id:
-            user_post_counts[user_id] = user_post_counts.get(user_id, 0) + 1
-    
-    # Find max post count for normalization
-    max_post_count = max(user_post_counts.values()) if user_post_counts else 1
-    if max_post_count == 0:
-        max_post_count = 1  # Avoid division by zero
-    
-    logger.info(f"📊 Max posts by a user in window: {max_post_count}")
-    
-    # 4. Find max likes for normalization
+    # 3. Find max likes for normalization
     max_likes = max([post.get("likes_count", 0) for post in posts])
     if max_likes == 0:
         max_likes = 1  # Avoid division by zero
     
-    # 5. Calculate scores for each post
+    # 4. Calculate scores for each post
     posts_with_scores = []
     for post in posts:
         try:
@@ -181,17 +144,11 @@ async def generate_leaderboard_snapshot():
             likes_count = post.get("likes_count", 0)
             user_id = str(post.get("user_id", ""))
             
-            # Get post count for this user
-            user_post_count = user_post_counts.get(user_id, 1)
-            
             # Calculate engagement score
             engagement_score = calculate_engagement_score(likes_count, max_likes)
             
-            # Calculate post count score
-            post_count_score = calculate_post_count_score(user_post_count, max_post_count)
-            
-            # Calculate combined score (now includes post count)
-            combined_score = calculate_combined_score(quality_score, engagement_score, post_count_score)
+            # Calculate combined score (quality + engagement only)
+            combined_score = calculate_combined_score(quality_score, engagement_score)
             
             # Get user info - handle both ObjectId and string user_id
             user = None
@@ -229,8 +186,6 @@ async def generate_leaderboard_snapshot():
                 "quality_score": quality_score,
                 "likes_count": likes_count,
                 "engagement_score": engagement_score,
-                "post_count": user_post_count,  # Number of posts by this user in 3-day window
-                "post_count_score": post_count_score,  # Post count score (0-100)
                 "combined_score": combined_score,
                 "created_at": post.get("created_at")
             })
@@ -259,7 +214,6 @@ async def generate_leaderboard_snapshot():
         "config": {
             "quality_weight": QUALITY_WEIGHT,
             "engagement_weight": ENGAGEMENT_WEIGHT,
-            "post_count_weight": POST_COUNT_WEIGHT,
             "leaderboard_size": LEADERBOARD_SIZE
         }
     }
@@ -310,7 +264,6 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
                     "config": {
                         "quality_weight": QUALITY_WEIGHT,
                         "engagement_weight": ENGAGEMENT_WEIGHT,
-                        "post_count_weight": POST_COUNT_WEIGHT,
                         "leaderboard_size": LEADERBOARD_SIZE
                     }
                 }
@@ -544,31 +497,22 @@ async def get_post_score(post_id: str, current_user: dict = Depends(get_current_
     
     max_likes = max([p.get("likes_count", 0) for p in posts_in_window]) if posts_in_window else 1
     
-    # Count posts by this user in window
-    user_post_count = sum(1 for p in posts_in_window if str(p.get("user_id", "")) == str(post.get("user_id", "")))
-    max_post_count = max([sum(1 for p in posts_in_window if str(p.get("user_id", "")) == str(uid)) for uid in set(str(p.get("user_id", "")) for p in posts_in_window)]) if posts_in_window else 1
-    
     engagement_score = calculate_engagement_score(likes_count, max_likes)
-    post_count_score = calculate_post_count_score(user_post_count, max_post_count)
-    combined_score = calculate_combined_score(quality_score, engagement_score, post_count_score)
+    combined_score = calculate_combined_score(quality_score, engagement_score)
     
     return {
         "post_id": post_id,
         "quality_score": quality_score,
         "likes_count": likes_count,
         "engagement_score": engagement_score,
-        "post_count": user_post_count,
-        "post_count_score": post_count_score,
         "combined_score": combined_score,
         "breakdown": {
             "quality_contribution": round(quality_score * QUALITY_WEIGHT, 2),
-            "engagement_contribution": round(engagement_score * ENGAGEMENT_WEIGHT, 2),
-            "post_count_contribution": round(post_count_score * POST_COUNT_WEIGHT, 2)
+            "engagement_contribution": round(engagement_score * ENGAGEMENT_WEIGHT, 2)
         },
         "config": {
             "quality_weight": QUALITY_WEIGHT,
-            "engagement_weight": ENGAGEMENT_WEIGHT,
-            "post_count_weight": POST_COUNT_WEIGHT
+            "engagement_weight": ENGAGEMENT_WEIGHT
         }
     }
 
