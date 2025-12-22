@@ -23,6 +23,7 @@ import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
 import SharePreviewModal from "../../components/SharePreviewModal";
 import ReportModal from "../../components/ReportModal";
+import { followUser, unfollowUser } from "../../utils/api";
 import axios from "axios";
 import { Image } from "expo-image";
 import { Video, ResizeMode } from "expo-av";
@@ -90,6 +91,7 @@ const GradientBookmark = ({ size = 26 }) => (
 ----------------------------------------------------------*/
 function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const router = useRouter();
+  const { user } = useAuth() as any;
   const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
@@ -102,7 +104,12 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const [isMuted, setIsMuted] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(post.is_following || false);
+  const [followLoading, setFollowLoading] = useState(false);
   const videoRef = useRef(null);
+  
+  // Check if this is the current user's own post
+  const isOwnPost = user?.id === post.user_id;
 
   // Pan responder for swipe down gesture
   const panResponder = useRef(
@@ -204,6 +211,28 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
       }
     } catch (e) {
       setIsSaved(prevSaved);
+    }
+  };
+
+  const handleFollowToggle = async () => {
+    if (!post.user_id || isOwnPost || followLoading) return;
+    
+    setFollowLoading(true);
+    const previousFollowState = isFollowing;
+    setIsFollowing(!isFollowing);
+    
+    try {
+      if (isFollowing) {
+        await unfollowUser(post.user_id);
+      } else {
+        await followUser(post.user_id);
+      }
+    } catch (error) {
+      console.error("Error toggling follow:", error);
+      setIsFollowing(previousFollowState);
+      Alert.alert("Error", "Failed to update follow status. Please try again.");
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -313,13 +342,28 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
               </View>
             </TouchableOpacity>
 
-            {/* Three Dots Menu */}
-            <TouchableOpacity
-              style={styles.optionsButton}
-              onPress={() => setShowOptionsMenu(!showOptionsMenu)}
-            >
-              <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
-            </TouchableOpacity>
+            <View style={styles.topHeaderRight}>
+              {/* Follow Button - Only show if not following and not own post */}
+              {!isOwnPost && !isFollowing && (
+                <TouchableOpacity
+                  style={styles.topFollowButton}
+                  onPress={handleFollowToggle}
+                  disabled={followLoading}
+                >
+                  <Text style={styles.topFollowButtonText}>
+                    {followLoading ? "..." : "Follow"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Three Dots Menu */}
+              <TouchableOpacity
+                style={styles.optionsButton}
+                onPress={() => setShowOptionsMenu(!showOptionsMenu)}
+              >
+                <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -442,6 +486,19 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                     <Text style={styles.detailsTimestamp}>{formatTime(post.created_at)}</Text>
                   </View>
                 </TouchableOpacity>
+                
+                {/* Follow Button - Only show if not following and not own post */}
+                {!isOwnPost && !isFollowing && (
+                  <TouchableOpacity
+                    style={styles.detailsFollowButton}
+                    onPress={handleFollowToggle}
+                    disabled={followLoading}
+                  >
+                    <Text style={styles.detailsFollowButtonText}>
+                      {followLoading ? "..." : "Follow"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Action Buttons with Cofau Theme */}
@@ -853,6 +910,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  topHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  topFollowButton: {
+    backgroundColor: "#4dd0e1",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+
+  topFollowButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
   topUsername: {
     fontSize: 15,
     fontWeight: "700",
@@ -1024,7 +1100,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
   },
 
   detailsUserRow: {
@@ -1036,6 +1112,20 @@ const styles = StyleSheet.create({
   detailsUserInfo: {
     marginLeft: 12,
     flex: 1,
+  },
+
+  detailsFollowButton: {
+    backgroundColor: "#4dd0e1",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginLeft: 8,
+  },
+
+  detailsFollowButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
 
   detailsUsername: {

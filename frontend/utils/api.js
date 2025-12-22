@@ -429,4 +429,29 @@ export const sharePostToUsers = async (postId, userIds) => {
   }
 };
 
+/**
+ * Add a post to story (Add to Story feature)
+ * @param {string} postId - Post ID to add to story
+ * @param {string} mediaUrl - Media URL from the post
+ * @param {string} review - Review text from the post
+ * @param {number} rating - Rating from the post
+ * @param {string} location - Location name from the post
+ * @returns {Promise} - API response
+ */
+export const addPostToStory = async (postId, mediaUrl, review = "", rating = 0, location = "") => {
+  try {
+    const response = await axios.post(`${API_URL}/stories/create-from-post`, {
+      post_id: postId,
+      media_url: mediaUrl,
+      review: review,
+      rating: rating,
+      location: location,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error adding post to story:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export default api;
