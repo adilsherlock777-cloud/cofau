@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 import os
 import shutil
@@ -552,6 +552,78 @@ async def get_feed(skip: int = 0, limit: int = None, category: str = None, curre
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),  # Add location_name
             "category": post.get("category"),  # Add category
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
+            "is_following": is_following,
+            # Convert created_at to ISO string for frontend (handles both datetime objects and existing ISO strings)
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+        })
+
+    return result
+
+# ==================== LAST 3 DAYS POSTS ENDPOINT ====================
+
+@app.get("/api/posts/last-3-days")
+async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
+    """Get posts from the last 3 days"""
+    db = get_database()
+    
+    # Calculate the date 3 days ago
+    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    
+    # Query posts created in the last 3 days
+    posts = await db.posts.find({
+        "created_at": {"$gte": three_days_ago}
+    }).sort("created_at", -1).to_list(None)
+    
+    print(f"📊 Found {len(posts)} posts from the last 3 days")
+    
+    result = []
+    for post in posts:
+        post_id = str(post["_id"])
+        user_id = post["user_id"]
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+
+        is_liked = await db.likes.find_one({
+            "post_id": post_id,
+            "user_id": str(current_user["_id"])
+        }) is not None
+
+        is_saved = await db.saved_posts.find_one({
+            "post_id": post_id,
+            "user_id": str(current_user["_id"])
+        }) is not None
+
+        # Check if current user is following the post author
+        is_following = await db.follows.find_one({
+            "follower_id": str(current_user["_id"]),
+            "following_id": user_id
+        }) is not None
+
+        media_url = post.get("media_url", "")
+        media_type = post.get("media_type", "image")
+        
+        # Only set image_url for images, not videos
+        image_url = post.get("image_url") if media_type == "image" else None
+
+        result.append({
+            "id": post_id,
+            "user_id": user_id,
+            "username": user["full_name"] if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
+            "user_level": user.get("level", 1),
+            "media_url": media_url,
+            "image_url": image_url,  # Only for images, None for videos
+            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
@@ -2157,3 +2229,7 @@ async def share_preview(post_id: str):
     """
 
     return HTMLResponse(content=html)
+
+# Debug endpoint for checking data
+from routers import check_data
+app.include_router(check_data.router)

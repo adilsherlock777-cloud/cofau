@@ -119,19 +119,35 @@ function getCategoryIcon(category: string): any {
 // =======================
 export default function LocationDetailsScreen() {
   const router = useRouter();
-  const { locationName } = useLocalSearchParams();
-  const { user, token } = useAuth();
+  const { locationName, category } = useLocalSearchParams();
+  const { user, token } = useAuth() as any;
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
   const [locationInfo, setLocationInfo] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  // Initialize selectedCategory from navigation params if provided
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => {
+    if (category) {
+      return typeof category === 'string' ? category : category[0];
+    }
+    return "";
+  });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const decodedLocationName = locationName
     ? decodeURIComponent(locationName as string)
     : "";
+
+  // Initialize category from navigation params on mount
+  useEffect(() => {
+    if (category) {
+      const categoryValue = typeof category === 'string' ? category : category[0];
+      if (categoryValue && categoryValue !== selectedCategory) {
+        setSelectedCategory(categoryValue);
+      }
+    }
+  }, [category]);
 
   useEffect(() => {
     if (user && token && decodedLocationName) {
@@ -178,7 +194,7 @@ export default function LocationDetailsScreen() {
           ...post,
           full_image_url: fullUrl,
           is_liked: false,
-          _isVideo: isVideoFile(fullUrl, post.media_type),
+          _isVideo: isVideoFile(fullUrl || '', post.media_type),
           category: post.category ? post.category.trim() : null,
         };
       });
@@ -299,15 +315,37 @@ export default function LocationDetailsScreen() {
           
           {/* ✅ Category Filter Button Inside Search Bar */}
           <TouchableOpacity 
-            style={styles.inlineFilterButton}
+            style={[
+              styles.inlineFilterButton,
+              selectedCategory && selectedCategory !== 'All' && styles.inlineFilterButtonActive
+            ]}
             onPress={() => setShowCategoryModal(true)}
+            activeOpacity={0.7}
           >
-            <Ionicons name="options-outline" size={18} color="#FFF" />
-            <Text style={styles.inlineFilterText}>
+            <Ionicons 
+              name={selectedCategory && selectedCategory !== 'All' ? "filter" : "options-outline"} 
+              size={18} 
+              color="#FFF" 
+            />
+            <Text style={styles.inlineFilterText} numberOfLines={1}>
               {selectedCategory && selectedCategory !== 'All' 
-                ? selectedCategory.substring(0, 8) + '...' 
+                ? (selectedCategory.length > 10 
+                    ? selectedCategory.substring(0, 10) + '...' 
+                    : selectedCategory)
                 : 'Category'}
             </Text>
+            {selectedCategory && selectedCategory !== 'All' && (
+              <TouchableOpacity
+                style={styles.clearCategoryIcon}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setSelectedCategory('');
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={16} color="#FFF" />
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -480,18 +518,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#1B7C82",
     borderRadius: 20,
     paddingVertical: 6,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     marginLeft: 8,
     gap: 4,
     borderWidth: 1,
     borderColor: "#000",
+    minWidth: 80,
   },
-
+  inlineFilterButtonActive: {
+    backgroundColor: "#E94A37",
+  },
   inlineFilterText: {
     fontSize: 12,
     color: "#FFF",
     fontWeight: "600",
-    maxWidth: 60,
+    maxWidth: 80,
+  },
+  clearCategoryIcon: {
+    marginLeft: 2,
   },
 
   // Grid Tiles

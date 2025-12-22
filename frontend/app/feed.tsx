@@ -12,7 +12,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import axios from "axios";
-
 import { useAuth } from "../context/AuthContext";
 import FeedCard from "../components/FeedCard";
 import UserAvatar from "../components/UserAvatar";
@@ -243,15 +242,27 @@ export default function FeedScreen() {
               {/* Left Message Icon */}
               <TouchableOpacity
                 style={styles.leftIcon}
-                onPress={() => router.push("/chat")}
+                onPress={() => {
+                  console.log("Chat icon pressed, navigating to /chat");
+                  router.push("/chat");
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="chatbox-ellipses" size={23} color="#fff" />
               </TouchableOpacity>
 
-              <Text style={styles.cofauTitle}>Cofau</Text>
+              <Text style={styles.cofauTitle} pointerEvents="none">Cofau</Text>
 
               <View style={styles.headerIcons}>
-                <TouchableOpacity onPress={() => router.push("/notifications")}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    console.log("Notifications icon pressed, navigating to /notifications");
+                    router.push("/notifications");
+                  }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
                   <Ionicons name="notifications" size={24} color="#fff" />
                   {unreadCount > 0 && (
                     <View style={styles.badge}>
@@ -459,6 +470,7 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 10, // Ensure it's above the title
   },
 
   cofauTitle: {
@@ -473,12 +485,14 @@ const styles = StyleSheet.create({
     zIndex: 1,
     textShadowColor: "rgba(0, 0, 0, 0.15)",      // ADD THIS
     textShadowOffset: { width: 6, height: 4 },   // ADD THIS
-    textShadowRadius: 4, 
+    textShadowRadius: 4,
+    pointerEvents: "none", // Don't block touch events
   },
 
   headerIcons: {
     flexDirection: "row",
     gap: 20,
+    zIndex: 10, // Ensure it's above the title
   },
 
   badge: {
@@ -496,7 +510,7 @@ const styles = StyleSheet.create({
 
   badgeText: {
     color: "#fff",
-    fontSize: 5,
+    fontSize: 11,
     fontWeight: "700",
   },
 
