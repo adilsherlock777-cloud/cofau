@@ -4,18 +4,18 @@ Leaderboard Router
 Handles content leaderboard based on quality scores and engagement.
 
 Endpoints:
-- GET /api/leaderboard/current: Get current 3-day leaderboard
+- GET /api/leaderboard/current: Get current 3-day rolling leaderboard
 - GET /api/leaderboard/history: Get historical leaderboards
 - POST /api/leaderboard/regenerate: Manually trigger leaderboard regeneration (admin)
 
 Scoring Algorithm:
 - Combined Score = (0.6 * Quality Score) + (0.4 * Engagement Score)
-- Quality Score: 0-100 from Sightengine API
+- Quality Score: 0-100 from rating field (normalized from 0-10 scale to 0-100)
 - Engagement Score: Normalized likes count (0-100)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from bson import ObjectId
 import logging
@@ -36,7 +36,7 @@ router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 QUALITY_WEIGHT = 0.6  # 60% weight for quality score
 ENGAGEMENT_WEIGHT = 0.4  # 40% weight for engagement score (likes)
 
-# Leaderboard window: 3 days
+# Leaderboard window: 3 days (rolling window)
 LEADERBOARD_WINDOW_DAYS = 3
 
 # Top N posts in leaderboard
@@ -46,6 +46,25 @@ LEADERBOARD_SIZE = 10
 # ======================================================
 # SCORING FUNCTIONS
 # ======================================================
+
+def normalize_rating_to_quality_score(rating: float) -> float:
+    """
+    Normalize rating (0-10 scale) to quality score (0-100 scale).
+    
+    Args:
+        rating: Rating value (typically 0-10)
+    
+    Returns:
+        float: Quality score between 0-100
+    """
+    # If rating is already in 0-100 range, return as is
+    if rating > 10:
+        return min(rating, 100.0)
+    
+    # Convert 0-10 scale to 0-100 scale
+    quality_score = rating * 10.0
+    return round(min(quality_score, 100.0), 2)
+
 
 def calculate_engagement_score(likes_count: int, max_likes: int) -> float:
     """
@@ -75,7 +94,7 @@ def calculate_combined_score(quality_score: float, engagement_score: float) -> f
     Formula: (QUALITY_WEIGHT * quality_score) + (ENGAGEMENT_WEIGHT * engagement_score)
     
     Args:
-        quality_score: Quality score from Sightengine (0-100)
+        quality_score: Quality score from rating (0-100)
         engagement_score: Normalized engagement score (0-100)
     
     Returns:
@@ -85,13 +104,51 @@ def calculate_combined_score(quality_score: float, engagement_score: float) -> f
     return round(combined, 2)
 
 
+def parse_datetime_safe(date_str: str) -> datetime:
+    """
+    Safely parse datetime string to datetime object.
+    Handles various ISO format variations.
+    
+    Args:
+        date_str: ISO format datetime string
+    
+    Returns:
+        datetime: Parsed datetime object (timezone-aware UTC)
+    """
+    if isinstance(date_str, datetime):
+        # Already a datetime object
+        if date_str.tzinfo is None:
+            return date_str.replace(tzinfo=timezone.utc)
+        return date_str
+    
+    try:
+        # Try parsing with different formats
+        if 'Z' in date_str:
+            # Replace Z with +00:00 for proper parsing
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        elif '+' in date_str or date_str.count('-') >= 3:
+            # Has timezone info
+            dt = datetime.fromisoformat(date_str)
+        else:
+            # No timezone, assume UTC
+            dt = datetime.fromisoformat(date_str)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+        
+        return dt
+    except Exception as e:
+        logger.error(f"Error parsing datetime '{date_str}': {e}")
+        # Return current time as fallback
+        return datetime.now(timezone.utc)
+
+
 # ======================================================
 # LEADERBOARD GENERATION
 # ======================================================
 
 async def generate_leaderboard_snapshot():
     """
-    Generate a new leaderboard snapshot for the current 3-day window.
+    Generate a new leaderboard snapshot for the current 3-day rolling window.
     
     Process:
     1. Determine 3-day window (current time - 3 days to current time)
@@ -107,47 +164,68 @@ async def generate_leaderboard_snapshot():
     """
     db = get_database()
     
-    # 1. Determine 3-day window
-    to_date = datetime.utcnow()
+    # 1. Determine 3-day rolling window (always shows last 3 days)
+    to_date = datetime.now(timezone.utc)
     from_date = to_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
     
-    logger.info(f"🏆 Generating leaderboard for window: {from_date} to {to_date}")
+    logger.info(f"🏆 Generating leaderboard for rolling 3-day window: {from_date.isoformat()} to {to_date.isoformat()}")
     
     # 2. Fetch all posts within the window
+    # Convert dates to ISO strings for MongoDB comparison
+    from_date_str = from_date.isoformat()
+    to_date_str = to_date.isoformat()
+    
     try:
         posts = await db.posts.find({
             "created_at": {
-                "$gte": from_date.isoformat(),
-                "$lte": to_date.isoformat()
+                "$gte": from_date_str,
+                "$lte": to_date_str
             }
         }).to_list(None)
+        
+        logger.info(f"📊 Query: created_at >= {from_date_str} AND created_at <= {to_date_str}")
+        logger.info(f"📊 Found {len(posts)} posts in database query")
     except Exception as e:
         logger.error(f"❌ Error fetching posts from database: {e}")
         posts = []
     
     if not posts:
-        logger.warning("⚠️ No posts found in 3-day window")
+        logger.warning(f"⚠️ No posts found in 3-day window ({from_date_str} to {to_date_str})")
+        # Let's check total posts in database for debugging
+        try:
+            total_posts = await db.posts.count_documents({})
+            logger.info(f"📊 Total posts in database: {total_posts}")
+            
+            # Get a sample post to see date format
+            sample_post = await db.posts.find_one({})
+            if sample_post:
+                logger.info(f"📊 Sample post created_at: {sample_post.get('created_at')} (type: {type(sample_post.get('created_at'))})")
+        except Exception as e:
+            logger.error(f"❌ Error checking database: {e}")
+        
         return None
-    
-    logger.info(f"📊 Found {len(posts)} posts in window")
     
     # 3. Find max likes for normalization
     max_likes = max([post.get("likes_count", 0) for post in posts])
     if max_likes == 0:
         max_likes = 1  # Avoid division by zero
     
+    logger.info(f"📊 Max likes in window: {max_likes}")
+    
     # 4. Calculate scores for each post
     posts_with_scores = []
     for post in posts:
         try:
-            quality_score = post.get("quality_score", 50.0)  # Default if not set
+            # Get quality score from 'rating' field (not 'quality_score')
+            rating = post.get("rating", 5.0)  # Default to 5 if not set
+            quality_score = normalize_rating_to_quality_score(rating)
+            
             likes_count = post.get("likes_count", 0)
-            user_id = str(post.get("user_id", ""))
             
             # Calculate engagement score
             engagement_score = calculate_engagement_score(likes_count, max_likes)
             
-            # Calculate combined score (quality + engagement only)
+            # Calculate combined score
             combined_score = calculate_combined_score(quality_score, engagement_score)
             
             # Get user info - handle both ObjectId and string user_id
@@ -179,19 +257,25 @@ async def generate_leaderboard_snapshot():
                 "username": username,
                 "user_profile_picture": user.get("profile_picture") if user else None,
                 "media_url": post.get("media_url", ""),
-                "thumbnail_url": post.get("thumbnail_url"),  # Include thumbnail for better image display
+                "thumbnail_url": post.get("thumbnail_url"),
                 "media_type": post.get("media_type", "image"),
                 "caption": post.get("review_text") or post.get("caption") or post.get("description") or "",
                 "location_name": post.get("location_name") or post.get("location") or None,
-                "quality_score": quality_score,
+                "rating": rating,  # Original rating (0-10)
+                "quality_score": quality_score,  # Normalized to 0-100
                 "likes_count": likes_count,
                 "engagement_score": engagement_score,
                 "combined_score": combined_score,
                 "created_at": post.get("created_at")
             })
+            
+            logger.debug(f"✓ Post {post['_id']}: rating={rating}, quality={quality_score}, likes={likes_count}, engagement={engagement_score}, combined={combined_score}")
+            
         except Exception as e:
             logger.error(f"❌ Error processing post {post.get('_id')}: {e}")
-            continue  # Skip this post and continue with others
+            continue
+    
+    logger.info(f"📊 Successfully processed {len(posts_with_scores)} posts with scores")
     
     # 5. Sort by combined score descending
     posts_with_scores.sort(key=lambda x: x["combined_score"], reverse=True)
@@ -203,11 +287,13 @@ async def generate_leaderboard_snapshot():
     for idx, post in enumerate(top_posts, start=1):
         post["rank"] = idx
     
+    logger.info(f"🏆 Top 3 posts: {[(p['rank'], p['username'], p['combined_score']) for p in top_posts[:3]]}")
+    
     # 7. Save snapshot to database
     snapshot = {
         "from_date": from_date.isoformat(),
         "to_date": to_date.isoformat(),
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "window_days": LEADERBOARD_WINDOW_DAYS,
         "total_posts_analyzed": len(posts),
         "entries": top_posts,
@@ -219,8 +305,12 @@ async def generate_leaderboard_snapshot():
     }
     
     # Insert into database
-    result = await db.leaderboard_snapshots.insert_one(snapshot)
-    snapshot["_id"] = str(result.inserted_id)
+    try:
+        result = await db.leaderboard_snapshots.insert_one(snapshot)
+        snapshot["_id"] = str(result.inserted_id)
+        logger.info(f"✅ Leaderboard snapshot saved with ID: {snapshot['_id']}")
+    except Exception as e:
+        logger.error(f"❌ Error saving snapshot to database: {e}")
     
     logger.info(f"✅ Leaderboard snapshot created with {len(top_posts)} entries")
     
@@ -234,10 +324,10 @@ async def generate_leaderboard_snapshot():
 @router.get("/current")
 async def get_current_leaderboard(current_user: dict = Depends(get_current_user)):
     """
-    Get the current 3-day leaderboard (top 10 posts).
+    Get the current 3-day rolling leaderboard (top 10 posts).
     
     Returns the most recent leaderboard snapshot.
-    If no snapshot exists, generates a new one.
+    Regenerates daily to always show the last 3 days of posts.
     """
     try:
         db = get_database()
@@ -248,16 +338,47 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
             sort=[("generated_at", -1)]
         )
         
-        # If no snapshot exists or it's too old, generate a new one
+        # Determine if we need to regenerate
+        should_regenerate = False
+        current_time = datetime.now(timezone.utc)
+        
         if not snapshot:
             logger.info("📊 No leaderboard snapshot found, generating new one...")
-            snapshot = await generate_leaderboard_snapshot()
-            
-            if not snapshot:
+            should_regenerate = True
+        else:
+            # Check if snapshot is from today
+            try:
+                generated_at_str = snapshot.get("generated_at")
+                if generated_at_str:
+                    generated_at = parse_datetime_safe(generated_at_str)
+                    
+                    # Calculate hours since last generation
+                    time_diff = current_time - generated_at
+                    hours_since_generation = time_diff.total_seconds() / 3600
+                    
+                    # Regenerate if more than 12 hours old (twice daily updates for rolling window)
+                    if hours_since_generation >= 12:
+                        logger.info(f"📊 Snapshot is {hours_since_generation:.1f} hours old, regenerating...")
+                        should_regenerate = True
+                    else:
+                        logger.info(f"✅ Using existing snapshot (generated {hours_since_generation:.1f} hours ago)")
+                else:
+                    should_regenerate = True
+            except Exception as e:
+                logger.error(f"❌ Error checking snapshot age: {e}")
+                should_regenerate = True
+        
+        # Regenerate if needed
+        if should_regenerate:
+            new_snapshot = await generate_leaderboard_snapshot()
+            if new_snapshot:
+                snapshot = new_snapshot
+            elif not snapshot:
+                # No snapshot and regeneration failed
                 return {
-                    "from_date": datetime.utcnow().isoformat(),
-                    "to_date": datetime.utcnow().isoformat(),
-                    "generated_at": datetime.utcnow().isoformat(),
+                    "from_date": (current_time - timedelta(days=LEADERBOARD_WINDOW_DAYS)).isoformat(),
+                    "to_date": current_time.isoformat(),
+                    "generated_at": current_time.isoformat(),
                     "window_days": LEADERBOARD_WINDOW_DAYS,
                     "total_posts_analyzed": 0,
                     "entries": [],
@@ -267,123 +388,12 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
                         "leaderboard_size": LEADERBOARD_SIZE
                     }
                 }
-        else:
-            # Check if snapshot is from current window
-            try:
-                to_date_str = snapshot.get("to_date")
-                current_date = datetime.utcnow()
-                current_window_start = current_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
-                
-                if to_date_str:
-                    # Handle both ISO format strings and datetime objects
-                    if isinstance(to_date_str, str):
-                        # Handle ISO format with or without timezone
-                        if 'Z' in to_date_str:
-                            snapshot_date = datetime.fromisoformat(to_date_str.replace('Z', '+00:00'))
-                        elif '+' in to_date_str or to_date_str.count('-') >= 3:
-                            snapshot_date = datetime.fromisoformat(to_date_str)
-                        else:
-                            # Assume UTC if no timezone
-                            snapshot_date = datetime.fromisoformat(to_date_str + '+00:00')
-                    else:
-                        snapshot_date = to_date_str
-                    
-                    # Check if snapshot covers current window
-                    # Calculate time difference
-                    time_diff = current_date - snapshot_date
-                    days_old = time_diff.days
-                    hours_old = time_diff.total_seconds() / 3600
-                    
-                    # Regenerate if snapshot is outdated:
-                    # 1. Snapshot's to_date is before current window start (snapshot is too old)
-                    # 2. Snapshot is more than 1 day old (ensures fresh data)
-                    # This ensures the leaderboard always shows the current 3-day window
-                    should_regenerate = (
-                        snapshot_date < current_window_start or 
-                        days_old >= 1  # Regenerate if at least 1 day old
-                    )
-                    
-                    if should_regenerate:
-                        logger.info(f"📊 Leaderboard snapshot is outdated (snapshot to_date: {snapshot_date.strftime('%Y-%m-%d %H:%M')}, current: {current_date.strftime('%Y-%m-%d %H:%M')}, days old: {days_old}), regenerating...")
-                        new_snapshot = await generate_leaderboard_snapshot()
-                        if new_snapshot:
-                            snapshot = new_snapshot
-                            logger.info(f"✅ New snapshot generated with window: {new_snapshot.get('from_date')} to {new_snapshot.get('to_date')}")
-                        else:
-                            # If regeneration failed (no posts), use old snapshot but log warning
-                            logger.warning("⚠️ Regeneration failed (no posts in window), using old snapshot")
-                    else:
-                        logger.info(f"✅ Using existing snapshot (to_date: {snapshot_date.strftime('%Y-%m-%d %H:%M')}, current: {current_date.strftime('%Y-%m-%d %H:%M')}, days old: {days_old})")
-                else:
-                    # If to_date is missing, regenerate
-                    logger.info("📊 Leaderboard snapshot missing to_date, regenerating...")
-                    new_snapshot = await generate_leaderboard_snapshot()
-                    if new_snapshot:
-                        snapshot = new_snapshot
-            except Exception as e:
-                logger.error(f"❌ Error checking snapshot date: {e}", exc_info=True)
-                # If date parsing fails, regenerate
-                logger.info("📊 Error parsing snapshot date, regenerating...")
-                new_snapshot = await generate_leaderboard_snapshot()
-                if new_snapshot:
-                    snapshot = new_snapshot
         
-        # Ensure snapshot is not None before accessing
-        if not snapshot:
-            return {
-                "from_date": datetime.utcnow().isoformat(),
-                "to_date": datetime.utcnow().isoformat(),
-                "generated_at": datetime.utcnow().isoformat(),
-                "window_days": LEADERBOARD_WINDOW_DAYS,
-                "total_posts_analyzed": 0,
-                "entries": [],
-                "config": {
-                    "quality_weight": QUALITY_WEIGHT,
-                    "engagement_weight": ENGAGEMENT_WEIGHT,
-                    "leaderboard_size": LEADERBOARD_SIZE
-                }
-            }
-        
-        # Format response - always use current window dates for display
-        # even if using an old snapshot (in case regeneration failed)
-        current_to_date = datetime.utcnow()
-        current_from_date = current_to_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
-        
-        # Use snapshot dates if they're recent, otherwise use current window
-        snapshot_to_date_str = snapshot.get("to_date")
-        if snapshot_to_date_str:
-            try:
-                if isinstance(snapshot_to_date_str, str):
-                    if 'Z' in snapshot_to_date_str:
-                        snapshot_to_date = datetime.fromisoformat(snapshot_to_date_str.replace('Z', '+00:00'))
-                    else:
-                        snapshot_to_date = datetime.fromisoformat(snapshot_to_date_str + '+00:00')
-                else:
-                    snapshot_to_date = snapshot_to_date_str
-                
-                # Only use snapshot dates if they're from today or yesterday
-                if (current_to_date - snapshot_to_date).days <= 1:
-                    # Use snapshot dates
-                    response_from_date = snapshot.get("from_date", current_from_date.isoformat())
-                    response_to_date = snapshot.get("to_date", current_to_date.isoformat())
-                else:
-                    # Use current window dates
-                    response_from_date = current_from_date.isoformat()
-                    response_to_date = current_to_date.isoformat()
-                    logger.info(f"📊 Using current window dates in response (snapshot was {((current_to_date - snapshot_to_date).days)} days old)")
-            except:
-                # If date parsing fails, use current window
-                response_from_date = current_from_date.isoformat()
-                response_to_date = current_to_date.isoformat()
-        else:
-            # No snapshot date, use current window
-            response_from_date = current_from_date.isoformat()
-            response_to_date = current_to_date.isoformat()
-        
+        # Return snapshot
         return {
-            "from_date": response_from_date,
-            "to_date": response_to_date,
-            "generated_at": snapshot.get("generated_at", datetime.utcnow().isoformat()),
+            "from_date": snapshot.get("from_date"),
+            "to_date": snapshot.get("to_date"),
+            "generated_at": snapshot.get("generated_at"),
             "window_days": snapshot.get("window_days", LEADERBOARD_WINDOW_DAYS),
             "total_posts_analyzed": snapshot.get("total_posts_analyzed", 0),
             "entries": snapshot.get("entries", []),
@@ -393,6 +403,7 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
                 "leaderboard_size": LEADERBOARD_SIZE
             })
         }
+        
     except Exception as e:
         logger.error(f"❌ Error in get_current_leaderboard: {e}", exc_info=True)
         raise HTTPException(
@@ -441,13 +452,8 @@ async def regenerate_leaderboard(current_user: dict = Depends(get_current_user))
     """
     Manually trigger leaderboard regeneration.
     
-    This endpoint allows admins to force a leaderboard update
-    without waiting for the scheduled job.
+    This endpoint allows users to force a leaderboard update.
     """
-    # TODO: Add admin check here
-    # if not current_user.get("is_admin"):
-    #     raise HTTPException(status_code=403, detail="Admin access required")
-    
     logger.info(f"🔄 Manual leaderboard regeneration triggered by user {current_user.get('id')}")
     
     snapshot = await generate_leaderboard_snapshot()
@@ -455,14 +461,18 @@ async def regenerate_leaderboard(current_user: dict = Depends(get_current_user))
     if not snapshot:
         raise HTTPException(
             status_code=404,
-            detail="No posts available for leaderboard generation"
+            detail="No posts available for leaderboard generation in the last 3 days"
         )
     
     return {
         "message": "Leaderboard regenerated successfully",
         "snapshot_id": snapshot.get("_id"),
         "generated_at": snapshot.get("generated_at"),
-        "entries_count": len(snapshot.get("entries", []))
+        "entries_count": len(snapshot.get("entries", [])),
+        "window": {
+            "from": snapshot.get("from_date"),
+            "to": snapshot.get("to_date")
+        }
     }
 
 
@@ -481,11 +491,12 @@ async def get_post_score(post_id: str, current_user: dict = Depends(get_current_
         raise HTTPException(status_code=404, detail="Post not found")
     
     # Calculate scores
-    quality_score = post.get("quality_score", 0)
+    rating = post.get("rating", 5.0)
+    quality_score = normalize_rating_to_quality_score(rating)
     likes_count = post.get("likes_count", 0)
     
     # Get max likes in current window for engagement calculation
-    to_date = datetime.utcnow()
+    to_date = datetime.now(timezone.utc)
     from_date = to_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
     
     posts_in_window = await db.posts.find({
@@ -502,6 +513,7 @@ async def get_post_score(post_id: str, current_user: dict = Depends(get_current_
     
     return {
         "post_id": post_id,
+        "rating": rating,
         "quality_score": quality_score,
         "likes_count": likes_count,
         "engagement_score": engagement_score,
@@ -515,4 +527,3 @@ async def get_post_score(post_id: str, current_user: dict = Depends(get_current_
             "engagement_weight": ENGAGEMENT_WEIGHT
         }
     }
-
