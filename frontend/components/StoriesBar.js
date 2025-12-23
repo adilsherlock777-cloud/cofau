@@ -103,7 +103,7 @@ export default function StoriesBar({ refreshTrigger }) {
             <UserAvatar
               profilePicture={normalizeProfilePicture(user.profile_picture)}
               username={user.full_name}
-              size={80}
+              size={70}
               showLevelBadge={false}
             />
 
@@ -138,7 +138,7 @@ export default function StoriesBar({ refreshTrigger }) {
                   <UserAvatar
                     profilePicture={normalizeProfilePicture(u.user.profile_picture)}
                     username={u.user.username}
-                    size={74}
+                    size={65}
                     showLevelBadge={false}
                   />
                 </View>
@@ -165,10 +165,10 @@ export default function StoriesBar({ refreshTrigger }) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#FFF",
-    borderBottomWidth: 2,
-    borderBottomColor: "#EEE",
-    marginTop: -4.9,
-    marginBottom: -8,
+    borderBottomWidth: 1,
+    borderBottomColor: "transparent",
+    marginTop: -6,
+    marginBottom: -5.5,
   },
 
   loadingContainer: {
@@ -178,13 +178,13 @@ const styles = StyleSheet.create({
 
   contentContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 6,
   },
 
   storyItem: {
     alignItems: "center",
     marginRight: 14,
-    width: 70,
+    width: 65,
   },
 
   avatarWrapper: {
@@ -193,8 +193,8 @@ const styles = StyleSheet.create({
 
   /* Gradient ring – thin */
   gradientRing: {
-    width: 80,
-    height: 80,
+    width: 70,
+    height: 70,
     borderRadius: 55,
     padding: 4,
     justifyContent: "center",
@@ -202,8 +202,8 @@ const styles = StyleSheet.create({
   },
 
   whiteRing: {
-    width: 76,
-    height: 76,
+    width: 66,
+    height: 66,
     borderRadius: 38,
     backgroundColor: "#FFF",
     justifyContent: "center",
@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
     right: 8,
     backgroundColor: "#fff",
     borderRadius: 12,
-    width: 18,
-    height: 18,
+    width: 16,
+    height: 16,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -228,14 +228,14 @@ const styles = StyleSheet.create({
   /* ✅ Correct level badge placement */
   levelBadgeWrap: {
     position: "absolute",
-    bottom: 5,
+    bottom: 2,
     right: 4,
     zIndex: 30,
   },
 
   storyUsername: {
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 11,
     color: "#333",
     textAlign: "center",
   },

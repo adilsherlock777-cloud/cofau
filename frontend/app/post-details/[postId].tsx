@@ -52,7 +52,7 @@ const normalizeUrl = (url: string | null | undefined): string | null => {
 /* ---------------------------------------------------------
    🔥 GRADIENT ICON COMPONENTS (Cofau Theme)
 ----------------------------------------------------------*/
-const GradientHeart = ({ size = 28 }) => (
+const GradientHeart = ({ size = 18 }) => (
   <MaskedView
     maskElement={
       <View style={{ backgroundColor: 'transparent' }}>
@@ -69,7 +69,7 @@ const GradientHeart = ({ size = 28 }) => (
   </MaskedView>
 );
 
-const GradientBookmark = ({ size = 26 }) => (
+const GradientBookmark = ({ size = 18 }) => (
   <MaskedView
     maskElement={
       <View style={{ backgroundColor: 'transparent' }}>
@@ -119,7 +119,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
         return gestureState.dy > 5;
       },
       onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dy > 50) {
+        if (gestureState.dy > 10) {
           setShowDetails(false);
         }
       },
@@ -275,7 +275,10 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   return (
     <View style={styles.postItem}>
       {/* MEDIA CONTAINER */}
-      <View style={styles.responsiveMediaContainer}>
+      <View style={[
+  styles.responsiveMediaContainer,
+  showDetails && styles.mediaContainerShrunk
+]}>
         <TouchableOpacity 
           style={styles.mediaWrapper}
           activeOpacity={1}
@@ -361,7 +364,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                 style={styles.optionsButton}
                 onPress={() => setShowOptionsMenu(!showOptionsMenu)}
               >
-                <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+                <Ionicons name="ellipsis-vertical" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
@@ -401,20 +404,20 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
         {!showDetails && (
           <TouchableOpacity 
             style={[styles.glassBottomOverlay, { bottom: BOTTOM_NAV_HEIGHT + 10 }]}
-            activeOpacity={0.9}
+            activeOpacity={0.7}
             onPress={() => setShowDetails(true)}
           >
             <View style={styles.glassBackground} />
             <View style={styles.glassContentRow}>
               {/* Rating */}
               <View style={styles.glassInfoItem}>
-                <Ionicons name="star" size={16} color="#FFD700" />
+                <Ionicons name="star" size={12} color="#FFD700" />
                 <Text style={styles.glassInfoText}>{post.rating || "N/A"}/10</Text>
               </View>
               
               {/* Location */}
               <View style={styles.glassInfoItem}>
-                <Ionicons name="location" size={16} color="#FFD700" />
+                <Ionicons name="location" size={12} color="#FFD700" />
                 <Text style={styles.glassInfoText} numberOfLines={1}>
                   {post.location_name || "N/A"}
                 </Text>
@@ -422,7 +425,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
               
               {/* Username */}
               <View style={styles.glassInfoItem}>
-                <Ionicons name="person" size={16} color="#FFD700" />
+                <Ionicons name="person" size={12} color="#FFD700" />
                 <Text style={styles.glassInfoText} numberOfLines={1}>
                   {post.username || "N/A"}
                 </Text>
@@ -477,7 +480,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                     profilePicture={profilePic}
                     username={post.username}
                     level={post.user_level}
-                    size={50}
+                    size={40}
                     showLevelBadge
                     style={{}}
                   />
@@ -505,9 +508,9 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
               <View style={styles.detailsActions}>
                 <TouchableOpacity style={styles.detailsActionBtn} onPress={handleLikeToggle}>
                   {isLiked ? (
-                    <GradientHeart size={20} />
+                    <GradientHeart size={18} />
                   ) : (
-                    <Ionicons name="heart-outline" size={20} color="#000" />
+                    <Ionicons name="heart-outline" size={18} color="#000" />
                   )}
                   <Text style={styles.detailsActionText}>{likesCount}</Text>
                 </TouchableOpacity>
@@ -516,7 +519,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   style={styles.detailsActionBtn}
                   onPress={() => setShowComments(!showComments)}
                 >
-                  <Ionicons name="chatbubble-outline" size={20} color="#000" />
+                  <Ionicons name="chatbubble-outline" size={18} color="#000" />
                   <Text style={styles.detailsActionText}>{post.comments_count || comments.length}</Text>
                 </TouchableOpacity>
 
@@ -527,15 +530,15 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                     setShowShareModal(true);
                   }}
                 >
-                  <Ionicons name="share-outline" size={20} color="#000" />
+                  <Ionicons name="share-outline" size={18} color="#000" />
                   <Text style={styles.detailsActionText}>{post.shares_count || 0}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.detailsActionBtn} onPress={handleSaveToggle}>
                   {isSaved ? (
-                    <GradientBookmark size={20} />
+                    <GradientBookmark size={18} />
                   ) : (
-                    <Ionicons name="bookmark-outline" size={20} color="#000" />
+                    <Ionicons name="bookmark-outline" size={18} color="#000" />
                   )}
                   <Text style={styles.detailsActionText}>Save</Text>
                 </TouchableOpacity>
@@ -545,7 +548,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
               {post.rating && (
                 <View style={styles.detailsCard}>
                   <View style={styles.detailsCardHeader}>
-                    <Ionicons name="star" size={20} color="#FFD700" />
+                    <Ionicons name="star" size={16} color="#FFD700" />
                     <Text style={styles.detailsCardLabel}>RATING</Text>
                   </View>
                   <Text style={styles.detailsRatingValue}>{post.rating}/10</Text>
@@ -556,7 +559,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
               {post.review_text && (
                 <View style={styles.detailsCard}>
                   <View style={styles.detailsCardHeader}>
-                    <Ionicons name="create" size={20} color="#FFD700" />
+                    <Ionicons name="create" size={16} color="#FFD700" />
                     <Text style={styles.detailsCardLabel}>REVIEW</Text>
                   </View>
                   <Text style={styles.detailsReviewText}>{post.review_text}</Text>
@@ -577,7 +580,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   }}
                 >
                   <View style={styles.detailsCardHeader}>
-                    <Ionicons name="location" size={20} color="#FFD700" />
+                    <Ionicons name="location" size={16} color="#FFD700" />
                     <Text style={styles.detailsCardLabel}>LOCATION</Text>
                   </View>
                   <View style={styles.locationRow}>
@@ -1001,7 +1004,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(120, 120, 120, 0.65)",
+    backgroundColor: "rgba(120, 120, 120, 0.4)",
     borderRadius: 20,
     borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.3)",
@@ -1026,8 +1029,8 @@ const styles = StyleSheet.create({
 
   glassInfoText: {
     color: "#FFF",
-    fontSize: 17,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "660",
   },
 
   glassChevronContainer: {
@@ -1052,7 +1055,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
   },
 
   bottomSheetDetails: {
@@ -1060,7 +1063,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: SCREEN_HEIGHT * 0.7,
+    maxHeight: SCREEN_HEIGHT * 0.6,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     overflow: "hidden",
@@ -1077,15 +1080,16 @@ const styles = StyleSheet.create({
   },
 
   dragHandleContainer: {
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 50,
     alignItems: "center",
+    backgroundColor: "rgba(200, 200, 200, 0)",
   },
 
   dragHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    width: 50,
+    height: 6,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 3,
   },
 
@@ -1097,8 +1101,8 @@ const styles = StyleSheet.create({
   detailsUserRowContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 1,
+    padding: 8,
+    borderBottomWidth: 0,
     borderBottomColor: "#F0F0F0",
     justifyContent: "space-between",
   },
@@ -1115,11 +1119,11 @@ const styles = StyleSheet.create({
   },
 
   detailsFollowButton: {
-    backgroundColor: "#4dd0e1",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: "#1B7C82",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 16,
-    marginLeft: 8,
+    marginLeft: 3,
   },
 
   detailsFollowButtonText: {
@@ -1129,13 +1133,13 @@ const styles = StyleSheet.create({
   },
 
   detailsUsername: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     color: "#000",
   },
 
   detailsTimestamp: {
-    fontSize: 13,
+    fontSize: 11,
     color: "#999",
     marginTop: 2,
   },
@@ -1143,8 +1147,8 @@ const styles = StyleSheet.create({
   detailsActions: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingVertical: 8,
+    borderBottomWidth: 0,
     borderBottomColor: "#F0F0F0",
   },
 
@@ -1154,7 +1158,7 @@ const styles = StyleSheet.create({
   },
 
   detailsActionText: {
-    fontSize: 13,
+    fontSize: 11,
     color: "#666",
     fontWeight: "500",
   },
@@ -1162,10 +1166,10 @@ const styles = StyleSheet.create({
   /* Details Cards */
   detailsCard: {
     backgroundColor: "rgba(255, 255, 255, 0.3)", 
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 16,
-    padding: 16,
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.5)",
     backdropFilter: "blur(10px)",  
@@ -1174,28 +1178,28 @@ const styles = StyleSheet.create({
   detailsCardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
+    gap: 6,
+    marginBottom: 6,
   },
 
   detailsCardLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
     color: "#888",
     letterSpacing: 0.5,
   },
 
   detailsRatingValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "700",
     color: "#333",
   },
 
   detailsReviewText: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#333",
     fontWeight: "700",
-    lineHeight: 22,
+    lineHeight: 19,
   },
 
   locationRow: {
@@ -1205,7 +1209,7 @@ const styles = StyleSheet.create({
   },
 
   detailsLocationText: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#333",
     fontWeight: "700",
     flex: 1,
@@ -1290,6 +1294,14 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  mediaContainerShrunk: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.6,  // Adjust this value (0.35 to 0.45) to fit perfectly above banner
+    zIndex: 5,
   },
 
   footerLoader: {

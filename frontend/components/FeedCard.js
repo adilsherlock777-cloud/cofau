@@ -224,7 +224,7 @@ export default function FeedCard({
             style={styles.optionsButton}
             onPress={() => setShowOptionsMenu(!showOptionsMenu)}
           >
-            <Ionicons name="ellipsis-vertical" size={24} color="#333" />
+            <Ionicons name="ellipsis-vertical" size={14} color="#333" />
           </TouchableOpacity>
         </View>
       </View>
@@ -492,7 +492,7 @@ export default function FeedCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
-    marginBottom: -10,
+    marginBottom: 2,
     elevation: 6,
   },
 
@@ -512,19 +512,19 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 0,
   },
 
   followButton: {
-    backgroundColor: "#4dd0e1",
-    paddingHorizontal: 16,
+    backgroundColor: "#1B7C82",
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
 
   followButtonText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "600",
   },
 
@@ -630,13 +630,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
     padding: 12,
-    marginBottom: 1,
+    marginBottom: 0,
     borderWidth: 0.2,
     borderColor: "#0e0e0dff",        // ✅ Change from #DADCE0 to cyan (more noticeable)
     shadowColor: "#000000ff",        // ✅ Add cyan shadow
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
     elevation: 12,
   },
 
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: "#F0F0F0",
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
   },
 
   actionCount: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#202124",
     fontWeight: "700",
   },
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   optionsButton: {
-    padding: 8,
+    padding: 4,
     marginLeft: 'auto',
   },
   optionsMenuBackdrop: {
