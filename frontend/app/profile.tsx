@@ -1100,7 +1100,7 @@ export default function ProfileScreen() {
           {/* Reviews - Show if review_text exists */}
           {item.review_text && (
             <View style={styles.listDetailRow}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="#F2CF68" />
+              <Ionicons name="create" size={20} color="#F2CF68" />
               <Text style={styles.listDetailText} numberOfLines={1}>
                 {item.review_text}
               </Text>
@@ -1238,7 +1238,7 @@ export default function ProfileScreen() {
                   profilePicture={userData.profile_picture}
                   username={userData.full_name || userData.username}
                   level={userData.level || 1}
-                  dpSize={90}
+                  dpSize={70}
                   cameraIcon={
                     isOwnProfile ? (
                       <TouchableOpacity
@@ -1358,7 +1358,7 @@ export default function ProfileScreen() {
                     <>
                       <Ionicons 
                         name={isFollowing ? "checkmark-circle" : "person-add"} 
-                        size={16} 
+                        size={15} 
                         color="#fff"
                       />
                       <Text style={styles.actionButtonText}>
@@ -1381,7 +1381,7 @@ export default function ProfileScreen() {
                   locations={[0, 0.35, 0.9]}
                   style={styles.actionButton}
                 >
-                  <Ionicons name="chatbubble" size={16} color="#fff" />
+                  <Ionicons name="chatbubble" size={15} color="#fff" />
                   <Text style={styles.actionButtonText}>Message</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -1401,7 +1401,7 @@ export default function ProfileScreen() {
                 >
                   <Ionicons 
                     name={hasComplimented ? "heart" : "heart"} 
-                    size={16} 
+                    size={15} 
                     color="#fff"
                   />
                   <Text style={styles.actionButtonText}>
@@ -1502,25 +1502,25 @@ export default function ProfileScreen() {
       {/* Bottom Navigation - Matching feed.tsx */}
       <View style={styles.navBar}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={28} color="#000" />
+          <Ionicons name="home-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-          <Ionicons name="compass-outline" size={28} color="#000" />
+          <Ionicons name="compass-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={28} color="#000" />
+            <Ionicons name="camera" size={22} color="#000" />
           </View>
           <Text style={styles.navLabel}>Top Posts</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-          <Ionicons name="location-outline" size={28} color="#000" />
+          <Ionicons name="location-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-          <Ionicons name="person" size={28} color="#000" />
+          <Ionicons name="person" size={20} color="#000" />
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -2001,8 +2001,8 @@ listItem: {
   backgroundColor: '#fff',
 },
 listImageContainer: {
-  width: 160,
-  height: 180,
+  width: 140,
+  height: 160,
   borderRadius: 12,
   overflow: 'hidden',
   position: 'relative',
@@ -2299,16 +2299,16 @@ favouriteGridImage: {
   },
 
   profileCardWrapper: {
-    marginHorizontal: 35,
+    marginHorizontal: 50,
     marginTop: -40,
-    marginBottom: 5,
+    marginBottom: 2,
   },
   profileCard: {
     backgroundColor: '#fff',
-    borderRadius: 24,
-    paddingVertical: 60,
-    paddingLeft: 100,
-    paddingRight: 100,
+    borderRadius: 20,
+    paddingVertical: 45,
+    paddingLeft: 80,
+    paddingRight: 120,
     justifyContent: 'center',
     elevation: 12,
     shadowColor: '#000',
@@ -2320,8 +2320,8 @@ favouriteGridImage: {
   },
   profilePictureContainer: {
     position: 'absolute',
-    left: 15,
-    top: '400%',
+    left: 12,
+    top: '280%',
     transform: [{ translateY: -45 }],
     zIndex: 10,
   },
@@ -2330,9 +2330,9 @@ favouriteGridImage: {
     right: 0,
     bottom: 0,
     backgroundColor: '#4dd0e1',
-    borderRadius: 14,
-    width: 28,
-    height: 28,
+    borderRadius: 10,
+    width: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -2377,12 +2377,12 @@ favouriteGridImage: {
   actionButtonsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 40,
-    gap: 14,
+    gap: 16,
     marginBottom: 8,
   },
   actionButtonWrapper: {
     flex: 1,
-    elevation: 8,
+    elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 8 },
     shadowOpacity: 0.25,
@@ -2391,7 +2391,7 @@ favouriteGridImage: {
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2400,7 +2400,7 @@ favouriteGridImage: {
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -2521,7 +2521,7 @@ favouriteGridImage: {
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingVertical: 8,
-    paddingTop: 12,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: '#E8E8E8',
     backgroundColor: '#FFFFFF',
