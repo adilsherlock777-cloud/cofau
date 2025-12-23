@@ -249,7 +249,7 @@ export default function FeedScreen() {
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="chatbox-ellipses" size={23} color="#fff" />
+                <Ionicons name="chatbox-ellipses" size={20} color="#fff" />
               </TouchableOpacity>
 
               <Text style={styles.cofauTitle} pointerEvents="none">Cofau</Text>
@@ -263,7 +263,7 @@ export default function FeedScreen() {
                   activeOpacity={0.7}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Ionicons name="notifications" size={24} color="#fff" />
+                  <Ionicons name="notifications" size={20} color="#fff" />
                   {unreadCount > 0 && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>
@@ -286,7 +286,7 @@ export default function FeedScreen() {
                   <UserAvatar
                     profilePicture={user.profile_picture}
                     username={user.username}
-                    size={80}
+                    size={70}
                     showLevelBadge={false}
                     level={user.level}
                     style={{}}
@@ -372,7 +372,7 @@ export default function FeedScreen() {
           style={styles.navItem}
           onPress={() => router.push("/feed")}
         >
-          <Ionicons name="home" size={28} color="#000" />
+          <Ionicons name="home" size={20} color="#000" />
           <Text style={styles.navLabelActive}>Home</Text>
         </TouchableOpacity>
 
@@ -380,7 +380,7 @@ export default function FeedScreen() {
           style={styles.navItem}
           onPress={() => router.push("/explore")}
         >
-          <Ionicons name="compass-outline" size={28} color="#000" />
+          <Ionicons name="compass-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Explore</Text>
         </TouchableOpacity>
 
@@ -390,7 +390,7 @@ export default function FeedScreen() {
           onPress={() => router.push("/leaderboard")}
         >
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={28} color="#000" />
+            <Ionicons name="camera" size={22} color="#000" />
           </View>
           <Text style={styles.navLabel}>Top Posts</Text>
         </TouchableOpacity>
@@ -399,7 +399,7 @@ export default function FeedScreen() {
           style={styles.navItem}
           onPress={() => router.push("/happening")}
         >
-          <Ionicons name="location-outline" size={28} color="#000" />
+          <Ionicons name="location-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
 
@@ -407,7 +407,7 @@ export default function FeedScreen() {
           style={styles.navItem}
           onPress={() => router.push("/profile")}
         >
-          <Ionicons name="person-outline" size={28} color="#000" />
+          <Ionicons name="person-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: 50,
     backgroundColor: "#fff",
-    borderBottomWidth: 2,
+    borderBottomWidth: 4,
     borderBottomColor: "#E0E0E0",
     zIndex: 1000,
     shadowColor: "#000",
@@ -447,15 +447,15 @@ const styles = StyleSheet.create({
   },
 
   gradientHeader: {
-    paddingTop: 65,
-    paddingBottom: 65,
+    paddingTop: 60,
+    paddingBottom: 60,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    shadowColor: "#000",                // ADD THIS
-    shadowOffset: { width: 4, height: 4 },  // ADD THIS
-    shadowOpacity: 0.15,                // ADD THIS
-    shadowRadius: 8,                    // ADD THIS
+    shadowColor: "#000",                
+    shadowOffset: { width: 4, height: 4 },  
+    shadowOpacity: 0.15,               
+    shadowRadius: 8,                
     elevation: 6, 
   },
 
@@ -479,12 +479,12 @@ const styles = StyleSheet.create({
     right: 0,
     textAlign: "center",
     fontFamily: "Lobster",
-    fontSize: 36,
+    fontSize: 32,
     color: "#fff",
     letterSpacing: 1,
-    zIndex: 1,
-    textShadowColor: "rgba(0, 0, 0, 0.15)",      // ADD THIS
-    textShadowOffset: { width: 6, height: 4 },   // ADD THIS
+    zIndex: 3,
+    textShadowColor: "rgba(0, 0, 0, 0.15)",      
+    textShadowOffset: { width: 6, height: 4 },   
     textShadowRadius: 4,
     pointerEvents: "none", // Don't block touch events
   },
@@ -515,25 +515,26 @@ const styles = StyleSheet.create({
   },
 
   levelCardWrapper: {
-    marginHorizontal: 26,
+    marginHorizontal: 30,
     marginTop: -40,
-    marginBottom: 1.5,
+    marginBottom: 3,
     borderBottomLeftRadius: 30,
+    zIndex: 10,
   },
 
   levelCard: {
     backgroundColor: "#fff",
     borderRadius: 23,
-    paddingVertical: 30,
-    paddingLeft: 100,
-    paddingRight: 10,
+    paddingVertical: 22,
+    paddingLeft: 90,
+    paddingRight: 25,
     flexDirection: "row",
     alignItems: "center",
     elevation: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     position: "relative",
     borderWidth: 0,  
     borderColor: "#090000ff",
@@ -542,8 +543,8 @@ const styles = StyleSheet.create({
   dpContainer: {
     position: "absolute",
     left: 10,
-    top: "140%",
-    transform: [{ translateY: -41 }],
+    top: "133%",
+    transform: [{ translateY: -40 }],
     zIndex: 6,
   },
 
@@ -566,7 +567,7 @@ const styles = StyleSheet.create({
   },
 
   levelLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
     color: "#333",
     marginBottom: 2,
@@ -575,7 +576,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 5,
   },
 
   progressBar: {
@@ -593,8 +594,8 @@ const styles = StyleSheet.create({
 
   progressText: {
     fontSize: 12,
-    color: "#666",
-    fontWeight: "500",
+    color: "rgba(10, 10, 10, 1)",
+    fontWeight: "600",
   },
 
   loadingContainer: {
@@ -608,7 +609,7 @@ const styles = StyleSheet.create({
   },
 
   postContainer: {
-    marginBottom: 20,
+    marginBottom: -4,
   },
 
   navBar: {
@@ -616,7 +617,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 8,
-    paddingTop: 12,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: "#E8E8E8",
     backgroundColor: "#FFFFFF",
@@ -649,15 +650,15 @@ const styles = StyleSheet.create({
 
   // ✅ Circle background for center icon
   centerIconCircle: {
-    width: 56,
-    height: 56,
+    width: 50,
+    height: 50,
     borderRadius: 28,
     backgroundColor: "#FFFFFF", 
     borderWidth: 2, 
     borderColor: "#000", 
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 2,
     elevation: 8,
     shadowColor: "#f0ebebff",
     shadowOffset: { width: 0, height: 4 },

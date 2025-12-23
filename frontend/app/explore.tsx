@@ -342,7 +342,7 @@ export default function ExploreScreen() {
         {/* Search bar with inline category filter */}
         <View style={styles.searchBoxWrapper}>
           <View style={styles.searchBox}>
-            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search"
@@ -409,7 +409,7 @@ export default function ExploreScreen() {
           style={styles.navItem}
           onPress={() => router.push("/feed")}
         >
-          <Ionicons name="home-outline" size={28} color="#000" />
+          <Ionicons name="home-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
         
@@ -418,7 +418,7 @@ export default function ExploreScreen() {
           style={styles.navItem}
           onPress={() => router.push("/explore")}
         >
-          <Ionicons name="compass" size={28} color="#000" />
+          <Ionicons name="compass" size={20} color="#000" />
           <Text style={styles.navLabelActive}>Explore</Text>
         </TouchableOpacity>
         
@@ -428,7 +428,7 @@ export default function ExploreScreen() {
           onPress={() => router.push("/leaderboard")}
         >
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={28} color="#000" />
+            <Ionicons name="camera" size={22} color="#000" />
           </View>
           <Text style={styles.navLabel}>Top Posts</Text>
         </TouchableOpacity>
@@ -438,7 +438,7 @@ export default function ExploreScreen() {
           style={styles.navItem}
           onPress={() => router.push("/happening")}
         >
-          <Ionicons name="location-outline" size={28} color="#000" />
+          <Ionicons name="location-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
         
@@ -447,7 +447,7 @@ export default function ExploreScreen() {
           style={styles.navItem}
           onPress={() => router.push("/profile")}
         >
-          <Ionicons name="person-outline" size={28} color="#000" />
+          <Ionicons name="person-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -574,13 +574,13 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     fontFamily: "Lobster",
-    fontSize: 36,
+    fontSize: 32,
     color: "#fff",
     textAlign: "center",
     letterSpacing: 1,
     zIndex: 1,
     textShadowColor: "rgba(0, 0, 0, 0.15)",      
-    textShadowOffset: { width: 4, height: 6 },   
+    textShadowOffset: { width: 2, height: 6 },   
     textShadowRadius: 4, 
   },
 
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 25,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
     shadowColor: "#000",
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
 
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: "#333",
   },
 
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 8,
-    paddingTop: 12,
+    paddingTop: 4,
     borderTopWidth: 1,
     borderTopColor: "#E8E8E8",
     backgroundColor: "#FFFFFF",
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 12,
   },
 
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
   navLabelActive: {
     fontSize: 11,
     color: "#000",
-    marginTop: 2,
+    marginTop: 0,
     textAlign: "center",
     fontWeight: "700",
   },
