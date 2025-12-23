@@ -319,7 +319,7 @@ export default function HappeningPlaces() {
           >
             <Ionicons
               name="home-outline"
-              size={28}
+              size={20}
               color="#000"
             />
             <Text style={styles.navLabel}>Home</Text>
@@ -332,7 +332,7 @@ export default function HappeningPlaces() {
           >
             <Ionicons
               name="compass-outline"
-              size={28}
+              size={20}
               color="#000"
             />
             <Text style={styles.navLabel}>
@@ -348,7 +348,7 @@ export default function HappeningPlaces() {
             <View style={styles.centerIconCircle}>
               <Ionicons
                 name="camera"
-                size={28}
+                size={22}
                 color="#000"
               />
             </View>
@@ -364,7 +364,7 @@ export default function HappeningPlaces() {
           >
             <Ionicons
               name="location"
-              size={28}
+              size={20}
               color="#000"
             />
             <Text style={styles.navLabelActive}>
@@ -379,7 +379,7 @@ export default function HappeningPlaces() {
           >
             <Ionicons
               name="person-outline"
-              size={28}
+              size={20}
               color="#000"
             />
             <Text style={styles.navLabel}>
@@ -431,8 +431,8 @@ const styles = StyleSheet.create({
 
   /* Gradient Header - PREMIUM FINISH */
   gradientHeader: {
-    paddingTop: 65,
-    paddingBottom: 55,
+    paddingTop: 45,
+    paddingBottom: 45,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomLeftRadius: 30,
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     fontFamily: 'Lobster',
-    fontSize: 36,
+    fontSize: 28,
     color: '#fff',
     textAlign: 'center',
     letterSpacing: 1,
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   titleBox: {
     backgroundColor: '#FFF',
     borderRadius: 35,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 8,
     marginHorizontal: 22,
     marginBottom: 12,
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   titleMain: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '700',
     color: '#000',
     fontStyle: 'lobster',
@@ -491,10 +491,10 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
+    borderRadius: 15,
+    padding: 12,
+    marginHorizontal: 20,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: '#E8E8E8',
     shadowColor: '#000',
@@ -510,25 +510,25 @@ const styles = StyleSheet.create({
     paddingVertical: 4, 
   },
   rankNumber: {
-    width: 25,
-    height: 25,
-    borderRadius: 16,
-    marginRight: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 12,
+    marginRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
   rankGradient: {
-    width: 33,
-    height: 33,
-    borderRadius: 20,
+    width: 26,
+    height: 26,
+    borderRadius: 15,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     justifyContent: 'center',
     alignItems: 'center',
   },
   rankNumberText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -538,31 +538,31 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   locationName: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   uploadCount: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#888',
-    marginTop: 0,
+    marginTop: 2,
     fontWeight: '400',
   },
   imageGrid: {
-    marginTop: 12,
+    marginTop: 8,
   },
 
   imageRow: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 3,
     marginBottom: 8,
   },
 
   gridImageLarge: {
     width: 80,
     height: 80,
-    borderRadius: 12,
+    borderRadius: 8,
     flex: 1,
   },
 
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
 
   blurredImageWrapper: {
     flex: 1,
-    height: 160,
+    height: 110,
     position: 'relative',
   },
 
@@ -599,8 +599,8 @@ const styles = StyleSheet.create({
 
 
 countButton: {
-  width: 75,
-  height: 50,
+  width: 65,
+  height: 45,
   borderRadius: 15,
   backgroundColor: '#FFFFFF',
   justifyContent: 'center',
@@ -613,16 +613,16 @@ countButton: {
   elevation: 12,
 },
 countButtonGradientBorder: {
-  width: 75,
-  height: 40,
-  borderRadius: 25,
+  width: 55,
+  height: 30,
+  borderRadius: 20,
   padding: 2.5,
   justifyContent: 'center',
   alignItems: 'center',
 },
 
 countButtonText: {
-  fontSize: 22,
+  fontSize: 16,
   fontWeight: '700',
   color: '#fff',
 },
@@ -662,7 +662,7 @@ moreImagesOverlay: {
 
   blurredImageContainer: {
     width: 70,
-    height: 70,
+    height: 50,
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
@@ -684,7 +684,7 @@ moreImagesOverlay: {
   },
   noImagePlaceholder: {
     width: 70,
-    height: 70,
+    height: 50,
     borderRadius: 12,
     backgroundColor: '#F5F5F5',
     justifyContent: 'center',
@@ -720,8 +720,8 @@ moreImagesOverlay: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingTop: 12,
+    paddingVertical: 12,
+    paddingTop: 4,
     borderTopWidth: 1,
     borderTopColor: '#E8E8E8',
     backgroundColor: '#FFFFFF',
