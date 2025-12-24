@@ -73,11 +73,13 @@ export default function FeedCard({
   const [showSimpleShareModal, setShowSimpleShareModal] = useState(false);
   const [showShareToUsersModal, setShowShareToUsersModal] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState(false);
   const [isFollowing, setIsFollowing] = useState(post.is_following || false);
   const [followLoading, setFollowLoading] = useState(false);
 
   const mediaUrl = normalizeMediaUrl(post.media_url);
-  
+
   // Check if this is the current user's own post
   const isOwnPost = user?.id === post.user_id;
   const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
@@ -98,13 +100,15 @@ export default function FeedCard({
         if (shouldPlay) {
           // For iOS, ensure video is loaded before playing
           if (status.isLoaded) {
-            await videoRef.current.playAsync();
+            if (!status.isPlaying) {
+              await videoRef.current.playAsync();
+            }
           } else {
             // If not loaded, wait a bit and try again (iOS sometimes needs this)
             setTimeout(async () => {
               try {
                 const newStatus = await videoRef.current.getStatusAsync();
-                if (newStatus.isLoaded) {
+                if (newStatus.isLoaded && !newStatus.isPlaying) {
                   await videoRef.current.playAsync();
                 }
               } catch (err) {
@@ -113,9 +117,30 @@ export default function FeedCard({
             }, 300);
           }
         } else {
-          // Pause video when not visible
+          // FULLY STOP video when not visible - pause, stop audio, and reset position
           if (status.isLoaded) {
-            await videoRef.current.pauseAsync();
+            try {
+              // First pause the video
+              if (status.isPlaying) {
+                await videoRef.current.pauseAsync();
+              }
+              // Reset video position to beginning to stop audio completely
+              await videoRef.current.setPositionAsync(0);
+              // Mute to ensure no audio plays
+              await videoRef.current.setIsMutedAsync(true);
+            } catch (err) {
+              console.log("Video stop error:", err);
+            }
+          }
+        }
+
+        // When video should play, ensure it's unmuted (if it was muted when paused)
+        if (shouldPlay && status.isLoaded) {
+          try {
+            // Unmute when playing (videos in feed are muted by default but we want to ensure state is correct)
+            await videoRef.current.setIsMutedAsync(true); // Keep muted in feed as per design
+          } catch (err) {
+            // Ignore mute errors
           }
         }
       } catch (error) {
@@ -128,8 +153,34 @@ export default function FeedCard({
       controlVideo();
     }, 100);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Cleanup: Ensure video is stopped when component unmounts or shouldPlay changes
+      if (videoRef.current && !shouldPlay) {
+        videoRef.current.pauseAsync().catch(() => { });
+        videoRef.current.setPositionAsync(0).catch(() => { });
+      }
+    };
   }, [shouldPlay, isVideo, videoLoaded]);
+
+  // Reset error state when shouldPlay changes
+  useEffect(() => {
+    if (shouldPlay) {
+      setVideoError(false);
+    }
+  }, [shouldPlay]);
+
+  // Cleanup: Ensure video is fully stopped when component unmounts
+  useEffect(() => {
+    return () => {
+      if (videoRef.current && isVideo) {
+        // Stop video completely on unmount
+        videoRef.current.pauseAsync().catch(() => { });
+        videoRef.current.setPositionAsync(0).catch(() => { });
+        videoRef.current.setIsMutedAsync(true).catch(() => { });
+      }
+    };
+  }, [isVideo]);
 
   const handleLike = async () => {
     const prev = isLiked;
@@ -167,11 +218,11 @@ export default function FeedCard({
 
   const handleFollowToggle = async () => {
     if (!post.user_id || isOwnPost || followLoading) return;
-    
+
     setFollowLoading(true);
     const previousFollowState = isFollowing;
     setIsFollowing(!isFollowing);
-    
+
     try {
       if (isFollowing) {
         await unfollowUser(post.user_id);
@@ -260,13 +311,13 @@ export default function FeedCard({
         >
           {isVideo ? (
             <>
-              {shouldPlay ? (
+              {shouldPlay && !videoError ? (
                 <Video
                   ref={videoRef}
                   source={{ uri: mediaUrl }}
                   style={styles.video}
                   resizeMode="cover"
-                  shouldPlay={true}
+                  shouldPlay={shouldPlay}
                   isLooping
                   isMuted={true}
                   useNativeControls={false}
@@ -275,12 +326,13 @@ export default function FeedCard({
                   onLoad={(status) => {
                     console.log("✅ Video loaded on iOS/Android", status);
                     setVideoLoaded(true);
+                    setVideoError(false);
                     // Ensure video plays after load (iOS needs explicit play)
                     if (shouldPlay && videoRef.current) {
                       setTimeout(async () => {
                         try {
                           const currentStatus = await videoRef.current.getStatusAsync();
-                          if (currentStatus.isLoaded && !currentStatus.isPlaying) {
+                          if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
                             await videoRef.current.playAsync();
                           }
                         } catch (err) {
@@ -292,29 +344,72 @@ export default function FeedCard({
                   onError={(error) => {
                     console.error("❌ Video error:", error);
                     console.error("❌ Video URL:", mediaUrl);
+                    setVideoError(true);
+                    setVideoLoaded(false);
                     // Try to reload video on error (iOS sometimes needs this)
                     if (videoRef.current) {
                       setTimeout(() => {
-                        videoRef.current?.reloadAsync().catch(console.error);
+                        videoRef.current?.reloadAsync().catch((reloadErr) => {
+                          console.error("Reload error:", reloadErr);
+                        });
                       }, 1000);
                     }
                   }}
                   onLoadStart={() => {
                     console.log("📹 Video loading started:", mediaUrl);
+                    setVideoError(false);
+                  }}
+                  onPlaybackStatusUpdate={(status) => {
+                    // Ensure video stops if shouldPlay becomes false
+                    if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
+                      videoRef.current.pauseAsync().catch(() => { });
+                      videoRef.current.setPositionAsync(0).catch(() => { });
+                    }
                   }}
                   progressUpdateIntervalMillis={1000}
                 />
               ) : (
-                <Image source={{ uri: thumbnailUrl || mediaUrl }} style={styles.image} />
+                <>
+                  {!thumbnailError ? (
+                    <Image
+                      source={{ uri: thumbnailUrl || mediaUrl }}
+                      style={styles.image}
+                      onError={() => {
+                        console.error("❌ Thumbnail error");
+                        setThumbnailError(true);
+                      }}
+                    />
+                  ) : (
+                    <View style={styles.videoPlaceholder}>
+                      <Ionicons name="videocam-outline" size={40} color="#999" />
+                      <Text style={styles.videoPlaceholderText}>Video</Text>
+                    </View>
+                  )}
+                </>
               )}
-              {!shouldPlay && (
+              {!shouldPlay && !videoError && (
                 <View style={styles.playIconOverlay}>
                   <Ionicons name="play-circle-outline" size={60} color="#fff" />
                 </View>
               )}
             </>
           ) : (
-            <Image source={{ uri: mediaUrl }} style={styles.image} />
+            mediaUrl ? (
+              <Image 
+                source={{ uri: mediaUrl }} 
+                style={styles.image}
+                onError={(error) => {
+                  console.error("❌ Image load error in FeedCard:", mediaUrl, error);
+                }}
+                onLoadStart={() => {
+                  console.log("🖼️ Loading image:", mediaUrl);
+                }}
+              />
+            ) : (
+              <View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="image-outline" size={40} color="#ccc" />
+              </View>
+            )
           )}
         </TouchableOpacity>
       )}
@@ -559,6 +654,18 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     alignItems: "center",
+  },
+  videoPlaceholder: {
+    width: "100%",
+    aspectRatio: 9 / 16,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoPlaceholderText: {
+    color: "#999",
+    fontSize: 14,
+    marginTop: 8,
   },
   playIconBackground: {
     width: 70,

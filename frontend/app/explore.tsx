@@ -270,14 +270,23 @@ export default function ExploreScreen() {
         activeOpacity={0.85}
         onPress={() => router.push(`/post-details/${item.id}`)}
       >
-        <Image
-          source={displayImg}
-          style={styles.gridImage}
-          placeholder={{ blurhash: BLUR_HASH }}
-          cachePolicy="memory-disk"
-          contentFit="cover"
-          transition={300}
-        />
+        {displayImg ? (
+          <Image
+            source={{ uri: displayImg }}
+            style={styles.gridImage}
+            placeholder={{ blurhash: BLUR_HASH }}
+            cachePolicy="memory-disk"
+            contentFit="cover"
+            transition={300}
+            onError={(error) => {
+              console.error("❌ Image load error in explore:", displayImg, error);
+            }}
+          />
+        ) : (
+          <View style={[styles.gridImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+            <Ionicons name="image-outline" size={32} color="#ccc" />
+          </View>
+        )}
 
         {item._isVideo && (
           <View style={styles.playIcon}>

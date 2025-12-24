@@ -14,9 +14,10 @@ from typing import Optional, Tuple
 async def transcode_video_to_mp4(input_path: str, output_path: Optional[str] = None, target_height: int = 720) -> str:
     """
     Transcode video to optimized 720p MP4 format (H.264 codec)
+    Handles both iOS MOV files and Android MP4 files to ensure compatibility.
     
     Args:
-        input_path: Path to the input video file (e.g., .mov)
+        input_path: Path to the input video file (e.g., .mov, .mp4)
         output_path: Optional path for output file. If None, replaces extension with .mp4
         target_height: Target video height in pixels (default: 720p)
         
@@ -28,18 +29,39 @@ async def transcode_video_to_mp4(input_path: str, output_path: Optional[str] = N
     """
     
     # Generate output path if not provided
+    # IMPORTANT: Always use a different filename to avoid FFmpeg "same as input" error
     if output_path is None:
         base_path = os.path.splitext(input_path)[0]
-        output_path = f"{base_path}.mp4"
+        # If input is already MP4, add _converted suffix to avoid same filename
+        input_ext = os.path.splitext(input_path)[1].lower()
+        if input_ext == '.mp4':
+            output_path = f"{base_path}_converted.mp4"
+        else:
+            output_path = f"{base_path}.mp4"
+    
+    # Ensure output path is different from input path (FFmpeg requirement)
+    if os.path.abspath(output_path) == os.path.abspath(input_path):
+        # If they're the same, add _converted suffix
+        base_path = os.path.splitext(output_path)[0]
+        output_path = f"{base_path}_converted.mp4"
     
     # Check if input file exists
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input video file not found: {input_path}")
     
-    print(f"🎬 Starting video transcoding to 720p: {input_path} -> {output_path}")
+    # Get file extension to determine source
+    input_ext = os.path.splitext(input_path)[1].lower()
+    is_ios_mov = input_ext == '.mov'
+    is_android_mp4 = input_ext == '.mp4'
+    
+    print(f"🎬 Starting video transcoding to 720p MP4:")
+    print(f"   Input: {input_path} ({'iOS MOV' if is_ios_mov else 'Android/Other MP4' if is_android_mp4 else 'Other'})")
+    print(f"   Output: {output_path}")
     
     try:
         # FFmpeg command to transcode to optimized 720p web-compatible format
+        # For iOS MOV: Convert to MP4 with H.264
+        # For Android MP4: Re-encode to ensure codec compatibility (fixes blank video issues)
         # -i: input file
         # -vf scale=-2:720: scale to 720p height, maintain aspect ratio (width auto-calculated, divisible by 2)
         # -c:v libx264: use H.264 video codec (universally supported)
@@ -50,7 +72,9 @@ async def transcode_video_to_mp4(input_path: str, output_path: Optional[str] = N
         # -c:a aac: use AAC audio codec (universally supported)
         # -b:a 128k: audio bitrate
         # -movflags +faststart: optimize for web streaming (moov atom at start)
-        # -pix_fmt yuv420p: ensure compatibility with all players
+        # -pix_fmt yuv420p: ensure compatibility with all players (critical for Android)
+        # -profile:v baseline: use baseline profile for maximum compatibility (especially Android)
+        # -level 3.0: H.264 level for compatibility
         # -y: overwrite output file if exists
         
         cmd = [
@@ -62,10 +86,12 @@ async def transcode_video_to_mp4(input_path: str, output_path: Optional[str] = N
             '-crf', '23',                          # Quality (lower = better, 18-28 range)
             '-maxrate', '2M',                      # Max bitrate for 720p
             '-bufsize', '4M',                      # Buffer size
+            '-profile:v', 'baseline',               # Baseline profile for max compatibility (fixes Android blank video)
+            '-level', '3.0',                       # H.264 level
             '-c:a', 'aac',                         # Audio codec: AAC
             '-b:a', '128k',                        # Audio bitrate
-            '-movflags', '+faststart',             # Web optimization
-            '-pix_fmt', 'yuv420p',                 # Pixel format compatibility
+            '-movflags', '+faststart',             # Web optimization (moov atom at start)
+            '-pix_fmt', 'yuv420p',                 # Pixel format compatibility (critical!)
             '-y',                                  # Overwrite output
             output_path
         ]
@@ -96,14 +122,40 @@ async def transcode_video_to_mp4(input_path: str, output_path: Optional[str] = N
         print(f"   Output: {output_path} ({output_size:,} bytes)")
         print(f"   Compression: {compression_ratio:.1f}% size reduction")
         
-        # Delete original file to save space
-        try:
-            os.remove(input_path)
-            print(f"🗑️  Deleted original file: {input_path}")
-        except Exception as e:
-            print(f"⚠️  Failed to delete original file: {e}")
+        # Determine final output path
+        final_output_path = output_path
         
-        return output_path
+        # If output has _converted suffix (because input was MP4), we need to replace original
+        if "_converted" in output_path:
+            # Remove _converted suffix to get final filename
+            final_output_path = output_path.replace("_converted.mp4", ".mp4")
+            
+            # Delete original file first (before renaming)
+            if os.path.abspath(input_path) != os.path.abspath(output_path):
+                try:
+                    os.remove(input_path)
+                    print(f"🗑️  Deleted original file: {input_path}")
+                except Exception as e:
+                    print(f"⚠️  Failed to delete original file: {e}")
+            
+            # Rename converted file to final name
+            try:
+                os.rename(output_path, final_output_path)
+                print(f"📝 Renamed converted file to final name: {final_output_path}")
+            except Exception as e:
+                print(f"⚠️  Failed to rename converted file: {e}")
+                # Continue with _converted filename if rename fails
+                final_output_path = output_path
+        else:
+            # For MOV files, just delete the original (output is already .mp4)
+            if os.path.abspath(input_path) != os.path.abspath(output_path):
+                try:
+                    os.remove(input_path)
+                    print(f"🗑️  Deleted original file: {input_path}")
+                except Exception as e:
+                    print(f"⚠️  Failed to delete original file: {e}")
+        
+        return final_output_path
         
     except Exception as e:
         print(f"❌ Error during video transcoding: {str(e)}")

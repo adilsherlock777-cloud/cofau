@@ -106,6 +106,8 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [isFollowing, setIsFollowing] = useState(post.is_following || false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const videoRef = useRef(null);
   
   // Check if this is the current user's own post
@@ -149,18 +151,65 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
     }
   }, [showComments, post.id]);
 
+  // Control video playback based on whether this post is currently visible
+  const shouldPlay = isVideo && post.id === currentPostId;
+
   useEffect(() => {
-    if (isVideo && videoRef.current && post.id === currentPostId) {
-      const timer = setTimeout(() => {
-        if (videoRef.current) {
-          (videoRef.current as any).playAsync?.().catch((error: any) => {
-            console.error("❌ Error playing video:", error);
-          });
+    if (!isVideo || !videoRef.current) return;
+
+    const controlVideo = async () => {
+      try {
+        const status = await (videoRef.current as any).getStatusAsync();
+
+        if (shouldPlay) {
+          // Play video if it should be playing
+          if (status.isLoaded && !status.isPlaying) {
+            await (videoRef.current as any).playAsync();
+          }
+        } else {
+          // FULLY STOP video when not visible - pause, stop audio, and reset position
+          if (status.isLoaded) {
+            try {
+              // First pause the video
+              if (status.isPlaying) {
+                await (videoRef.current as any).pauseAsync();
+              }
+              // Reset video position to beginning to stop audio completely
+              await (videoRef.current as any).setPositionAsync(0);
+            } catch (err) {
+              console.log("Video stop error:", err);
+            }
+          }
         }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isVideo, post.id, currentPostId]);
+      } catch (error: any) {
+        console.error("❌ Error controlling video:", error);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      controlVideo();
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      // Cleanup: Ensure video is stopped when component unmounts or shouldPlay changes
+      if (videoRef.current && !shouldPlay) {
+        (videoRef.current as any).pauseAsync().catch(() => {});
+        (videoRef.current as any).setPositionAsync(0).catch(() => {});
+      }
+    };
+  }, [shouldPlay, isVideo, videoLoaded]);
+
+  // Cleanup: Ensure video is fully stopped when component unmounts
+  useEffect(() => {
+    return () => {
+      if (videoRef.current && isVideo) {
+        // Stop video completely on unmount
+        (videoRef.current as any).pauseAsync().catch(() => {});
+        (videoRef.current as any).setPositionAsync(0).catch(() => {});
+      }
+    };
+  }, [isVideo]);
 
   const fetchComments = async () => {
     try {
@@ -290,23 +339,87 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
         >
           {isVideo ? (
             <>
-              <Video
-                ref={videoRef}
-                source={{ uri: mediaUrl || displayUrl || '' }}
-                style={styles.responsiveMedia}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay={true}
-                isLooping
-                isMuted={isMuted}
-                useNativeControls={false}
-              />
-              <View style={styles.muteIndicatorReels}>
-                <Ionicons 
-                  name={isMuted ? "volume-mute" : "volume-high"} 
-                  size={24} 
-                  color="rgba(255,255,255,0.9)" 
+              {!videoError ? (
+                <Video
+                  ref={videoRef}
+                  source={{ uri: mediaUrl || displayUrl || '' }}
+                  style={styles.responsiveMedia}
+                  resizeMode={ResizeMode.CONTAIN}
+                  shouldPlay={shouldPlay}
+                  isLooping
+                  isMuted={isMuted}
+                  useNativeControls={false}
+                  onLoad={(status: any) => {
+                    console.log("✅ Video loaded in post details", status);
+                    setVideoLoaded(true);
+                    setVideoError(false);
+                    // Ensure video plays after load only if it should be playing
+                    if (videoRef.current && shouldPlay) {
+                      setTimeout(async () => {
+                        try {
+                          const currentStatus = await (videoRef.current as any).getStatusAsync();
+                          if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
+                            await (videoRef.current as any).playAsync();
+                          }
+                        } catch (err) {
+                          console.log("Auto-play error in post details:", err);
+                        }
+                      }, 200);
+                    }
+                  }}
+                  onError={(error: any) => {
+                    console.error("❌ Video error in post details:", error);
+                    console.error("❌ Video URL:", mediaUrl || displayUrl);
+                    setVideoError(true);
+                    setVideoLoaded(false);
+                    // Try to reload video on error
+                    if (videoRef.current) {
+                      setTimeout(() => {
+                        (videoRef.current as any)?.reloadAsync?.().catch((reloadErr: any) => {
+                          console.error("Reload error:", reloadErr);
+                        });
+                      }, 1000);
+                    }
+                  }}
+                  onLoadStart={() => {
+                    console.log("📹 Video loading started in post details:", mediaUrl || displayUrl);
+                    setVideoError(false);
+                  }}
+                  onPlaybackStatusUpdate={(status: any) => {
+                    // Ensure video stops if shouldPlay becomes false
+                    if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
+                      (videoRef.current as any).pauseAsync().catch(() => {});
+                      (videoRef.current as any).setPositionAsync(0).catch(() => {});
+                    }
+                  }}
+                  progressUpdateIntervalMillis={1000}
                 />
-              </View>
+              ) : (
+                <View style={styles.videoErrorContainer}>
+                  <Ionicons name="videocam-outline" size={40} color="#999" />
+                  <Text style={styles.videoErrorText}>Unable to load video</Text>
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={() => {
+                      setVideoError(false);
+                      if (videoRef.current) {
+                        (videoRef.current as any)?.reloadAsync?.().catch(console.error);
+                      }
+                    }}
+                  >
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {!videoError && (
+                <View style={styles.muteIndicatorReels}>
+                  <Ionicons 
+                    name={isMuted ? "volume-mute" : "volume-high"} 
+                    size={24} 
+                    color="rgba(255,255,255,0.9)" 
+                  />
+                </View>
+              )}
             </>
           ) : (
             <Image
@@ -669,13 +782,20 @@ export default function PostDetailsScreen() {
   const [skip, setSkip] = useState(0);
   const [initialPostIndex, setInitialPostIndex] = useState(0);
   const [currentVisiblePost, setCurrentVisiblePost] = useState<any>(null);
+  const [visiblePostId, setVisiblePostId] = useState<string | null>(postId as string);
   const flatListRef = useRef<FlatList<any> | null>(null);
 
   const LIMIT = 10;
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
-      setCurrentVisiblePost(viewableItems[0].item);
+      const visibleItem = viewableItems[0].item;
+      setCurrentVisiblePost(visibleItem);
+      // Update visible post ID to control video playback
+      setVisiblePostId(visibleItem.id);
+    } else {
+      // If no items are visible, clear the visible post ID to pause all videos
+      setVisiblePostId(null);
     }
   }, []);
 
@@ -711,6 +831,7 @@ export default function PostDetailsScreen() {
       setPosts(postsFromCurrent);
       setInitialPostIndex(0);
       setCurrentVisiblePost(postsFromCurrent[0]);
+      setVisiblePostId(postsFromCurrent[0]?.id || postId);
       setSkip(postsFromCurrent.length);
 
       setTimeout(() => {
@@ -762,12 +883,12 @@ export default function PostDetailsScreen() {
     ({ item }: any) => (
       <PostItem
         post={item}
-        currentPostId={postId}
+        currentPostId={visiblePostId}
         token={token}
         bottomInset={insets.bottom}
       />
     ),
-    [postId, token, insets.bottom]
+    [visiblePostId, token, insets.bottom]
   );
 
   const renderFooter = () => {
@@ -1307,5 +1428,29 @@ const styles = StyleSheet.create({
   footerLoader: {
     padding: 20,
     alignItems: "center",
+  },
+  videoErrorContainer: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoErrorText: {
+    color: "#999",
+    fontSize: 16,
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: "#4dd0e1",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

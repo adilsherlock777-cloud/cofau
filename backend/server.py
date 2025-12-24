@@ -288,14 +288,18 @@ async def create_post(
 
     # ======================================================
     # VIDEO OPTIMIZATION - Transcode to 720p H.264 and generate thumbnail
+    # Handles both iOS MOV files and Android MP4 files
     # ======================================================
     thumbnail_url = None
     if media_type == "video":
         from utils.video_transcode import should_transcode_video, optimize_video_with_thumbnail
         
-        print(f"🎬 Video detected - optimizing to 720p H.264 and generating thumbnail...")
+        video_source = "iOS MOV" if file_ext == "mov" else "Android/Other MP4"
+        print(f"🎬 Video detected ({video_source}) - converting/optimizing to 720p H.264 MP4 and generating thumbnail...")
+        
         try:
-            # Optimize video to 720p and generate thumbnail
+            # Always optimize video to 720p and generate thumbnail
+            # This converts iOS MOV to MP4 and re-encodes Android MP4 for compatibility
             video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
             
             # Update file_path and filename to point to the optimized file
@@ -306,12 +310,23 @@ async def create_post(
             thumbnail_filename = os.path.basename(thumbnail_path)
             thumbnail_url = f"/api/static/uploads/{thumbnail_filename}"
             
-            print(f"✅ Video optimized to 720p: {filename}")
+            print(f"✅ Video converted/optimized to 720p MP4: {filename}")
             print(f"✅ Thumbnail generated: {thumbnail_filename}")
         except Exception as e:
             print(f"❌ Video optimization failed: {str(e)}")
-            # Continue with original file if optimization fails
-            print(f"⚠️  Using original file (video may be large and slow to load)")
+            import traceback
+            traceback.print_exc()
+            # Don't continue with original file - fail the upload
+            # This ensures all videos are properly formatted
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+            raise HTTPException(
+                status_code=500,
+                detail=f"Video processing failed. Please ensure your video is in a supported format (MP4 or MOV). Error: {str(e)}"
+            )
 
     # ======================================================
     # CONTENT MODERATION - Check for banned content

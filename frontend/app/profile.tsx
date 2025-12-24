@@ -254,6 +254,7 @@ export default function ProfileScreen() {
       const postsWithFullUrls = posts.map((post: any) => {
         const mediaUrl = post.media_url || post.full_image_url;
         const normalizedUrl = fixUrl(mediaUrl);
+        const thumbnailUrl = post.thumbnail_url ? fixUrl(post.thumbnail_url) : null;
         const isVideo = 
           post.media_type === 'video' ||
           normalizedUrl?.toLowerCase().endsWith('.mp4') ||
@@ -281,6 +282,7 @@ export default function ProfileScreen() {
           ...post,
           full_image_url: normalizedUrl,
           media_url: normalizedUrl,
+          thumbnail_url: thumbnailUrl,
           isVideo: isVideo,
           location_name: locationName || null,
           location: locationName || null,
@@ -813,12 +815,16 @@ export default function ProfileScreen() {
               <View style={styles.locationPostsGrid}>
                 {posts.map((post) => {
                   const mediaUrl = fixUrl(post.full_image_url || post.media_url);
+                  const thumbnailUrl = post.thumbnail_url ? fixUrl(post.thumbnail_url) : null;
                   const isVideo =
                     post.media_type === 'video' ||
                     mediaUrl?.toLowerCase().endsWith('.mp4') ||
                     mediaUrl?.toLowerCase().endsWith('.mov') ||
                     mediaUrl?.toLowerCase().endsWith('.avi') ||
                     mediaUrl?.toLowerCase().endsWith('.webm');
+                  
+                  // For videos, use thumbnail if available, otherwise use mediaUrl
+                  const displayUrl = isVideo ? (thumbnailUrl || mediaUrl) : mediaUrl;
 
                   return (
                     <TouchableOpacity
@@ -827,12 +833,18 @@ export default function ProfileScreen() {
                       onPress={() => router.push(`/post-details/${post.id}`)}
                       activeOpacity={0.8}
                     >
-                      {mediaUrl ? (
+                      {displayUrl ? (
                         <View style={styles.favouriteGridImageContainer}>
                           <Image 
-                            source={{ uri: mediaUrl }} 
+                            source={{ uri: displayUrl }} 
                             style={styles.favouriteGridImage} 
-                            resizeMode="cover" 
+                            resizeMode="cover"
+                            onError={(error) => {
+                              console.error("❌ Image load error in profile (favourite):", displayUrl, error);
+                            }}
+                            onLoadStart={() => {
+                              console.log("🖼️ Loading image (favourite):", displayUrl);
+                            }}
                           />
                           {isVideo && (
                             <View style={styles.videoOverlay}>
@@ -862,12 +874,16 @@ export default function ProfileScreen() {
 };
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
+    const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
     const isVideo =
       item.media_type === 'video' ||
       mediaUrl?.toLowerCase().endsWith('.mp4') ||
       mediaUrl?.toLowerCase().endsWith('.mov') ||
       mediaUrl?.toLowerCase().endsWith('.avi') ||
       mediaUrl?.toLowerCase().endsWith('.webm');
+    
+    // For videos, use thumbnail if available, otherwise use mediaUrl
+    const displayUrl = isVideo ? (thumbnailUrl || mediaUrl) : mediaUrl;
 
     const handlePostPress = () => {
       if (item.id) {
@@ -890,14 +906,30 @@ export default function ProfileScreen() {
         onPress={handlePostPress}
         activeOpacity={0.8}
       >
-        {mediaUrl && !isVideo ? (
-          <Image source={{ uri: mediaUrl }} style={styles.gridImage} resizeMode="cover" />
-        ) : mediaUrl && isVideo ? (
+        {displayUrl && !isVideo ? (
+          <Image 
+            source={{ uri: displayUrl }} 
+            style={styles.gridImage} 
+            resizeMode="cover"
+            onError={(error) => {
+              console.error("❌ Image load error in profile (grid):", displayUrl, error);
+            }}
+            onLoadStart={() => {
+              console.log("🖼️ Loading image (grid):", displayUrl);
+            }}
+          />
+        ) : displayUrl && isVideo ? (
           <View style={styles.gridImageContainer}>
             <Image
-              source={{ uri: mediaUrl }}
+              source={{ uri: displayUrl }}
               style={styles.gridImage}
               resizeMode="cover"
+              onError={(error) => {
+                console.error("❌ Video thumbnail load error in profile (grid):", displayUrl, error);
+              }}
+              onLoadStart={() => {
+                console.log("🖼️ Loading video thumbnail (grid):", displayUrl);
+              }}
             />
             <View style={styles.videoOverlay}>
               <Ionicons name="play-circle" size={40} color="#fff" />
@@ -1033,7 +1065,10 @@ export default function ProfileScreen() {
 };
 
   const renderVideoListItem = ({ item }: { item: any }) => {
+  // Use thumbnail_url if available, otherwise fall back to media_url
+  const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
   const mediaUrl = fixUrl(item.full_image_url || item.media_url);
+  const displayUrl = thumbnailUrl || mediaUrl;
 
   const handlePostPress = () => {
     if (item.id) {
@@ -1059,12 +1094,18 @@ export default function ProfileScreen() {
       >
         {/* Left Side - Video Thumbnail */}
         <View style={styles.listImageContainer}>
-          {mediaUrl ? (
+          {displayUrl ? (
             <View style={styles.videoThumbnailContainer}>
               <Image 
-                source={{ uri: mediaUrl }} 
+                source={{ uri: displayUrl }} 
                 style={styles.listImage} 
-                resizeMode="cover" 
+                resizeMode="cover"
+                onError={(error) => {
+                  console.error("❌ Video thumbnail load error in profile (video list):", displayUrl, error);
+                }}
+                onLoadStart={() => {
+                  console.log("🖼️ Loading video thumbnail (video list):", displayUrl);
+                }}
               />
               <View style={styles.videoPlayOverlay}>
                 <Ionicons name="play-circle" size={50} color="#fff" />

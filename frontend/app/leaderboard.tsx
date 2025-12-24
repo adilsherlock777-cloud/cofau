@@ -8,13 +8,16 @@ TouchableOpacity,
 Image,
 ActivityIndicator,
 RefreshControl,
+Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
-import { normalizeMediaUrl, BACKEND_URL } from "../utils/imageUrlFix";
+import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
+import { followUser, unfollowUser } from "../utils/api";
+import UserAvatar from "../components/UserAvatar";
 
 export default function LeaderboardScreen() {
 const router = useRouter();
@@ -24,6 +27,9 @@ const [loading, setLoading] = useState(true);
 const [refreshing, setRefreshing] = useState(false);
 const [leaderboardData, setLeaderboardData] = useState<any>(null);
 const [error, setError] = useState<string | null>(null);
+const [followingStates, setFollowingStates] = useState<{ [key: string]: boolean }>({});
+const [followLoading, setFollowLoading] = useState<{ [key: string]: boolean }>({});
+const { user } = useAuth() as any;
 
 useEffect(() => {
 fetchLeaderboard();
@@ -73,6 +79,18 @@ from_date: fromDate,
 to_date: toDate,
 entries_count: data.entries?.length || 0,
 });
+
+// Debug: Log first entry to verify data structure
+if (data.entries && data.entries.length > 0) {
+console.log("🔍 First entry sample:", {
+rank: data.entries[0].rank,
+username: data.entries[0].username,
+full_name: data.entries[0].full_name,
+followers_count: data.entries[0].followers_count,
+posts_count: data.entries[0].posts_count,
+user_id: data.entries[0].user_id,
+});
+}
 } catch (err: any) {
 console.error("❌ Error fetching leaderboard:", err);
 
@@ -160,6 +178,56 @@ const handlePostPress = (postId: string) => {
 router.push(`/post-details/${postId}`);
 };
 
+const handleFollowToggle = async (userId: string, entry: any) => {
+if (!userId || userId === user?.id || followLoading[userId]) return;
+
+setFollowLoading((prev) => ({ ...prev, [userId]: true }));
+const previousState = followingStates[userId] || false;
+setFollowingStates((prev) => ({ ...prev, [userId]: !previousState }));
+
+try {
+if (previousState) {
+await unfollowUser(userId);
+} else {
+await followUser(userId);
+}
+} catch (error) {
+console.error("Error toggling follow:", error);
+setFollowingStates((prev) => ({ ...prev, [userId]: previousState }));
+Alert.alert("Error", "Failed to update follow status. Please try again.");
+} finally {
+setFollowLoading((prev) => ({ ...prev, [userId]: false }));
+}
+};
+
+const handleRegenerateLeaderboard = async () => {
+try {
+setLoading(true);
+const response = await axios.post(
+`${BACKEND_URL}/api/leaderboard/regenerate`,
+{},
+{
+headers: {
+Authorization: `Bearer ${token}`,
+},
+}
+);
+Alert.alert("Success", "Leaderboard regenerated! Refreshing...");
+// Refresh the leaderboard after regeneration
+setTimeout(() => {
+fetchLeaderboard();
+}, 1000);
+} catch (error: any) {
+console.error("Error regenerating leaderboard:", error);
+Alert.alert(
+"Error",
+error.response?.data?.detail || "Failed to regenerate leaderboard"
+);
+} finally {
+setLoading(false);
+}
+};
+
 return (
 <View style={styles.container}>
 <ScrollView
@@ -199,6 +267,20 @@ style={styles.gradientHeader}
 {leaderboardData.total_posts_analyzed} images analyzed
 </Text>
 )}
+{/* Check if entries have the new fields, if not show regenerate option */}
+{entries.length > 0 && entries[0] && 
+(entries[0].followers_count === undefined || 
+ entries[0].posts_count === undefined || 
+ entries[0].full_name === undefined) ? (
+<TouchableOpacity
+style={styles.regenerateButton}
+onPress={handleRegenerateLeaderboard}
+>
+<Text style={styles.regenerateButtonText}>
+🔄 Regenerate Leaderboard (Update Required)
+</Text>
+</TouchableOpacity>
+) : null}
 </View>
 )}
 
@@ -210,6 +292,12 @@ style={styles.gradientHeader}
 <Text style={styles.emptySubtext}>
 Start posting to see the leaderboard!
 </Text>
+<TouchableOpacity
+style={styles.regenerateButton}
+onPress={handleRegenerateLeaderboard}
+>
+<Text style={styles.regenerateButtonText}>Regenerate Leaderboard</Text>
+</TouchableOpacity>
 </View>
 )}
 
@@ -217,7 +305,24 @@ Start posting to see the leaderboard!
 {entries.length > 0 && (
 <View style={styles.section}>
 <Text style={styles.sectionTitle}>Top Posts This Week</Text>
-{entries.map((entry: any, index: number) => (
+{entries.map((entry: any, index: number) => {
+const isRankOne = index === 0;
+const isOwnPost = entry.user_id === user?.id;
+const isFollowing = followingStates[entry.user_id] || false;
+
+// Debug logging for each entry
+if (index === 0) {
+console.log("🔍 Rendering entry:", {
+rank: entry.rank,
+username: entry.username,
+full_name: entry.full_name,
+followers_count: entry.followers_count,
+posts_count: entry.posts_count,
+user_id: entry.user_id,
+});
+}
+
+return (
 <TouchableOpacity
 key={entry.post_id}
 style={[
@@ -243,6 +348,80 @@ index < 3 && styles.topThreeRankText
 </Text>
 </View>
 
+{isRankOne ? (
+/* RANK #1 - Full Profile Info */
+<View style={styles.rankOneContainer}>
+<View style={styles.rankOneProfileSection}>
+<UserAvatar
+profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
+username={entry.username}
+size={80}
+showLevelBadge={false}
+level={1}
+style={{}}
+/>
+<View style={styles.rankOneInfo}>
+<Text style={styles.rankOneName} numberOfLines={1}>
+{entry.full_name || entry.username || "Unknown User"}
+</Text>
+<View style={styles.rankOneStats}>
+<View style={styles.statItem}>
+<Ionicons name="people-outline" size={16} color="#666" />
+<Text style={styles.statText}>
+{entry.followers_count !== undefined && entry.followers_count !== null 
+  ? entry.followers_count 
+  : 0}
+</Text>
+</View>
+<View style={styles.statItem}>
+<Ionicons name="images-outline" size={16} color="#666" />
+<Text style={styles.statText}>
+{entry.posts_count !== undefined && entry.posts_count !== null 
+  ? entry.posts_count 
+  : 0}
+</Text>
+</View>
+</View>
+{!isOwnPost && (
+<TouchableOpacity
+style={[
+styles.followButtonLeaderboard,
+isFollowing && styles.followingButtonLeaderboard
+]}
+onPress={(e) => {
+e.stopPropagation();
+handleFollowToggle(entry.user_id, entry);
+}}
+disabled={followLoading[entry.user_id]}
+>
+<Text style={[
+styles.followButtonTextLeaderboard,
+isFollowing && styles.followingButtonTextLeaderboard
+]}>
+{followLoading[entry.user_id] ? "..." : (isFollowing ? "Following" : "Follow")}
+</Text>
+</TouchableOpacity>
+)}
+</View>
+</View>
+</View>
+) : (
+/* REMAINING RANKS - Profile Picture and Name Only */
+<View style={styles.otherRanksContainer}>
+<UserAvatar
+profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
+username={entry.username}
+size={50}
+showLevelBadge={false}
+level={1}
+style={{}}
+/>
+<Text style={styles.otherRanksName} numberOfLines={1}>
+{entry.full_name || entry.username || "Unknown User"}
+</Text>
+</View>
+)}
+
 <View style={styles.cardContent}>
 {/* Media Thumbnail - Use thumbnail if available, otherwise use media_url */}
 <Image
@@ -256,13 +435,8 @@ console.log("Error loading thumbnail:", error);
 }}
 />
 
-{/* Entry Info - NOW SHOWS USERNAME FOR ALL POSTS */}
+{/* Entry Info */}
 <View style={styles.entryInfo}>
-{/* Username - Always shown */}
-<Text style={styles.usernameText} numberOfLines={1}>
-{entry.username || "Unknown User"}
-</Text>
-
 {/* Caption */}
 {entry.caption && (
 <Text style={styles.captionText} numberOfLines={2}>
@@ -305,7 +479,8 @@ console.log("Error loading thumbnail:", error);
 </View>
 </View>
 </TouchableOpacity>
-))}
+);
+})}
 </View>
 )}
 
@@ -897,4 +1072,89 @@ marginTop: 2,
 textAlign: "center",
 fontWeight: "700",
 },
+
+/* Rank #1 Profile Styles */
+rankOneContainer: {
+marginBottom: 16,
+paddingBottom: 16,
+borderBottomWidth: 1,
+borderBottomColor: "rgba(0,0,0,0.1)",
+},
+rankOneProfileSection: {
+flexDirection: "row",
+alignItems: "center",
+gap: 16,
+},
+rankOneInfo: {
+flex: 1,
+},
+rankOneName: {
+fontSize: 20,
+fontWeight: "700",
+color: "#333",
+marginBottom: 12,
+},
+rankOneStats: {
+flexDirection: "row",
+gap: 20,
+marginBottom: 12,
+},
+statItem: {
+flexDirection: "row",
+alignItems: "center",
+gap: 6,
+},
+statText: {
+fontSize: 14,
+fontWeight: "600",
+color: "#666",
+},
+followButtonLeaderboard: {
+backgroundColor: "#1B7C82",
+paddingHorizontal: 20,
+paddingVertical: 8,
+borderRadius: 20,
+alignSelf: "flex-start",
+},
+followingButtonLeaderboard: {
+backgroundColor: "#E8E8E8",
+},
+followButtonTextLeaderboard: {
+color: "#fff",
+fontSize: 14,
+fontWeight: "600",
+},
+followingButtonTextLeaderboard: {
+color: "#666",
+},
+
+/* Other Ranks Profile Styles */
+otherRanksContainer: {
+flexDirection: "row",
+alignItems: "center",
+gap: 12,
+marginBottom: 12,
+paddingBottom: 12,
+borderBottomWidth: 1,
+borderBottomColor: "rgba(0,0,0,0.05)",
+},
+otherRanksName: {
+fontSize: 16,
+fontWeight: "600",
+color: "#333",
+flex: 1,
+},
+regenerateButton: {
+marginTop: 20,
+backgroundColor: "#1B7C82",
+paddingVertical: 12,
+paddingHorizontal: 24,
+borderRadius: 8,
+},
+regenerateButtonText: {
+color: "#fff",
+fontSize: 14,
+fontWeight: "600",
+},
 });
+
