@@ -89,6 +89,7 @@ export default function FeedScreen() {
         description: post.review_text || post.description,
         rating: post.rating,
         media_url: normalizeMediaUrl(post.image_url || post.media_url),
+        thumbnail_url: post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null,
         media_type: post.media_type,
         created_at: post.created_at,
         user_level: post.user_level || post.level || post.userLevel,
@@ -184,6 +185,12 @@ export default function FeedScreen() {
       setShowFixedLine(false);
     }
     
+    // IMMEDIATELY pause all videos when scrolling starts
+    // This prevents audio overlap when swiping between videos
+    if (visibleVideoId) {
+      setVisibleVideoId(null);
+    }
+    
     // Clear existing timeout
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
@@ -197,7 +204,7 @@ export default function FeedScreen() {
       
       setVisibleVideoId(visibleId);
     }, 150); // Wait 150ms after scrolling stops
-  }, [findVisibleVideo]);
+  }, [findVisibleVideo, visibleVideoId]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

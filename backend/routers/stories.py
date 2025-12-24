@@ -48,7 +48,7 @@ async def upload_story(
         media_type = "image" if file.content_type.startswith("image") else "video"
         
         # Generate unique filename
-        file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+        file_ext = file.filename.split(".")[-1].lower() if "." in file.filename else "jpg"
         unique_filename = f"story_{current_user['_id']}_{uuid.uuid4().hex[:8]}.{file_ext}"
         file_path = os.path.join(UPLOAD_DIR, unique_filename)
         
@@ -56,6 +56,39 @@ async def upload_story(
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
+        
+        # ======================================================
+        # VIDEO OPTIMIZATION - Convert MOV to MP4 and optimize Android MP4
+        # ======================================================
+        if media_type == "video":
+            from utils.video_transcode import optimize_video_with_thumbnail
+            
+            video_source = "iOS MOV" if file_ext == "mov" or file.content_type == "video/quicktime" else "Android/Other MP4"
+            print(f"🎬 Story video detected ({video_source}) - converting/optimizing to 720p H.264 MP4...")
+            
+            try:
+                # Optimize video to 720p and generate thumbnail
+                video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
+                
+                # Update file_path and filename to point to the optimized file
+                file_path = video_path
+                unique_filename = os.path.basename(video_path)
+                
+                print(f"✅ Story video converted/optimized to 720p MP4: {unique_filename}")
+            except Exception as e:
+                print(f"❌ Story video optimization failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                # Clean up and fail
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                    except:
+                        pass
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Video processing failed. Please ensure your video is in a supported format (MP4 or MOV). Error: {str(e)}"
+                )
         
         # ======================================================
         # CONTENT MODERATION - Check for banned content

@@ -20,6 +20,7 @@ class PyObjectId(ObjectId):
 
 class UserCreate(BaseModel):
     full_name: str
+    username: str = Field(..., min_length=3, max_length=30, description="Unique username (3-30 characters)")
     email: EmailStr
     password: str
 
@@ -30,6 +31,7 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: str
     full_name: str
+    username: Optional[str] = None
     email: str
     profile_picture: Optional[str] = None
     bio: Optional[str] = None

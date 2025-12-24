@@ -166,21 +166,142 @@ async def generate_leaderboard_snapshot():
 
             user = None
             user_id = post.get("user_id")
+            followers_count = 0
+            following_count = 0
+            posts_count = 0
 
             if user_id:
                 try:
-                    user = await db.users.find_one(
-                        {"_id": ObjectId(user_id)}
-                    )
-                except:
-                    user = await db.users.find_one(
-                        {"_id": str(user_id)}
-                    )
+                    # Try ObjectId first
+                    try:
+                        user = await db.users.find_one(
+                            {"_id": ObjectId(user_id)}
+                        )
+                    except:
+                        # Try as string
+                        user = await db.users.find_one(
+                            {"_id": str(user_id)}
+                        )
+                    
+                    # Debug: Log what we found
+                    if user:
+                        logger.info(f"🔍 Found user {user_id}")
+                        logger.info(f"🔍 Available fields: {list(user.keys())}")
+                        logger.info(f"🔍 full_name={user.get('full_name')}, username={user.get('username')}, email={user.get('email')}")
+                    else:
+                        logger.warning(f"⚠️ User {user_id} not found in users collection")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error looking up user {user_id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    user = None
+                
+                # Get user stats if user exists
+                if user:
+                    followers_count = user.get("followers_count", 0)
+                    following_count = user.get("following_count", 0)
+                
+                # Count user's posts - try multiple formats to ensure we get the count
+                # Posts might have user_id as ObjectId or string format
+                posts_count = 0
+                if user_id:
+                    try:
+                        # Get the actual user_id values to try (from user document if available, or from post)
+                        user_obj_id = None
+                        user_str_id = str(user_id)
+                        
+                        # If user exists, use user's _id for more accurate matching
+                        if user and user.get("_id"):
+                            user_obj_id = user["_id"]
+                            if not isinstance(user_obj_id, ObjectId):
+                                try:
+                                    user_obj_id = ObjectId(str(user_obj_id))
+                                except:
+                                    user_obj_id = None
+                            user_str_id = str(user["_id"])
+                        else:
+                            # Try to convert post's user_id to ObjectId
+                            try:
+                                user_obj_id = ObjectId(user_id)
+                            except:
+                                user_obj_id = None
+                        
+                        # Try both ObjectId and string formats, take the maximum count
+                        count_objid = 0
+                        count_string = 0
+                        
+                        if user_obj_id:
+                            try:
+                                count_objid = await db.posts.count_documents({"user_id": user_obj_id})
+                            except Exception as e:
+                                logger.debug(f"Could not count with ObjectId: {e}")
+                        
+                        try:
+                            count_string = await db.posts.count_documents({"user_id": user_str_id})
+                        except Exception as e:
+                            logger.debug(f"Could not count with string: {e}")
+                        
+                        # Take the maximum (one should work)
+                        posts_count = max(count_objid, count_string)
+                        
+                        logger.info(f"📊 Posts count for user {user_id}: ObjectId={count_objid}, String={count_string}, Final={posts_count}")
+                                    
+                    except Exception as e:
+                        logger.error(f"❌ Error counting posts for user {user_id}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        posts_count = 0
 
-            username = (
-                user.get("username")
-                if user else "Unknown"
-            )
+            # Get username and full_name with proper fallbacks
+            username = None
+            full_name = None
+            
+            if user:
+                # Try multiple field name variations
+                username = (
+                    user.get("username") or 
+                    user.get("userName") or 
+                    user.get("user_name") or 
+                    (user.get("email", "").split("@")[0] if user.get("email") else None)
+                )
+                
+                full_name = (
+                    user.get("full_name") or 
+                    user.get("fullName") or 
+                    user.get("name") or 
+                    user.get("display_name")
+                )
+                
+                # If full_name is not available, use username as fallback
+                if not full_name and username:
+                    full_name = username
+                
+                # Ensure both have values
+                if not username:
+                    username = full_name or "User_" + str(user_id)[:8]
+                
+                if not full_name:
+                    full_name = username
+                
+                # Debug logging
+                logger.info(f"✅ User {user_id}: username={username}, full_name={full_name}")
+            else:
+                # If user not found, try to get from post data as last resort
+                post_username = post.get("username") or post.get("user_name")
+                post_full_name = post.get("full_name") or post.get("fullName")
+                
+                if post_username:
+                    username = post_username
+                    full_name = post_full_name or post_username
+                elif post_full_name:
+                    username = post_full_name
+                    full_name = post_full_name
+                else:
+                    username = "User_" + str(user_id)[:8]
+                    full_name = username
+                
+                logger.warning(f"⚠️ User {user_id} not found in DB, using fallback: username={username}, full_name={full_name}")
 
             # Convert created_at to ISO string if it's a datetime object
             created_at_value = post.get("created_at")
@@ -194,8 +315,12 @@ async def generate_leaderboard_snapshot():
             posts_with_scores.append({
                 "post_id": str(post["_id"]),
                 "user_id": str(user_id) if user_id else "",
-                "username": username,
+                "username": username or "Unknown",  # Ensure username is never None
+                "full_name": full_name,  # Can be None, frontend will handle
                 "user_profile_picture": user.get("profile_picture") if user else None,
+                "followers_count": followers_count,
+                "following_count": following_count,
+                "posts_count": posts_count,
                 "media_url": post.get("media_url", ""),
                 "thumbnail_url": post.get("thumbnail_url"),
                 "media_type": post.get("media_type", "image"),
@@ -247,10 +372,14 @@ async def generate_leaderboard_snapshot():
 # ======================================================
 
 @router.get("/current")
-async def get_current_leaderboard(current_user: dict = Depends(get_current_user)):
+async def get_current_leaderboard(
+    force_refresh: bool = Query(False, description="Force regenerate leaderboard"),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Get the current leaderboard snapshot.
     If no snapshot exists or it's outdated (>3 days old), generate a new one.
+    Use force_refresh=true to force regeneration.
     """
     db = get_database()
     
@@ -260,9 +389,13 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
             sort=[("generated_at", -1)]
         )
         
-        should_regenerate = False
+        should_regenerate = force_refresh
         
-        if not latest_snapshot:
+        if force_refresh:
+            logger.info("🔄 Force refresh requested, regenerating leaderboard...")
+            # Clear old snapshots when force refreshing
+            await db.leaderboard_snapshots.delete_many({})
+        elif not latest_snapshot:
             logger.info("📊 No leaderboard snapshot found, generating new one...")
             should_regenerate = True
         else:
@@ -318,5 +451,44 @@ async def get_current_leaderboard(current_user: dict = Depends(get_current_user)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve leaderboard: {str(e)}"
+        )
+
+
+@router.post("/refresh")
+async def refresh_leaderboard(current_user: dict = Depends(get_current_user)):
+    """
+    Force refresh the leaderboard by clearing all cached snapshots and generating a new one.
+    """
+    db = get_database()
+    
+    try:
+        # Delete all existing snapshots
+        result = await db.leaderboard_snapshots.delete_many({})
+        logger.info(f"🗑️ Cleared {result.deleted_count} cached leaderboard snapshots")
+        
+        # Generate fresh snapshot
+        snapshot = await generate_leaderboard_snapshot()
+        
+        if not snapshot:
+            return {
+                "message": "Leaderboard refreshed but no posts found in the time window",
+                "from_date": (datetime.utcnow() - timedelta(days=LEADERBOARD_WINDOW_DAYS)).isoformat(),
+                "to_date": datetime.utcnow().isoformat(),
+                "entries": []
+            }
+        
+        return {
+            "message": "Leaderboard refreshed successfully",
+            "entries_count": len(snapshot.get("entries", [])),
+            "from_date": snapshot.get("from_date"),
+            "to_date": snapshot.get("to_date"),
+            "generated_at": snapshot.get("generated_at")
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error refreshing leaderboard: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to refresh leaderboard: {str(e)}"
         )
 
