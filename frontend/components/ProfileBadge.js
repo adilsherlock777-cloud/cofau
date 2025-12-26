@@ -25,7 +25,7 @@ export default function ProfileBadge({
   username,
   level = 1,
   dpSize = 115,
-  badgeSize = 100,
+  badgeSize = 95,
   cameraIcon = null
 }) {
 
@@ -95,10 +95,11 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     alignItems: 'center',
-    marginLeft: 80,
+    marginLeft: 70,
+    marginTop: 10,
   },
   badgeTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     marginTop: 6,
     color: '#444',

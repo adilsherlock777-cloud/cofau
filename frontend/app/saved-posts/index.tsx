@@ -53,6 +53,18 @@ export default function SavedPostsScreen() {
 
   const renderPost = (post: any) => {
     const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
+    const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
+    const isVideo =
+      post.media_type === 'video' ||
+      mediaUrl?.toLowerCase().endsWith('.mp4') ||
+      mediaUrl?.toLowerCase().endsWith('.mov') ||
+      mediaUrl?.toLowerCase().endsWith('.avi') ||
+      mediaUrl?.toLowerCase().endsWith('.webm');
+    
+    // For videos, ONLY use thumbnail (never try to load video URL as image)
+    // For images, use mediaUrl
+    const displayUrl = isVideo ? thumbnailUrl : mediaUrl;
+    const hasValidThumbnail = isVideo ? !!thumbnailUrl : !!mediaUrl;
 
     return (
       <TouchableOpacity
@@ -61,14 +73,32 @@ export default function SavedPostsScreen() {
         onPress={() => router.push(`/post-details/${post._id || post.id}`)}
         activeOpacity={0.8}
       >
-        <Image
-          source={{ uri: mediaUrl }}
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
-        {post.media_type === 'video' && (
-          <View style={styles.videoIndicator}>
-            <Ionicons name="play" size={20} color="#FFF" />
+        {hasValidThumbnail && displayUrl ? (
+          <View style={styles.thumbnailContainer}>
+            <Image
+              source={{ uri: displayUrl }}
+              style={styles.thumbnail}
+              resizeMode="cover"
+              onError={(error) => {
+                console.error("❌ Image load error in saved posts:", displayUrl, error);
+              }}
+            />
+            {isVideo && (
+              <View style={styles.videoOverlay}>
+                <Ionicons name="play-circle" size={40} color="#fff" />
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.thumbnailPlaceholder}>
+            <Ionicons
+              name={isVideo ? 'videocam-outline' : 'image-outline'}
+              size={40}
+              color="#ccc"
+            />
+            {isVideo && !thumbnailUrl && (
+              <Text style={styles.placeholderText}>Video</Text>
+            )}
           </View>
         )}
       </TouchableOpacity>
@@ -169,18 +199,37 @@ const styles = StyleSheet.create({
     height: ITEM_SIZE,
     position: 'relative',
   },
+  thumbnailContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
   thumbnail: {
     width: '100%',
     height: '100%',
     backgroundColor: '#f0f0f0',
   },
-  videoIndicator: {
+  thumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#999',
+  },
+  videoOverlay: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
-    padding: 4,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,

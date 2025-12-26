@@ -50,11 +50,12 @@ export default function SignupScreen() {
 
     setCheckingUsername(true);
     try {
-      const response = await axios.get(`${API_URL}/api/auth/check-username`, {
-        params: { username: usernameToCheck },
+      // Fix: API_URL already includes /api, so use /auth/check-username not /api/auth/check-username
+      const response = await axios.get(`${API_URL}/auth/check-username`, {
+        params: { username: usernameToCheck.trim() },
       });
 
-      if (response.data.available) {
+      if (response.data && response.data.available === true) {
         setUsernameAvailable(true);
         setUsernameError('');
         setUsernameSuggestions([]);
@@ -62,13 +63,21 @@ export default function SignupScreen() {
       } else {
         setUsernameAvailable(false);
         setUsernameError(`Username "${usernameToCheck}" is already taken`);
-        setUsernameSuggestions(response.data.suggestions || []);
+        setUsernameSuggestions(response.data?.suggestions || []);
         return false;
       }
     } catch (error: any) {
       console.error('Error checking username:', error);
+      // If it's a 404, the endpoint might not exist - treat as unavailable to be safe
+      if (error.response?.status === 404) {
+        setUsernameAvailable(false);
+        setUsernameError('Unable to verify username. Please try again.');
+        setUsernameSuggestions([]);
+        return false;
+      }
+      // For other errors, don't block signup but show warning
       setUsernameAvailable(null);
-      setUsernameError('');
+      setUsernameError('Could not verify username availability. Please try again.');
       setUsernameSuggestions([]);
       return false;
     } finally {
@@ -133,17 +142,27 @@ export default function SignupScreen() {
       return;
     }
 
-    // If username hasn't been checked yet, check it now
-    if (usernameAvailable === null && username.trim().length >= 3) {
-      const isAvailable = await checkUsernameAvailability(username.trim());
+    // Always check username availability before signup to ensure it's still available
+    const trimmedUsername = username.trim();
+    if (trimmedUsername.length >= 3) {
+      const isAvailable = await checkUsernameAvailability(trimmedUsername);
       if (!isAvailable) {
-        Alert.alert('Username Taken', 'Please choose a different username or select one of the suggestions');
+        // Show error with suggestions if available
+        if (usernameSuggestions.length > 0) {
+          Alert.alert(
+            'Username Taken',
+            `"${trimmedUsername}" is already taken. Please choose a different username or select one of the suggestions below.`
+          );
+        } else {
+          Alert.alert(
+            'Username Taken',
+            `"${trimmedUsername}" is already taken. Please choose a different username.`
+          );
+        }
         return;
       }
-    }
-
-    if (usernameAvailable === false) {
-      Alert.alert('Username Taken', 'Please choose a different username or select one of the suggestions');
+    } else {
+      Alert.alert('Error', 'Username must be at least 3 characters');
       return;
     }
 
@@ -176,12 +195,32 @@ export default function SignupScreen() {
           ]
         );
       } else {
-        // Show error from backend
-        Alert.alert('Signup Failed', result.error || 'Please try again');
+        // Show specific error from backend
+        const errorMessage = result.error || 'Please try again';
+        
+        // If username is taken, update UI state
+        if (errorMessage.toLowerCase().includes('username') && errorMessage.toLowerCase().includes('taken')) {
+          setUsernameAvailable(false);
+          setUsernameError(`Username "${username.trim()}" is already taken`);
+          // Re-check to get suggestions
+          await checkUsernameAvailability(username.trim());
+        }
+        
+        Alert.alert('Signup Failed', errorMessage);
       }
-    } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } catch (error: any) {
       console.error('Signup error:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'An unexpected error occurred. Please try again.';
+      
+      // If username is taken, update UI state
+      if (errorMessage.toLowerCase().includes('username') && errorMessage.toLowerCase().includes('taken')) {
+        setUsernameAvailable(false);
+        setUsernameError(`Username "${username.trim()}" is already taken`);
+        // Re-check to get suggestions
+        await checkUsernameAvailability(username.trim());
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }

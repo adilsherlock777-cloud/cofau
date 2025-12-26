@@ -23,6 +23,7 @@ import { createPost } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
+import axios from 'axios';
 
 export default function AddPostScreen() {
   const router = useRouter();
@@ -262,11 +263,39 @@ export default function AddPostScreen() {
 
       // Refresh user data immediately to show updated points
       await refreshUser();
+      
+      // Get the old level before refresh
+      const oldLevel = auth?.user?.level || 1;
+      
+      // Wait a bit for state to update, then get updated user
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Fetch updated user data to get new level
+      const userResponse = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${auth?.token}` },
+      });
+      const updatedUser = userResponse.data;
+      const newLevel = updatedUser?.level || oldLevel;
+      
+      // Get the user's current level to calculate points earned (use old level for calculation)
+      const currentLevel = oldLevel;
+      
+      // Calculate points earned based on level
+      // Levels 1-4 (Reviewer): 25 points
+      // Levels 5-8 (Top Reviewer): 15 points
+      // Levels 9-12 (Influencer): 5 points
+      let earnedPoints = 25; // Default
+      if (currentLevel >= 5 && currentLevel <= 8) {
+        earnedPoints = 15;
+      } else if (currentLevel >= 9 && currentLevel <= 12) {
+        earnedPoints = 5;
+      }
 
-      // Check for level up in the level_update object
-      const levelUpdate = result.level_update;
-      if (levelUpdate && levelUpdate.leveledUp) {
-        showLevelUpAnimation(levelUpdate.level);
+      // Check for level up
+      const leveledUp = newLevel > oldLevel;
+
+      if (leveledUp) {
+        showLevelUpAnimation(newLevel);
         // Use replace instead of push to force refresh, and add small delay for DB to commit
         setTimeout(() => {
           router.replace('/feed');
@@ -275,7 +304,6 @@ export default function AddPostScreen() {
       }
 
       // Show points earned animation based on points earned
-      const earnedPoints = levelUpdate?.pointsEarned || 0;
       if (earnedPoints > 0) {
         setPointsEarned(earnedPoints);
         setShowPointsAnimation(true);
