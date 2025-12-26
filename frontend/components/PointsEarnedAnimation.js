@@ -8,13 +8,13 @@ export default function PointsEarnedAnimation({ visible, pointsEarned, onClose }
   useEffect(() => {
     if (visible) {
       setShowGif(true);
-      // Hide after GIF finishes (approximately 1800ms)
+      // Hide after GIF finishes (approximately 2500ms for better visibility)
       const timer = setTimeout(() => {
         setShowGif(false);
         if (onClose) {
           onClose();
         }
-      }, 1800);
+      }, 2500);
       
       return () => clearTimeout(timer);
     } else {
@@ -27,6 +27,9 @@ export default function PointsEarnedAnimation({ visible, pointsEarned, onClose }
     if (pointsEarned === 25) {
       return require('../assets/animations/25.gif');
     } else if (pointsEarned === 15) {
+      return require('../assets/animations/15.gif');
+    } else if (pointsEarned === 5) {
+      // For 5 points (Influencer level), use 15.gif as fallback or create a 5.gif later
       return require('../assets/animations/15.gif');
     }
     // Default fallback - use 25 points GIF

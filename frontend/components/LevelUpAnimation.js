@@ -6,6 +6,7 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Image,
 } from 'react-native';
 import { useLevelAnimation } from '../context/LevelContext';
 
@@ -90,76 +91,20 @@ export default function LevelUpAnimation() {
     if (showAnimation) {
       console.log('🎬 Starting level-up animation for Level', currentLevel);
 
-      // Reset all animations
+      // Fade in background
       fadeAnim.setValue(0);
-      scaleAnim.setValue(0);
-      trophyScale.setValue(0);
-      trophyRotate.setValue(0);
-      textSlideUp.setValue(50);
-      textOpacity.setValue(0);
-      glowAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
 
-      // Sequence of animations
-      Animated.sequence([
-        // 1. Fade in background
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        // 2. Trophy burst in with rotation
-        Animated.parallel([
-          Animated.spring(trophyScale, {
-            toValue: 1,
-            tension: 100,
-            friction: 5,
-            useNativeDriver: true,
-          }),
-          Animated.timing(trophyRotate, {
-            toValue: 360,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ]),
-        // 3. Pulsing glow effect
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(glowAnim, {
-              toValue: 1,
-              duration: 800,
-              useNativeDriver: true,
-            }),
-            Animated.timing(glowAnim, {
-              toValue: 0,
-              duration: 800,
-              useNativeDriver: true,
-            }),
-          ]),
-          { iterations: 2 }
-        ),
-      ]).start();
-
-      // Text slides up separately
-      setTimeout(() => {
-        Animated.parallel([
-          Animated.spring(textSlideUp, {
-            toValue: 0,
-            tension: 80,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-          Animated.timing(textOpacity, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }, 500);
-
-      // Auto-hide after 2.5 seconds
-      setTimeout(() => {
+      // Auto-hide after 3 seconds (GIF duration)
+      const timer = setTimeout(() => {
         handleAnimationEnd();
-      }, 2500);
+      }, 3000);
+
+      return () => clearTimeout(timer);
     }
   }, [showAnimation, currentLevel]);
 
@@ -204,68 +149,14 @@ export default function LevelUpAnimation() {
         {/* Dimmed Background */}
         <View style={styles.dimmedBackground} />
 
-        {/* Confetti Particles */}
-        {Array.from({ length: 30 }).map((_, index) => (
-          <ConfettiParticle key={index} delay={index * 50} index={index} />
-        ))}
-
-        {/* Trophy/Star Container */}
-        <Animated.View
-          style={[
-            styles.trophyContainer,
-            {
-              transform: [
-                { scale: trophyScale },
-                {
-                  rotate: trophyRotate.interpolate({
-                    inputRange: [0, 360],
-                    outputRange: ['0deg', '360deg'],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          {/* Glow effect */}
-          <Animated.View
-            style={[
-              styles.glowCircle,
-              {
-                opacity: glowAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.3, 0.8],
-                }),
-                transform: [
-                  {
-                    scale: glowAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 1.2],
-                    }),
-                  },
-                ],
-              },
-            ]}
+        {/* Level Up GIF Animation */}
+        <View style={styles.gifContainer}>
+          <Image
+            source={require('../assets/animations/LEVEL_UP.gif')}
+            style={styles.levelUpGif}
+            resizeMode="cover"
           />
-          <Text style={styles.trophyEmoji}>🏆</Text>
-        </Animated.View>
-
-        {/* Level Up Text */}
-        <Animated.View
-          style={[
-            styles.textContainer,
-            {
-              opacity: textOpacity,
-              transform: [{ translateY: textSlideUp }],
-            },
-          ]}
-        >
-          <Text style={styles.celebrationEmoji}>🎉</Text>
-          <Text style={styles.levelUpText}>Level Up!</Text>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelNumberText}>Level {currentLevel}</Text>
-          </View>
-          <Text style={styles.subText}>Keep going!</Text>
-        </Animated.View>
+        </View>
       </Animated.View>
     </Modal>
   );
@@ -361,6 +252,20 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 
+  gifContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 10,
+  },
+  levelUpGif: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
   subText: {
     fontSize: 18,
     color: '#FFD700',

@@ -78,6 +78,11 @@ export default function FeedCard({
   const [isFollowing, setIsFollowing] = useState(post.is_following || false);
   const [followLoading, setFollowLoading] = useState(false);
 
+  // Update isFollowing state when post data changes
+  useEffect(() => {
+    setIsFollowing(post.is_following || false);
+  }, [post.is_following]);
+
   const mediaUrl = normalizeMediaUrl(post.media_url);
 
   // Check if this is the current user's own post
@@ -219,22 +224,53 @@ export default function FeedCard({
   const handleFollowToggle = async () => {
     if (!post.user_id || isOwnPost || followLoading) return;
 
-    setFollowLoading(true);
-    const previousFollowState = isFollowing;
-    setIsFollowing(!isFollowing);
+    // Show alert when following
+    if (!isFollowing) {
+      Alert.alert(
+        "Follow User",
+        `Do you want to follow ${post.username || "this user"}?`,
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => { },
+          },
+          {
+            text: "Follow",
+            onPress: async () => {
+              setFollowLoading(true);
+              const previousFollowState = isFollowing;
+              setIsFollowing(true);
 
-    try {
-      if (isFollowing) {
+              try {
+                await followUser(post.user_id);
+                Alert.alert("Success", `You are now following ${post.username || "this user"}`);
+              } catch (error) {
+                console.error("Error following user:", error);
+                setIsFollowing(previousFollowState);
+                Alert.alert("Error", "Failed to follow user. Please try again.");
+              } finally {
+                setFollowLoading(false);
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      // Unfollow without alert (less intrusive)
+      setFollowLoading(true);
+      const previousFollowState = isFollowing;
+      setIsFollowing(false);
+
+      try {
         await unfollowUser(post.user_id);
-      } else {
-        await followUser(post.user_id);
+      } catch (error) {
+        console.error("Error unfollowing user:", error);
+        setIsFollowing(previousFollowState);
+        Alert.alert("Error", "Failed to unfollow user. Please try again.");
+      } finally {
+        setFollowLoading(false);
       }
-    } catch (error) {
-      console.error("Error toggling follow:", error);
-      setIsFollowing(previousFollowState);
-      Alert.alert("Error", "Failed to update follow status. Please try again.");
-    } finally {
-      setFollowLoading(false);
     }
   };
 
@@ -395,8 +431,8 @@ export default function FeedCard({
             </>
           ) : (
             mediaUrl ? (
-              <Image 
-                source={{ uri: mediaUrl }} 
+              <Image
+                source={{ uri: mediaUrl }}
                 style={styles.image}
                 onError={(error) => {
                   console.error("❌ Image load error in FeedCard:", mediaUrl, error);

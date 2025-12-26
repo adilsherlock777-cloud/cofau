@@ -2397,6 +2397,7 @@ favouriteGridImage: {
     justifyContent: 'space-around',
     paddingHorizontal: 20,
     marginBottom: 8,
+    marginTop: 8
   },
   statBox: {
     paddingVertical: 8,
