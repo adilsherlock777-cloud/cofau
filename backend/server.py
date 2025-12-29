@@ -148,16 +148,27 @@ async def serve_media_file(filename: str, request: Request):
                 
                 # Return partial content response
                 return Response(
-                content=chunk,
-                status_code=206,  # Partial Content
-                headers={
-                    'Content-Type': content_type,
-                    'Content-Range': f'bytes {start}-{end}/{file_size}',
-                    'Accept-Ranges': 'bytes',
-                    'Content-Length': str(content_length),
-                    'Cache-Control': 'public, max-age=31536000',
-                }
-            )
+                    content=chunk,
+                    status_code=206,  # Partial Content
+                    headers={
+                        'Content-Type': content_type,
+                        'Content-Range': f'bytes {start}-{end}/{file_size}',
+                        'Accept-Ranges': 'bytes',
+                        'Content-Length': str(content_length),
+                        'Cache-Control': 'public, max-age=31536000',
+                    }
+                )
+            except (ValueError, IndexError, IOError) as e:
+                # If range parsing fails, return full file
+                print(f"Error parsing range header: {e}")
+                return FileResponse(
+                    file_path,
+                    media_type=content_type,
+                    headers={
+                        'Accept-Ranges': 'bytes',
+                        'Cache-Control': 'public, max-age=31536000',
+                    }
+                )
         else:
             # Full file response for videos
             return FileResponse(
@@ -168,19 +179,6 @@ async def serve_media_file(filename: str, request: Request):
                     'Cache-Control': 'public, max-age=31536000',
                 }
             )
-            except (ValueError, IndexError):
-                # Invalid range header, serve full file
-                pass
-        
-        # Full file response for videos (no range request or invalid range)
-        return FileResponse(
-            file_path,
-            media_type=content_type,
-            headers={
-                'Accept-Ranges': 'bytes',
-                'Cache-Control': 'public, max-age=31536000',
-            }
-        )
     else:
         # For images, use standard FileResponse
         return FileResponse(

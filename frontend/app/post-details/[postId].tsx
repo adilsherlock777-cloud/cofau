@@ -108,6 +108,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const [followLoading, setFollowLoading] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState(false);
   const videoRef = useRef(null);
   
   // Update isFollowing state when post data changes
@@ -136,6 +137,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const isVideo = (post.media_type || "").toLowerCase() === "video";
   const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url);
   const imageUrl = normalizeMediaUrl(post.image_url || post.media_url);
+  const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
   const profilePic = normalizeProfilePicture(post.user_profile_picture);
 
   const getDisplayUrl = () => {
@@ -375,7 +377,24 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
         >
           {isVideo ? (
             <>
-              {!videoError ? (
+              {/* Thumbnail - Always rendered, hidden when video is playing (Critical for iOS) */}
+              {(!videoLoaded || videoError || !shouldPlay) && !thumbnailError && (thumbnailUrl || mediaUrl || displayUrl) && (
+                <Image
+                  source={{ uri: (thumbnailUrl || mediaUrl || displayUrl) as string }}
+                  style={[
+                    styles.responsiveMedia,
+                    videoLoaded && shouldPlay && styles.hiddenImage
+                  ] as any}
+                  contentFit="cover"
+                  onError={() => {
+                    console.error("❌ Thumbnail error in post details");
+                    setThumbnailError(true);
+                  }}
+                />
+              )}
+
+              {/* Video - Only render when shouldPlay is true and no error (Critical for iOS performance) */}
+              {shouldPlay && !videoError && (
                 <Video
                   ref={videoRef}
                   source={{
@@ -386,7 +405,10 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                       'User-Agent': 'Cofau/1.0',
                     }
                   }}
-                  style={styles.responsiveMedia}
+                  style={[
+                    styles.responsiveMedia,
+                    !videoLoaded && styles.hiddenVideo
+                  ]}
                   resizeMode={ResizeMode.COVER}
                   shouldPlay={shouldPlay}
                   isLooping
@@ -430,7 +452,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                         } catch (err) {
                           console.log("Auto-play error in post details:", err);
                         }
-                      }, 300); // Increased delay for iOS
+                      }, 200); // Reduced delay to prevent flickering (matching FeedCard)
                     }
                   }}
                   onError={(error: any) => {
@@ -487,7 +509,25 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   }}
                   progressUpdateIntervalMillis={1000}
                 />
-              ) : (
+              )}
+
+              {/* Play icon overlay - Only show when video is not playing */}
+              {(!shouldPlay || videoError || !videoLoaded) && (
+                <View style={styles.playIconOverlay}>
+                  <Ionicons name="play-circle-outline" size={60} color="rgba(255,255,255,0.9)" />
+                </View>
+              )}
+
+              {/* Fallback placeholder if thumbnail fails */}
+              {thumbnailError && !videoLoaded && (
+                <View style={styles.videoPlaceholder}>
+                  <Ionicons name="videocam-outline" size={40} color="#999" />
+                  <Text style={styles.videoPlaceholderText}>Video</Text>
+                </View>
+              )}
+
+              {/* Error container - Show when video fails to load */}
+              {videoError && (
                 <View style={styles.videoErrorContainer}>
                   <Ionicons name="videocam-outline" size={40} color="#999" />
                   <Text style={styles.videoErrorText}>Unable to load video</Text>
@@ -504,7 +544,9 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   </TouchableOpacity>
                 </View>
               )}
-              {!videoError && (
+
+              {/* Mute indicator - Only show when video is playing */}
+              {!videoError && videoLoaded && shouldPlay && (
                 <View style={styles.muteIndicatorReels}>
                   <Ionicons 
                     name={isMuted ? "volume-mute" : "volume-high"} 
@@ -1545,5 +1587,41 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+  hiddenImage: {
+    position: "absolute",
+    opacity: 0,
+    width: "100%",
+    height: "100%",
+    zIndex: 0,
+  },
+  hiddenVideo: {
+    position: "absolute",
+    opacity: 0,
+    width: "100%",
+    height: "100%",
+    zIndex: 1,
+  },
+  playIconOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  videoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoPlaceholderText: {
+    color: "#999",
+    fontSize: 14,
+    marginTop: 8,
   },
 });
