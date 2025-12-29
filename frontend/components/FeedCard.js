@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -344,14 +345,41 @@ export default function FeedCard({
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => router.push(`/post-details/${post.id}`)}
+          style={isVideo ? styles.videoWrapper : null}
         >
           {isVideo ? (
             <>
-              {shouldPlay && !videoError ? (
+              {/* Thumbnail - Always rendered, hidden when video is playing */}
+              {(!videoLoaded || videoError || !shouldPlay) && !thumbnailError && (
+                <Image
+                  source={{ uri: thumbnailUrl || mediaUrl }}
+                  style={[
+                    styles.video,
+                    videoLoaded && shouldPlay && styles.hiddenImage
+                  ]}
+                  onError={() => {
+                    console.error("❌ Thumbnail error");
+                    setThumbnailError(true);
+                  }}
+                />
+              )}
+
+              {/* Video - Only render when shouldPlay is true and no error */}
+              {shouldPlay && !videoError && (
                 <Video
                   ref={videoRef}
-                  source={{ uri: mediaUrl }}
-                  style={styles.video}
+                  source={{
+                    uri: mediaUrl,
+                    // iOS requires headers for proper video loading
+                    headers: {
+                      'Accept': 'video/mp4, video/quicktime, video/*',
+                      'User-Agent': 'Cofau/1.0',
+                    }
+                  }}
+                  style={[
+                    styles.video,
+                    !videoLoaded && styles.hiddenVideo
+                  ]}
                   resizeMode="cover"
                   shouldPlay={shouldPlay}
                   isLooping
@@ -359,41 +387,77 @@ export default function FeedCard({
                   useNativeControls={false}
                   allowsExternalPlayback={false}
                   playInSilentModeIOS={true}
+                  // iOS-specific props for better compatibility
+                  usePoster={false}
+                  posterSource={null}
+                  // Preload video for iOS
                   onLoad={(status) => {
                     console.log("✅ Video loaded on iOS/Android", status);
-                    setVideoLoaded(true);
-                    setVideoError(false);
+                    // Only update state if it changed to prevent flickering
+                    if (!videoLoaded) {
+                      setVideoLoaded(true);
+                    }
+                    if (videoError) {
+                      setVideoError(false);
+                    }
                     // Ensure video plays after load (iOS needs explicit play)
                     if (shouldPlay && videoRef.current) {
                       setTimeout(async () => {
                         try {
                           const currentStatus = await videoRef.current.getStatusAsync();
                           if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
+                            // iOS needs explicit play call
                             await videoRef.current.playAsync();
+                            // Ensure it's actually playing
+                            const afterPlayStatus = await videoRef.current.getStatusAsync();
+                            if (!afterPlayStatus.isPlaying && shouldPlay) {
+                              // Retry play if it didn't start
+                              setTimeout(async () => {
+                                try {
+                                  await videoRef.current.playAsync();
+                                } catch (retryErr) {
+                                  console.log("Video play retry error:", retryErr);
+                                }
+                              }, 300);
+                            }
                           }
                         } catch (err) {
                           console.log("Auto-play error:", err);
                         }
-                      }, 200);
+                      }, 200); // Reduced delay to prevent flickering
                     }
                   }}
                   onError={(error) => {
                     console.error("❌ Video error:", error);
                     console.error("❌ Video URL:", mediaUrl);
-                    setVideoError(true);
-                    setVideoLoaded(false);
+                    if (!videoError) {
+                      setVideoError(true);
+                    }
+                    if (videoLoaded) {
+                      setVideoLoaded(false);
+                    }
                     // Try to reload video on error (iOS sometimes needs this)
                     if (videoRef.current) {
-                      setTimeout(() => {
-                        videoRef.current?.reloadAsync().catch((reloadErr) => {
+                      setTimeout(async () => {
+                        try {
+                          await videoRef.current.unloadAsync();
+                          await videoRef.current.loadAsync({ uri: mediaUrl });
+                          if (shouldPlay) {
+                            await videoRef.current.playAsync();
+                          }
+                        } catch (reloadErr) {
                           console.error("Reload error:", reloadErr);
-                        });
+                        }
                       }, 1000);
                     }
                   }}
                   onLoadStart={() => {
                     console.log("📹 Video loading started:", mediaUrl);
-                    setVideoError(false);
+                    // Don't reset videoLoaded here to prevent flickering
+                    // Only set error to false if it was true
+                    if (videoError) {
+                      setVideoError(false);
+                    }
                   }}
                   onPlaybackStatusUpdate={(status) => {
                     // Ensure video stops if shouldPlay becomes false
@@ -401,31 +465,29 @@ export default function FeedCard({
                       videoRef.current.pauseAsync().catch(() => { });
                       videoRef.current.setPositionAsync(0).catch(() => { });
                     }
+                    // Only attempt to play if video is loaded and should play
+                    if (status.isLoaded && !status.isPlaying && shouldPlay && videoLoaded) {
+                      videoRef.current?.playAsync().catch((err) => {
+                        // Silently handle - don't log to prevent spam
+                      });
+                    }
                   }}
                   progressUpdateIntervalMillis={1000}
                 />
-              ) : (
-                <>
-                  {!thumbnailError ? (
-                    <Image
-                      source={{ uri: thumbnailUrl || mediaUrl }}
-                      style={styles.image}
-                      onError={() => {
-                        console.error("❌ Thumbnail error");
-                        setThumbnailError(true);
-                      }}
-                    />
-                  ) : (
-                    <View style={styles.videoPlaceholder}>
-                      <Ionicons name="videocam-outline" size={40} color="#999" />
-                      <Text style={styles.videoPlaceholderText}>Video</Text>
-                    </View>
-                  )}
-                </>
               )}
-              {!shouldPlay && !videoError && (
+
+              {/* Play icon overlay - Only show when video is not playing */}
+              {(!shouldPlay || videoError || !videoLoaded) && (
                 <View style={styles.playIconOverlay}>
                   <Ionicons name="play-circle-outline" size={60} color="#fff" />
+                </View>
+              )}
+
+              {/* Fallback placeholder if thumbnail fails */}
+              {thumbnailError && !videoLoaded && (
+                <View style={styles.videoPlaceholder}>
+                  <Ionicons name="videocam-outline" size={40} color="#999" />
+                  <Text style={styles.videoPlaceholderText}>Video</Text>
                 </View>
               )}
             </>
@@ -666,11 +728,9 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
-  videoContainer: {
+  videoWrapper: {
     position: "relative",
     width: "100%",
-    aspectRatio: 2,
-    backgroundColor: "#000",
   },
   image: {
     width: "100%",
@@ -680,6 +740,22 @@ const styles = StyleSheet.create({
   video: {
     width: "100%",
     aspectRatio: 9 / 16,
+  },
+
+  hiddenImage: {
+    position: "absolute",
+    opacity: 0,
+    width: "100%",
+    height: "100%",
+    zIndex: 0,
+  },
+
+  hiddenVideo: {
+    position: "absolute",
+    opacity: 0,
+    width: "100%",
+    height: "100%",
+    zIndex: 1,
   },
 
   playIconOverlay: {

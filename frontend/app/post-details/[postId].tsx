@@ -378,54 +378,111 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
               {!videoError ? (
                 <Video
                   ref={videoRef}
-                  source={{ uri: mediaUrl || displayUrl || '' }}
+                  source={{
+                    uri: mediaUrl || displayUrl || '',
+                    // iOS requires headers for proper video loading
+                    headers: {
+                      'Accept': 'video/mp4, video/quicktime, video/*',
+                      'User-Agent': 'Cofau/1.0',
+                    }
+                  }}
                   style={styles.responsiveMedia}
                   resizeMode={ResizeMode.CONTAIN}
                   shouldPlay={shouldPlay}
                   isLooping
                   isMuted={isMuted}
                   useNativeControls={false}
+                  allowsExternalPlayback={false}
+                  playInSilentModeIOS={true}
+                  // iOS-specific props for better compatibility
+                  usePoster={false}
+                  posterSource={null}
                   onLoad={(status: any) => {
                     console.log("✅ Video loaded in post details", status);
-                    setVideoLoaded(true);
-                    setVideoError(false);
-                    // Ensure video plays after load only if it should be playing
+                    // Only update state if it changed to prevent flickering
+                    if (!videoLoaded) {
+                      setVideoLoaded(true);
+                    }
+                    if (videoError) {
+                      setVideoError(false);
+                    }
+                    // Ensure video plays after load (iOS needs explicit play)
                     if (videoRef.current && shouldPlay) {
                       setTimeout(async () => {
                         try {
                           const currentStatus = await (videoRef.current as any).getStatusAsync();
                           if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
+                            // iOS needs explicit play call
                             await (videoRef.current as any).playAsync();
+                            // Ensure it's actually playing
+                            const afterPlayStatus = await (videoRef.current as any).getStatusAsync();
+                            if (!afterPlayStatus.isPlaying && shouldPlay) {
+                              // Retry play if it didn't start (iOS sometimes needs this)
+                              setTimeout(async () => {
+                                try {
+                                  await (videoRef.current as any).playAsync();
+                                } catch (retryErr) {
+                                  console.log("Video play retry error in post details:", retryErr);
+                                }
+                              }, 300);
+                            }
                           }
                         } catch (err) {
                           console.log("Auto-play error in post details:", err);
                         }
-                      }, 200);
+                      }, 300); // Increased delay for iOS
                     }
                   }}
                   onError={(error: any) => {
                     console.error("❌ Video error in post details:", error);
                     console.error("❌ Video URL:", mediaUrl || displayUrl);
-                    setVideoError(true);
-                    setVideoLoaded(false);
-                    // Try to reload video on error
+                    console.error("❌ Error details:", JSON.stringify(error, null, 2));
+                    if (!videoError) {
+                      setVideoError(true);
+                    }
+                    if (videoLoaded) {
+                      setVideoLoaded(false);
+                    }
+                    // Try to reload video on error (iOS sometimes needs this)
                     if (videoRef.current) {
-                      setTimeout(() => {
-                        (videoRef.current as any)?.reloadAsync?.().catch((reloadErr: any) => {
-                          console.error("Reload error:", reloadErr);
-                        });
+                      setTimeout(async () => {
+                        try {
+                          await (videoRef.current as any).unloadAsync();
+                          await (videoRef.current as any).loadAsync({
+                            uri: mediaUrl || displayUrl || '',
+                            headers: {
+                              'Accept': 'video/mp4, video/quicktime, video/*',
+                              'User-Agent': 'Cofau/1.0',
+                            }
+                          });
+                          if (shouldPlay) {
+                            await (videoRef.current as any).playAsync();
+                          }
+                        } catch (reloadErr) {
+                          console.error("Reload error in post details:", reloadErr);
+                        }
                       }, 1000);
                     }
                   }}
                   onLoadStart={() => {
                     console.log("📹 Video loading started in post details:", mediaUrl || displayUrl);
-                    setVideoError(false);
+                    // Don't reset videoLoaded here to prevent flickering
+                    // Only set error to false if it was true
+                    if (videoError) {
+                      setVideoError(false);
+                    }
                   }}
                   onPlaybackStatusUpdate={(status: any) => {
                     // Ensure video stops if shouldPlay becomes false
                     if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
                       (videoRef.current as any).pauseAsync().catch(() => {});
                       (videoRef.current as any).setPositionAsync(0).catch(() => {});
+                    }
+                    // Only attempt to play if video is loaded and should play
+                    if (status.isLoaded && !status.isPlaying && shouldPlay && videoLoaded) {
+                      (videoRef.current as any)?.playAsync().catch((err: any) => {
+                        // Silently handle - don't log to prevent spam
+                      });
                     }
                   }}
                   progressUpdateIntervalMillis={1000}

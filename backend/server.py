@@ -80,7 +80,118 @@ if not os.path.isabs(settings.UPLOAD_DIR):
 print("STATIC DIRECTORY => ", STATIC_DIR)
 print("UPLOAD DIRECTORY => ", settings.UPLOAD_DIR)
 
-# Mount static files correctly
+# Create uploads directory if missing
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
+# ======================================================
+# CUSTOM VIDEO ENDPOINT FOR iOS COMPATIBILITY
+# iOS requires proper headers and range request support
+# This route must be defined BEFORE the static mount
+# ======================================================
+from fastapi.responses import FileResponse, Response
+from fastapi import Request, HTTPException
+import mimetypes
+
+@app.get("/api/static/uploads/{filename:path}")
+async def serve_media_file(filename: str, request: Request):
+    """
+    Serve media files (images/videos) with proper headers for iOS compatibility.
+    Supports range requests for video streaming on iOS.
+    """
+    import os
+    from pathlib import Path
+    
+    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+    
+    # Check if file exists
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(file_path)
+    if not content_type:
+        # Default based on extension
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in ['.mp4', '.mov', '.m4v']:
+            content_type = 'video/mp4'
+        elif ext in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        elif ext == '.png':
+            content_type = 'image/png'
+        else:
+            content_type = 'application/octet-stream'
+    
+    # Check if it's a video file
+    is_video = content_type.startswith('video/')
+    
+    # For video files, support range requests (required for iOS)
+    if is_video:
+        file_size = os.path.getsize(file_path)
+        range_header = request.headers.get('range')
+        
+        if range_header:
+            # Parse range header
+            try:
+                range_match = range_header.replace('bytes=', '').split('-')
+                start = int(range_match[0]) if range_match[0] else 0
+                end = int(range_match[1]) if range_match[1] else file_size - 1
+                
+                # Ensure valid range
+                start = max(0, start)
+                end = min(file_size - 1, end)
+                content_length = end - start + 1
+                
+                # Read file chunk
+                with open(file_path, 'rb') as f:
+                    f.seek(start)
+                    chunk = f.read(content_length)
+                
+                # Return partial content response
+                return Response(
+                content=chunk,
+                status_code=206,  # Partial Content
+                headers={
+                    'Content-Type': content_type,
+                    'Content-Range': f'bytes {start}-{end}/{file_size}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(content_length),
+                    'Cache-Control': 'public, max-age=31536000',
+                }
+            )
+        else:
+            # Full file response for videos
+            return FileResponse(
+                file_path,
+                media_type=content_type,
+                headers={
+                    'Accept-Ranges': 'bytes',
+                    'Cache-Control': 'public, max-age=31536000',
+                }
+            )
+            except (ValueError, IndexError):
+                # Invalid range header, serve full file
+                pass
+        
+        # Full file response for videos (no range request or invalid range)
+        return FileResponse(
+            file_path,
+            media_type=content_type,
+            headers={
+                'Accept-Ranges': 'bytes',
+                'Cache-Control': 'public, max-age=31536000',
+            }
+        )
+    else:
+        # For images, use standard FileResponse
+        return FileResponse(
+            file_path,
+            media_type=content_type,
+            headers={
+                'Cache-Control': 'public, max-age=31536000',
+            }
+        )
+
+# Mount static files correctly (after custom route)
 app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Create uploads directory if missing
