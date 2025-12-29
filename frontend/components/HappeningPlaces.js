@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { BlurView } from 'expo-blur';
 
 export const options = {
   headerShown: false,
@@ -155,13 +156,17 @@ export default function HappeningPlaces() {
           </View>
 
           {/* Title Box */}
-          <View style={styles.titleBox}>
-            <Text style={styles.titleMain}>Happening place</Text>
-            <Text style={styles.titleSub}>
-              Most Visited Places Around you
-            </Text>
-          </View>
-
+<View style={styles.titleBoxWrapper}>
+  <BlurView intensity={60} tint="light" style={styles.titleBox}>
+    <Text style={styles.titleMain}>Happening places</Text>
+    <View style={styles.subtitleRow}>
+      <Ionicons name="location" size={16} color="#E94A37" />
+      <Text style={styles.titleSub}>
+        Most Visited Places Around you
+      </Text>
+    </View>
+  </BlurView>
+</View>
           {/* Empty State */}
           {topLocations.length === 0 && (
             <View style={styles.emptyState}>
@@ -426,7 +431,7 @@ const styles = StyleSheet.create({
 
   /* Header Container */
   headerContainer: {
-    marginBottom: -30,
+    marginBottom: -40,
   },
 
   /* Gradient Header - PREMIUM FINISH */
@@ -446,7 +451,7 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     fontFamily: 'Lobster',
-    fontSize: 28,
+    fontSize: 32,
     color: '#fff',
     textAlign: 'center',
     letterSpacing: 1,
@@ -461,34 +466,54 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  titleBox: {
-    backgroundColor: '#FFF',
-    borderRadius: 35,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    marginHorizontal: 22,
-    marginBottom: 12,
-    alignItems: 'center',
-    borderWidth: 0,
-    borderColor: '#000',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 12,
-  },
+
+  titleBoxWrapper: {
+  marginHorizontal: 40,
+  marginBottom: 16,
+  borderRadius: 30,
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 4,
+},
+
+ titleBox: {
+  paddingVertical: 18,
+  paddingHorizontal: 30,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+},
   titleMain: {
-    fontSize: 20,
-    fontWeight: '700',
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#000',
+},
+
+  titleMain: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#000',
     fontStyle: 'lobster',
-    textDecorationLine: 'underline',
   },
   titleSub: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
   },
+
+  subtitleRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 6,
+},
+titleSub: {
+  fontSize: 14,
+  color: '#666',
+  marginLeft: 6,
+},
   card: {
     backgroundColor: '#FFF',
     borderRadius: 15,
@@ -766,9 +791,9 @@ const styles = StyleSheet.create({
 
   // Circle background for center icon
   centerIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#000',
