@@ -387,7 +387,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                     }
                   }}
                   style={styles.responsiveMedia}
-                  resizeMode={ResizeMode.CONTAIN}
+                  resizeMode={ResizeMode.COVER}
                   shouldPlay={shouldPlay}
                   isLooping
                   isMuted={isMuted}
