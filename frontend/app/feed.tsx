@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import FeedCard from "../components/FeedCard";
 import UserAvatar from "../components/UserAvatar";
 import StoriesBar from "../components/StoriesBar";
+import { BlurView } from 'expo-blur';
 import { fetchUnreadCount } from "../utils/notifications";
 import {
   normalizeMediaUrl,
@@ -338,60 +340,110 @@ export default function FeedScreen() {
             </View>
           </LinearGradient>
 
-          {/* ===== LEVEL CARD WITH OVERLAPPING DP - OVERLAPS GRADIENT ===== */}
-          {user && (
-            <View style={styles.levelCardWrapper}>
-              {/* Level card - white background with more rounded edges */}
-              <View style={styles.levelCard}>
-                {/* Profile picture - positioned to overlap on the left */}
-                <View style={styles.dpContainer}>
-                  <UserAvatar
-                    profilePicture={user.profile_picture}
-                    username={user.username}
-                    size={70}
-                    showLevelBadge={false}
-                    level={user.level}
-                    style={{}}
-                  />
-                  <TouchableOpacity
-                    style={styles.dpAddButton}
-                    onPress={() => router.push("/add-post")}
-                  >
-                    <Ionicons name="add" size={19} color="#0f0303ff" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.levelContent}>
-                  <Text style={styles.levelLabel}>Level {user.level}</Text>
-
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <LinearGradient
-                        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={[
-                          styles.progressFill,
-                          {
-                            width: `${Math.min(
-                              ((user.currentPoints || 0) /
-                                (user.requiredPoints || 1250)) *
-                                100,
-                              100
-                            )}%`,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.progressText}>
-                      {user.currentPoints || 0}/{user.requiredPoints || 1250}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
+         {/* ===== LEVEL CARD WITH OVERLAPPING DP - OVERLAPS GRADIENT ===== */}
+{user && (
+  <View style={styles.levelCardWrapper}>
+    {Platform.OS === 'ios' ? (
+      <BlurView intensity={60} tint="light" style={styles.levelCard}>
+        {/* Profile picture - positioned to overlap on the left */}
+        <View style={styles.dpContainer}>
+          <UserAvatar
+            profilePicture={user.profile_picture}
+            username={user.username}
+            size={70}
+            showLevelBadge={false}
+            level={user.level}
+            style={{}}
+          />
+          <TouchableOpacity
+            style={styles.dpAddButton}
+            onPress={() => router.push("/add-post")}
+          >
+            <Ionicons name="add" size={19} color="#0f0303ff" />
+          </TouchableOpacity>
         </View>
+
+        <View style={styles.levelContent}>
+          <Text style={styles.levelLabel}>Level {user.level}</Text>
+
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <LinearGradient
+                colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.min(
+                      ((user.currentPoints || 0) /
+                        (user.requiredPoints || 1250)) *
+                        100,
+                      100
+                    )}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {user.currentPoints || 0}/{user.requiredPoints || 1250}
+            </Text>
+          </View>
+        </View>
+      </BlurView>
+    ) : (
+      <View style={[styles.levelCard, styles.levelCardAndroid]}>
+        {/* Profile picture - positioned to overlap on the left */}
+        <View style={styles.dpContainer}>
+          <UserAvatar
+            profilePicture={user.profile_picture}
+            username={user.username}
+            size={70}
+            showLevelBadge={false}
+            level={user.level}
+            style={{}}
+          />
+          <TouchableOpacity
+            style={styles.dpAddButton}
+            onPress={() => router.push("/add-post")}
+          >
+            <Ionicons name="add" size={19} color="#0f0303ff" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.levelContent}>
+          <Text style={styles.levelLabel}>Level {user.level}</Text>
+
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <LinearGradient
+                colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.min(
+                      ((user.currentPoints || 0) /
+                        (user.requiredPoints || 1250)) *
+                        100,
+                      100
+                    )}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {user.currentPoints || 0}/{user.requiredPoints || 1250}
+            </Text>
+          </View>
+        </View>
+      </View>
+    )}
+  </View>
+)}
+        </View>
+        {/* ↑ This closes headerContainer */}
 
         {/* ================= STORIES ================= */}
         <StoriesBar refreshTrigger={refreshing} />
@@ -583,30 +635,40 @@ const styles = StyleSheet.create({
   },
 
   levelCardWrapper: {
-    marginHorizontal: 30,
-    marginTop: -40,
-    marginBottom: 3,
-    borderBottomLeftRadius: 30,
-    zIndex: 10,
-  },
+  marginHorizontal: 20,
+  marginTop: -40,
+  marginBottom: 3,
+  borderRadius: 25,
+  overflow: 'hidden',
+  zIndex: 10,
+  // Add subtle border
+  borderWidth: 1,
+  borderColor: 'rgba(255, 255, 255, 0.8)',
+  // Shadow for depth
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  elevation: 8,
+},
 
-  levelCard: {
-    backgroundColor: "#fff",
-    borderRadius: 23,
-    paddingVertical: 22,
-    paddingLeft: 90,
-    paddingRight: 25,
-    flexDirection: "row",
-    alignItems: "center",
-    elevation: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    position: "relative",
-    borderWidth: 0,  
-    borderColor: "#090000ff",
-  },
+levelCard: {
+  borderRadius: 25,
+  paddingVertical: 22,
+  paddingLeft: 90,
+  paddingRight: 25,
+  flexDirection: "row",
+  alignItems: "center",
+  position: "relative",
+  backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  // Inner subtle border
+  borderWidth: 1,
+  borderColor: 'rgba(200, 200, 200, 0.3)',
+},
+
+levelCardAndroid: {
+  backgroundColor: 'rgba(255, 255, 255, 0.92)',
+},
 
   dpContainer: {
     position: "absolute",
