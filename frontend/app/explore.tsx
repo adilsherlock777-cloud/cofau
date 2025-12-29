@@ -99,9 +99,12 @@ export default function ExploreScreen() {
   const [posts, setPosts] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  
+  const POSTS_PER_PAGE = 30;
 
   // Categories list
   const CATEGORIES = [
@@ -156,22 +159,31 @@ export default function ExploreScreen() {
       if (refresh) {
         setLoading(true);
         setPage(1);
+        setHasMore(true);
       } else {
+        if (!hasMore || loadingMore) return;
         setLoadingMore(true);
       }
 
-      const skip = refresh ? 0 : (page - 1) * 30;
+      const skip = refresh ? 0 : (page - 1) * POSTS_PER_PAGE;
 
-      // Build URL with category filter if selected
-      let feedUrl = `${API_URL}/feed?skip=${skip}`;
+      // Build URL with category filter and pagination limit
+      let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
       if (selectedCategory && selectedCategory !== 'All') {
         feedUrl += `&category=${encodeURIComponent(selectedCategory)}`;
       }
 
-      // No limit parameter - fetch ALL posts (or filtered by category)
       const res = await axios.get(feedUrl, {
         headers: { Authorization: `Bearer ${token || ''}` },
       });
+
+      if (res.data.length === 0) {
+        setHasMore(false);
+        if (refresh) {
+          setPosts([]);
+        }
+        return;
+      }
 
       const newPosts = res.data.map((post: any) => {
         const rawUrl = post.media_url || post.image_url;
@@ -190,28 +202,17 @@ export default function ExploreScreen() {
         };
       });
 
-      // ✅ Sort by created_at descending (newest first)
-      const sortedNewPosts = newPosts.sort((a: any, b: any) => {
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateB - dateA; // Descending order (newest first)
-      });
-
+      // Backend already sorts by created_at descending (-1), no need for client-side sorting
       if (refresh) {
-        setPosts(sortedNewPosts);
+        setPosts(newPosts);
       } else {
-        // When appending, combine and sort all posts
-        setPosts((p) => {
-          const combined = [...p, ...sortedNewPosts];
-          return combined.sort((a: any, b: any) => {
-            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-            return dateB - dateA; // Descending order (newest first)
-          });
-        });
+        setPosts((p) => [...p, ...newPosts]);
+        setPage((prev) => prev + 1);
       }
 
-      setPage((prev) => prev + 1);
+      if (res.data.length < POSTS_PER_PAGE) {
+        setHasMore(false);
+      }
     } catch (err) {
       console.error("❌ Explore fetch error:", err);
     } finally {
@@ -399,7 +400,9 @@ export default function ExploreScreen() {
           paddingHorizontal: SPACING,
         }}
         onEndReached={() => {
-          fetchPosts(false);
+          if (hasMore && !loadingMore) {
+            fetchPosts(false);
+          }
         }}
         onEndReachedThreshold={0.4}
         ListFooterComponent={
