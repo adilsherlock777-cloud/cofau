@@ -49,10 +49,17 @@ export default function FeedScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
   const [showFixedLine, setShowFixedLine] = useState(false);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isScrollingRef = useRef(false);
+  const paginationTriggeredRef = useRef(false);
+  const lastScrollYRef = useRef(0);
+  
+  const POSTS_PER_PAGE = 30;
 
   useEffect(() => {
     fetchFeed();
@@ -77,9 +84,28 @@ export default function FeedScreen() {
 
   const fetchFeed = async (forceRefresh = false) => {
     try {
-      setLoading(true);
-      const ts = forceRefresh ? `?_t=${Date.now()}` : "";
-      const res = await axios.get(`${BACKEND}/api/feed${ts}`);
+      if (forceRefresh) {
+        setLoading(true);
+        setPage(1);
+        setHasMore(true);
+        paginationTriggeredRef.current = false;
+      } else {
+        if (!hasMore || loadingMore || paginationTriggeredRef.current) return;
+        setLoadingMore(true);
+        paginationTriggeredRef.current = true;
+      }
+
+      const skip = forceRefresh ? 0 : (page - 1) * POSTS_PER_PAGE;
+      const ts = forceRefresh ? `&_t=${Date.now()}` : "";
+      const res = await axios.get(`${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${ts}`);
+
+      if (res.data.length === 0) {
+        setHasMore(false);
+        if (forceRefresh) {
+          setFeedPosts([]);
+        }
+        return;
+      }
 
       const mapped = res.data.map((post: any) => ({
         id: post.id,
@@ -105,17 +131,24 @@ export default function FeedScreen() {
         is_following: post.is_following || false,
       }));
 
-      mapped.sort(
-        (a: any, b: any) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      // Backend already sorts by created_at descending, no need for client-side sorting
+      if (forceRefresh) {
+        setFeedPosts(mapped);
+      } else {
+        setFeedPosts((prev) => [...prev, ...mapped]);
+        setPage((prev) => prev + 1);
+      }
 
-      setFeedPosts(mapped);
+      if (res.data.length < POSTS_PER_PAGE) {
+        setHasMore(false);
+      }
+
       // Reset visible video when feed refreshes
       setVisibleVideoId(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
@@ -177,6 +210,7 @@ export default function FeedScreen() {
     // Extract values immediately before event is nullified
     const scrollY = event.nativeEvent.contentOffset.y;
     const viewportHeight = event.nativeEvent.layoutMeasurement.height;
+    const contentHeight = event.nativeEvent.contentSize.height;
     
     // Show fixed line when scrolled down more than 100px
     if (scrollY > 100) {
@@ -184,6 +218,12 @@ export default function FeedScreen() {
     } else {
       setShowFixedLine(false);
     }
+    
+    // Reset pagination trigger if user scrolls back up significantly
+    if (scrollY < lastScrollYRef.current - 100) {
+      paginationTriggeredRef.current = false;
+    }
+    lastScrollYRef.current = scrollY;
     
     // IMMEDIATELY pause all videos when scrolling starts
     // This prevents audio overlap when swiping between videos
@@ -203,8 +243,23 @@ export default function FeedScreen() {
       const visibleId = findVisibleVideo(scrollY, viewportHeight);
       
       setVisibleVideoId(visibleId);
-    }, 150); // Wait 150ms after scrolling stops
-  }, [findVisibleVideo, visibleVideoId]);
+      
+      // Only check for pagination AFTER scrolling has stopped
+      // This prevents auto-scrolling during active scrolling
+      const paddingToBottom = 100;
+      const isNearBottom = scrollY + viewportHeight >= contentHeight - paddingToBottom;
+      
+      if (isNearBottom && hasMore && !loadingMore && !loading && !paginationTriggeredRef.current) {
+        paginationTriggeredRef.current = true;
+        fetchFeed(false).finally(() => {
+          // Reset after a delay to allow for next pagination
+          setTimeout(() => {
+            paginationTriggeredRef.current = false;
+          }, 1000);
+        });
+      }
+    }, 200); // Wait 200ms after scrolling stops before checking pagination
+  }, [findVisibleVideo, visibleVideoId, hasMore, loadingMore, loading]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -342,15 +397,14 @@ export default function FeedScreen() {
         <StoriesBar refreshTrigger={refreshing} />
 
         {/* ================= FEED ================= */}
-        {loading && (
+        {loading && feedPosts.length === 0 && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4dd0e1" />
             <Text style={styles.loadingText}>Loading feed...</Text>
           </View>
         )}
 
-        {!loading &&
-          feedPosts.map((post) => {
+        {feedPosts.map((post) => {
             const isVideo =
               post.media_type === "video" ||
               post.media_url?.toLowerCase().endsWith(".mp4");
@@ -371,6 +425,13 @@ export default function FeedScreen() {
               </View>
             );
           })}
+
+        {/* Load More Indicator */}
+        {loadingMore && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#4dd0e1" />
+          </View>
+        )}
       </ScrollView>
 
       {/* ================= BOTTOM TABS (UPDATED) ================= */}

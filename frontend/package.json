@@ -16,7 +16,10 @@
     "build:android:production": "eas build --platform android --profile production --clear-cache",
     "build:android:preview": "eas build --platform android --profile preview --clear-cache",
     "build:android:dev": "eas build --platform android --profile development --clear-cache",
-    "build:android:apk": "npm run clean && eas build --platform android --profile preview --clear-cache"
+    "build:android:apk": "npm run clean && eas build --platform android --profile preview --clear-cache",
+    "build:ios:preview": "eas build --platform ios --profile preview --clear-cache",
+    "build:ios:production": "eas build --platform ios --profile production --clear-cache",
+    "build:ios:ipa": "npm run clean && eas build --platform ios --profile preview --clear-cache"
   },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",
