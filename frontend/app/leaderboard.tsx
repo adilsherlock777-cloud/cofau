@@ -709,20 +709,20 @@ const styles = StyleSheet.create({
 
   headerContainer: {
   marginHorizontal: -16,
-  marginBottom: -50,
+  marginBottom: -40,
 },
 
 /* Title Box Styles - Matching Happening Places */
 titleBoxWrapper: {
   marginHorizontal: 20,
-  marginBottom: 16,
+  marginBottom: 20,
   borderRadius: 30,
   overflow: 'hidden',
   borderWidth: 1,
-  borderColor: 'rgba(255, 255, 255, 0.9)',
+  borderColor: 'rgba(255, 255, 255, 0.45)',
   // Add shadow for depth
   shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
+  shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.1,
   shadowRadius: 8,
   elevation: 4,
@@ -732,10 +732,10 @@ titleBox: {
   paddingHorizontal: 30,
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  backgroundColor: 'rgba(255, 255, 255, 0.95)',
 },
 titleBoxAndroid: {
-  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  backgroundColor: 'rgba(255, 255, 255, 0.95)',
 },
 titleMain: {
   fontSize: 18,
