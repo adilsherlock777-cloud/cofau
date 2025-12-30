@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   ScrollView,
   Dimensions,
   TextInput,
 } from 'react-native';
+import { Image } from 'expo-image'; 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
@@ -24,6 +24,20 @@ export const options = {
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${API_BASE_URL}/api`;
+
+const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
+
+// Check if URL is a video file
+const isVideoFile = (url) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('.mp4') ||
+    lower.includes('.mov') ||
+    lower.includes('.mkv') ||
+    lower.includes('.webm')
+  );
+};
 
 export default function HappeningPlaces() {
   const router = useRouter();
@@ -186,133 +200,177 @@ export default function HappeningPlaces() {
           )}
 
           {/* Location Cards */}
-          {topLocations.map((location, index) => {
-            const images = location.images || [];
-            const remainingCount = images.length > 7 ? images.length - 7 : 0;
+{topLocations.map((location, index) => {
+  const images = location.images || [];
+  const thumbnails = location.thumbnails || []; // Backend should provide thumbnails for videos
 
-            return (
-              <TouchableOpacity
-                key={
-                  location.location ||
-                  location.location_name ||
-                  index
-                }
-                style={styles.card}
-                onPress={() => handleLocationPress(location)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={styles.rankNumber}>
+  return (
+    <TouchableOpacity
+      key={
+        location.location ||
+        location.location_name ||
+        index
+      }
+      style={styles.card}
+      onPress={() => handleLocationPress(location)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.cardHeader}>
+        <View style={styles.rankNumber}>
+          <LinearGradient
+            colors={['#E94A37', '#F2CF68', '#1B7C82']}
+            start={{ x: 3, y: 3 }}
+            end={{ x: 0, y: 3 }}
+            style={styles.rankGradient}
+          >
+            <Text style={styles.rankNumberText}>
+              {index + 1}
+            </Text>
+          </LinearGradient>
+        </View>
+        <View style={styles.locationInfo}>
+          <Text
+            style={styles.locationName}
+            numberOfLines={1}
+          >
+            {location.location ||
+              location.location_name}
+          </Text>
+          <Text style={styles.uploadCount}>
+            (
+            {formatUploadCount(
+              location.uploads
+            )}{' '}
+            uploaded)
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.imageGrid}>
+        {images.length > 0 ? (
+          <>
+            {/* First Row - 3 images */}
+            <View style={styles.imageRow}>
+              {images.slice(0, 3).map((imageUrl, imgIndex) => {
+                const fixedUrl = fixUrl(imageUrl);
+                const thumbnailUrl = fixUrl(thumbnails[imgIndex]);
+                const isVideo = isVideoFile(imageUrl);
+                
+                // Use thumbnail if it's a video, otherwise use the image
+                const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
+                
+                if (!displayUrl) return null;
+                return (
+                  <View key={imgIndex} style={styles.gridImageContainer}>
+                    <Image
+                      source={{ uri: displayUrl }}
+                      style={styles.gridImageSquare}
+                      contentFit="cover"
+                      placeholder={{ blurhash: BLUR_HASH }}
+                      transition={300}
+                    />
+                    {isVideo && (
+                      <View style={styles.videoPlayIcon}>
+                        <Ionicons name="play-circle" size={24} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Second Row - 2 images */}
+            <View style={styles.imageRow}>
+              {/* Show 4th image (index 3) */}
+              {images[3] && (
+                (() => {
+                  const fixedUrl = fixUrl(images[3]);
+                  const thumbnailUrl = fixUrl(thumbnails[3]);
+                  const isVideo = isVideoFile(images[3]);
+                  const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
+                  
+                  return (
+                    <View style={styles.gridImageContainer}>
+                      <Image
+                        source={{ uri: displayUrl }}
+                        style={styles.gridImageSquare}
+                        contentFit="cover"
+                        placeholder={{ blurhash: BLUR_HASH }}
+                        transition={300}
+                      />
+                      {isVideo && (
+                        <View style={styles.videoPlayIcon}>
+                          <Ionicons name="play-circle" size={24} color="#fff" />
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()
+              )}
+
+              {/* Show 5th image or blurred overlay with count */}
+              {images.length === 5 ? (
+                // Exactly 5 images - show 5th normally
+                (() => {
+                  const fixedUrl = fixUrl(images[4]);
+                  const thumbnailUrl = fixUrl(thumbnails[4]);
+                  const isVideo = isVideoFile(images[4]);
+                  const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
+                  
+                  return (
+                    <View style={styles.gridImageContainer}>
+                      <Image
+                        source={{ uri: displayUrl }}
+                        style={styles.gridImageSquare}
+                        contentFit="cover"
+                        placeholder={{ blurhash: BLUR_HASH }}
+                        transition={300}
+                      />
+                      {isVideo && (
+                        <View style={styles.videoPlayIcon}>
+                          <Ionicons name="play-circle" size={24} color="#fff" />
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()
+              ) : images.length > 5 ? (
+                // More than 5 - show blurred with total count
+                <View style={styles.blurredImageWrapper}>
+                  <Image
+                    source={{ uri: fixUrl(thumbnails[4]) || fixUrl(images[4]) }}
+                    style={styles.gridImageSquare}
+                    contentFit="cover"
+                    blurRadius={8}
+                    placeholder={{ blurhash: BLUR_HASH }}
+                  />
+                  <View style={styles.countButtonOverlay}>
                     <LinearGradient
                       colors={['#E94A37', '#F2CF68', '#1B7C82']}
                       start={{ x: 3, y: 3 }}
                       end={{ x: 0, y: 3 }}
-                      style={styles.rankGradient}
+                      style={styles.countButtonGradientBorder}
                     >
-                      <Text style={styles.rankNumberText}>
-                        {index + 1}
-                      </Text>
+                      <View style={styles.countButtonInner}>
+                        <Text style={styles.countButtonText}>
+                          +{location.uploads || images.length}
+                        </Text>
+                      </View>
                     </LinearGradient>
                   </View>
-                  <View style={styles.locationInfo}>
-                    <Text
-                      style={styles.locationName}
-                      numberOfLines={1}
-                    >
-                      {location.location ||
-                        location.location_name}
-                    </Text>
-                    <Text style={styles.uploadCount}>
-                      (
-                      {formatUploadCount(
-                        location.uploads
-                      )}{' '}
-                      uploaded)
-                    </Text>
-                  </View>
                 </View>
-
-                <View style={styles.imageGrid}>
-                  {images.length > 0 ? (
-                    <>
-                      {/* First Row - 3 images */}
-                      <View style={styles.imageRow}>
-                        {images.slice(0, 3).map((imageUrl, imgIndex) => {
-                          const fixedUrl = fixUrl(imageUrl);
-                          if (!fixedUrl) return null;
-                          return (
-                            <Image
-                              key={imgIndex}
-                              source={{ uri: fixedUrl }}
-                              style={styles.gridImageSquare}
-                              resizeMode="cover"
-                            />
-                          );
-                        })}
-                      </View>
-
-                      {/* Second Row - 2 images OR 1 image + blurred overlay */}
-                      <View style={styles.imageRow}>
-                        {/* Show 3rd image */}
-                        {images[2] && (
-                          <Image
-                            source={{ uri: fixUrl(images[2]) }}
-                            style={styles.gridImageSquare}
-                            resizeMode="cover"
-                          />
-                        )}
-
-                        {/* Show 4th image OR blurred 5th image with count */}
-                        {images.length === 4 ? (
-                          // Exactly 4 images - show 4th normally
-                          <Image
-                            source={{ uri: fixUrl(images[3]) }}
-                            style={styles.gridImageSquare}
-                            resizeMode="cover"
-                          />
-                        ) : images.length > 4 ? (
-                          // More than 4 - show 5th blurred with total count
-                          <View style={styles.blurredImageWrapper}>
-                            <Image
-                              source={{ uri: fixUrl(images[4]) }}
-                              style={styles.gridImageSquare}
-                              resizeMode="cover"
-                              blurRadius={8}
-                            />
-                            <View style={styles.countButtonOverlay}>
-                              <LinearGradient
-                                colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                                start={{ x: 3, y: 3 }}
-                                end={{ x: 0, y: 3 }}
-                                style={styles.countButtonGradientBorder}
-                              >
-                                <View style={styles.countButtonInner}>
-                                  <Text style={styles.countButtonText}>
-                                    +{location.uploads || images.length}
-                                  </Text>
-                                </View>
-                              </LinearGradient>
-                            </View>
-                          </View>
-                        ) : images[3] ? (
-                          // Less than 4 but 4th exists
-                          <Image
-                            source={{ uri: fixUrl(images[3]) }}
-                            style={styles.gridImageSquare}
-                            resizeMode="cover"
-                          />
-                        ) : null}
-                      </View>
-                    </>
-                  ) : (
-                    <View style={styles.noImagePlaceholder}>
-                      <Ionicons name="image-outline" size={32} color="#CCC" />
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+              ) : null}
+            </View>
+          </>
+        ) : (
+          <View style={styles.noImagePlaceholder}>
+            <Ionicons name="image-outline" size={32} color="#CCC" />
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+})}
         </ScrollView>
 
         {/* Bottom Navigation - Same as Explore */}
@@ -485,11 +543,32 @@ const styles = StyleSheet.create({
   alignItems: 'center',
   justifyContent: 'center',
   backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  borderWidth: 1,
+  borderColor: 'rgba(200, 200, 200, 0.3)',
 },
   titleMain: {
   fontSize: 12,
   fontWeight: '600',
   color: '#000',
+},
+
+gridImageContainer: {
+  flex: 1,
+  height: 110,
+  borderRadius: 10,
+  overflow: 'hidden',
+  position: 'relative',
+  borderWidth: 0.5,           
+  borderColor: '#000',
+},
+
+videoPlayIcon: {
+  position: 'absolute',
+  bottom: 6,
+  left: 6,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  borderRadius: 14,
+  padding: 0,
 },
 
   titleMain: {
@@ -608,6 +687,10 @@ titleSub: {
     flex: 1,
     height: 110,
     position: 'relative',
+    borderRadius: 10,         
+    overflow: 'hidden',       
+    borderWidth: 0.5,           
+    borderColor: '#000',
   },
 
   countButtonOverlay: {
