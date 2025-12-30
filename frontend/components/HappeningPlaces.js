@@ -16,6 +16,7 @@ import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { BlurView } from 'expo-blur';
+import LevelBadge from './LevelBadge';
 
 export const options = {
   headerShown: false,
@@ -203,6 +204,7 @@ export default function HappeningPlaces() {
 {topLocations.map((location, index) => {
   const images = location.images || [];
   const thumbnails = location.thumbnails || []; // Backend should provide thumbnails for videos
+  const imagesData = location.images_data || []; // Full image data with user levels
 
   return (
     <TouchableOpacity
@@ -254,7 +256,9 @@ export default function HappeningPlaces() {
               {images.slice(0, 3).map((imageUrl, imgIndex) => {
                 const fixedUrl = fixUrl(imageUrl);
                 const thumbnailUrl = fixUrl(thumbnails[imgIndex]);
-                const isVideo = isVideoFile(imageUrl);
+                const imageData = imagesData[imgIndex] || {};
+                const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
+                const userLevel = imageData.user_level || null;
                 
                 // Use thumbnail if it's a video, otherwise use the image
                 const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
@@ -274,6 +278,12 @@ export default function HappeningPlaces() {
                         <Ionicons name="play-circle" size={24} color="#fff" />
                       </View>
                     )}
+                    {/* User Level Badge */}
+                    {userLevel && (
+                      <View style={styles.levelBadgeContainer}>
+                        <LevelBadge level={userLevel} size="small" />
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -286,7 +296,9 @@ export default function HappeningPlaces() {
                 (() => {
                   const fixedUrl = fixUrl(images[3]);
                   const thumbnailUrl = fixUrl(thumbnails[3]);
-                  const isVideo = isVideoFile(images[3]);
+                  const imageData = imagesData[3] || {};
+                  const isVideo = isVideoFile(images[3]) || imageData.media_type === 'video';
+                  const userLevel = imageData.user_level || null;
                   const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
                   
                   return (
@@ -303,6 +315,12 @@ export default function HappeningPlaces() {
                           <Ionicons name="play-circle" size={24} color="#fff" />
                         </View>
                       )}
+                      {/* User Level Badge */}
+                      {userLevel && (
+                        <View style={styles.levelBadgeContainer}>
+                          <LevelBadge level={userLevel} size="small" />
+                        </View>
+                      )}
                     </View>
                   );
                 })()
@@ -314,7 +332,9 @@ export default function HappeningPlaces() {
                 (() => {
                   const fixedUrl = fixUrl(images[4]);
                   const thumbnailUrl = fixUrl(thumbnails[4]);
-                  const isVideo = isVideoFile(images[4]);
+                  const imageData = imagesData[4] || {};
+                  const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
+                  const userLevel = imageData.user_level || null;
                   const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
                   
                   return (
@@ -329,6 +349,12 @@ export default function HappeningPlaces() {
                       {isVideo && (
                         <View style={styles.videoPlayIcon}>
                           <Ionicons name="play-circle" size={24} color="#fff" />
+                        </View>
+                      )}
+                      {/* User Level Badge */}
+                      {userLevel && (
+                        <View style={styles.levelBadgeContainer}>
+                          <LevelBadge level={userLevel} size="small" />
                         </View>
                       )}
                     </View>
@@ -560,6 +586,12 @@ gridImageContainer: {
   position: 'relative',
   borderWidth: 0.5,           
   borderColor: '#000',
+},
+levelBadgeContainer: {
+  position: 'absolute',
+  bottom: 4,
+  left: 4,
+  zIndex: 10,
 },
 
 videoPlayIcon: {

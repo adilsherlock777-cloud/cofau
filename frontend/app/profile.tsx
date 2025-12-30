@@ -1387,7 +1387,7 @@ export default function ProfileScreen() {
     {/* Message Button */}
     <TouchableOpacity
       style={styles.actionButtonWrapper}
-      onPress={() => router.push('/messages')}
+      onPress={() => router.push('/chat')}
     >
       <LinearGradient
         colors={['#E94A37', '#F2CF68', '#1B7C82']}
@@ -1436,7 +1436,7 @@ export default function ProfileScreen() {
               {/* Message Button */}
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
-                onPress={() => router.push(`/chat/${userData.id}`)}
+                onPress={() => router.push('/chat')}
               >
                 <LinearGradient
                   colors={['#E94A37', '#F2CF68', '#1B7C82']}

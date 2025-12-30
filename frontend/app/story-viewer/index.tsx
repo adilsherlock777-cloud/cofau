@@ -44,6 +44,8 @@ export default function StoryViewerScreen() {
   const [viewedStories, setViewedStories] = useState(new Set<string>());
   const [showViewersModal, setShowViewersModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(true);
+  const [mediaError, setMediaError] = useState(false);
 
   const progressAnims = useRef<any[]>([]);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -119,9 +121,11 @@ export default function StoryViewerScreen() {
      AUTO ADVANCE STORY
   -----------------------------------------------------------*/
   useEffect(() => {
-    // Reset media type when story changes - will be determined by what actually loads
+    // Reset media type and loading state when story changes
     if (stories[currentIndex]) {
       setActualMediaType(stories[currentIndex].media_type);
+      setMediaLoading(true);
+      setMediaError(false);
       // Load view count for current story
       loadStoryViews(stories[currentIndex].id);
       // Mark story as viewed if not already viewed
@@ -130,14 +134,20 @@ export default function StoryViewerScreen() {
       }
     }
 
-    if (stories.length > 0 && !paused) {
+    // Only start progress when media is loaded and not paused
+    if (stories.length > 0 && !paused && !mediaLoading && !mediaError) {
       startProgress();
+    } else if (paused) {
+      // Stop timer when paused
+      if (autoAdvanceTimer.current) {
+        clearTimeout(autoAdvanceTimer.current);
+      }
     }
 
     return () => {
       if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     };
-  }, [currentIndex, stories, paused]);
+  }, [currentIndex, stories, paused, mediaLoading, mediaError]);
 
   /* ----------------------------------------------------------
      MARK STORY AS VIEWED
@@ -172,10 +182,18 @@ export default function StoryViewerScreen() {
 
   const startProgress = () => {
     const currentStory = stories[currentIndex];
-    if (!currentStory) return;
+    if (!currentStory || mediaLoading || mediaError) return;
+
+    // Clear any existing timer
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+    }
 
     const duration =
-      currentStory.media_type === "video" ? 30000 : 5000;
+      (actualMediaType || currentStory.media_type) === "video" ? 30000 : 5000;
+
+    // Reset progress bar
+    progressAnims.current[currentIndex].setValue(0);
 
     Animated.timing(progressAnims.current[currentIndex], {
       toValue: 1,
@@ -367,8 +385,26 @@ export default function StoryViewerScreen() {
 
       {/* Story Media */}
       <View style={styles.contentContainer}>
-        {(actualMediaType || currentStory.media_type) === "video" ? (
+        {mediaError && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={48} color="#FFF" />
+            <Text style={styles.errorText}>Failed to load story</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                setMediaError(false);
+                setMediaLoading(true);
+                // Reset to original media type and force reload
+                setActualMediaType(currentStory.media_type);
+              }}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!mediaError && (actualMediaType || currentStory.media_type) === "video" ? (
           <Video
+            key={`video-${currentStory.id}-${currentIndex}`}
             source={{ uri: currentStory.media_url }}
             style={styles.storyVideo}
             shouldPlay={!paused}
@@ -378,25 +414,37 @@ export default function StoryViewerScreen() {
             onError={(error) => {
               console.error("❌ Video playback error:", error);
               console.error("❌ Failed video URL:", currentStory.media_url);
+              
+              // Stop the timer and mark as error
+              if (autoAdvanceTimer.current) {
+                clearTimeout(autoAdvanceTimer.current);
+              }
+              setMediaError(true);
+              setMediaLoading(false);
 
-              // Try to reload with timestamp to bypass cache
-              const timestamp = new Date().getTime();
-              const refreshedUrl = currentStory.media_url.includes('?')
-                ? `${currentStory.media_url}&_t=${timestamp}`
-                : `${currentStory.media_url}?_t=${timestamp}`;
-
-              console.log("🔄 Refreshed URL:", refreshedUrl);
-
-              // If still failing, try as image
+              // Try as image fallback
               console.log("🔄 Trying as image instead...");
               setActualMediaType("image");
+              setMediaLoading(true);
             }}
             onLoadStart={() => {
               console.log("📹 Video loading:", currentStory.media_url);
+              setMediaLoading(true);
+              setMediaError(false);
+              // Pause timer while loading
+              if (autoAdvanceTimer.current) {
+                clearTimeout(autoAdvanceTimer.current);
+              }
             }}
             onLoad={() => {
               console.log("✅ Video loaded successfully");
               setActualMediaType("video");
+              setMediaLoading(false);
+              setMediaError(false);
+              // Start progress after video loads
+              if (!paused) {
+                startProgress();
+              }
             }}
             onPlaybackStatusUpdate={(status) => {
               if (status.isLoaded && status.didJustFinish) {
@@ -407,22 +455,44 @@ export default function StoryViewerScreen() {
           />
         ) : (
           <Image
+            key={`image-${currentStory.id}-${currentIndex}`}
             source={{ uri: currentStory.media_url }}
             style={styles.storyImage}
             resizeMode={ResizeMode.COVER}
             onError={(error) => {
               console.error("❌ Image load error:", error);
               console.error("❌ Failed image URL:", currentStory.media_url);
-              // Try to load as video as fallback
+              
+              // Stop the timer and mark as error
+              if (autoAdvanceTimer.current) {
+                clearTimeout(autoAdvanceTimer.current);
+              }
+              setMediaError(true);
+              setMediaLoading(false);
+
+              // Try as video fallback
               console.log("🔄 Trying as video instead...");
               setActualMediaType("video");
+              setMediaLoading(true);
             }}
             onLoadStart={() => {
               console.log("🖼️ Image loading:", currentStory.media_url);
+              setMediaLoading(true);
+              setMediaError(false);
+              // Pause timer while loading
+              if (autoAdvanceTimer.current) {
+                clearTimeout(autoAdvanceTimer.current);
+              }
             }}
             onLoad={() => {
               console.log("✅ Image loaded successfully");
               setActualMediaType("image");
+              setMediaLoading(false);
+              setMediaError(false);
+              // Start progress after image loads
+              if (!paused) {
+                startProgress();
+              }
             }}
           />
         )}
@@ -568,6 +638,25 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT - 150,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+  },
+  errorText: {
+    color: "#FFF",
+    fontSize: 16,
+    marginTop: 16,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: "#4dd0e1",
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
   tapLeft: {
     position: "absolute",

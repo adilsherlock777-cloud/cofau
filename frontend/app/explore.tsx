@@ -136,13 +136,17 @@ export default function ExploreScreen() {
         console.log('🔄 Explore screen focused - refreshing posts');
         fetchPosts(true);
       }
-    }, [user, token, selectedCategory])
+    }, [user, token])
   );
 
   // Refetch posts when category changes
   useEffect(() => {
     if (user && token) {
       console.log('🔄 Category changed, refetching posts:', selectedCategory);
+      // Reset state before fetching
+      setPosts([]);
+      setPage(1);
+      setHasMore(true);
       fetchPosts(true);
     }
   }, [selectedCategory]);
@@ -205,8 +209,14 @@ export default function ExploreScreen() {
       // Backend already sorts by created_at descending (-1), no need for client-side sorting
       if (refresh) {
         setPosts(newPosts);
+        setPage(2); // Set to 2 since we just loaded page 1
       } else {
-        setPosts((p) => [...p, ...newPosts]);
+        // ✅ Deduplicate posts by ID to prevent duplicates
+        setPosts((p) => {
+          const existingIds = new Set(p.map(post => post.id));
+          const uniqueNewPosts = newPosts.filter(post => !existingIds.has(post.id));
+          return [...p, ...uniqueNewPosts];
+        });
         setPage((prev) => prev + 1);
       }
 
@@ -391,7 +401,7 @@ export default function ExploreScreen() {
       <FlatList
         data={filteredPosts}
         renderItem={renderGridItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         numColumns={NUM_COLUMNS}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -400,7 +410,7 @@ export default function ExploreScreen() {
           paddingHorizontal: SPACING,
         }}
         onEndReached={() => {
-          if (hasMore && !loadingMore) {
+          if (hasMore && !loadingMore && !loading) {
             fetchPosts(false);
           }
         }}
@@ -412,6 +422,9 @@ export default function ExploreScreen() {
             </View>
           ) : null
         }
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={10}
       />
 
       {/* Bottom Navigation - Updated Style */}
