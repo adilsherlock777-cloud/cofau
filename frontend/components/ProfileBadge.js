@@ -3,9 +3,9 @@ import { View, Image, Text, StyleSheet } from 'react-native';
 import UserAvatar from './UserAvatar';
 
 // Import badge images
-const ReviewerBadge = require('../assets/badges/reviewer.jpeg');
-const TopReviewerBadge = require('../assets/badges/top_reviewer.jpeg');
-const InfluencerBadge = require('../assets/badges/influencer.jpeg');
+const ReviewerBadge = require('../assets/badges/reviewer.png');
+const TopReviewerBadge = require('../assets/badges/top_reviewer.png');
+const InfluencerBadge = require('../assets/badges/influencer.png');
 
 /**
  * ProfileBadge Component
@@ -25,7 +25,7 @@ export default function ProfileBadge({
   username,
   level = 1,
   dpSize = 115,
-  badgeSize = 95,
+  badgeSize = 80,
   cameraIcon = null
 }) {
 
@@ -51,53 +51,72 @@ export default function ProfileBadge({
   };
 
   return (
-    <View style={styles.container}>
-      {/* Profile Picture Container (for camera icon positioning) */}
+  <View style={styles.container}>
+    {/* Left side: DP + Username stacked */}
+    <View style={styles.leftSection}>
+      {/* Profile Picture Container */}
       <View style={styles.avatarContainer}>
         <UserAvatar
           profilePicture={profilePicture}
           username={username}
           size={dpSize}
-          showLevelBadge={false} // Disable small badge completely
+          showLevelBadge={false}
         />
         {cameraIcon}
       </View>
-
-      {/* Badge + Title Stack */}
-      <View style={styles.badgeContainer}>
-        {/* Full-size Category Badge Image */}
-        <Image
-          source={getCategoryBadge()}
-          style={{
-            width: badgeSize,
-            height: badgeSize,
-            resizeMode: 'contain',
-          }}
-        />
-
-        {/* Badge Title Text */}
-        <Text style={styles.badgeTitle}>
-          {getBadgeTitle()}
-        </Text>
-      </View>
+      
+      {/* Username below DP */}
+      <Text style={styles.usernameText} numberOfLines={1}>
+        {username}
+      </Text>
     </View>
-  );
+
+    {/* Right side: Badge + Title */}
+    <View style={styles.badgeContainer}>
+      <Image
+        source={getCategoryBadge()}
+        style={{
+          width: badgeSize,
+          height: badgeSize,
+          resizeMode: 'contain',
+        }}
+      />
+      <Text style={styles.badgeTitle}>
+        {getBadgeTitle()}
+      </Text>
+    </View>
+  </View>
+);
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  width: '100%',
+  paddingLeft: 10,
+  paddingRight: 25,
+  paddingVertical: 10,
+},
+  leftSection: {
     alignItems: 'center',
-    justifyContent: 'space-around',
   },
   avatarContainer: {
     position: 'relative',
   },
-  badgeContainer: {
-    alignItems: 'center',
-    marginLeft: 70,
-    marginTop: 10,
+  usernameText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+    maxWidth: 100,
+    textAlign: 'center',
   },
+  badgeContainer: {
+  alignItems: 'center',
+  marginRight: -50,
+},
   badgeTitle: {
     fontSize: 12,
     fontWeight: '600',

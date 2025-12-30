@@ -27,6 +27,7 @@ import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
 import { sendCompliment, getFollowers } from '../utils/api';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { BlurView } from 'expo-blur';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${BACKEND_URL}/api`;
@@ -1269,44 +1270,66 @@ export default function ProfileScreen() {
             </View>
           </LinearGradient>
 
-          {/* ================= PROFILE CARD - OVERLAPS GRADIENT ================= */}
           <View style={styles.profileCardWrapper}>
-            <View style={styles.profileCard}>
-              {/* Profile Picture */}
-              <View style={styles.profilePictureContainer}>
-                {/* @ts-ignore */}
-                <ProfileBadge
-                  profilePicture={userData.profile_picture}
-                  username={userData.full_name || userData.username}
-                  level={userData.level || 1}
-                  dpSize={70}
-                  cameraIcon={
-                    isOwnProfile ? (
-                      <TouchableOpacity
-                        style={styles.cameraIcon}
-                        onPress={handleProfilePicturePress}
-                        disabled={uploadingImage}
-                      >
-                        {uploadingImage ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <Ionicons name="camera" size={16} color="#fff" />
-                        )}
-                      </TouchableOpacity>
-                    ) : null
-                  }
-                />
-              </View>
+  {Platform.OS === 'ios' ? (
+    <BlurView intensity={60} tint="light" style={styles.profileCard}>
+      {/* Profile Picture */}
+      <View style={styles.profilePictureContainer}>
+           <ProfileBadge
+  profilePicture={userData.profile_picture}
+  username={userData.full_name || userData.username}
+  level={userData.level || 1}
+  dpSize={80}
+  cameraIcon={
+    isOwnProfile ? (
+      <TouchableOpacity
+        style={styles.cameraIcon}
+        onPress={handleProfilePicturePress}
+        disabled={uploadingImage}
+      >
+        {uploadingImage ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Ionicons name="camera" size={16} color="#fff" />
+        )}
+      </TouchableOpacity>
+    ) : null
+  }
+/>
+      </View>
 
-              {/* Username */}
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileUsername}>
-                  {userData.username || userData.full_name || 'User'}
-                </Text>
-              </View>
+    </BlurView>
+  ) : (
+    <View style={[styles.profileCard, styles.profileCardAndroid]}>
+      {/* Profile Picture */}
+      <View style={styles.profilePictureContainer}>
+        <ProfileBadge
+  profilePicture={userData.profile_picture}
+  username={userData.full_name || userData.username}
+  level={userData.level || 1}
+  dpSize={80}
+  cameraIcon={
+    isOwnProfile ? (
+      <TouchableOpacity
+        style={styles.cameraIcon}
+        onPress={handleProfilePicturePress}
+        disabled={uploadingImage}
+      >
+        {uploadingImage ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Ionicons name="camera" size={16} color="#fff" />
+        )}
+      </TouchableOpacity>
+    ) : null
+  }
+/>
+      </View>
 
-            </View>
-          </View>
+      
+    </View>
+  )}
+</View>
         </View>
 
         {/* Stats Section */}
@@ -1356,7 +1379,7 @@ export default function ProfileScreen() {
         locations={[0, 0.35, 0.9]}
         style={styles.actionButton}
       >
-        <Ionicons name="create" size={20} color="#fff" />
+        <Ionicons name="create" size={18} color="#fff" />
         <Text style={styles.actionButtonText}>Edit Profile</Text>
       </LinearGradient>
     </TouchableOpacity>
@@ -1373,7 +1396,7 @@ export default function ProfileScreen() {
         locations={[0, 0.35, 0.9]}
         style={styles.actionButton}
       >
-        <Ionicons name="chatbubble" size={20} color="#fff" />
+        <Ionicons name="chatbubble" size={18} color="#fff" />
         <Text style={styles.actionButtonText}>Messages</Text>
       </LinearGradient>
     </TouchableOpacity>
@@ -2340,32 +2363,44 @@ favouriteGridImage: {
   },
 
   profileCardWrapper: {
-    marginHorizontal: 50,
-    marginTop: -40,
-    marginBottom: 2,
-  },
+  marginHorizontal: 60,
+  marginTop: -40,
+  marginBottom: 2,
+  borderRadius: 20,
+  overflow: 'hidden',
+  // Add subtle border
+  borderWidth: 1,
+  borderColor: 'rgba(255, 255, 255, 0.2)',
+  // Shadow for depth
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  elevation: 8,
+},
   profileCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingVertical: 45,
-    paddingLeft: 80,
-    paddingRight: 120,
-    justifyContent: 'center',
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    position: 'relative',
-    borderWidth: 0,
-  },
-  profilePictureContainer: {
-    position: 'absolute',
-    left: 12,
-    top: '280%',
-    transform: [{ translateY: -45 }],
-    zIndex: 10,
-  },
+  borderRadius: 20,
+  paddingVertical: 65,
+  paddingHorizontal: 30,
+  paddingLeft: 60,
+  paddingRight: -100,
+  justifyContent: 'center',
+  position: 'relative',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  borderWidth: 1,
+  borderColor: 'rgba(200, 200, 200, 0.2)',
+},
+
+profileCardAndroid: {
+  backgroundColor: 'rgba(255, 255, 255, 1)',
+},
+ profilePictureContainer: {
+  position: 'absolute',
+  left: 12,
+  top: '100%',
+  transform: [{ translateY: 5 }],
+  zIndex: 8,
+},
   cameraIcon: {
     position: 'absolute',
     right: 0,
@@ -2385,9 +2420,9 @@ favouriteGridImage: {
     paddingLeft: 10,
   },
   profileUsername: {
-    fontSize: 17,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#333',
+    color: '#444',
     marginBottom: 2,
     marginTop: -10,
   },
@@ -2418,7 +2453,7 @@ favouriteGridImage: {
 
   actionButtonsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 40,
+    paddingHorizontal: 70,
     gap: 16,
     marginBottom: 8,
   },
