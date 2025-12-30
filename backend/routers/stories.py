@@ -199,8 +199,20 @@ async def get_stories_feed(
         current_user_id = str(current_user["_id"])
         
         # Get list of users the current user follows
-        follows = await db.follows.find({"follower_id": current_user_id}).to_list(None)
-        following_ids = [follow["following_id"] for follow in follows]
+        # Check both field name formats (camelCase and snake_case) for compatibility
+        follows = await db.follows.find({
+            "$or": [
+                {"followerId": current_user_id},
+                {"follower_id": current_user_id}
+            ]
+        }).to_list(None)
+        
+        # Extract following IDs from either field name format
+        following_ids = []
+        for follow in follows:
+            following_id = follow.get("followingId") or follow.get("following_id")
+            if following_id:
+                following_ids.append(following_id)
         
         # Include current user in the list
         user_ids = [current_user_id] + following_ids

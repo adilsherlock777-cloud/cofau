@@ -29,7 +29,63 @@ const BACKEND = BACKEND_URL;
 let globalMuteState = true; // Start muted by default
 
 /* -------------------------
-Normalize DP
+   Level System Helper
+------------------------- */
+// Level thresholds matching backend LEVEL_TABLE
+const LEVEL_TABLE = [
+  { level: 1, required_points: 1250 },
+  { level: 2, required_points: 2500 },
+  { level: 3, required_points: 3750 },
+  { level: 4, required_points: 5000 },
+  { level: 5, required_points: 5750 },
+  { level: 6, required_points: 6500 },
+  { level: 7, required_points: 7250 },
+  { level: 8, required_points: 8000 },
+  { level: 9, required_points: 9000 },
+  { level: 10, required_points: 10000 },
+  { level: 11, required_points: 11000 },
+  { level: 12, required_points: 12000 },
+];
+
+/**
+ * Calculate points needed from current level to next level
+ * @param currentLevel - Current user level
+ * @param requiredPoints - Total points required for NEXT level (from backend, after fix)
+ * @returns Points needed to reach next level (the difference between next and previous level thresholds)
+ */
+const getPointsNeededForNextLevel = (currentLevel: number, requiredPoints: number): number => {
+  // If at max level (12), return the current required points
+  if (currentLevel >= 12) {
+    return requiredPoints;
+  }
+  
+  // Find the previous level's threshold
+  // currentPoints is calculated as: total_points - previous_level_threshold
+  // So we need to find the threshold for level (currentLevel - 1)
+  const previousLevelData = LEVEL_TABLE.find(level => level.level === currentLevel - 1);
+  
+  if (previousLevelData) {
+    // Points needed = next level threshold - previous level threshold
+    // requiredPoints is now the next level's threshold (after backend fix)
+    return requiredPoints - previousLevelData.required_points;
+  }
+  
+  // For Level 1, there's no previous level (threshold is 0)
+  // So points needed = requiredPoints (which is Level 2's threshold = 1250)
+  if (currentLevel === 1) {
+    return requiredPoints;
+  }
+  
+  // Fallback: calculate based on level progression
+  if (currentLevel === 4) return 750; // Level 4 → 5: 5750 - 5000 = 750
+  if (currentLevel >= 5 && currentLevel <= 8) return 750; // Levels 5-8: 750 points per level
+  if (currentLevel >= 9 && currentLevel <= 11) return 1000; // Levels 9-11: 1000 points per level
+  
+  return 1250; // Default: 1250 points for levels 2-3
+};
+
+/* -------------------------
+   Normalize DP
 ------------------------- */
 const getPostDP = (post: any) =>
 normalizeProfilePicture(
@@ -268,7 +324,7 @@ paginationTriggeredRef.current = false;
 }, 1000);
 });
 }
-}, 150); // Wait 200ms after scrolling stops before checking pagination
+}, 150); // Wait 150ms after scrolling stops before checking pagination
 }, [findVisibleVideo, visibleVideoId, hasMore, loadingMore, loading]);
 
 // Cleanup timeout on unmount
@@ -376,6 +432,14 @@ onPress={() => router.push("/add-post")}
 
 <View style={styles.progressContainer}>
 <View style={styles.progressBar}>
+{(() => {
+const currentLevel = user.level || 1;
+const currentRequiredPoints = user.requiredPoints || 1250;
+const currentPoints = user.currentPoints || 0;
+const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+const progressPercent = Math.min((currentPoints / pointsNeeded) * 100, 100);
+
+return (
 <LinearGradient
 colors={["#E94A37", "#F2CF68", "#1B7C82"]}
 start={{ x: 0, y: 0 }}
@@ -383,19 +447,25 @@ end={{ x: 1, y: 0 }}
 style={[
 styles.progressFill,
 {
-width: `${Math.min(
-((user.currentPoints || 0) /
-(user.requiredPoints || 1250)) *
-100,
-100
-)}%`,
+width: `${progressPercent}%`,
 },
 ]}
 />
+);
+})()}
 </View>
+{(() => {
+const currentLevel = user.level || 1;
+const currentRequiredPoints = user.requiredPoints || 1250;
+const currentPoints = user.currentPoints || 0;
+const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+
+return (
 <Text style={styles.progressText}>
-{user.currentPoints || 0}/{user.requiredPoints || 1250}
+{currentPoints}/{pointsNeeded}
 </Text>
+);
+})()}
 </View>
 </View>
 </BlurView>
@@ -424,6 +494,14 @@ onPress={() => router.push("/add-post")}
 
 <View style={styles.progressContainer}>
 <View style={styles.progressBar}>
+{(() => {
+const currentLevel = user.level || 1;
+const currentRequiredPoints = user.requiredPoints || 1250;
+const currentPoints = user.currentPoints || 0;
+const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+const progressPercent = Math.min((currentPoints / pointsNeeded) * 100, 100);
+
+return (
 <LinearGradient
 colors={["#E94A37", "#F2CF68", "#1B7C82"]}
 start={{ x: 0, y: 0 }}
@@ -431,19 +509,25 @@ end={{ x: 1, y: 0 }}
 style={[
 styles.progressFill,
 {
-width: `${Math.min(
-((user.currentPoints || 0) /
-(user.requiredPoints || 1250)) *
-100,
-100
-)}%`,
+width: `${progressPercent}%`,
 },
 ]}
 />
+);
+})()}
 </View>
+{(() => {
+const currentLevel = user.level || 1;
+const currentRequiredPoints = user.requiredPoints || 1250;
+const currentPoints = user.currentPoints || 0;
+const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+
+return (
 <Text style={styles.progressText}>
-{user.currentPoints || 0}/{user.requiredPoints || 1250}
+{currentPoints}/{pointsNeeded}
 </Text>
+);
+})()}
 </View>
 </View>
 </View>

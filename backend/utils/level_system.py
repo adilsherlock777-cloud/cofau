@@ -43,8 +43,17 @@ def get_level_from_total_points(total_points: int) -> dict:
         required_for_next = 12000  # Max
     else:
         # Get required points for NEXT level
+        # If at level N, we need level N's threshold (which is the next level to reach)
         if current_level <= 12:
-            required_for_next = LEVEL_TABLE[current_level - 1]["required_points"]
+            # current_level is the level the user is at (1-indexed)
+            # To get the threshold for the NEXT level, we need LEVEL_TABLE[current_level]
+            # But LEVEL_TABLE is 0-indexed, so LEVEL_TABLE[current_level - 1] is current level's threshold
+            # We need LEVEL_TABLE[current_level] for next level's threshold
+            if current_level < 12:
+                required_for_next = LEVEL_TABLE[current_level]["required_points"]
+            else:
+                # At max level, use current level's threshold
+                required_for_next = LEVEL_TABLE[current_level - 1]["required_points"]
     
     return {
         "level": current_level,

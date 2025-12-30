@@ -3,6 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List
 from collections import defaultdict
 from datetime import datetime
+from bson import ObjectId
 
 from database import get_database
 from routers.auth import get_current_user
@@ -71,8 +72,25 @@ async def get_top_locations(
             # Increment upload count
             location_data[location]["uploads"] += 1
             
-            # Add post image with creation date for sorting
+            # Get user details for this post
+            user_id = post.get("user_id")
+            user_level = None
+            if user_id:
+                try:
+                    # Handle both string and ObjectId formats
+                    user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+                    user = await db.users.find_one({"_id": user_id_obj})
+                    if user:
+                        user_level = user.get("level", 1)
+                except Exception as e:
+                    print(f"⚠️ Error fetching user level for post: {str(e)}")
+                    pass
+            
+            # Add post image with creation date and user level for sorting
             media_url = post.get("media_url") or post.get("image_url")
+            thumbnail_url = post.get("thumbnail_url")
+            media_type = post.get("media_type", "image")
+            
             if media_url:
                 # Get creation date for sorting
                 created_at = post.get("created_at")
@@ -84,9 +102,12 @@ async def get_top_locations(
                 elif created_at is None:
                     created_at = None
                 
-                # Store image with date for later sorting
+                # Store image with date, user level, and media info for later sorting
                 location_data[location]["images_with_dates"].append({
                     "url": media_url,
+                    "thumbnail_url": thumbnail_url,
+                    "media_type": media_type,
+                    "user_level": user_level,
                     "created_at": created_at if created_at else datetime.utcnow()  # Use current time as fallback
                 })
             
@@ -105,14 +126,27 @@ async def get_top_locations(
                 reverse=True  # Latest first
             )
             
-            # Extract just the URLs, keeping the latest first order
-            images = [img["url"] for img in sorted_images[:8]]  # Get top 8 latest images
+            # Extract image data with user levels, keeping the latest first order
+            images_data = []
+            thumbnails = []
+            for img in sorted_images[:8]:  # Get top 8 latest images
+                images_data.append({
+                    "url": img["url"],
+                    "user_level": img.get("user_level", 1),
+                    "media_type": img.get("media_type", "image")
+                })
+                thumbnails.append(img.get("thumbnail_url"))
+            
+            # For backward compatibility, also include simple URL arrays
+            images = [img["url"] for img in sorted_images[:8]]
             
             top_locations.append({
                 "location": location,
                 "location_name": location,  # Alias for consistency
                 "uploads": data["uploads"],
-                "images": images,  # Already sorted by latest first
+                "images": images,  # Simple URL array for backward compatibility
+                "images_data": images_data,  # Full image data with user levels
+                "thumbnails": thumbnails,  # Thumbnail URLs for videos
                 "post_ids": data["posts"],  # All post IDs for this location
             })
         
@@ -180,6 +214,7 @@ async def get_location_details(
                     "id": str(user["_id"]) if user else None,
                     "username": user.get("full_name") or user.get("username") if user else "Unknown",
                     "profile_picture": user.get("profile_picture") if user else None,
+                    "level": user.get("level", 1) if user else 1,
                 }
             })
         

@@ -16,7 +16,9 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../../context/AuthContext';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com/api';
+import { BACKEND_URL } from '../../utils/imageUrlFix';
+
+const API_URL = `${BACKEND_URL}/api`;
 
 export default function StoryUploadScreen() {
   const router = useRouter();
