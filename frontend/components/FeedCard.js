@@ -582,33 +582,27 @@ console.log("🖼️ Loading image:", mediaUrl);
 
 {/* LOCATION */}
 {(post.location_name || post.location_address) && (
-<TouchableOpacity
-style={[styles.detailBox, styles.locationBox]}
-onPress={handleOpenMap}
-activeOpacity={0.85}
->
-<Text style={styles.detailLabel}>LOCATION</Text>
+<TouchableOpacity onPress={handleOpenMap} activeOpacity={0.85}>
+  <LinearGradient
+    colors={[
+      "rgba(27,124,130,0.10)",   // top highlight
+      "rgba(27,124,130,0.10)"     // bottom tint (Cofau teal)
+    ]}
+    start={{ x: 1, y: 0 }}
+    end={{ x: 2, y: 2 }}
+    style={styles.locationBox}
+  >
+    <Text style={styles.detailLabel}>LOCATION</Text>
 
-<View style={styles.locationRow}>
-<Ionicons
-name="location"
-size={19}
-color="#FFD700" // ✅ GOLD ICON
-/>
-
-<Text style={styles.locationText}>
-{post.location_name}
-</Text>
-
-<View style={{ flex: 1 }} />
-
-<Ionicons
-name="chevron-forward"
-size={18}
-color="#999"
-/>
-</View>
+    <View style={styles.locationRow}>
+      <Ionicons name="location" size={18} color="#FFD700" />
+      <Text style={styles.locationText}>{post.location_name}</Text>
+      <View style={{ flex: 1 }} />
+      <Ionicons name="chevron-forward" size={18} color="#999" />
+    </View>
+  </LinearGradient>
 </TouchableOpacity>
+
 )}
 </View>
 
@@ -617,9 +611,9 @@ color="#999"
 {/* LIKE */}
 <TouchableOpacity onPress={handleLike} style={styles.actionButton}>
 {isLiked ? (
-<GradientHeart size={22} /> // ✅ COFAU GRADIENT RESTORED
+<GradientHeart size={18} /> // ✅ COFAU GRADIENT RESTORED
 ) : (
-<Ionicons name="heart-outline" size={22} color="#666" />
+<Ionicons name="heart-outline" size={18} color="#666" />
 )}
 <Text style={[styles.actionCount, isLiked && styles.likedCount]}>
 {likesCount}
@@ -631,7 +625,7 @@ color="#999"
 style={styles.actionButton}
 onPress={() => router.push(`/comments/${post.id}`)}
 >
-<Ionicons name="chatbubble-outline" size={22} color="#666" />
+<Ionicons name="chatbubble-outline" size={18} color="#666" />
 <Text style={styles.actionCount}>{post.comments || 0}</Text>
 </TouchableOpacity>
 
@@ -682,7 +676,7 @@ style: "cancel",
 );
 }}
 >
-<Ionicons name="paper-plane-outline" size={22} color="#666" />
+<Ionicons name="paper-plane-outline" size={18} color="#666" />
 <Text style={styles.actionCount}>{post.shares || 0}</Text>
 </TouchableOpacity>
 
@@ -690,7 +684,7 @@ style: "cancel",
 <TouchableOpacity style={styles.actionButton} onPress={handleSave}>
 <Ionicons
 name={isSaved ? "bookmark" : "bookmark-outline"}
-size={22}
+size={18}
 color={isSaved ? "#1B7C82" : "#666"}
 />
 </TouchableOpacity>
@@ -956,12 +950,12 @@ gap: 6,
 
 ratingText: {
 fontSize: 15,
-fontWeight: "700",
+fontWeight: "400",
 color: "#202124",
 },
 
 ratingNumber: {
-fontWeight: "700",
+fontWeight: "400",
 fontSize: 15,
 },
 
@@ -972,24 +966,26 @@ gap: 8,
 
 reviewText: {
 fontSize: 16,
-fontWeight: "600",
+fontWeight: "400",
 color: "#202124",
 flex: 1,
 },
 
 locationBox: {
-backgroundColor: "#FFFFFF",
-borderRadius: 10,
-padding: 12,
+borderRadius: 12,
+paddingVertical: 14,
+paddingHorizontal: 14,
 marginBottom: 0,
-borderWidth: 0.2,
-borderColor: "#0e0e0dff", // ✅ Change from #DADCE0 to cyan (more noticeable)
-shadowColor: "#000000ff", // ✅ Add cyan shadow
-shadowOffset: { width: 0, height: 2 },
-shadowOpacity: 0.15,
-shadowRadius: 4,
-elevation: 12,
+overflow: "hidden",
+borderWidth: 2,
+borderColor: "rgba(27, 124, 130, 0.10)",
+shadowColor: "rgba(27, 124, 130, 0.10)", 
+shadowOffset: { width: 0, height: 6 },
+shadowOpacity: 0.12,
+shadowRadius: 10,
+elevation: 6,
 },
+
 
 locationRow: {
 flexDirection: "row",
@@ -999,7 +995,7 @@ gap: 7,
 
 locationText: {
 fontSize: 15,
-fontWeight: "700",
+fontWeight: "600",
 color: "#202124",
 },
 
