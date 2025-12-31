@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 
 import UserAvatar from "./UserAvatar";
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import SharePreviewModal from "./SharePreviewModal";
 import ShareToUsersModal from "./ShareToUsersModal";
 import SimpleShareModal from "./SimpleShareModal";
@@ -81,6 +82,7 @@ const [videoError, setVideoError] = useState(false);
 const [thumbnailError, setThumbnailError] = useState(false);
 const [isFollowing, setIsFollowing] = useState(post.is_following || false);
 const [followLoading, setFollowLoading] = useState(false);
+const [generatedThumbnail, setGeneratedThumbnail] = useState(null);
 
 // Update isFollowing state when post data changes
 useEffect(() => {
@@ -92,6 +94,51 @@ const mediaUrl = normalizeMediaUrl(post.media_url);
 // Check if this is the current user's own post
 const isOwnPost = user?.id === post.user_id;
 const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
+
+useEffect(() => {
+  const generateThumbnail = async () => {
+    if (isVideo && !thumbnailUrl && mediaUrl && !generatedThumbnail) {
+      try {
+        const { uri } = await VideoThumbnails.getThumbnailAsync(mediaUrl, {
+          time: 1000,
+          quality: 1.0,
+        });
+        setGeneratedThumbnail(uri);
+      } catch (e) {
+        console.log('Thumbnail generation failed:', e);
+      }
+    }
+  };
+  generateThumbnail();
+}, [isVideo, thumbnailUrl, mediaUrl]);
+
+// Generate thumbnail for videos
+useEffect(() => {
+  const generateThumbnail = async () => {
+    if (isVideo && mediaUrl && !generatedThumbnail) {
+      try {
+        const { uri } = await VideoThumbnails.getThumbnailAsync(mediaUrl, {
+          time: 500,
+          quality: 1.0,
+        });
+        setGeneratedThumbnail(uri);
+      } catch (e) {
+        console.log('Thumbnail generation failed:', e);
+      }
+    }
+  };
+  generateThumbnail();
+}, [isVideo, mediaUrl]);
+
+console.log('🎬 VIDEO DEBUG:', {
+  postId: post.id,
+  username: post.username,
+  hasThumbnail: !!post.thumbnail_url,
+  thumbnailUrl: thumbnailUrl,
+  mediaUrl: mediaUrl,
+  isVideo: isVideo,
+});
+
 const isVideo =
 post.media_type === "video" || mediaUrl?.toLowerCase().endsWith(".mp4");
 
@@ -396,13 +443,18 @@ setShowOptionsMenu(!showOptionsMenu);
 </View>
 
 {/* Thumbnail - Show when video is not preloaded */}
-{!shouldPreload && (
-  <Image
-    key="thumbnail"
-    source={{ uri: thumbnailUrl || mediaUrl }}
-    style={styles.video}
-    resizeMode="cover"
-  />
+{(!shouldPlay || !videoLoaded) && (
+  <View style={[styles.video, styles.videoPlaceholder]}>
+    <Image
+      source={{ uri: thumbnailUrl || generatedThumbnail || mediaUrl }}
+      style={StyleSheet.absoluteFill}
+      resizeMode="cover"
+      blurRadius={5}
+    />
+    <View style={styles.playIconContainer}>
+      <Ionicons name="play-circle" size={56} color="rgba(255,255,255,0.7)" />
+    </View>
+  </View>
 )}
 
 {/* Video - Only render when shouldPlay is true and no error */}
@@ -794,6 +846,24 @@ height: "100%",
 zIndex: 0,
 },
 
+videoPlaceholder: {
+  backgroundColor: '#000',
+  justifyContent: 'center',
+  alignItems: 'center',
+  overflow: 'hidden',
+},
+
+playIconContainer: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0,0,0,0.3)',
+},
+
 hdrOverlay: {
   position: 'absolute',
   top: 0,
@@ -810,6 +880,22 @@ opacity: 0,
 width: "100%",
 height: "100%",
 zIndex: 1,
+},
+
+videoPlaceholder: {
+  backgroundColor: '#000',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+playIconContainer: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
 },
 
 playIconOverlay: {
