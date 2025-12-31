@@ -130,12 +130,14 @@ async def get_top_locations(
             images_data = []
             thumbnails = []
             for img in sorted_images[:8]:  # Get top 8 latest images
+                thumbnail_url = img.get("thumbnail_url")
                 images_data.append({
                     "url": img["url"],
+                    "thumbnail_url": thumbnail_url,  # Include thumbnail in images_data
                     "user_level": img.get("user_level", 1),
                     "media_type": img.get("media_type", "image")
                 })
-                thumbnails.append(img.get("thumbnail_url"))
+                thumbnails.append(thumbnail_url)
             
             # For backward compatibility, also include simple URL arrays
             images = [img["url"] for img in sorted_images[:8]]

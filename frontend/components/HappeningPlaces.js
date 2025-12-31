@@ -248,11 +248,29 @@ export default function HappeningPlaces() {
               <View style={styles.imageRow}>
                 {images.slice(0, 3).map((imageUrl, imgIndex) => {
                   const fixedUrl = fixUrl(imageUrl);
-                  const thumbnailUrl = fixUrl(thumbnails[imgIndex]);
                   const imageData = imagesData[imgIndex] || {};
+                  // Get thumbnail from images_data first, then fallback to thumbnails array
+                  const thumbnailUrl = imageData.thumbnail_url 
+                    ? fixUrl(imageData.thumbnail_url) 
+                    : (thumbnails[imgIndex] ? fixUrl(thumbnails[imgIndex]) : null);
                   const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
                   const userLevel = imageData.user_level || null;
-                  const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
+                  
+                  // For videos, ONLY use thumbnail - never use video URL as image source
+                  // For images, use the image URL
+                  let displayUrl = null;
+                  if (isVideo) {
+                    // Only use thumbnail for videos - if no thumbnail, skip this image
+                    if (thumbnailUrl) {
+                      displayUrl = thumbnailUrl;
+                    } else {
+                      // Skip videos without thumbnails
+                      return null;
+                    }
+                  } else {
+                    // For images, use the image URL
+                    displayUrl = fixedUrl;
+                  }
                   
                   if (!displayUrl) return null;
                   return (
@@ -263,12 +281,16 @@ export default function HappeningPlaces() {
                         contentFit="cover"
                         placeholder={{ blurhash: BLUR_HASH }}
                         transition={300}
+                        onError={(error) => {
+                          console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
+                        }}
                       />
                       {isVideo && (
                         <View style={styles.videoPlayIcon}>
                           <Ionicons name="play-circle" size={24} color="#fff" />
                         </View>
                       )}
+                      {/* User Level Badge */}
                       {userLevel && (
                         <View style={styles.levelBadgeContainer}>
                           <LevelBadge level={userLevel} size="small" />
@@ -283,12 +305,31 @@ export default function HappeningPlaces() {
               <View style={styles.imageRow}>
                 {images[3] && (() => {
                   const fixedUrl = fixUrl(images[3]);
-                  const thumbnailUrl = fixUrl(thumbnails[3]);
                   const imageData = imagesData[3] || {};
+                  // Get thumbnail from images_data first, then fallback to thumbnails array
+                  const thumbnailUrl = imageData.thumbnail_url 
+                    ? fixUrl(imageData.thumbnail_url) 
+                    : (thumbnails[3] ? fixUrl(thumbnails[3]) : null);
                   const isVideo = isVideoFile(images[3]) || imageData.media_type === 'video';
                   const userLevel = imageData.user_level || null;
-                  const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
                   
+                  // For videos, ONLY use thumbnail - never use video URL as image source
+                  // For images, use the image URL
+                  let displayUrl = null;
+                  if (isVideo) {
+                    // Only use thumbnail for videos - if no thumbnail, skip this image
+                    if (thumbnailUrl) {
+                      displayUrl = thumbnailUrl;
+                    } else {
+                      // Skip videos without thumbnails
+                      return null;
+                    }
+                  } else {
+                    // For images, use the image URL
+                    displayUrl = fixedUrl;
+                  }
+                  
+                  if (!displayUrl) return null;
                   return (
                     <View style={styles.gridImageContainer}>
                       <Image
@@ -297,6 +338,9 @@ export default function HappeningPlaces() {
                         contentFit="cover"
                         placeholder={{ blurhash: BLUR_HASH }}
                         transition={300}
+                        onError={(error) => {
+                          console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
+                        }}
                       />
                       {isVideo && (
                         <View style={styles.videoPlayIcon}>
@@ -314,12 +358,31 @@ export default function HappeningPlaces() {
 
                 {images.length === 5 ? (() => {
                   const fixedUrl = fixUrl(images[4]);
-                  const thumbnailUrl = fixUrl(thumbnails[4]);
                   const imageData = imagesData[4] || {};
+                  // Get thumbnail from images_data first, then fallback to thumbnails array
+                  const thumbnailUrl = imageData.thumbnail_url 
+                    ? fixUrl(imageData.thumbnail_url) 
+                    : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
                   const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
                   const userLevel = imageData.user_level || null;
-                  const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
                   
+                  // For videos, ONLY use thumbnail - never use video URL as image source
+                  // For images, use the image URL
+                  let displayUrl = null;
+                  if (isVideo) {
+                    // Only use thumbnail for videos - if no thumbnail, skip this image
+                    if (thumbnailUrl) {
+                      displayUrl = thumbnailUrl;
+                    } else {
+                      // Skip videos without thumbnails
+                      return null;
+                    }
+                  } else {
+                    // For images, use the image URL
+                    displayUrl = fixedUrl;
+                  }
+                  
+                  if (!displayUrl) return null;
                   return (
                     <View style={styles.gridImageContainer}>
                       <Image
@@ -328,6 +391,9 @@ export default function HappeningPlaces() {
                         contentFit="cover"
                         placeholder={{ blurhash: BLUR_HASH }}
                         transition={300}
+                        onError={(error) => {
+                          console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
+                        }}
                       />
                       {isVideo && (
                         <View style={styles.videoPlayIcon}>
@@ -341,22 +407,54 @@ export default function HappeningPlaces() {
                       )}
                     </View>
                   );
-                })() : images.length > 5 ? (
-                  <View style={styles.blurredImageWrapper}>
-                    <Image
-                      source={{ uri: fixUrl(thumbnails[4]) || fixUrl(images[4]) }}
-                      style={styles.gridImageSquare}
-                      contentFit="cover"
-                      blurRadius={8}
-                      placeholder={{ blurhash: BLUR_HASH }}
-                    />
-                    <View style={styles.countButtonOverlay}>
-                      <LinearGradient
-                        colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                        start={{ x: 3, y: 3 }}
-                        end={{ x: 0, y: 3 }}
-                        style={styles.countButtonGradientBorder}
-                      >
+                })()
+              ) : images.length > 5 ? (
+                // More than 5 - show blurred with total count
+                <View style={styles.blurredImageWrapper}>
+                  {(() => {
+                    const imageData = imagesData[4] || {};
+                    const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
+                    
+                    // For videos, ONLY use thumbnail - never use video URL
+                    // For images, use image URL
+                    let displayUrl = null;
+                    if (isVideo) {
+                      // Get thumbnail from images_data first, then fallback to thumbnails array
+                      const thumbnailUrl = imageData.thumbnail_url 
+                        ? fixUrl(imageData.thumbnail_url) 
+                        : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
+                      if (thumbnailUrl) {
+                        displayUrl = thumbnailUrl;
+                      } else {
+                        // If no thumbnail for video, use a placeholder or skip
+                        displayUrl = fixUrl(images[4]); // Fallback to video URL but it won't work as image
+                      }
+                    } else {
+                      displayUrl = fixUrl(images[4]);
+                    }
+                    
+                    if (!displayUrl) return null;
+                    return (
+                      <Image
+                        source={{ uri: displayUrl }}
+                        style={styles.gridImageSquare}
+                        contentFit="cover"
+                        blurRadius={8}
+                        placeholder={{ blurhash: BLUR_HASH }}
+                        onError={(error) => {
+                          console.error("❌ Blurred image load error:", displayUrl, error);
+                        }}
+                      />
+                    );
+                  })()}
+                  <View style={styles.countButtonOverlay}>
+                    <LinearGradient
+                      colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                      start={{ x: 3, y: 3 }}
+                      end={{ x: 0, y: 3 }}
+                      style={styles.countButtonGradientBorder}
+                    >
+                      <View style={styles.countButtonInner}>
                         <Text style={styles.countButtonText}>
                           +{location.uploads || images.length}
                         </Text>
