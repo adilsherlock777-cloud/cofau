@@ -203,97 +203,85 @@ export default function HappeningPlaces() {
           {/* Location Cards */}
 {topLocations.map((location, index) => {
   const images = location.images || [];
-  const thumbnails = location.thumbnails || []; // Backend should provide thumbnails for videos
-  const imagesData = location.images_data || []; // Full image data with user levels
+  const thumbnails = location.thumbnails || [];
+  const imagesData = location.images_data || [];
 
   return (
     <TouchableOpacity
-      key={
-        location.location ||
-        location.location_name ||
-        index
-      }
-      style={styles.card}
+      key={location.location || location.location_name || index}
+      style={styles.cardOuter}
       onPress={() => handleLocationPress(location)}
       activeOpacity={0.8}
     >
-      <View style={styles.cardHeader}>
-        <View style={styles.rankNumber}>
-          <LinearGradient
-            colors={['#E94A37', '#F2CF68', '#1B7C82']}
-            start={{ x: 3, y: 3 }}
-            end={{ x: 0, y: 3 }}
-            style={styles.rankGradient}
-          >
-            <Text style={styles.rankNumberText}>
-              {index + 1}
+      <LinearGradient
+        colors={['rgba(27, 124, 130, 0.35)', 'rgba(27, 124, 130, 0.15)', 'rgba(255, 255, 255, 1)']}
+        locations={[0, 0.3, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.card}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.rankNumber}>
+            <LinearGradient
+              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              start={{ x: 3, y: 3 }}
+              end={{ x: 0, y: 3 }}
+              style={styles.rankGradient}
+            >
+              <Text style={styles.rankNumberText}>{index + 1}</Text>
+            </LinearGradient>
+          </View>
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationName} numberOfLines={1}>
+              {location.location || location.location_name}
             </Text>
-          </LinearGradient>
+            <Text style={styles.uploadCount}>
+              ({formatUploadCount(location.uploads)} uploaded)
+            </Text>
+          </View>
         </View>
-        <View style={styles.locationInfo}>
-          <Text
-            style={styles.locationName}
-            numberOfLines={1}
-          >
-            {location.location ||
-              location.location_name}
-          </Text>
-          <Text style={styles.uploadCount}>
-            (
-            {formatUploadCount(
-              location.uploads
-            )}{' '}
-            uploaded)
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.imageGrid}>
-        {images.length > 0 ? (
-          <>
-            {/* First Row - 3 images */}
-            <View style={styles.imageRow}>
-              {images.slice(0, 3).map((imageUrl, imgIndex) => {
-                const fixedUrl = fixUrl(imageUrl);
-                const thumbnailUrl = fixUrl(thumbnails[imgIndex]);
-                const imageData = imagesData[imgIndex] || {};
-                const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
-                const userLevel = imageData.user_level || null;
-                
-                // Use thumbnail if it's a video, otherwise use the image
-                const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
-                
-                if (!displayUrl) return null;
-                return (
-                  <View key={imgIndex} style={styles.gridImageContainer}>
-                    <Image
-                      source={{ uri: displayUrl }}
-                      style={styles.gridImageSquare}
-                      contentFit="cover"
-                      placeholder={{ blurhash: BLUR_HASH }}
-                      transition={300}
-                    />
-                    {isVideo && (
-                      <View style={styles.videoPlayIcon}>
-                        <Ionicons name="play-circle" size={24} color="#fff" />
-                      </View>
-                    )}
-                    {/* User Level Badge */}
-                    {userLevel && (
-                      <View style={styles.levelBadgeContainer}>
-                        <LevelBadge level={userLevel} size="small" />
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
+        <View style={styles.imageGrid}>
+          {images.length > 0 ? (
+            <>
+              {/* First Row - 3 images */}
+              <View style={styles.imageRow}>
+                {images.slice(0, 3).map((imageUrl, imgIndex) => {
+                  const fixedUrl = fixUrl(imageUrl);
+                  const thumbnailUrl = fixUrl(thumbnails[imgIndex]);
+                  const imageData = imagesData[imgIndex] || {};
+                  const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
+                  const userLevel = imageData.user_level || null;
+                  const displayUrl = isVideo && thumbnailUrl ? thumbnailUrl : fixedUrl;
+                  
+                  if (!displayUrl) return null;
+                  return (
+                    <View key={imgIndex} style={styles.gridImageContainer}>
+                      <Image
+                        source={{ uri: displayUrl }}
+                        style={styles.gridImageSquare}
+                        contentFit="cover"
+                        placeholder={{ blurhash: BLUR_HASH }}
+                        transition={300}
+                      />
+                      {isVideo && (
+                        <View style={styles.videoPlayIcon}>
+                          <Ionicons name="play-circle" size={24} color="#fff" />
+                        </View>
+                      )}
+                      {userLevel && (
+                        <View style={styles.levelBadgeContainer}>
+                          <LevelBadge level={userLevel} size="small" />
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
 
-            {/* Second Row - 2 images */}
-            <View style={styles.imageRow}>
-              {/* Show 4th image (index 3) */}
-              {images[3] && (
-                (() => {
+              {/* Second Row - 2 images */}
+              <View style={styles.imageRow}>
+                {images[3] && (() => {
                   const fixedUrl = fixUrl(images[3]);
                   const thumbnailUrl = fixUrl(thumbnails[3]);
                   const imageData = imagesData[3] || {};
@@ -315,7 +303,6 @@ export default function HappeningPlaces() {
                           <Ionicons name="play-circle" size={24} color="#fff" />
                         </View>
                       )}
-                      {/* User Level Badge */}
                       {userLevel && (
                         <View style={styles.levelBadgeContainer}>
                           <LevelBadge level={userLevel} size="small" />
@@ -323,13 +310,9 @@ export default function HappeningPlaces() {
                       )}
                     </View>
                   );
-                })()
-              )}
+                })()}
 
-              {/* Show 5th image or blurred overlay with count */}
-              {images.length === 5 ? (
-                // Exactly 5 images - show 5th normally
-                (() => {
+                {images.length === 5 ? (() => {
                   const fixedUrl = fixUrl(images[4]);
                   const thumbnailUrl = fixUrl(thumbnails[4]);
                   const imageData = imagesData[4] || {};
@@ -351,7 +334,6 @@ export default function HappeningPlaces() {
                           <Ionicons name="play-circle" size={24} color="#fff" />
                         </View>
                       )}
-                      {/* User Level Badge */}
                       {userLevel && (
                         <View style={styles.levelBadgeContainer}>
                           <LevelBadge level={userLevel} size="small" />
@@ -359,41 +341,38 @@ export default function HappeningPlaces() {
                       )}
                     </View>
                   );
-                })()
-              ) : images.length > 5 ? (
-                // More than 5 - show blurred with total count
-                <View style={styles.blurredImageWrapper}>
-                  <Image
-                    source={{ uri: fixUrl(thumbnails[4]) || fixUrl(images[4]) }}
-                    style={styles.gridImageSquare}
-                    contentFit="cover"
-                    blurRadius={8}
-                    placeholder={{ blurhash: BLUR_HASH }}
-                  />
-                  <View style={styles.countButtonOverlay}>
-                    <LinearGradient
-                      colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                      start={{ x: 3, y: 3 }}
-                      end={{ x: 0, y: 3 }}
-                      style={styles.countButtonGradientBorder}
-                    >
-                      <View style={styles.countButtonInner}>
+                })() : images.length > 5 ? (
+                  <View style={styles.blurredImageWrapper}>
+                    <Image
+                      source={{ uri: fixUrl(thumbnails[4]) || fixUrl(images[4]) }}
+                      style={styles.gridImageSquare}
+                      contentFit="cover"
+                      blurRadius={8}
+                      placeholder={{ blurhash: BLUR_HASH }}
+                    />
+                    <View style={styles.countButtonOverlay}>
+                      <LinearGradient
+                        colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                        start={{ x: 3, y: 3 }}
+                        end={{ x: 0, y: 3 }}
+                        style={styles.countButtonGradientBorder}
+                      >
                         <Text style={styles.countButtonText}>
                           +{location.uploads || images.length}
                         </Text>
-                      </View>
-                    </LinearGradient>
+                      </LinearGradient>
+                    </View>
                   </View>
-                </View>
-              ) : null}
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <View style={styles.noImagePlaceholder}>
+              <Ionicons name="image-outline" size={32} color="#CCC" />
             </View>
-          </>
-        ) : (
-          <View style={styles.noImagePlaceholder}>
-            <Ionicons name="image-outline" size={32} color="#CCC" />
-          </View>
-        )}
-      </View>
+          )}
+        </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 })}
@@ -561,6 +540,21 @@ const styles = StyleSheet.create({
   shadowOpacity: 0.1,
   shadowRadius: 8,
   elevation: 4,
+},
+
+cardOuter: {
+  marginHorizontal: 4,
+  marginBottom: 12,
+  borderRadius: 15,
+  backgroundColor: '#fff',  // Add this - Android needs background for shadows
+},
+card: {
+  borderRadius: 15,
+  padding: 20,
+  paddingBottom: 24,
+  borderWidth: 1,
+  borderColor: '#E8E8E8',
+  overflow: 'hidden',  // Move it here
 },
 
  titleBox: {
