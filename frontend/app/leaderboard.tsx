@@ -176,6 +176,8 @@ export default function LeaderboardScreen() {
 
   const entries = leaderboardData?.entries || [];
 
+  console.log("entries", entries);
+
   const handlePostPress = (postId: string) => {
     router.push(`/post-details/${postId}`);
   };
@@ -426,6 +428,9 @@ export default function LeaderboardScreen() {
                           <Text style={styles.rankOneName} numberOfLines={1}>
                             {entry.full_name || entry.username || "Unknown User"}
                           </Text>
+                          <Text style={styles.levelText}>
+                            Level {entry.user_level || entry.level || 1}
+                          </Text>
                           <View style={styles.rankOneStats}>
   <View style={styles.statItem}>
     <Ionicons name="people" size={18} color="#666" />
@@ -517,9 +522,14 @@ export default function LeaderboardScreen() {
                           level={entry.user_level || entry.level || 1}
                           style={{}}
                         />
-                        <Text style={styles.otherRanksName} numberOfLines={1}>
-                          {entry.full_name || entry.username || "Unknown User"}
-                        </Text>
+                        <View style={styles.otherRanksInfo}>
+                          <Text style={styles.otherRanksName} numberOfLines={1}>
+                            {entry.full_name || entry.username || "Unknown User"}
+                          </Text>
+                          <Text style={styles.levelTextSmall}>
+                            Level {entry.user_level || entry.level || 1}
+                          </Text>
+                        </View>
                       </View>
 
                       <View style={styles.cardContent}>
@@ -1301,6 +1311,12 @@ rankBadgeGradient: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
+    marginBottom: 4,
+  },
+  levelText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1B7C82",
     marginBottom: 8,
   },
   rankOneStats: {
@@ -1416,11 +1432,19 @@ rankBadgeGradient: {
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.05)",
   },
+  otherRanksInfo: {
+    flex: 1,
+  },
   otherRanksName: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
-    flex: 1,
+    marginBottom: 2,
+  },
+  levelTextSmall: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#1B7C82",
   },
   regenerateButton: {
     marginTop: 20,

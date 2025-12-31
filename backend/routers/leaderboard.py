@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo  # ✅ ADDED (only import change)
 from routers.auth import get_current_user
 from database import get_database
 from utils.sightengine_quality import analyze_media_quality
+from utils.level_system import get_level_from_total_points
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,7 @@ async def generate_leaderboard_snapshot():
             followers_count = 0
             following_count = 0
             posts_count = 0
+            user_level = 1  # Default level - ALWAYS initialize to ensure it's always set
 
             if user_id:
                 try:
@@ -201,6 +203,26 @@ async def generate_leaderboard_snapshot():
                 if user:
                     followers_count = user.get("followers_count", 0)
                     following_count = user.get("following_count", 0)
+                    
+                    # Get user level - match feed endpoint logic exactly: user.get("level", 1)
+                    # This matches how feed, profile, and explore endpoints get the level
+                    user_level = user.get("level", 1)
+                    
+                    # If level is missing or 0, try to calculate from total_points as fallback
+                    if user_level is None or user_level < 1:
+                        total_points = user.get("total_points", 0)
+                        if total_points > 0:
+                            # Calculate level from total_points
+                            level_info = get_level_from_total_points(total_points)
+                            user_level = level_info.get("level", 1)
+                            logger.info(f"📊 User {user_id} level calculated from total_points {total_points}: {user_level}")
+                        else:
+                            user_level = 1
+                    else:
+                        logger.debug(f"📊 User {user_id} level from user document: {user_level}")
+                else:
+                    # User not found - keep default level of 1
+                    logger.warning(f"⚠️ User {user_id} not found, using default level 1")
                 
                 # Count user's posts - try multiple formats to ensure we get the count
                 # Posts might have user_id as ObjectId or string format
@@ -318,6 +340,8 @@ async def generate_leaderboard_snapshot():
                 "username": username or "Unknown",  # Ensure username is never None
                 "full_name": full_name,  # Can be None, frontend will handle
                 "user_profile_picture": user.get("profile_picture") if user else None,
+                "user_level": user_level,  # User's level (1-12)
+                "level": user_level,  # Alias for compatibility
                 "followers_count": followers_count,
                 "following_count": following_count,
                 "posts_count": posts_count,

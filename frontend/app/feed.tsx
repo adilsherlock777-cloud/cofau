@@ -8,6 +8,7 @@ TouchableOpacity,
 ActivityIndicator,
 RefreshControl,
 Platform,
+Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -112,6 +113,7 @@ const [page, setPage] = useState(1);
 const [loadingMore, setLoadingMore] = useState(false);
 const [hasMore, setHasMore] = useState(true);
 const [isMuted, setIsMuted] = useState(globalMuteState);
+const [showAddMenu, setShowAddMenu] = useState(false);
 const scrollViewRef = useRef<ScrollView>(null);
 const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
 const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -411,6 +413,10 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 <BlurView intensity={60} tint="light" style={styles.levelCard}>
 {/* Profile picture - positioned to overlap on the left */}
 <View style={styles.dpContainer}>
+<TouchableOpacity
+onPress={() => setShowAddMenu(true)}
+activeOpacity={0.8}
+>
 <UserAvatar
 profilePicture={user.profile_picture}
 username={user.username}
@@ -419,9 +425,10 @@ showLevelBadge={false}
 level={user.level}
 style={{}}
 />
+</TouchableOpacity>
 <TouchableOpacity
 style={styles.dpAddButton}
-onPress={() => router.push("/add-post")}
+onPress={() => setShowAddMenu(true)}
 >
 <Ionicons name="add" size={19} color="#0f0303ff" />
 </TouchableOpacity>
@@ -473,6 +480,10 @@ return (
 <View style={[styles.levelCard, styles.levelCardAndroid]}>
 {/* Profile picture - positioned to overlap on the left */}
 <View style={styles.dpContainer}>
+<TouchableOpacity
+onPress={() => setShowAddMenu(true)}
+activeOpacity={0.8}
+>
 <UserAvatar
 profilePicture={user.profile_picture}
 username={user.username}
@@ -481,9 +492,10 @@ showLevelBadge={false}
 level={user.level}
 style={{}}
 />
+</TouchableOpacity>
 <TouchableOpacity
 style={styles.dpAddButton}
-onPress={() => router.push("/add-post")}
+onPress={() => setShowAddMenu(true)}
 >
 <Ionicons name="add" size={19} color="#0f0303ff" />
 </TouchableOpacity>
@@ -628,6 +640,48 @@ onPress={() => router.push("/profile")}
 </TouchableOpacity>
 </View>
 </View>
+
+{/* Add Post/Story Menu Modal */}
+<Modal
+visible={showAddMenu}
+transparent={true}
+animationType="fade"
+onRequestClose={() => setShowAddMenu(false)}
+>
+<TouchableOpacity
+style={styles.modalOverlay}
+activeOpacity={1}
+onPress={() => setShowAddMenu(false)}
+>
+<View style={styles.modalContent}>
+<TouchableOpacity
+style={styles.menuItem}
+onPress={() => {
+setShowAddMenu(false);
+router.push("/add-post");
+}}
+activeOpacity={0.7}
+>
+<Ionicons name="image-outline" size={24} color="#333" />
+<Text style={styles.menuItemText}>Add Post</Text>
+</TouchableOpacity>
+
+<View style={styles.menuDivider} />
+
+<TouchableOpacity
+style={styles.menuItem}
+onPress={() => {
+setShowAddMenu(false);
+router.push("/story-upload");
+}}
+activeOpacity={0.7}
+>
+<Ionicons name="camera-outline" size={24} color="#333" />
+<Text style={styles.menuItemText}>Add Story</Text>
+</TouchableOpacity>
+</View>
+</TouchableOpacity>
+</Modal>
 );
 }
 
@@ -906,5 +960,45 @@ color: "#000",
 marginTop: 2,
 textAlign: "center",
 fontWeight: "700",
+},
+
+// Modal styles
+modalOverlay: {
+flex: 1,
+backgroundColor: "rgba(0, 0, 0, 0.5)",
+justifyContent: "center",
+alignItems: "center",
+},
+
+modalContent: {
+backgroundColor: "#fff",
+borderRadius: 20,
+paddingVertical: 10,
+minWidth: 200,
+shadowColor: "#000",
+shadowOffset: { width: 0, height: 4 },
+shadowOpacity: 0.3,
+shadowRadius: 8,
+elevation: 8,
+},
+
+menuItem: {
+flexDirection: "row",
+alignItems: "center",
+paddingVertical: 16,
+paddingHorizontal: 24,
+gap: 16,
+},
+
+menuItemText: {
+fontSize: 16,
+color: "#333",
+fontWeight: "600",
+},
+
+menuDivider: {
+height: 1,
+backgroundColor: "#E8E8E8",
+marginHorizontal: 10,
 },
 });
