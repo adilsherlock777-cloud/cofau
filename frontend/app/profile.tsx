@@ -33,6 +33,62 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.co
 const API_URL = `${BACKEND_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+/* -------------------------
+   Level System Helper
+------------------------- */
+// Level thresholds matching backend LEVEL_TABLE
+const LEVEL_TABLE = [
+  { level: 1, required_points: 1250 },
+  { level: 2, required_points: 2500 },
+  { level: 3, required_points: 3750 },
+  { level: 4, required_points: 5000 },
+  { level: 5, required_points: 5750 },
+  { level: 6, required_points: 6500 },
+  { level: 7, required_points: 7250 },
+  { level: 8, required_points: 8000 },
+  { level: 9, required_points: 9000 },
+  { level: 10, required_points: 10000 },
+  { level: 11, required_points: 11000 },
+  { level: 12, required_points: 12000 },
+];
+
+/**
+ * Calculate points needed from current level to next level
+ * @param currentLevel - Current user level
+ * @param requiredPoints - Total points required for NEXT level (from backend, after fix)
+ * @returns Points needed to reach next level (the difference between next and previous level thresholds)
+ */
+const getPointsNeededForNextLevel = (currentLevel: number, requiredPoints: number): number => {
+  // If at max level (12), return the current required points
+  if (currentLevel >= 12) {
+    return requiredPoints;
+  }
+  
+  // Find the previous level's threshold
+  // currentPoints is calculated as: total_points - previous_level_threshold
+  // So we need to find the threshold for level (currentLevel - 1)
+  const previousLevelData = LEVEL_TABLE.find(level => level.level === currentLevel - 1);
+  
+  if (previousLevelData) {
+    // Points needed = next level threshold - previous level threshold
+    // requiredPoints is now the next level's threshold (after backend fix)
+    return requiredPoints - previousLevelData.required_points;
+  }
+  
+  // For Level 1, there's no previous level (threshold is 0)
+  // So points needed = requiredPoints (which is Level 2's threshold = 1250)
+  if (currentLevel === 1) {
+    return requiredPoints;
+  }
+  
+  // Fallback: calculate based on level progression
+  if (currentLevel === 4) return 750; // Level 4 → 5: 5750 - 5000 = 750
+  if (currentLevel >= 5 && currentLevel <= 8) return 750; // Levels 5-8: 750 points per level
+  if (currentLevel >= 9 && currentLevel <= 11) return 1000; // Levels 9-11: 1000 points per level
+  
+  return 1250; // Default: 1250 points for levels 2-3
+};
+
 const fixUrl = (url?: string | null) => {
   if (!url) return null;
   if (url.startsWith("http")) return url;
@@ -1971,31 +2027,57 @@ export default function ProfileScreen() {
                   </View>
                 )}
 
-                {userData?.requiredPoints !== undefined && (
+                {userData?.requiredPoints !== undefined && userData?.level !== undefined && (
                   <View style={styles.levelInfoRow}>
                     <Text style={styles.levelInfoLabel}>Points for Next Level:</Text>
                     <Text style={styles.levelInfoValue}>
-                      {userData.requiredPoints || 1250}
+                      {(() => {
+                        const currentLevel = userData.level || 1;
+                        const currentRequiredPoints = userData.requiredPoints || 1250;
+                        return getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+                      })()}
                     </Text>
                   </View>
                 )}
 
-                {userData?.requiredPoints && userData?.points !== undefined && (
+                {userData?.requiredPoints !== undefined && userData?.currentPoints !== undefined && (
                   <View style={styles.progressContainer}>
                     <Text style={styles.progressLabel}>Progress to Next Level</Text>
                     <View style={styles.progressBar}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            width: `${Math.min(100, (userData.points / userData.requiredPoints) * 100)}%`
-                          }
-                        ]}
-                      />
+                      {(() => {
+                        const currentLevel = userData?.level || 1;
+                        const currentRequiredPoints = userData.requiredPoints || 1250;
+                        const currentPoints = userData.currentPoints || 0;
+                        const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+                        const progressPercent = Math.min((currentPoints / pointsNeeded) * 100, 100);
+                        
+                        return (
+                          <LinearGradient
+                            colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={[
+                              styles.progressFill,
+                              {
+                                width: `${progressPercent}%`
+                              }
+                            ]}
+                          />
+                        );
+                      })()}
                     </View>
-                    <Text style={styles.progressText}>
-                      {userData.points} / {userData.requiredPoints} points
-                    </Text>
+                    {(() => {
+                      const currentLevel = userData?.level || 1;
+                      const currentRequiredPoints = userData.requiredPoints || 1250;
+                      const currentPoints = userData.currentPoints || 0;
+                      const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+                      
+                      return (
+                        <Text style={styles.progressText}>
+                          {currentPoints} / {pointsNeeded} points
+                        </Text>
+                      );
+                    })()}
                   </View>
                 )}
               </View>

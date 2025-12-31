@@ -279,11 +279,7 @@ export default function LeaderboardScreen() {
             <Text style={styles.dateRange}>
               {formatDate(leaderboardData.from_date)} - {formatDate(leaderboardData.to_date)}
             </Text>
-            {leaderboardData.total_posts_analyzed !== undefined && leaderboardData.total_posts_analyzed > 0 && (
-              <Text style={styles.postsCountText}>
-                {leaderboardData.total_posts_analyzed} images analyzed
-              </Text>
-            )}
+         
             {/* Check if entries have the new fields, if not show regenerate option */}
             {entries.length > 0 && entries[0] &&
               (entries[0].followers_count === undefined ||
@@ -793,7 +789,7 @@ rankBadgeGradient: {
   dateRange: {
     fontSize: 10,
     color: "#888",
-    marginBottom: 2,
+    marginBottom: 1,
     opacity: 0.7,
     textAlign: "center",
   },
