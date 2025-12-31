@@ -9,7 +9,7 @@ import {
   Dimensions,
   TextInput,
 } from 'react-native';
-import { Image } from 'expo-image'; 
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
@@ -171,17 +171,17 @@ export default function HappeningPlaces() {
           </View>
 
           {/* Title Box */}
-<View style={styles.titleBoxWrapper}>
-  <BlurView intensity={60} tint="light" style={styles.titleBox}>
-    <Text style={styles.titleMain}>Happening places</Text>
-    <View style={styles.subtitleRow}>
-      <Ionicons name="location" size={16} color="#E94A37" />
-      <Text style={styles.titleSub}>
-        Most Visited Places Around you
-      </Text>
-    </View>
-  </BlurView>
-</View>
+          <View style={styles.titleBoxWrapper}>
+            <BlurView intensity={60} tint="light" style={styles.titleBox}>
+              <Text style={styles.titleMain}>Happening places</Text>
+              <View style={styles.subtitleRow}>
+                <Ionicons name="location" size={16} color="#E94A37" />
+                <Text style={styles.titleSub}>
+                  Most Visited Places Around you
+                </Text>
+              </View>
+            </BlurView>
+          </View>
           {/* Empty State */}
           {topLocations.length === 0 && (
             <View style={styles.emptyState}>
@@ -201,279 +201,279 @@ export default function HappeningPlaces() {
           )}
 
           {/* Location Cards */}
-{topLocations.map((location, index) => {
-  const images = location.images || [];
-  const thumbnails = location.thumbnails || [];
-  const imagesData = location.images_data || [];
+          {topLocations.map((location, index) => {
+            const images = location.images || [];
+            const thumbnails = location.thumbnails || [];
+            const imagesData = location.images_data || [];
 
-  return (
-    <TouchableOpacity
-      key={location.location || location.location_name || index}
-      style={styles.cardOuter}
-      onPress={() => handleLocationPress(location)}
-      activeOpacity={0.8}
-    >
-      <LinearGradient
-        colors={['rgba(27, 124, 130, 0.35)', 'rgba(27, 124, 130, 0.15)', 'rgba(255, 255, 255, 1)']}
-        locations={[0, 0.3, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.card}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.rankNumber}>
-            <LinearGradient
-              colors={['#E94A37', '#F2CF68', '#1B7C82']}
-              start={{ x: 3, y: 3 }}
-              end={{ x: 0, y: 3 }}
-              style={styles.rankGradient}
-            >
-              <Text style={styles.rankNumberText}>{index + 1}</Text>
-            </LinearGradient>
-          </View>
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationName} numberOfLines={1}>
-              {location.location || location.location_name}
-            </Text>
-            <Text style={styles.uploadCount}>
-              ({formatUploadCount(location.uploads)} uploaded)
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.imageGrid}>
-          {images.length > 0 ? (
-            <>
-              {/* First Row - 3 images */}
-              <View style={styles.imageRow}>
-                {images.slice(0, 3).map((imageUrl, imgIndex) => {
-                  const fixedUrl = fixUrl(imageUrl);
-                  const imageData = imagesData[imgIndex] || {};
-                  // Get thumbnail from images_data first, then fallback to thumbnails array
-                  const thumbnailUrl = imageData.thumbnail_url 
-                    ? fixUrl(imageData.thumbnail_url) 
-                    : (thumbnails[imgIndex] ? fixUrl(thumbnails[imgIndex]) : null);
-                  const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
-                  const userLevel = imageData.user_level || null;
-                  
-                  // For videos, ONLY use thumbnail - never use video URL as image source
-                  // For images, use the image URL
-                  let displayUrl = null;
-                  if (isVideo) {
-                    // Only use thumbnail for videos - if no thumbnail, skip this image
-                    if (thumbnailUrl) {
-                      displayUrl = thumbnailUrl;
-                    } else {
-                      // Skip videos without thumbnails
-                      return null;
-                    }
-                  } else {
-                    // For images, use the image URL
-                    displayUrl = fixedUrl;
-                  }
-                  
-                  if (!displayUrl) return null;
-                  return (
-                    <View key={imgIndex} style={styles.gridImageContainer}>
-                      <Image
-                        source={{ uri: displayUrl }}
-                        style={styles.gridImageSquare}
-                        contentFit="cover"
-                        placeholder={{ blurhash: BLUR_HASH }}
-                        transition={300}
-                        onError={(error) => {
-                          console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
-                        }}
-                      />
-                      {isVideo && (
-                        <View style={styles.videoPlayIcon}>
-                          <Ionicons name="play-circle" size={24} color="#fff" />
-                        </View>
-                      )}
-                      {/* User Level Badge */}
-                      {userLevel && (
-                        <View style={styles.levelBadgeContainer}>
-                          <LevelBadge level={userLevel} size="small" />
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-
-              {/* Second Row - 2 images */}
-              <View style={styles.imageRow}>
-                {images[3] && (() => {
-                  const fixedUrl = fixUrl(images[3]);
-                  const imageData = imagesData[3] || {};
-                  // Get thumbnail from images_data first, then fallback to thumbnails array
-                  const thumbnailUrl = imageData.thumbnail_url 
-                    ? fixUrl(imageData.thumbnail_url) 
-                    : (thumbnails[3] ? fixUrl(thumbnails[3]) : null);
-                  const isVideo = isVideoFile(images[3]) || imageData.media_type === 'video';
-                  const userLevel = imageData.user_level || null;
-                  
-                  // For videos, ONLY use thumbnail - never use video URL as image source
-                  // For images, use the image URL
-                  let displayUrl = null;
-                  if (isVideo) {
-                    // Only use thumbnail for videos - if no thumbnail, skip this image
-                    if (thumbnailUrl) {
-                      displayUrl = thumbnailUrl;
-                    } else {
-                      // Skip videos without thumbnails
-                      return null;
-                    }
-                  } else {
-                    // For images, use the image URL
-                    displayUrl = fixedUrl;
-                  }
-                  
-                  if (!displayUrl) return null;
-                  return (
-                    <View style={styles.gridImageContainer}>
-                      <Image
-                        source={{ uri: displayUrl }}
-                        style={styles.gridImageSquare}
-                        contentFit="cover"
-                        placeholder={{ blurhash: BLUR_HASH }}
-                        transition={300}
-                        onError={(error) => {
-                          console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
-                        }}
-                      />
-                      {isVideo && (
-                        <View style={styles.videoPlayIcon}>
-                          <Ionicons name="play-circle" size={24} color="#fff" />
-                        </View>
-                      )}
-                      {userLevel && (
-                        <View style={styles.levelBadgeContainer}>
-                          <LevelBadge level={userLevel} size="small" />
-                        </View>
-                      )}
-                    </View>
-                  );
-                })()}
-
-                {images.length === 5 ? (() => {
-                  const fixedUrl = fixUrl(images[4]);
-                  const imageData = imagesData[4] || {};
-                  // Get thumbnail from images_data first, then fallback to thumbnails array
-                  const thumbnailUrl = imageData.thumbnail_url 
-                    ? fixUrl(imageData.thumbnail_url) 
-                    : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
-                  const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
-                  const userLevel = imageData.user_level || null;
-                  
-                  // For videos, ONLY use thumbnail - never use video URL as image source
-                  // For images, use the image URL
-                  let displayUrl = null;
-                  if (isVideo) {
-                    // Only use thumbnail for videos - if no thumbnail, skip this image
-                    if (thumbnailUrl) {
-                      displayUrl = thumbnailUrl;
-                    } else {
-                      // Skip videos without thumbnails
-                      return null;
-                    }
-                  } else {
-                    // For images, use the image URL
-                    displayUrl = fixedUrl;
-                  }
-                  
-                  if (!displayUrl) return null;
-                  return (
-                    <View style={styles.gridImageContainer}>
-                      <Image
-                        source={{ uri: displayUrl }}
-                        style={styles.gridImageSquare}
-                        contentFit="cover"
-                        placeholder={{ blurhash: BLUR_HASH }}
-                        transition={300}
-                        onError={(error) => {
-                          console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
-                        }}
-                      />
-                      {isVideo && (
-                        <View style={styles.videoPlayIcon}>
-                          <Ionicons name="play-circle" size={24} color="#fff" />
-                        </View>
-                      )}
-                      {userLevel && (
-                        <View style={styles.levelBadgeContainer}>
-                          <LevelBadge level={userLevel} size="small" />
-                        </View>
-                      )}
-                    </View>
-                  );
-                })()
-              ) : images.length > 5 ? (
-                // More than 5 - show blurred with total count
-                <View style={styles.blurredImageWrapper}>
-                  {(() => {
-                    const imageData = imagesData[4] || {};
-                    const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
-                    
-                    // For videos, ONLY use thumbnail - never use video URL
-                    // For images, use image URL
-                    let displayUrl = null;
-                    if (isVideo) {
-                      // Get thumbnail from images_data first, then fallback to thumbnails array
-                      const thumbnailUrl = imageData.thumbnail_url 
-                        ? fixUrl(imageData.thumbnail_url) 
-                        : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
-                      if (thumbnailUrl) {
-                        displayUrl = thumbnailUrl;
-                      } else {
-                        // If no thumbnail for video, use a placeholder or skip
-                        displayUrl = fixUrl(images[4]); // Fallback to video URL but it won't work as image
-                      }
-                    } else {
-                      displayUrl = fixUrl(images[4]);
-                    }
-                    
-                    if (!displayUrl) return null;
-                    return (
-                      <Image
-                        source={{ uri: displayUrl }}
-                        style={styles.gridImageSquare}
-                        contentFit="cover"
-                        blurRadius={8}
-                        placeholder={{ blurhash: BLUR_HASH }}
-                        onError={(error) => {
-                          console.error("❌ Blurred image load error:", displayUrl, error);
-                        }}
-                      />
-                    );
-                  })()}
-                  <View style={styles.countButtonOverlay}>
-                    <LinearGradient
-                      colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                      start={{ x: 3, y: 3 }}
-                      end={{ x: 0, y: 3 }}
-                      style={styles.countButtonGradientBorder}
-                    >
-                      <View style={styles.countButtonInner}>
-                        <Text style={styles.countButtonText}>
-                          +{location.uploads || images.length}
-                        </Text>
+            return (
+              <TouchableOpacity
+                key={location.location || location.location_name || index}
+                style={styles.cardOuter}
+                onPress={() => handleLocationPress(location)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['rgba(27, 124, 130, 0.35)', 'rgba(27, 124, 130, 0.15)', 'rgba(255, 255, 255, 1)']}
+                  locations={[0, 0.3, 1]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.card}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={styles.rankNumber}>
+                      <LinearGradient
+                        colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                        start={{ x: 3, y: 3 }}
+                        end={{ x: 0, y: 3 }}
+                        style={styles.rankGradient}
+                      >
+                        <Text style={styles.rankNumberText}>{index + 1}</Text>
                       </LinearGradient>
                     </View>
+                    <View style={styles.locationInfo}>
+                      <Text style={styles.locationName} numberOfLines={1}>
+                        {location.location || location.location_name}
+                      </Text>
+                      <Text style={styles.uploadCount}>
+                        ({formatUploadCount(location.uploads)} uploaded)
+                      </Text>
+                    </View>
                   </View>
-                ) : null}
-              </View>
-            </>
-          ) : (
-            <View style={styles.noImagePlaceholder}>
-              <Ionicons name="image-outline" size={32} color="#CCC" />
-            </View>
-          )}
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-})}
+
+                  <View style={styles.imageGrid}>
+                    {images.length > 0 ? (
+                      <>
+                        {/* First Row - 3 images */}
+                        <View style={styles.imageRow}>
+                          {images.slice(0, 3).map((imageUrl, imgIndex) => {
+                            const fixedUrl = fixUrl(imageUrl);
+                            const imageData = imagesData[imgIndex] || {};
+                            // Get thumbnail from images_data first, then fallback to thumbnails array
+                            const thumbnailUrl = imageData.thumbnail_url
+                              ? fixUrl(imageData.thumbnail_url)
+                              : (thumbnails[imgIndex] ? fixUrl(thumbnails[imgIndex]) : null);
+                            const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
+                            const userLevel = imageData.user_level || null;
+
+                            // For videos, ONLY use thumbnail - never use video URL as image source
+                            // For images, use the image URL
+                            let displayUrl = null;
+                            if (isVideo) {
+                              // Only use thumbnail for videos - if no thumbnail, skip this image
+                              if (thumbnailUrl) {
+                                displayUrl = thumbnailUrl;
+                              } else {
+                                // Skip videos without thumbnails
+                                return null;
+                              }
+                            } else {
+                              // For images, use the image URL
+                              displayUrl = fixedUrl;
+                            }
+
+                            if (!displayUrl) return null;
+                            return (
+                              <View key={imgIndex} style={styles.gridImageContainer}>
+                                <Image
+                                  source={{ uri: displayUrl }}
+                                  style={styles.gridImageSquare}
+                                  contentFit="cover"
+                                  placeholder={{ blurhash: BLUR_HASH }}
+                                  transition={300}
+                                  onError={(error) => {
+                                    console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
+                                  }}
+                                />
+                                {isVideo && (
+                                  <View style={styles.videoPlayIcon}>
+                                    <Ionicons name="play-circle" size={24} color="#fff" />
+                                  </View>
+                                )}
+                                {/* User Level Badge */}
+                                {userLevel && (
+                                  <View style={styles.levelBadgeContainer}>
+                                    <LevelBadge level={userLevel} size="small" />
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
+
+                        {/* Second Row - 2 images */}
+                        <View style={styles.imageRow}>
+                          {images[3] && (() => {
+                            const fixedUrl = fixUrl(images[3]);
+                            const imageData = imagesData[3] || {};
+                            // Get thumbnail from images_data first, then fallback to thumbnails array
+                            const thumbnailUrl = imageData.thumbnail_url
+                              ? fixUrl(imageData.thumbnail_url)
+                              : (thumbnails[3] ? fixUrl(thumbnails[3]) : null);
+                            const isVideo = isVideoFile(images[3]) || imageData.media_type === 'video';
+                            const userLevel = imageData.user_level || null;
+
+                            // For videos, ONLY use thumbnail - never use video URL as image source
+                            // For images, use the image URL
+                            let displayUrl = null;
+                            if (isVideo) {
+                              // Only use thumbnail for videos - if no thumbnail, skip this image
+                              if (thumbnailUrl) {
+                                displayUrl = thumbnailUrl;
+                              } else {
+                                // Skip videos without thumbnails
+                                return null;
+                              }
+                            } else {
+                              // For images, use the image URL
+                              displayUrl = fixedUrl;
+                            }
+
+                            if (!displayUrl) return null;
+                            return (
+                              <View style={styles.gridImageContainer}>
+                                <Image
+                                  source={{ uri: displayUrl }}
+                                  style={styles.gridImageSquare}
+                                  contentFit="cover"
+                                  placeholder={{ blurhash: BLUR_HASH }}
+                                  transition={300}
+                                  onError={(error) => {
+                                    console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
+                                  }}
+                                />
+                                {isVideo && (
+                                  <View style={styles.videoPlayIcon}>
+                                    <Ionicons name="play-circle" size={24} color="#fff" />
+                                  </View>
+                                )}
+                                {userLevel && (
+                                  <View style={styles.levelBadgeContainer}>
+                                    <LevelBadge level={userLevel} size="small" />
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })()}
+
+                          {images.length === 5 ? (() => {
+                            const fixedUrl = fixUrl(images[4]);
+                            const imageData = imagesData[4] || {};
+                            // Get thumbnail from images_data first, then fallback to thumbnails array
+                            const thumbnailUrl = imageData.thumbnail_url
+                              ? fixUrl(imageData.thumbnail_url)
+                              : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
+                            const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
+                            const userLevel = imageData.user_level || null;
+
+                            // For videos, ONLY use thumbnail - never use video URL as image source
+                            // For images, use the image URL
+                            let displayUrl = null;
+                            if (isVideo) {
+                              // Only use thumbnail for videos - if no thumbnail, skip this image
+                              if (thumbnailUrl) {
+                                displayUrl = thumbnailUrl;
+                              } else {
+                                // Skip videos without thumbnails
+                                return null;
+                              }
+                            } else {
+                              // For images, use the image URL
+                              displayUrl = fixedUrl;
+                            }
+
+                            if (!displayUrl) return null;
+                            return (
+                              <View style={styles.gridImageContainer}>
+                                <Image
+                                  source={{ uri: displayUrl }}
+                                  style={styles.gridImageSquare}
+                                  contentFit="cover"
+                                  placeholder={{ blurhash: BLUR_HASH }}
+                                  transition={300}
+                                  onError={(error) => {
+                                    console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
+                                  }}
+                                />
+                                {isVideo && (
+                                  <View style={styles.videoPlayIcon}>
+                                    <Ionicons name="play-circle" size={24} color="#fff" />
+                                  </View>
+                                )}
+                                {userLevel && (
+                                  <View style={styles.levelBadgeContainer}>
+                                    <LevelBadge level={userLevel} size="small" />
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })() : images.length > 5 ? (
+                            // More than 5 - show blurred with total count
+                            <View style={styles.blurredImageWrapper}>
+                              {(() => {
+                                const imageData = imagesData[4] || {};
+                                const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
+
+                                // For videos, ONLY use thumbnail - never use video URL
+                                // For images, use image URL
+                                let displayUrl = null;
+                                if (isVideo) {
+                                  // Get thumbnail from images_data first, then fallback to thumbnails array
+                                  const thumbnailUrl = imageData.thumbnail_url
+                                    ? fixUrl(imageData.thumbnail_url)
+                                    : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
+                                  if (thumbnailUrl) {
+                                    displayUrl = thumbnailUrl;
+                                  } else {
+                                    // If no thumbnail for video, use a placeholder or skip
+                                    displayUrl = fixUrl(images[4]); // Fallback to video URL but it won't work as image
+                                  }
+                                } else {
+                                  displayUrl = fixUrl(images[4]);
+                                }
+
+                                if (!displayUrl) return null;
+                                return (
+                                  <Image
+                                    source={{ uri: displayUrl }}
+                                    style={styles.gridImageSquare}
+                                    contentFit="cover"
+                                    blurRadius={8}
+                                    placeholder={{ blurhash: BLUR_HASH }}
+                                    onError={(error) => {
+                                      console.error("❌ Blurred image load error:", displayUrl, error);
+                                    }}
+                                  />
+                                );
+                              })()}
+                              <View style={styles.countButtonOverlay}>
+                                <LinearGradient
+                                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                                  start={{ x: 3, y: 3 }}
+                                  end={{ x: 0, y: 3 }}
+                                  style={styles.countButtonGradientBorder}
+                                >
+                                  <View style={styles.countButtonInner}>
+                                    <Text style={styles.countButtonText}>
+                                      +{location.uploads || images.length}
+                                    </Text>
+                                  </View>
+                                </LinearGradient>
+                              </View>
+                            </View>
+                          ) : null}
+                        </View>
+                      </>
+                    ) : (
+                      <View style={styles.noImagePlaceholder}>
+                        <Ionicons name="image-outline" size={32} color="#CCC" />
+                      </View>
+                    )}
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
         {/* Bottom Navigation - Same as Explore */}
@@ -629,71 +629,71 @@ const styles = StyleSheet.create({
   },
 
   titleBoxWrapper: {
-  marginHorizontal: 40,
-  marginBottom: 16,
-  borderRadius: 30,
-  overflow: 'hidden',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 8,
-  elevation: 4,
-},
+    marginHorizontal: 40,
+    marginBottom: 16,
+    borderRadius: 30,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
 
-cardOuter: {
-  marginHorizontal: 4,
-  marginBottom: 12,
-  borderRadius: 15,
-  backgroundColor: '#fff',  // Add this - Android needs background for shadows
-},
-card: {
-  borderRadius: 15,
-  padding: 20,
-  paddingBottom: 24,
-  borderWidth: 1,
-  borderColor: '#E8E8E8',
-  overflow: 'hidden',  // Move it here
-},
+  cardOuter: {
+    marginHorizontal: 4,
+    marginBottom: 12,
+    borderRadius: 15,
+    backgroundColor: '#fff',  // Add this - Android needs background for shadows
+  },
+  card: {
+    borderRadius: 15,
+    padding: 20,
+    paddingBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    overflow: 'hidden',  // Move it here
+  },
 
- titleBox: {
-  paddingVertical: 18,
-  paddingHorizontal: 30,
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  borderWidth: 1,
-  borderColor: 'rgba(200, 200, 200, 0.3)',
-},
+  titleBox: {
+    paddingVertical: 18,
+    paddingHorizontal: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(200, 200, 200, 0.3)',
+  },
   titleMain: {
-  fontSize: 12,
-  fontWeight: '600',
-  color: '#000',
-},
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000',
+  },
 
-gridImageContainer: {
-  flex: 1,
-  height: 110,
-  borderRadius: 10,
-  overflow: 'hidden',
-  position: 'relative',
-  borderWidth: 0.5,           
-  borderColor: '#000',
-},
-levelBadgeContainer: {
-  position: 'absolute',
-  bottom: 4,
-  left: 4,
-  zIndex: 10,
-},
+  gridImageContainer: {
+    flex: 1,
+    height: 110,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 0.5,
+    borderColor: '#000',
+  },
+  levelBadgeContainer: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    zIndex: 10,
+  },
 
-videoPlayIcon: {
-  position: 'absolute',
-  bottom: 6,
-  left: 6,
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  borderRadius: 14,
-  padding: 0,
-},
+  videoPlayIcon: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 14,
+    padding: 0,
+  },
 
   titleMain: {
     fontSize: 18,
@@ -708,15 +708,15 @@ videoPlayIcon: {
   },
 
   subtitleRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginTop: 6,
-},
-titleSub: {
-  fontSize: 14,
-  color: '#666',
-  marginLeft: 6,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  titleSub: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+  },
   card: {
     backgroundColor: '#FFF',
     borderRadius: 15,
@@ -811,9 +811,9 @@ titleSub: {
     flex: 1,
     height: 110,
     position: 'relative',
-    borderRadius: 10,         
-    overflow: 'hidden',       
-    borderWidth: 0.5,           
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 0.5,
     borderColor: '#000',
   },
 
