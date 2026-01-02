@@ -96,6 +96,9 @@ const mediaUrl = normalizeMediaUrl(post.media_url);
 const isOwnPost = user?.id === post.user_id;
 const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
 
+const isVideo =
+post.media_type === "video" || mediaUrl?.toLowerCase().endsWith(".mp4");
+
 useEffect(() => {
   const generateThumbnail = async () => {
     if (isVideo && !thumbnailUrl && mediaUrl && !generatedThumbnail) {
@@ -113,23 +116,6 @@ useEffect(() => {
   generateThumbnail();
 }, [isVideo, thumbnailUrl, mediaUrl]);
 
-// Generate thumbnail for videos
-useEffect(() => {
-  const generateThumbnail = async () => {
-    if (isVideo && mediaUrl && !generatedThumbnail) {
-      try {
-        const { uri } = await VideoThumbnails.getThumbnailAsync(mediaUrl, {
-          time: 500,
-          quality: 1.0,
-        });
-        setGeneratedThumbnail(uri);
-      } catch (e) {
-        console.log('Thumbnail generation failed:', e);
-      }
-    }
-  };
-  generateThumbnail();
-}, [isVideo, mediaUrl]);
 
 console.log('🎬 VIDEO DEBUG:', {
   postId: post.id,
@@ -140,8 +126,6 @@ console.log('🎬 VIDEO DEBUG:', {
   isVideo: isVideo,
 });
 
-const isVideo =
-post.media_type === "video" || mediaUrl?.toLowerCase().endsWith(".mp4");
 
 const dpRaw = normalizeProfilePicture(post.user_profile_picture);
 

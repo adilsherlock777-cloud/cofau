@@ -16,7 +16,6 @@ import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { BlurView } from 'expo-blur';
-import LevelBadge from './LevelBadge';
 
 export const options = {
   headerShown: false,
@@ -287,15 +286,10 @@ export default function HappeningPlaces() {
                                 />
                                 {isVideo && (
                                   <View style={styles.videoPlayIcon}>
-                                    <Ionicons name="play-circle" size={24} color="#fff" />
+                                    <Ionicons name="play-circle" size={22} color="#fff" />
                                   </View>
                                 )}
-                                {/* User Level Badge */}
-                                {userLevel && (
-                                  <View style={styles.levelBadgeContainer}>
-                                    <LevelBadge level={userLevel} size="small" />
-                                  </View>
-                                )}
+                              
                               </View>
                             );
                           })}
@@ -347,11 +341,6 @@ export default function HappeningPlaces() {
                                     <Ionicons name="play-circle" size={24} color="#fff" />
                                   </View>
                                 )}
-                                {userLevel && (
-                                  <View style={styles.levelBadgeContainer}>
-                                    <LevelBadge level={userLevel} size="small" />
-                                  </View>
-                                )}
                               </View>
                             );
                           })()}
@@ -398,11 +387,6 @@ export default function HappeningPlaces() {
                                 {isVideo && (
                                   <View style={styles.videoPlayIcon}>
                                     <Ionicons name="play-circle" size={24} color="#fff" />
-                                  </View>
-                                )}
-                                {userLevel && (
-                                  <View style={styles.levelBadgeContainer}>
-                                    <LevelBadge level={userLevel} size="small" />
                                   </View>
                                 )}
                               </View>
@@ -678,12 +662,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderWidth: 0.5,
     borderColor: '#000',
-  },
-  levelBadgeContainer: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    zIndex: 10,
   },
 
   videoPlayIcon: {

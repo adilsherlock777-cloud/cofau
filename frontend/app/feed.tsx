@@ -272,61 +272,70 @@ const findVisibleVideo = useCallback((scrollY, viewportHeight) => {
 }, [feedPosts]);
 
 // Handle scroll events
+// Handle scroll events
 const handleScroll = useCallback((event: any) => {
-isScrollingRef.current = true;
+  isScrollingRef.current = true;
 
-// Extract values immediately before event is nullified
-const scrollY = event.nativeEvent.contentOffset.y;
-const viewportHeight = event.nativeEvent.layoutMeasurement.height;
-const contentHeight = event.nativeEvent.contentSize.height;
+  // Extract values immediately before event is nullified
+  const scrollY = event.nativeEvent.contentOffset.y;
+  const viewportHeight = event.nativeEvent.layoutMeasurement.height;
+  const contentHeight = event.nativeEvent.contentSize.height;
 
-// Show fixed line when scrolled down more than 100px
-if (scrollY > 100) {
-setShowFixedLine(true);
-} else {
-setShowFixedLine(false);
-}
+  // Show fixed line when scrolled down more than 100px
+  if (scrollY > 100) {
+    setShowFixedLine(true);
+  } else {
+    setShowFixedLine(false);
+  }
 
-// Reset pagination trigger if user scrolls back up significantly
-if (scrollY < lastScrollYRef.current - 100) {
-paginationTriggeredRef.current = false;
-}
-lastScrollYRef.current = scrollY;
+  // Reset pagination trigger if user scrolls back up significantly
+  if (scrollY < lastScrollYRef.current - 100) {
+    paginationTriggeredRef.current = false;
+  }
+  lastScrollYRef.current = scrollY;
 
-// IMMEDIATELY pause all videos when scrolling starts
-// This prevents audio overlap when swiping between videos
-if (visibleVideoId) {
-setVisibleVideoId(null);
-}
+  // Platform-specific behavior:
+  // iOS: Keep video playing while scrolling (smoother experience)
+  // Android: Pause video while scrolling (better performance)
+  if (Platform.OS === 'ios') {
+    // iOS: Update visible video while scrolling (Instagram-style)
+    const visibleId = findVisibleVideo(scrollY, viewportHeight);
+    if (visibleId !== visibleVideoId) {
+      setVisibleVideoId(visibleId);
+    }
+  } else {
+    // Android: Pause videos while actively scrolling to prevent lag
+    if (visibleVideoId) {
+      setVisibleVideoId(null);
+    }
+  }
 
-// Clear existing timeout
-if (scrollTimeoutRef.current) {
-clearTimeout(scrollTimeoutRef.current);
-}
+  // Clear existing timeout
+  if (scrollTimeoutRef.current) {
+    clearTimeout(scrollTimeoutRef.current);
+  }
 
-// Set timeout to detect when scrolling stops
-scrollTimeoutRef.current = setTimeout(() => {
-isScrollingRef.current = false;
+  // Set timeout to detect when scrolling stops
+  scrollTimeoutRef.current = setTimeout(() => {
+    isScrollingRef.current = false;
 
-const visibleId = findVisibleVideo(scrollY, viewportHeight);
+    // Find and play the most visible video after scrolling stops
+    const visibleId = findVisibleVideo(scrollY, viewportHeight);
+    setVisibleVideoId(visibleId);
 
-setVisibleVideoId(visibleId);
+    // Only check for pagination AFTER scrolling has stopped
+    const paddingToBottom = 100;
+    const isNearBottom = scrollY + viewportHeight >= contentHeight - paddingToBottom;
 
-// Only check for pagination AFTER scrolling has stopped
-// This prevents auto-scrolling during active scrolling
-const paddingToBottom = 100;
-const isNearBottom = scrollY + viewportHeight >= contentHeight - paddingToBottom;
-
-if (isNearBottom && hasMore && !loadingMore && !loading && !paginationTriggeredRef.current) {
-paginationTriggeredRef.current = true;
-fetchFeed(false).finally(() => {
-// Reset after a delay to allow for next pagination
-setTimeout(() => {
-paginationTriggeredRef.current = false;
-}, 1000);
-});
-}
-}, 150); // Wait 150ms after scrolling stops before checking pagination
+    if (isNearBottom && hasMore && !loadingMore && !loading && !paginationTriggeredRef.current) {
+      paginationTriggeredRef.current = true;
+      fetchFeed(false).finally(() => {
+        setTimeout(() => {
+          paginationTriggeredRef.current = false;
+        }, 1000);
+      });
+    }
+  }, Platform.OS === 'ios' ? 100 : 200); // Faster response on iOS, slightly delayed on Android
 }, [findVisibleVideo, visibleVideoId, hasMore, loadingMore, loading]);
 
 // Cleanup timeout on unmount
@@ -480,6 +489,15 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 );
               })()}
             </View>
+          {/* Progress Text - Shows total_points / next_level_threshold */}
+<Text style={styles.progressText}>
+  {user.total_points || user.points || 0}/{(() => {
+    const currentLevel = user.level || 1;
+    const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
+    return currentLevelData?.required_points || 1250;
+  })()}
+</Text>
+  
           </View>
         </View>
       </BlurView>
@@ -554,6 +572,14 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 );
               })()}
             </View>
+            {/* Progress Text - Shows total_points / next_level_threshold */}
+<Text style={styles.progressText}>
+  {user.total_points || user.points || 0}/{(() => {
+    const currentLevel = user.level || 1;
+    const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
+    return currentLevelData?.required_points || 1250;
+  })()}
+</Text>
           </View>
         </View>
       </View>
@@ -561,6 +587,8 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
   </View>
 )}
 </View> 
+
+
 {/* ↑ This closes headerContainer */}
 
 {/* ================= STORIES ================= */}
@@ -578,7 +606,11 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 const isVideo =
 post.media_type === "video" ||
 post.media_url?.toLowerCase().endsWith(".mp4");
-const shouldPlay = isVideo && visibleVideoId === String(post.id) && !isScrollingRef.current;
+
+// iOS: Allow playing while scrolling (Instagram-style)
+// Android: Only play when not scrolling
+const shouldPlay = isVideo && visibleVideoId === String(post.id) && 
+  (Platform.OS === 'ios' || !isScrollingRef.current);
 const shouldPreload = isVideo && visibleVideoId === String(post.id);
 
 return (
