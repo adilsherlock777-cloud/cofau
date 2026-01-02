@@ -209,8 +209,7 @@ async def generate_video_thumbnail(video_path: str, thumbnail_path: Optional[str
             '-ss', time_offset,          # Seek to time offset
             '-i', video_path,            # Input video
             '-vframes', '1',             # Extract 1 frame
-            '-vf', 'scale=-2:360',       # Scale to 360p for thumbnail
-            '-q:v', '2',                 # Quality (2 = high quality)
+            '-q:v', '1',                 # Quality (2 = high quality)
             '-y',                        # Overwrite output
             thumbnail_path
         ]
