@@ -408,145 +408,159 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
 
 {/* ===== LEVEL CARD WITH OVERLAPPING DP - OVERLAPS GRADIENT ===== */}
 {user && (
-<View style={styles.levelCardWrapper}>
-{Platform.OS === 'ios' ? (
-<BlurView intensity={60} tint="light" style={styles.levelCard}>
-{/* Profile picture - positioned to overlap on the left */}
-<View style={styles.dpContainer}>
-<TouchableOpacity
-onPress={() => setShowAddMenu(true)}
-activeOpacity={0.8}
->
-<UserAvatar
-profilePicture={user.profile_picture}
-username={user.username}
-size={70}
-showLevelBadge={false}
-level={user.level}
-style={{}}
-/>
-</TouchableOpacity>
-<TouchableOpacity
-style={styles.dpAddButton}
-onPress={() => setShowAddMenu(true)}
->
-<Ionicons name="add" size={19} color="#0f0303ff" />
-</TouchableOpacity>
-</View>
+  <View style={styles.levelCardWrapper}>
+    {Platform.OS === "ios" ? (
+      <BlurView intensity={60} tint="light" style={styles.levelCard}>
+        {/* Profile picture */}
+        <View style={styles.dpContainer}>
+          <TouchableOpacity onPress={() => setShowAddMenu(true)} activeOpacity={0.8}>
+            <UserAvatar
+              profilePicture={user.profile_picture}
+              username={user.username}
+              size={70}
+              showLevelBadge={false}
+              level={user.level}
+              style={{}}
+            />
+          </TouchableOpacity>
 
-<View style={styles.levelContent}>
-<Text style={styles.levelLabel}>Level {user.level}</Text>
+          <TouchableOpacity
+            style={styles.dpAddButton}
+            onPress={() => setShowAddMenu(true)}
+          >
+            <Ionicons name="add" size={19} color="#0f0303ff" />
+          </TouchableOpacity>
+        </View>
 
-<View style={styles.progressContainer}>
-<View style={styles.progressBar}>
-{(() => {
-const currentLevel = user.level || 1;
-const currentRequiredPoints = user.requiredPoints || 1250;
-const currentPoints = user.currentPoints || 0;
-const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
-const progressPercent = Math.min((currentPoints / pointsNeeded) * 100, 100);
+        {/* Content */}
+        <View style={styles.levelContent}>
+          <Text style={styles.levelLabel}>Level {user.level}</Text>
 
-return (
-<LinearGradient
-colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 0 }}
-style={[
-styles.progressFill,
-{
-width: `${progressPercent}%`,
-},
-]}
-/>
-);
-})()}
-</View>
-{(() => {
-const currentLevel = user.level || 1;
-const currentRequiredPoints = user.requiredPoints || 1250;
-const currentPoints = user.currentPoints || 0;
-const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              {(() => {
+                const currentLevel = user.level || 1;
+                const currentPoints = user.currentPoints || 0;
 
-return (
-<Text style={styles.progressText}>
-{currentPoints}/{pointsNeeded}
-</Text>
-);
-})()}
-</View>
-</View>
-</BlurView>
-) : (
-<View style={[styles.levelCard, styles.levelCardAndroid]}>
-{/* Profile picture - positioned to overlap on the left */}
-<View style={styles.dpContainer}>
-<TouchableOpacity
-onPress={() => setShowAddMenu(true)}
-activeOpacity={0.8}
->
-<UserAvatar
-profilePicture={user.profile_picture}
-username={user.username}
-size={70}
-showLevelBadge={false}
-level={user.level}
-style={{}}
-/>
-</TouchableOpacity>
-<TouchableOpacity
-style={styles.dpAddButton}
-onPress={() => setShowAddMenu(true)}
->
-<Ionicons name="add" size={19} color="#0f0303ff" />
-</TouchableOpacity>
-</View>
+                const prevLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel - 1);
+                const prevThreshold = prevLevelData?.required_points || 0;
 
-<View style={styles.levelContent}>
-<Text style={styles.levelLabel}>Level {user.level}</Text>
+                const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
+                const currentThreshold = currentLevelData?.required_points || 1250;
 
-<View style={styles.progressContainer}>
-<View style={styles.progressBar}>
-{(() => {
-const currentLevel = user.level || 1;
-const currentRequiredPoints = user.requiredPoints || 1250;
-const currentPoints = user.currentPoints || 0;
-const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
-const progressPercent = Math.min((currentPoints / pointsNeeded) * 100, 100);
+                const pointsNeededForLevel = currentThreshold - prevThreshold;
 
-return (
-<LinearGradient
-colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 0 }}
-style={[
-styles.progressFill,
-{
-width: `${progressPercent}%`,
-},
-]}
-/>
-);
-})()}
-</View>
-{(() => {
-const currentLevel = user.level || 1;
-const currentRequiredPoints = user.requiredPoints || 1250;
-const currentPoints = user.currentPoints || 0;
-const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
+                const progressPercent =
+                  pointsNeededForLevel > 0
+                    ? Math.min((currentPoints / pointsNeededForLevel) * 100, 100)
+                    : 0;
 
-return (
-<Text style={styles.progressText}>
-{currentPoints}/{pointsNeeded}
-</Text>
-);
-})()}
-</View>
-</View>
-</View>
+                let gradientColors;
+                let gradientLocations;
+
+                if (progressPercent <= 33) {
+                  gradientColors = ["#E94A37", "#E94A37"];
+                  gradientLocations = [0, 1];
+                } else if (progressPercent <= 66) {
+                  gradientColors = ["#E94A37", "#F2CF68"];
+                  gradientLocations = [0, 1];
+                } else {
+                  gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
+                  gradientLocations = [0, 0.5, 1];
+                }
+
+                return (
+                  <LinearGradient
+                    colors={gradientColors}
+                    locations={gradientLocations}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
+                  />
+                );
+              })()}
+            </View>
+          </View>
+        </View>
+      </BlurView>
+    ) : (
+      <View style={[styles.levelCard, styles.levelCardAndroid]}>
+        {/* Profile picture */}
+        <View style={styles.dpContainer}>
+          <TouchableOpacity onPress={() => setShowAddMenu(true)} activeOpacity={0.8}>
+            <UserAvatar
+              profilePicture={user.profile_picture}
+              username={user.username}
+              size={70}
+              showLevelBadge={false}
+              level={user.level}
+              style={{}}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.dpAddButton}
+            onPress={() => setShowAddMenu(true)}
+          >
+            <Ionicons name="add" size={19} color="#0f0303ff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Content */}
+        <View style={styles.levelContent}>
+          <Text style={styles.levelLabel}>Level {user.level}</Text>
+
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              {(() => {
+                const currentLevel = user.level || 1;
+                const currentPoints = user.currentPoints || 0;
+
+                const prevLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel - 1);
+                const prevThreshold = prevLevelData?.required_points || 0;
+
+                const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
+                const currentThreshold = currentLevelData?.required_points || 1250;
+
+                const pointsNeededForLevel = currentThreshold - prevThreshold;
+
+                const progressPercent =
+                  pointsNeededForLevel > 0
+                    ? Math.min((currentPoints / pointsNeededForLevel) * 100, 100)
+                    : 0;
+
+                let gradientColors;
+                let gradientLocations;
+
+                if (progressPercent <= 33) {
+                  gradientColors = ["#E94A37", "#E94A37"];
+                  gradientLocations = [0, 1];
+                } else if (progressPercent <= 66) {
+                  gradientColors = ["#E94A37", "#F2CF68"];
+                  gradientLocations = [0, 1];
+                } else {
+                  gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
+                  gradientLocations = [0, 0.5, 1];
+                }
+
+                return (
+                  <LinearGradient
+                    colors={gradientColors}
+                    locations={gradientLocations}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
+                  />
+                );
+              })()}
+            </View>
+          </View>
+        </View>
+      </View>
+    )}
+  </View>
 )}
-</View>
-)}
-</View>
+</View> 
 {/* ↑ This closes headerContainer */}
 
 {/* ================= STORIES ================= */}
@@ -639,7 +653,6 @@ onPress={() => router.push("/profile")}
 <Text style={styles.navLabel}>Profile</Text>
 </TouchableOpacity>
 </View>
-</View>
 
 {/* Add Post/Story Menu Modal */}
 <Modal
@@ -682,6 +695,7 @@ activeOpacity={0.7}
 </View>
 </TouchableOpacity>
 </Modal>
+</View>
 );
 }
 

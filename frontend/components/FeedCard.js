@@ -11,6 +11,7 @@ Modal,
 TextInput,
 ActivityIndicator,
 Platform,
+Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -449,7 +450,7 @@ setShowOptionsMenu(!showOptionsMenu);
       source={{ uri: thumbnailUrl || generatedThumbnail || mediaUrl }}
       style={StyleSheet.absoluteFill}
       resizeMode="cover"
-      blurRadius={5}
+      blurRadius={0}
     />
     <View style={styles.playIconContainer}>
       <Ionicons name="play-circle" size={56} color="rgba(255,255,255,0.7)" />
@@ -634,27 +635,34 @@ console.log("🖼️ Loading image:", mediaUrl);
 
 {/* LOCATION */}
 {(post.location_name || post.location_address) && (
-<TouchableOpacity onPress={handleOpenMap} activeOpacity={0.85}>
-  <LinearGradient
-    colors={[
-      "rgba(27,124,130,0.10)",   // top highlight
-      "rgba(27,124,130,0.10)"     // bottom tint (Cofau teal)
+  <Pressable 
+    onPress={handleOpenMap}
+    style={({ pressed }) => [
+      styles.locationBoxWrapper,
+      pressed && styles.locationBoxPressed
     ]}
-    start={{ x: 1, y: 0 }}
-    end={{ x: 2, y: 2 }}
-    style={styles.locationBox}
   >
-    <Text style={styles.detailLabel}>LOCATION</Text>
+    <LinearGradient
+      colors={[
+        "rgba(27,124,130,0.12)",
+        "rgba(27,124,130,0.06)"
+      ]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.locationBox}
+    >
+      <Text style={styles.detailLabel}>LOCATION</Text>
 
-    <View style={styles.locationRow}>
-      <Ionicons name="location" size={18} color="#FFD700" />
-      <Text style={styles.locationText}>{post.location_name}</Text>
-      <View style={{ flex: 1 }} />
-      <Ionicons name="chevron-forward" size={18} color="#999" />
-    </View>
-  </LinearGradient>
-</TouchableOpacity>
-
+      <View style={styles.locationRow}>
+  <Ionicons name="location" size={18} color="#1B7C82" />
+  <Text style={styles.locationText} numberOfLines={1}>{post.location_name}</Text>
+  <View style={{ flex: 1 }} />
+  <View style={styles.locationArrowButton}>
+    <Ionicons name="chevron-forward" size={14} color="#fff" />
+  </View>
+</View>
+    </LinearGradient>
+  </Pressable>
 )}
 </View>
 
@@ -1058,20 +1066,66 @@ flex: 1,
 },
 
 locationBox: {
-borderRadius: 12,
-paddingVertical: 14,
-paddingHorizontal: 14,
-marginBottom: 0,
-overflow: "hidden",
-borderWidth: 2,
-borderColor: "rgba(27, 124, 130, 0.10)",
-shadowColor: "rgba(27, 124, 130, 0.10)", 
-shadowOffset: { width: 0, height: 6 },
-shadowOpacity: 0.12,
-shadowRadius: 10,
-elevation: 6,
+  borderRadius: 12,
+  paddingVertical: 14,
+  paddingHorizontal: 14,
+  borderWidth: 1,
+  borderColor: 'rgba(27, 124, 130, 0.15)',
 },
 
+locationButton: {
+  borderRadius: 25,
+  paddingVertical: 14,
+  paddingHorizontal: 20,
+  marginBottom: 10,
+  shadowColor: '#1B7C82',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 6,
+},
+
+locationArrowButton: {
+  width: 24,
+  height: 24,
+  borderRadius: 12,
+  backgroundColor: '#1B7C82',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+locationButtonContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+},
+
+locationButtonText: {
+  flex: 1,
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#fff',
+},
+
+locationArrowCircle: {
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  backgroundColor: '#fff',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+locationBoxWrapper: {
+  borderRadius: 12,
+  marginBottom: 10,
+  overflow: 'hidden',
+},
+
+locationBoxPressed: {
+  transform: [{ scale: 0.97 }],
+  opacity: 0.9,
+},
 
 locationRow: {
 flexDirection: "row",
