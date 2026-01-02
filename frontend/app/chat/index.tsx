@@ -97,55 +97,74 @@ export default function ChatListScreen() {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  const renderItem = ({ item }: { item: ChatItem }) => (
-    <TouchableOpacity
-      style={styles.chatItem}
-      onPress={() =>
-        router.push({
-          pathname: "/chat/[userId]",
-          params: {
-            userId: item.other_user_id,
-            fullName: item.other_user_name || "User",
-            profilePicture: item.other_user_profile_picture || "", // Pass profile picture
-          },
-        })
-      }
-      activeOpacity={0.7}
-    >
-      <View style={styles.avatarContainer}>
-        <UserAvatar
-          profilePicture={item.other_user_profile_picture}
-          username={item.other_user_name}
-          size={56}
-        />
-        {item.unread_count && item.unread_count > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>
-              {item.unread_count > 99 ? "99+" : item.unread_count}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.chatContent}>
-        <View style={styles.chatHeader}>
-          <Text style={styles.userName} numberOfLines={1}>
-            {item.other_user_name || "Unknown User"}
-          </Text>
-          <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+  const renderItem = ({ item }: { item: ChatItem }) => {
+    const hasUnread = item.unread_count && item.unread_count > 0;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.chatItem,
+          hasUnread && styles.chatItemUnread
+        ]}
+        onPress={() =>
+          router.push({
+            pathname: "/chat/[userId]",
+            params: {
+              userId: item.other_user_id,
+              fullName: item.other_user_name || "User",
+              profilePicture: item.other_user_profile_picture || "",
+            },
+          })
+        }
+        activeOpacity={0.7}
+      >
+        <View style={styles.avatarContainer}>
+          <UserAvatar
+            profilePicture={item.other_user_profile_picture}
+            username={item.other_user_name}
+            size={56}
+          />
+          {hasUnread && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>
+                {item.unread_count > 99 ? "99+" : item.unread_count}
+              </Text>
+            </View>
+          )}
         </View>
 
-        <Text numberOfLines={1} style={styles.lastMessage}>
-          {item.last_from_me ? "You: " : ""}
-          {item.last_message || "Say hello! 👋"}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.chatContent}>
+          <View style={styles.chatHeader}>
+            <Text 
+              style={[
+                styles.userName,
+                hasUnread && styles.userNameUnread
+              ]} 
+              numberOfLines={1}
+            >
+              {item.other_user_name || "Unknown User"}
+            </Text>
+            <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+          </View>
+
+          <Text 
+            numberOfLines={1} 
+            style={[
+              styles.lastMessage,
+              hasUnread && styles.lastMessageUnread
+            ]}
+          >
+            {item.last_from_me ? "You: " : ""}
+            {item.last_message || "Say hello! 👋"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* Cofau Gradient Header - Matching Feed Exactly */}
+      {/* Cofau Gradient Header */}
       <LinearGradient
         colors={["#E94A37", "#F2CF68", "#1B7C82"]}
         locations={[0, 0.5, 1]}
@@ -154,32 +173,45 @@ export default function ChatListScreen() {
         style={styles.gradientHeader}
       >
         <View style={styles.headerContent}>
+          {/* Back Button */}
+          <TouchableOpacity 
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </TouchableOpacity>
+
           <Text style={styles.headerTitle}>Messages</Text>
+          
+          {/* Spacer for centering */}
+          <View style={styles.headerSpacer} />
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={20}
-            color="#999"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search conversations..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery("")}
-              style={styles.clearButton}
-            >
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </TouchableOpacity>
-          )}
+        {/* Search Bar - Centered */}
+        <View style={styles.searchWrapper}>
+          <View style={styles.searchContainer}>
+            <Ionicons
+              name="search"
+              size={20}
+              color="#999"
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search conversations..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                style={styles.clearButton}
+              >
+                <Ionicons name="close-circle" size={20} color="#999" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </LinearGradient>
 
@@ -216,7 +248,7 @@ const styles = StyleSheet.create({
   },
   gradientHeader: {
     paddingTop: Platform.OS === "ios" ? 60 : 50,
-    paddingBottom: 20,
+    paddingBottom: 30,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
@@ -227,8 +259,18 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   headerContent: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
     fontFamily: "Lobster",
@@ -239,18 +281,29 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 6, height: 4 },
     textShadowRadius: 4,
   },
+  headerSpacer: {
+    width: 40,
+  },
+ searchWrapper: {
+  position: 'absolute',  // ✅ Add this
+  bottom: -5,  // ✅ Add this - positions from bottom of gradient
+  left: 20,
+  right: 20,
+  alignItems: "center",
+},
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
     borderRadius: 25,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 11,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    width: "100%",
   },
   searchIcon: {
     marginRight: 8,
@@ -273,6 +326,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: "#fff",
+  },
+  chatItemUnread: {
+    backgroundColor: "#F0F8FF",
   },
   avatarContainer: {
     position: "relative",
@@ -313,6 +369,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  userNameUnread: {
+    fontWeight: "700",
+    color: "#000",
+  },
   timeText: {
     fontSize: 13,
     color: "#8E8E93",
@@ -321,6 +381,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#8E8E93",
     lineHeight: 18,
+  },
+  lastMessageUnread: {
+    fontWeight: "600",
+    color: "#000",
   },
   separator: {
     height: 1,

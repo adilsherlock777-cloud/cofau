@@ -120,6 +120,8 @@ const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 const isScrollingRef = useRef(false);
 const paginationTriggeredRef = useRef(false);
 const lastScrollYRef = useRef(0);
+const [hasOwnStory, setHasOwnStory] = useState(false);
+const [ownStoryData, setOwnStoryData] = useState(null);
 
 const POSTS_PER_PAGE = 30;
 const VISIBILITY_THRESHOLD = 0.2; // 20% visibility threshold
@@ -141,6 +143,7 @@ React.useCallback(() => {
 loadUnreadCount();
 refreshUser();
 fetchFeed(true);
+fetchOwnStory(); 
 }, [token])
 );
 
@@ -150,6 +153,39 @@ try {
 const count = await fetchUnreadCount(token);
 setUnreadCount(count);
 } catch {}
+};
+
+const fetchOwnStory = async () => {
+  if (!token || !user?.id) return;
+  try {
+    const response = await axios.get(`${BACKEND}/api/stories/feed`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    // Find own story from the response
+    const ownStory = response.data.find(u => u.user.id === user.id || u.user._id === user.id);
+    
+    if (ownStory && ownStory.stories && ownStory.stories.length > 0) {
+      setOwnStoryData({
+        user: {
+          id: user.id,
+          username: user.username,
+          profile_picture: user.profile_picture,
+          level: user.level,
+        },
+        stories: ownStory.stories.map(s => ({
+          ...s,
+          media_url: normalizeMediaUrl(s.media_url),
+          media_type: s.media_type || s.type || "image",
+        })),
+      });
+    } else {
+      setOwnStoryData(null);
+    }
+  } catch (err) {
+    console.log("Error fetching own story:", err);
+    setOwnStoryData(null);
+  }
 };
 
 const fetchFeed = async (forceRefresh = false) => {
@@ -420,26 +456,67 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
   <View style={styles.levelCardWrapper}>
     {Platform.OS === "ios" ? (
       <BlurView intensity={60} tint="light" style={styles.levelCard}>
-        {/* Profile picture */}
-        <View style={styles.dpContainer}>
-          <TouchableOpacity onPress={() => setShowAddMenu(true)} activeOpacity={0.8}>
-            <UserAvatar
-              profilePicture={user.profile_picture}
-              username={user.username}
-              size={70}
-              showLevelBadge={false}
-              level={user.level}
-              style={{}}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.dpAddButton}
-            onPress={() => setShowAddMenu(true)}
-          >
-            <Ionicons name="add" size={19} color="#0f0303ff" />
-          </TouchableOpacity>
+       <View style={styles.dpContainer}>
+  <TouchableOpacity 
+    onPress={() => {
+      if (ownStoryData) {
+        // Navigate to story viewer if user has story
+        router.push({
+          pathname: "/story-viewer",
+          params: {
+            userId: user.id,
+            stories: JSON.stringify(ownStoryData.stories),
+            user: JSON.stringify(ownStoryData.user),
+          },
+        });
+      } else {
+        // Show add menu if no story
+        setShowAddMenu(true);
+      }
+    }} 
+    activeOpacity={0.8}
+  >
+    {ownStoryData ? (
+      // Show gradient ring if user has story
+      <LinearGradient
+        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+        locations={[0, 0.35, 0.9]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.dpGradientRing}
+      >
+        <View style={styles.dpWhiteRing}>
+          <UserAvatar
+            profilePicture={user.profile_picture}
+            username={user.username}
+            size={62}
+            showLevelBadge={false}
+            level={user.level}
+            style={{}}
+          />
         </View>
+      </LinearGradient>
+    ) : (
+      // No story - show normal avatar
+      <UserAvatar
+        profilePicture={user.profile_picture}
+        username={user.username}
+        size={70}
+        showLevelBadge={false}
+        level={user.level}
+        style={{}}
+      />
+    )}
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={styles.dpAddButton}
+    onPress={() => setShowAddMenu(true)}
+  >
+    <Ionicons name="add" size={19} color="#0f0303ff" />
+  </TouchableOpacity>
+</View>
+
 
         {/* Content */}
         <View style={styles.levelContent}>
@@ -956,6 +1033,23 @@ shadowColor: "#f7f3f3ff",
 shadowOffset: { width: 0, height: -2 },
 shadowOpacity: 0.08,
 shadowRadius: 4,
+},
+dpGradientRing: {
+  width: 72,
+  height: 72,
+  borderRadius: 34,
+  padding: 4,
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+dpWhiteRing: {
+  width: 68,
+  height: 68,
+  borderRadius: 35,
+  backgroundColor: "#FFF",
+  justifyContent: "center",
+  alignItems: "center",
 },
 
 navItem: {

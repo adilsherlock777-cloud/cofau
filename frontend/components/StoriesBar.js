@@ -40,32 +40,29 @@ export default function StoriesBar({ refreshTrigger }) {
       });
 
       const fixed = response.data.map((u) => ({
-        ...u,
-        user: {
-          ...u.user,
-          id: u.user.id || u.user._id,
-          username: u.user.username || u.user.full_name || "User",
-          profile_picture: normalizeProfilePicture(u.user.profile_picture),
-          level:
-            u.user.level ||
-            u.user.user_level ||
-            u.user.userLevel ||
-            u.user.levelNumber ||
-            null,
-        },
-        stories: u.stories.map((s) => ({
-          ...s,
-          media_url: normalizeStoryUrl(s.media_url),
-          media_type: s.media_type || s.type || "image",
-        })),
-      }));
+  ...u,
+  user: {
+    ...u.user,
+    id: u.user.id || u.user._id,
+    username: u.user.username || u.user.full_name || "User",
+    profile_picture: normalizeProfilePicture(u.user.profile_picture),
+    level:
+      u.user.level ||
+      u.user.user_level ||
+      u.user.userLevel ||
+      u.user.levelNumber ||
+      null,
+  },
+  stories: u.stories.map((s) => ({
+    ...s,
+    media_url: normalizeStoryUrl(s.media_url),
+    media_type: s.media_type || s.type || "image",
+  })),
+}));
 
-      // Sort stories: own user first, then others
-const sorted = fixed.sort((a, b) => {
-  if (a.user.id === user?.id) return -1;
-  if (b.user.id === user?.id) return 1;
-  return 0;
-});
+// Filter out own user's stories - they only appear in level card
+const filtered = fixed.filter(u => u.user.id !== user?.id);
+setStories(filtered);
 setStories(sorted);
     } catch (err) {
       console.log("❌ Story fetch error:", err?.response?.data || err.message);
