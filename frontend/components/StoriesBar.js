@@ -60,7 +60,13 @@ export default function StoriesBar({ refreshTrigger }) {
         })),
       }));
 
-      setStories(fixed);
+      // Sort stories: own user first, then others
+const sorted = fixed.sort((a, b) => {
+  if (a.user.id === user?.id) return -1;
+  if (b.user.id === user?.id) return 1;
+  return 0;
+});
+setStories(sorted);
     } catch (err) {
       console.log("❌ Story fetch error:", err?.response?.data || err.message);
     } finally {
@@ -96,25 +102,6 @@ export default function StoriesBar({ refreshTrigger }) {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-      {/* ===== Your Story (NO level badge) ===== */}
-      {user && (
-        <TouchableOpacity style={styles.storyItem} onPress={handleAddStory}>
-          <View style={styles.avatarWrapper}>
-            <UserAvatar
-              profilePicture={normalizeProfilePicture(user.profile_picture)}
-              username={user.full_name}
-              size={70}
-              showLevelBadge={false}
-            />
-
-            <View style={styles.addIconContainer}>
-              <Ionicons name="add" size={12} color="#000" />
-            </View>
-          </View>
-
-          <Text style={styles.storyUsername}>Your Story</Text>
-        </TouchableOpacity>
-      )}
 
       {/* ===== Other Users ===== */}
       {stories.map((u) => {
