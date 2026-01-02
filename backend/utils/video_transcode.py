@@ -170,7 +170,7 @@ async def transcode_video_to_mp4(input_path: str, output_path: Optional[str] = N
 
 async def generate_video_thumbnail(video_path: str, thumbnail_path: Optional[str] = None, time_offset: str = "00:00:01") -> str:
     """
-    Generate a thumbnail image from a video
+    Generate a HIGH-QUALITY thumbnail image from a video
     
     Args:
         video_path: Path to the video file
@@ -193,24 +193,25 @@ async def generate_video_thumbnail(video_path: str, thumbnail_path: Optional[str
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
     
-    print(f"📸 Generating thumbnail: {video_path} -> {thumbnail_path}")
+    print(f"📸 Generating HIGH-QUALITY thumbnail: {video_path} -> {thumbnail_path}")
     
     try:
-        # FFmpeg command to extract a frame as thumbnail
+        # FFmpeg command to extract a HIGH-QUALITY frame as thumbnail
         # -ss: time offset to seek to
         # -i: input video file
         # -vframes 1: extract only one frame
-        # -vf scale=-2:360: scale to 360p for thumbnail (smaller size)
-        # -q:v 2: quality (1-31, lower is better, 2-5 is good for thumbnails)
+        # -vf scale=-2:720: scale to 720p for thumbnail (MUCH better quality than 360p)
+        # -q:v 2: JPEG quality (1-31, 2 = excellent quality, ~95% quality)
         # -y: overwrite output
         
         cmd = [
             'ffmpeg',
-            '-ss', time_offset,          # Seek to time offset
-            '-i', video_path,            # Input video
-            '-vframes', '1',             # Extract 1 frame
-            '-q:v', '1',                 # Quality (2 = high quality)
-            '-y',                        # Overwrite output
+            '-ss', time_offset,           # Seek to time offset
+            '-i', video_path,             # Input video
+            '-vframes', '1',              # Extract 1 frame
+            '-vf', 'scale=-2:720',        # Scale to 720p (HIGH QUALITY) - maintains aspect ratio
+            '-q:v', '2',                  # JPEG quality 2 = ~95% quality (excellent)
+            '-y',                         # Overwrite output
             thumbnail_path
         ]
         
@@ -233,7 +234,7 @@ async def generate_video_thumbnail(video_path: str, thumbnail_path: Optional[str
             raise Exception(f"Thumbnail was not created: {thumbnail_path}")
         
         thumb_size = os.path.getsize(thumbnail_path)
-        print(f"✅ Thumbnail generated successfully!")
+        print(f"✅ HIGH-QUALITY Thumbnail generated successfully!")
         print(f"   Thumbnail: {thumbnail_path} ({thumb_size:,} bytes)")
         
         return thumbnail_path
