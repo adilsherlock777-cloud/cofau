@@ -80,7 +80,8 @@ export default function AddPostScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsEditing: false,
+      aspect: [4, 5],
       quality: 0.8,
     });
 
@@ -100,6 +101,7 @@ export default function AddPostScreen() {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
+      aspect: [4, 5],
       quality: 0.8,
     });
 
@@ -150,6 +152,7 @@ export default function AddPostScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All, // Both images and videos
         allowsEditing: true,
+        aspect: [4, 5],
         quality: 0.8,
         videoMaxDuration: 15,
       });
@@ -482,9 +485,11 @@ export default function AddPostScreen() {
           disabled={loading}
         >
           <LinearGradient
-            colors={['#66D9E8', '#F093FB', '#F5576C']}
-            style={styles.postButton}
-          >
+  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0 }}
+  style={styles.postButton}
+>
             {loading ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
@@ -665,7 +670,7 @@ const styles = StyleSheet.create({
   mapsButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#4ECDC4',
+    color: '#1B7C82',
   },
 
   postButtonContainer: { marginTop: 10 },
@@ -747,9 +752,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9F9F9',
   },
   categoryItemSelected: {
-    backgroundColor: '#E8F8F7',
+    backgroundColor: '#FFF5E6',
     borderWidth: 2,
-    borderColor: '#4ECDC4',
+    borderColor: '#F2CF68',
   },
   categoryItemText: {
     fontSize: 16,

@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { Image } from 'react-native';
 
 export default function LoginScreen() {
   console.log('🎬 LoginScreen component rendered');
@@ -91,16 +92,13 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Logo */}
+        
         <View style={styles.logoContainer}>
-          <LinearGradient
-            colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logo}
-          >
-            <Text style={styles.logoText}>C</Text>
-          </LinearGradient>
-        </View>
+  <Image
+    source={require('../../assets/images/icon.png')}
+    style={styles.logoImage}
+  />
+</View>
 
         {/* Title */}
         <Text style={styles.title}>Login</Text>
@@ -166,11 +164,11 @@ export default function LoginScreen() {
             disabled={loading}
           >
             <LinearGradient
-              colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.button}
-            >
+  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0 }}
+  style={styles.button}
+>
               {loading ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
@@ -210,7 +208,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: 120,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -268,7 +266,7 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 14,
-    color: '#4dd0e1',
+    color: '#1B7C82',
     fontWeight: '600',
   },
   buttonContainer: {
@@ -285,6 +283,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+
+  logoImage: {
+  width: 120,
+  height: 120,
+  borderRadius: 60,
+},
   buttonText: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -302,7 +306,7 @@ const styles = StyleSheet.create({
   },
   signupLink: {
     fontSize: 14,
-    color: '#4dd0e1',
+    color: '#1B7C82',
     fontWeight: '600',
   },
 });

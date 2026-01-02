@@ -433,7 +433,7 @@ setShowOptionsMenu(!showOptionsMenu);
     <Image
       source={{ uri: thumbnailUrl || generatedThumbnail || mediaUrl }}
       style={StyleSheet.absoluteFill}
-      resizeMode="cover"
+      resizeMode="contain"
       blurRadius={0}
     />
     <View style={styles.playIconContainer}>
@@ -457,7 +457,7 @@ headers: {
 }}
 
 style={styles.video}
-resizeMode="cover"
+resizeMode="contain"
 shouldPlay={shouldPlay}
 isLooping
 isMuted={isMuted}
@@ -575,6 +575,7 @@ mediaUrl ? (
 <Image
 source={{ uri: mediaUrl }}
 style={styles.image}
+resizeMode="cover"
 onError={(error) => {
 console.error("❌ Image load error in FeedCard:", mediaUrl, error);
 }}
@@ -786,7 +787,7 @@ videoWrapper: {
   position: "relative",
   width: "100%",
   overflow: 'hidden',
-  backgroundColor: '#000',  // ADD THIS LINE
+  backgroundColor: '#000',
 },
 
 headerRight: {
@@ -815,19 +816,16 @@ fontWeight: "600",
 color: "#333",
 },
 
-videoWrapper: {
-position: "relative",
-width: "100%",
-overflow: 'hidden',
-},
 image: {
 width: "100%",
-aspectRatio: 1,
+aspectRatio: 0.75,
 },
+
 
 video: {
 width: "100%",
 aspectRatio: 9 / 16,
+backgroundColor: '#000',
 },
 
 hiddenImage: {
@@ -874,22 +872,6 @@ height: "100%",
 zIndex: 1,
 },
 
-videoPlaceholder: {
-  backgroundColor: '#000',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-
-playIconContainer: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-
 playIconOverlay: {
 position: "absolute",
 top: 0,
@@ -899,18 +881,13 @@ bottom: 0,
 justifyContent: "center",
 alignItems: "center",
 },
-videoPlaceholder: {
-width: "100%",
-aspectRatio: 9 / 16,
-backgroundColor: "#000",
-justifyContent: "center",
-alignItems: "center",
-},
+
 videoPlaceholderText: {
 color: "#999",
 fontSize: 14,
 marginTop: 8,
 },
+
 playIconBackground: {
 width: 70,
 height: 70,
@@ -986,10 +963,6 @@ videoFollowButtonText: {
 color: '#fff',
 fontSize: 10,
 fontWeight: '600',
-},
-
-videoOptionsButton: {
-padding: 8,
 },
 
 detailsContainer: {
