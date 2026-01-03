@@ -481,16 +481,27 @@ export default function LeaderboardScreen() {
                   activeOpacity={0.7}
                 >
                   {index < 3 ? (
-                    <View style={styles.rankOneBadge}>
-  <Text style={styles.rankOneBadgeText}>#1</Text>
-</View>
-                  ) : (
-                    <View style={styles.rankBadge}>
-                      <Text style={styles.rankText}>
-                        #{entry.rank}
-                      </Text>
-                    </View>
-                  )}
+  <LinearGradient
+    colors={
+      index === 0 
+        ? ["#E94A37", "#F2CF68", "#1B7C82"]  // Rank 1: Cofau gradient
+        : index === 1
+        ? ["#E94A37", "#F2CF68", "#1B7C82"]   // Rank 2: Silver gradient
+        : ["#E94A37", "#F2CF68", "#1B7C82"]    // Rank 3: Bronze gradient
+    }
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={styles.rankOneBadge}
+  >
+    <Text style={styles.rankOneBadgeText}>#{entry.rank}</Text>
+  </LinearGradient>
+) : (
+  <View style={styles.rankBadge}>
+    <Text style={styles.rankText}>
+      #{entry.rank}
+    </Text>
+  </View>
+)}
 
                   <View style={styles.otherRanksContainer}>
                     <UserAvatar

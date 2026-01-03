@@ -489,7 +489,7 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           <UserAvatar
             profilePicture={user.profile_picture}
             username={user.username}
-            size={62}
+            size={66}
             showLevelBadge={false}
             level={user.level}
             style={{}}
@@ -582,16 +582,37 @@ hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       <View style={[styles.levelCard, styles.levelCardAndroid]}>
         {/* Profile picture */}
         <View style={styles.dpContainer}>
-          <TouchableOpacity onPress={() => setShowAddMenu(true)} activeOpacity={0.8}>
-            <UserAvatar
-              profilePicture={user.profile_picture}
-              username={user.username}
-              size={70}
-              showLevelBadge={false}
-              level={user.level}
-              style={{}}
-            />
-          </TouchableOpacity>
+          {ownStoryData ? (
+      // Show gradient ring if user has story
+      <LinearGradient
+        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+        locations={[0, 0.35, 0.9]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.dpGradientRing}
+      >
+        <View style={styles.dpWhiteRing}>
+          <UserAvatar
+            profilePicture={user.profile_picture}
+            username={user.username}
+            size={66}
+            showLevelBadge={false}
+            level={user.level}
+            style={{}}
+          />
+        </View>
+      </LinearGradient>
+    ) : (
+      // No story - show normal avatar
+      <UserAvatar
+        profilePicture={user.profile_picture}
+        username={user.username}
+        size={70}
+        showLevelBadge={false}
+        level={user.level}
+        style={{}}
+      />
+    )}
 
           <TouchableOpacity
             style={styles.dpAddButton}

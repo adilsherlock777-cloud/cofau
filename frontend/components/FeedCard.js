@@ -84,6 +84,7 @@ const [thumbnailError, setThumbnailError] = useState(false);
 const [isFollowing, setIsFollowing] = useState(post.is_following || false);
 const [followLoading, setFollowLoading] = useState(false);
 const [generatedThumbnail, setGeneratedThumbnail] = useState(null);
+const [imageDimensions, setImageDimensions] = useState(null);
 
 // Update isFollowing state when post data changes
 useEffect(() => {
@@ -567,27 +568,33 @@ progressUpdateIntervalMillis={1000}
     </View>
   </TouchableOpacity>
 )}
-
-{/* Fallback placeholder if thumbnail fails */}
 </>
 ) : (
-mediaUrl ? (
-<Image
-source={{ uri: mediaUrl }}
-style={styles.image}
-resizeMode="cover"
-onError={(error) => {
-console.error("❌ Image load error in FeedCard:", mediaUrl, error);
-}}
-onLoadStart={() => {
-console.log("🖼️ Loading image:", mediaUrl);
-}}
-/>
-) : (
-<View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-<Ionicons name="image-outline" size={40} color="#ccc" />
-</View>
-)
+  mediaUrl ? (
+    <Image
+      source={{ uri: mediaUrl }}
+      style={[
+        styles.image,
+        imageDimensions && { aspectRatio: imageDimensions.width / imageDimensions.height }
+      ]}
+      resizeMode="cover"
+      onLoad={(e) => {
+        // Get the actual image dimensions
+        const { width, height } = e.nativeEvent.source;
+        setImageDimensions({ width, height });
+      }}
+      onError={(error) => {
+        console.error("❌ Image load error in FeedCard:", mediaUrl, error);
+      }}
+      onLoadStart={() => {
+        console.log("🖼️ Loading image:", mediaUrl);
+      }}
+    />
+  ) : (
+    <View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', aspectRatio: 0.75 }]}>
+      <Ionicons name="image-outline" size={40} color="#ccc" />
+    </View>
+  )
 )}
 </TouchableOpacity>
 )}
@@ -798,9 +805,9 @@ gap: 0,
 
 followButton: {
 backgroundColor: "#1B7C82",
-paddingHorizontal: 12,
-paddingVertical: 6,
-borderRadius: 16,
+paddingHorizontal: 10,
+paddingVertical: 4,
+borderRadius: 12,
 },
 
 followButtonText: {
@@ -818,7 +825,8 @@ color: "#333",
 
 image: {
 width: "100%",
-aspectRatio: 0.75,
+aspectRatio: 0.75, // Default aspect ratio while loading
+backgroundColor: '#f9f9f9',
 },
 
 
