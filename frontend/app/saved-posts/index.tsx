@@ -52,58 +52,66 @@ export default function SavedPostsScreen() {
   };
 
   const renderPost = (post: any) => {
-    const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
-    const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
-    const isVideo =
-      post.media_type === 'video' ||
-      mediaUrl?.toLowerCase().endsWith('.mp4') ||
-      mediaUrl?.toLowerCase().endsWith('.mov') ||
-      mediaUrl?.toLowerCase().endsWith('.avi') ||
-      mediaUrl?.toLowerCase().endsWith('.webm');
-    
-    // For videos, ONLY use thumbnail (never try to load video URL as image)
-    // For images, use mediaUrl
-    const displayUrl = isVideo ? thumbnailUrl : mediaUrl;
-    const hasValidThumbnail = isVideo ? !!thumbnailUrl : !!mediaUrl;
+  // Debug log
+  console.log('📹 Post data:', {
+    id: post._id || post.id,
+    media_type: post.media_type,
+    thumbnail_url: post.thumbnail_url,
+    media_url: post.media_url
+  });
 
-    return (
-      <TouchableOpacity
-        key={post._id || post.id}
-        style={styles.gridItem}
-        onPress={() => router.push(`/post-details/${post._id || post.id}`)}
-        activeOpacity={0.8}
-      >
-        {hasValidThumbnail && displayUrl ? (
-          <View style={styles.thumbnailContainer}>
-            <Image
-              source={{ uri: displayUrl }}
-              style={styles.thumbnail}
-              resizeMode="cover"
-              onError={(error) => {
-                console.error("❌ Image load error in saved posts:", displayUrl, error);
-              }}
-            />
-            {isVideo && (
-              <View style={styles.videoOverlay}>
-                <Ionicons name="play-circle" size={40} color="#fff" />
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.thumbnailPlaceholder}>
-            <Ionicons
-              name={isVideo ? 'videocam-outline' : 'image-outline'}
-              size={40}
-              color="#ccc"
-            />
-            {isVideo && !thumbnailUrl && (
-              <Text style={styles.placeholderText}>Video</Text>
-            )}
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
+  const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
+  const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
+  const isVideo =
+    post.media_type === 'video' ||
+    mediaUrl?.toLowerCase().endsWith('.mp4') ||
+    mediaUrl?.toLowerCase().endsWith('.mov') ||
+    mediaUrl?.toLowerCase().endsWith('.avi') ||
+    mediaUrl?.toLowerCase().endsWith('.webm');
+
+  // For videos, ONLY use thumbnail (never try to load video URL as image)
+  // For images, use mediaUrl
+  const displayUrl = isVideo ? thumbnailUrl : mediaUrl;
+  const hasValidThumbnail = isVideo ? !!thumbnailUrl : !!mediaUrl;
+
+  return (
+    <TouchableOpacity
+      key={post._id || post.id}
+      style={styles.gridItem}
+      onPress={() => router.push(`/post-details/${post._id || post.id}`)}
+      activeOpacity={0.8}
+    >
+      {hasValidThumbnail && displayUrl ? (
+        <View style={styles.thumbnailContainer}>
+          <Image
+            source={{ uri: displayUrl }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+            onError={(error) => {
+              console.error("❌ Image load error in saved posts:", displayUrl, error);
+            }}
+          />
+          {isVideo && (
+            <View style={styles.videoOverlay}>
+              <Ionicons name="play-circle" size={40} color="#fff" />
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={styles.thumbnailPlaceholder}>
+          <Ionicons
+            name={isVideo ? 'videocam-outline' : 'image-outline'}
+            size={40}
+            color="#ccc"
+          />
+          {isVideo && !thumbnailUrl && (
+            <Text style={styles.placeholderText}>Video</Text>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
 
   if (loading) {
     return (
@@ -168,6 +176,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingTop: 50,  // ADD THIS LINE
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
     backgroundColor: '#fff',
