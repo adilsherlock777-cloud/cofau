@@ -55,8 +55,7 @@ style={{ width: size, height: size }}
 />
 </MaskedView>
 );
-
-export default function FeedCard({
+ function FeedCard({
   post,
   onLikeUpdate,
   onStoryCreated,
@@ -85,6 +84,7 @@ const [isFollowing, setIsFollowing] = useState(post.is_following || false);
 const [followLoading, setFollowLoading] = useState(false);
 const [generatedThumbnail, setGeneratedThumbnail] = useState(null);
 const [imageDimensions, setImageDimensions] = useState(null);
+const dimensionCache = useRef({});
 
 // Update isFollowing state when post data changes
 useEffect(() => {
@@ -117,15 +117,6 @@ useEffect(() => {
   generateThumbnail();
 }, [isVideo, thumbnailUrl, mediaUrl]);
 
-
-console.log('🎬 VIDEO DEBUG:', {
-  postId: post.id,
-  username: post.username,
-  hasThumbnail: !!post.thumbnail_url,
-  thumbnailUrl: thumbnailUrl,
-  mediaUrl: mediaUrl,
-  isVideo: isVideo,
-});
 
 
 const dpRaw = normalizeProfilePicture(post.user_profile_picture);
@@ -518,14 +509,6 @@ if (videoLoaded) {
 setVideoLoaded(false);
 }
 }}
-onLoadStart={() => {
-console.log("📹 Video loading started:", mediaUrl);
-// Don't reset videoLoaded here to prevent flickering
-// Only set error to false if it was true
-if (videoError) {
-setVideoError(false);
-}
-}}
 onPlaybackStatusUpdate={(status) => {
 // Ensure video stops if shouldPlay becomes false
 if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
@@ -579,9 +562,11 @@ progressUpdateIntervalMillis={1000}
       ]}
       resizeMode="cover"
       onLoad={(e) => {
-        // Get the actual image dimensions
-        const { width, height } = e.nativeEvent.source;
-        setImageDimensions({ width, height });
+       if (!dimensionCache.current[mediaUrl]) {
+      const { width, height } = e.nativeEvent.source;
+      dimensionCache.current[mediaUrl] = { width, height };
+      setImageDimensions({ width, height });
+    }
       }}
       onError={(error) => {
         console.error("❌ Image load error in FeedCard:", mediaUrl, error);
@@ -1167,4 +1152,15 @@ fontSize: 16,
 color: '#333',
 fontWeight: '500',
 },
+});
+
+
+export default React.memo(FeedCard, (prevProps, nextProps) => {
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.shouldPlay === nextProps.shouldPlay &&
+    prevProps.isMuted === nextProps.isMuted &&
+    prevProps.post.is_liked === nextProps.post.is_liked &&
+    prevProps.post.is_saved_by_user === nextProps.post.is_saved_by_user
+  );
 });

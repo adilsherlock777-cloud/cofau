@@ -114,6 +114,7 @@ export default function ExploreScreen() {
     'Biryani',
     'SeaFood',
     'Chinese',
+    'Desserts',
     'Arabic',
     'BBQ/Tandoor',
     'Fast Food',
