@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
-View,
-Text,
-StyleSheet,
-ScrollView,
-TouchableOpacity,
-ActivityIndicator,
-RefreshControl,
-Platform,
-Modal,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Platform,
+  Modal,
+  FlatList,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,18 +21,17 @@ import StoriesBar from "../components/StoriesBar";
 import { BlurView } from 'expo-blur';
 import { fetchUnreadCount } from "../utils/notifications";
 import {
-normalizeMediaUrl,
-normalizeProfilePicture,
-BACKEND_URL,
+  normalizeMediaUrl,
+  normalizeProfilePicture,
+  BACKEND_URL,
 } from "../utils/imageUrlFix";
 
 const BACKEND = BACKEND_URL;
-let globalMuteState = true; // Start muted by default
+let globalMuteState = true;
 
 /* -------------------------
    Level System Helper
 ------------------------- */
-// Level thresholds matching backend LEVEL_TABLE
 const LEVEL_TABLE = [
   { level: 1, required_points: 1250 },
   { level: 2, required_points: 2500 },
@@ -48,1118 +47,1068 @@ const LEVEL_TABLE = [
   { level: 12, required_points: 12000 },
 ];
 
-/**
- * Calculate points needed from current level to next level
- * @param currentLevel - Current user level
- * @param requiredPoints - Total points required for NEXT level (from backend, after fix)
- * @returns Points needed to reach next level (the difference between next and previous level thresholds)
- */
-const getPointsNeededForNextLevel = (currentLevel: number, requiredPoints: number): number => {
-  // If at max level (12), return the current required points
-  if (currentLevel >= 12) {
-    return requiredPoints;
-  }
-  
-  // Find the previous level's threshold
-  // currentPoints is calculated as: total_points - previous_level_threshold
-  // So we need to find the threshold for level (currentLevel - 1)
-  const previousLevelData = LEVEL_TABLE.find(level => level.level === currentLevel - 1);
-  
-  if (previousLevelData) {
-    // Points needed = next level threshold - previous level threshold
-    // requiredPoints is now the next level's threshold (after backend fix)
-    return requiredPoints - previousLevelData.required_points;
-  }
-  
-  // For Level 1, there's no previous level (threshold is 0)
-  // So points needed = requiredPoints (which is Level 2's threshold = 1250)
-  if (currentLevel === 1) {
-    return requiredPoints;
-  }
-  
-  // Fallback: calculate based on level progression
-  if (currentLevel === 4) return 750; // Level 4 → 5: 5750 - 5000 = 750
-  if (currentLevel >= 5 && currentLevel <= 8) return 750; // Levels 5-8: 750 points per level
-  if (currentLevel >= 9 && currentLevel <= 11) return 1000; // Levels 9-11: 1000 points per level
-  
-  return 1250; // Default: 1250 points for levels 2-3
-};
-
 /* -------------------------
    Normalize DP
 ------------------------- */
 const getPostDP = (post: any) =>
-normalizeProfilePicture(
-post.user_profile_picture ||
-post.profile_picture ||
-post.profile_picture_url ||
-post.profile_pic ||
-post.user_profile_pic ||
-post.userProfilePicture ||
-post.profilePicture
-);
+  normalizeProfilePicture(
+    post.user_profile_picture ||
+    post.profile_picture ||
+    post.profile_picture_url ||
+    post.profile_pic ||
+    post.user_profile_pic ||
+    post.userProfilePicture ||
+    post.profilePicture
+  );
 
 export default function FeedScreen() {
-const router = useRouter();
-const { user, token, refreshUser } = useAuth() as any;
+  const router = useRouter();
+  const { user, token, refreshUser } = useAuth() as any;
 
-const [feedPosts, setFeedPosts] = useState<any[]>([]);
-const [loading, setLoading] = useState(true);
-const [refreshing, setRefreshing] = useState(false);
-const [unreadCount, setUnreadCount] = useState(0);
-const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
-const [showFixedLine, setShowFixedLine] = useState(false);
-const [page, setPage] = useState(1);
-const [loadingMore, setLoadingMore] = useState(false);
-const [hasMore, setHasMore] = useState(true);
-const [isMuted, setIsMuted] = useState(globalMuteState);
-const [showAddMenu, setShowAddMenu] = useState(false);
-const scrollViewRef = useRef<ScrollView>(null);
-const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
-const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-const isScrollingRef = useRef(false);
-const paginationTriggeredRef = useRef(false);
-const lastScrollYRef = useRef(0);
-const [hasOwnStory, setHasOwnStory] = useState(false);
-const [ownStoryData, setOwnStoryData] = useState(null);
+  const [feedPosts, setFeedPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
+  const [showFixedLine, setShowFixedLine] = useState(false);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [isMuted, setIsMuted] = useState(globalMuteState);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [ownStoryData, setOwnStoryData] = useState<any>(null);
 
-const POSTS_PER_PAGE = 30;
-const VISIBILITY_THRESHOLD = 0.2; // 20% visibility threshold
-const PRELOAD_THRESHOLD = 0.05; // 5% visibility - start loading video
+  const flatListRef = useRef<FlatList>(null);
+  const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isScrollingRef = useRef(false);
+  const paginationTriggeredRef = useRef(false);
+  const lastScrollYRef = useRef(0);
 
-// Handle mute toggle - persists across all videos
-const handleMuteToggle = useCallback((newMuteState) => {
-  globalMuteState = newMuteState;
-  setIsMuted(newMuteState);
-}, []);
+  const POSTS_PER_PAGE = 30;
+  const VISIBILITY_THRESHOLD = 0.2;
 
-useEffect(() => {
-fetchFeed();
-loadUnreadCount();
-}, []);
+  // Handle mute toggle
+  const handleMuteToggle = useCallback((newMuteState: boolean) => {
+    globalMuteState = newMuteState;
+    setIsMuted(newMuteState);
+  }, []);
 
-useFocusEffect(
-React.useCallback(() => {
-loadUnreadCount();
-refreshUser();
-fetchFeed(true);
-fetchOwnStory(); 
-}, [token])
-);
+  useEffect(() => {
+    fetchFeed(true);
+    loadUnreadCount();
+  }, []);
 
-const loadUnreadCount = async () => {
-if (!token) return;
-try {
-const count = await fetchUnreadCount(token);
-setUnreadCount(count);
-} catch {}
-};
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUnreadCount();
+      refreshUser();
+      fetchFeed(true);
+      fetchOwnStory();
+    }, [token])
+  );
 
-const fetchOwnStory = async () => {
-  if (!token || !user?.id) return;
-  try {
-    const response = await axios.get(`${BACKEND}/api/stories/feed`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    // Find own story from the response
-    const ownStory = response.data.find(u => u.user.id === user.id || u.user._id === user.id);
-    
-    if (ownStory && ownStory.stories && ownStory.stories.length > 0) {
-      setOwnStoryData({
-        user: {
-          id: user.id,
-          username: user.username,
-          profile_picture: user.profile_picture,
-          level: user.level,
-        },
-        stories: ownStory.stories.map(s => ({
-          ...s,
-          media_url: normalizeMediaUrl(s.media_url),
-          media_type: s.media_type || s.type || "image",
-        })),
+  const loadUnreadCount = async () => {
+    if (!token) return;
+    try {
+      const count = await fetchUnreadCount(token);
+      setUnreadCount(count);
+    } catch {}
+  };
+
+  const fetchOwnStory = async () => {
+    if (!token || !user?.id) return;
+    try {
+      const response = await axios.get(`${BACKEND}/api/stories/feed`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-    } else {
-      setOwnStoryData(null);
-    }
-  } catch (err) {
-    console.log("Error fetching own story:", err);
-    setOwnStoryData(null);
-  }
-};
 
-const fetchFeed = async (forceRefresh = false) => {
-try {
-if (forceRefresh) {
-setLoading(true);
-setPage(1);
-setHasMore(true);
-paginationTriggeredRef.current = false;
-} else {
-if (!hasMore || loadingMore || paginationTriggeredRef.current) return;
-setLoadingMore(true);
-paginationTriggeredRef.current = true;
-}
+      const ownStory = response.data.find(
+        (u: any) => u.user.id === user.id || u.user._id === user.id
+      );
 
-const skip = forceRefresh ? 0 : (page - 1) * POSTS_PER_PAGE;
-const ts = forceRefresh ? `&_t=${Date.now()}` : "";
-const res = await axios.get(`${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${ts}`);
-
-if (res.data.length === 0) {
-setHasMore(false);
-if (forceRefresh) {
-setFeedPosts([]);
-}
-return;
-}
-
-const mapped = res.data.map((post: any) => ({
-id: post.id,
-user_id: post.user_id,
-username: post.username,
-user_profile_picture: getPostDP(post),
-description: post.review_text || post.description,
-rating: post.rating,
-media_url: normalizeMediaUrl(post.image_url || post.media_url),
-thumbnail_url: post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null,
-media_type: post.media_type,
-created_at: post.created_at,
-user_level: post.user_level || post.level || post.userLevel,
-// Location fields
-location_name: post.location_name || post.location || post.place_name,
-location_address: post.location_address || post.address,
-map_link: post.map_link || post.google_maps_link,
-// Engagement fields
-likes: post.likes || post.likes_count || 0,
-comments: post.comments || post.comments_count || 0,
-is_liked: post.is_liked || false,
-is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
-is_following: post.is_following || false,
-}));
-
-// Backend already sorts by created_at descending, no need for client-side sorting
-if (forceRefresh) {
-setFeedPosts(mapped);
-} else {
-setFeedPosts((prev) => [...prev, ...mapped]);
-setPage((prev) => prev + 1);
-}
-
-if (res.data.length < POSTS_PER_PAGE) {
-setHasMore(false);
-}
-
-// Reset visible video when feed refreshes
-setVisibleVideoId(null);
-} finally {
-setLoading(false);
-setRefreshing(false);
-setLoadingMore(false);
-}
-};
-
-// Track post positions for viewability detection
-const handlePostLayout = useCallback((postId: string, event: any) => {
-const { y, height } = event.nativeEvent.layout;
-postPositionsRef.current.set(postId, { y, height });
-}, []);
-
-// Find which video should be playing based on scroll position (40% visibility)
-const findVisibleVideo = useCallback((scrollY, viewportHeight) => {
-  const viewportTop = scrollY;
-  const viewportBottom = scrollY + viewportHeight;
-
-  let bestVideo = null;
-
-  const positions = Array.from(postPositionsRef.current.entries());
-  for (const [postId, position] of positions) {
-    const post = feedPosts.find((p) => String(p.id) === String(postId));
-    if (!post) continue;
-
-    const isVideo =
-      post.media_type === "video" ||
-      post.media_url?.toLowerCase().endsWith(".mp4");
-
-    if (!isVideo) continue;
-
-    const postTop = position.y;
-    const postBottom = position.y + position.height;
-    const postHeight = position.height;
-
-    // Calculate visible portion of the post
-    const visibleTop = Math.max(postTop, viewportTop);
-    const visibleBottom = Math.min(postBottom, viewportBottom);
-    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-    
-    // Calculate visibility ratio (0 to 1)
-    const visibilityRatio = postHeight > 0 ? visibleHeight / postHeight : 0;
-
-    // Only consider videos with at least 40% visibility
-    if (visibilityRatio >= VISIBILITY_THRESHOLD) {
-      const candidate = { id: String(postId), visibilityRatio };
-      // Select the video with highest visibility
-      if (!bestVideo || visibilityRatio > bestVideo.visibilityRatio) {
-        bestVideo = candidate;
-      }
-    }
-  }
-
-  return bestVideo?.id ?? null;
-}, [feedPosts]);
-
-// Handle scroll events
-// Handle scroll events
-const handleScroll = useCallback((event: any) => {
-  isScrollingRef.current = true;
-
-  // Extract values immediately before event is nullified
-  const scrollY = event.nativeEvent.contentOffset.y;
-  const viewportHeight = event.nativeEvent.layoutMeasurement.height;
-  const contentHeight = event.nativeEvent.contentSize.height;
-
-  // Show fixed line when scrolled down more than 100px
-  if (scrollY > 100) {
-    setShowFixedLine(true);
-  } else {
-    setShowFixedLine(false);
-  }
-
-  // Reset pagination trigger if user scrolls back up significantly
-  if (scrollY < lastScrollYRef.current - 100) {
-    paginationTriggeredRef.current = false;
-  }
-  lastScrollYRef.current = scrollY;
-
-  // Platform-specific behavior:
-  // iOS: Keep video playing while scrolling (smoother experience)
-  // Android: Pause video while scrolling (better performance)
-  if (Platform.OS === 'ios') {
-    // iOS: Update visible video while scrolling (Instagram-style)
-    const visibleId = findVisibleVideo(scrollY, viewportHeight);
-    if (visibleId !== visibleVideoId) {
-      setVisibleVideoId(visibleId);
-    }
-  } else {
-    // Android: Pause videos while actively scrolling to prevent lag
-    if (visibleVideoId) {
-      setVisibleVideoId(null);
-    }
-  }
-
-  // Clear existing timeout
-  if (scrollTimeoutRef.current) {
-    clearTimeout(scrollTimeoutRef.current);
-  }
-
-  // Set timeout to detect when scrolling stops
-  scrollTimeoutRef.current = setTimeout(() => {
-    isScrollingRef.current = false;
-
-    // Find and play the most visible video after scrolling stops
-    const visibleId = findVisibleVideo(scrollY, viewportHeight);
-    setVisibleVideoId(visibleId);
-
-    // Only check for pagination AFTER scrolling has stopped
-    const paddingToBottom = 100;
-    const isNearBottom = scrollY + viewportHeight >= contentHeight - paddingToBottom;
-
-    if (isNearBottom && hasMore && !loadingMore && !loading && !paginationTriggeredRef.current) {
-      paginationTriggeredRef.current = true;
-      fetchFeed(false).finally(() => {
-        setTimeout(() => {
-          paginationTriggeredRef.current = false;
-        }, 1000);
-      });
-    }
-  }, Platform.OS === 'ios' ? 100 : 200); // Faster response on iOS, slightly delayed on Android
-}, [findVisibleVideo, visibleVideoId, hasMore, loadingMore, loading]);
-
-// Cleanup timeout on unmount
-useEffect(() => {
-return () => {
-if (scrollTimeoutRef.current) {
-clearTimeout(scrollTimeoutRef.current);
-}
-};
-}, []);
-
-return (
-<View style={styles.container}>
-{/* Fixed Line Below Status Bar - Shows only when scrolled */}
-{showFixedLine && (
-<View style={styles.fixedLine} />
-)}
-
-<ScrollView
-ref={scrollViewRef}
-contentContainerStyle={{ paddingBottom: 90 }}
-refreshControl={
-<RefreshControl
-refreshing={refreshing}
-onRefresh={() => fetchFeed(true)}
-/>
-}
-showsVerticalScrollIndicator={false}
-onScroll={handleScroll}
-scrollEventThrottle={16}
->
-{/* ================= HEADER WITH GRADIENT - NOW SCROLLABLE ================= */}
-<View style={styles.headerContainer}>
-<LinearGradient
-colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-locations={[0, 0.5, 1]}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 0 }}
-style={styles.gradientHeader}
->
-{/* Top row with icons */}
-<View style={styles.headerRow}>
-{/* Left Message Icon */}
-<TouchableOpacity
-style={styles.leftIcon}
-onPress={() => {
-console.log("Chat icon pressed, navigating to /chat");
-router.push("/chat");
-}}
-activeOpacity={0.7}
-hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
->
-<Ionicons name="chatbox-ellipses" size={20} color="#fff" />
-</TouchableOpacity>
-
-<Text style={styles.cofauTitle} pointerEvents="none">Cofau</Text>
-
-<View style={styles.headerIcons}>
-<TouchableOpacity
-onPress={() => {
-console.log("Notifications icon pressed, navigating to /notifications");
-router.push("/notifications");
-}}
-activeOpacity={0.7}
-hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
->
-<Ionicons name="notifications" size={20} color="#fff" />
-{unreadCount > 0 && (
-<View style={styles.badge}>
-<Text style={styles.badgeText}>
-{unreadCount > 99 ? "99+" : unreadCount}
-</Text>
-</View>
-)}
-</TouchableOpacity>
-</View>
-</View>
-</LinearGradient>
-
-{/* ===== LEVEL CARD WITH OVERLAPPING DP - OVERLAPS GRADIENT ===== */}
-{user && (
-  <View style={styles.levelCardWrapper}>
-    {Platform.OS === "ios" ? (
-      <BlurView intensity={60} tint="light" style={styles.levelCard}>
-       <View style={styles.dpContainer}>
-  <TouchableOpacity 
-    onPress={() => {
-      if (ownStoryData) {
-        // Navigate to story viewer if user has story
-        router.push({
-          pathname: "/story-viewer",
-          params: {
-            userId: user.id,
-            stories: JSON.stringify(ownStoryData.stories),
-            user: JSON.stringify(ownStoryData.user),
+      if (ownStory && ownStory.stories && ownStory.stories.length > 0) {
+        setOwnStoryData({
+          user: {
+            id: user.id,
+            username: user.username,
+            profile_picture: user.profile_picture,
+            level: user.level,
           },
+          stories: ownStory.stories.map((s: any) => ({
+            ...s,
+            media_url: normalizeMediaUrl(s.media_url),
+            media_type: s.media_type || s.type || "image",
+          })),
         });
       } else {
-        // Show add menu if no story
-        setShowAddMenu(true);
+        setOwnStoryData(null);
       }
-    }} 
-    activeOpacity={0.8}
-  >
-    {ownStoryData ? (
-      // Show gradient ring if user has story
-      <LinearGradient
-        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-        locations={[0, 0.35, 0.9]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.dpGradientRing}
-      >
-        <View style={styles.dpWhiteRing}>
-          <UserAvatar
-            profilePicture={user.profile_picture}
-            username={user.username}
-            size={66}
-            showLevelBadge={false}
-            level={user.level}
-            style={{}}
+    } catch (err) {
+      if (__DEV__) console.log("Error fetching own story:", err);
+      setOwnStoryData(null);
+    }
+  };
+
+  const fetchFeed = async (forceRefresh = false) => {
+    try {
+      if (forceRefresh) {
+        setLoading(true);
+        setPage(1);
+        setHasMore(true);
+        paginationTriggeredRef.current = false;
+      } else {
+        if (!hasMore || loadingMore || paginationTriggeredRef.current) return;
+        setLoadingMore(true);
+        paginationTriggeredRef.current = true;
+      }
+
+      const skip = forceRefresh ? 0 : (page - 1) * POSTS_PER_PAGE;
+      const ts = forceRefresh ? `&_t=${Date.now()}` : "";
+      const res = await axios.get(
+        `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${ts}`
+      );
+
+      if (res.data.length === 0) {
+        setHasMore(false);
+        if (forceRefresh) {
+          setFeedPosts([]);
+        }
+        return;
+      }
+
+      const mapped = res.data.map((post: any) => ({
+        id: post.id,
+        user_id: post.user_id,
+        username: post.username,
+        user_profile_picture: getPostDP(post),
+        description: post.review_text || post.description,
+        rating: post.rating,
+        media_url: normalizeMediaUrl(post.image_url || post.media_url),
+        thumbnail_url: post.thumbnail_url
+          ? normalizeMediaUrl(post.thumbnail_url)
+          : null,
+        media_type: post.media_type,
+        created_at: post.created_at,
+        user_level: post.user_level || post.level || post.userLevel,
+        location_name: post.location_name || post.location || post.place_name,
+        location_address: post.location_address || post.address,
+        map_link: post.map_link || post.google_maps_link,
+        likes: post.likes || post.likes_count || 0,
+        comments: post.comments || post.comments_count || 0,
+        is_liked: post.is_liked || false,
+        is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
+        is_following: post.is_following || false,
+      }));
+
+      if (forceRefresh) {
+        setFeedPosts(mapped);
+      } else {
+        setFeedPosts((prev) => [...prev, ...mapped]);
+        setPage((prev) => prev + 1);
+      }
+
+      if (res.data.length < POSTS_PER_PAGE) {
+        setHasMore(false);
+      }
+
+      setVisibleVideoId(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Track post positions
+  const handlePostLayout = useCallback((postId: string, event: any) => {
+    const { y, height } = event.nativeEvent.layout;
+    postPositionsRef.current.set(postId, { y, height });
+  }, []);
+
+  // Find visible video
+  const findVisibleVideo = useCallback(
+    (scrollY: number, viewportHeight: number) => {
+      const viewportTop = scrollY;
+      const viewportBottom = scrollY + viewportHeight;
+
+      let bestVideo: { id: string; visibilityRatio: number } | null = null;
+
+      const positions = Array.from(postPositionsRef.current.entries());
+      for (const [postId, position] of positions) {
+        const post = feedPosts.find((p) => String(p.id) === String(postId));
+        if (!post) continue;
+
+        const isVideo =
+          post.media_type === "video" ||
+          post.media_url?.toLowerCase().endsWith(".mp4");
+
+        if (!isVideo) continue;
+
+        const postTop = position.y;
+        const postBottom = position.y + position.height;
+        const postHeight = position.height;
+
+        const visibleTop = Math.max(postTop, viewportTop);
+        const visibleBottom = Math.min(postBottom, viewportBottom);
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+
+        const visibilityRatio =
+          postHeight > 0 ? visibleHeight / postHeight : 0;
+
+        if (visibilityRatio >= VISIBILITY_THRESHOLD) {
+          const candidate = { id: String(postId), visibilityRatio };
+          if (!bestVideo || visibilityRatio > bestVideo.visibilityRatio) {
+            bestVideo = candidate;
+          }
+        }
+      }
+
+      return bestVideo?.id ?? null;
+    },
+    [feedPosts]
+  );
+
+  // Handle scroll
+  const handleScroll = useCallback(
+    (event: any) => {
+      isScrollingRef.current = true;
+
+      const scrollY = event.nativeEvent.contentOffset.y;
+      const viewportHeight = event.nativeEvent.layoutMeasurement.height;
+      const contentHeight = event.nativeEvent.contentSize.height;
+
+      setShowFixedLine(scrollY > 100);
+
+      if (scrollY < lastScrollYRef.current - 100) {
+        paginationTriggeredRef.current = false;
+      }
+      lastScrollYRef.current = scrollY;
+
+      if (Platform.OS === "ios") {
+        const visibleId = findVisibleVideo(scrollY, viewportHeight);
+        if (visibleId !== visibleVideoId) {
+          setVisibleVideoId(visibleId);
+        }
+      } else {
+        if (visibleVideoId) {
+          setVisibleVideoId(null);
+        }
+      }
+
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      scrollTimeoutRef.current = setTimeout(() => {
+        isScrollingRef.current = false;
+
+        const visibleId = findVisibleVideo(scrollY, viewportHeight);
+        setVisibleVideoId(visibleId);
+
+        const paddingToBottom = 100;
+        const isNearBottom =
+          scrollY + viewportHeight >= contentHeight - paddingToBottom;
+
+        if (
+          isNearBottom &&
+          hasMore &&
+          !loadingMore &&
+          !loading &&
+          !paginationTriggeredRef.current
+        ) {
+          paginationTriggeredRef.current = true;
+          fetchFeed(false).finally(() => {
+            setTimeout(() => {
+              paginationTriggeredRef.current = false;
+            }, 1000);
+          });
+        }
+      }, Platform.OS === "ios" ? 100 : 200);
+    },
+    [findVisibleVideo, visibleVideoId, hasMore, loadingMore, loading]
+  );
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Render post item
+  const renderPost = useCallback(
+    ({ item: post, index }: { item: any; index: number }) => {
+      const isVideo =
+        post.media_type === "video" ||
+        post.media_url?.toLowerCase().endsWith(".mp4");
+      const shouldPlay =
+        isVideo &&
+        visibleVideoId === String(post.id) &&
+        (Platform.OS === "ios" || !isScrollingRef.current);
+      const shouldPreload = isVideo && visibleVideoId === String(post.id);
+
+      return (
+        <View
+          style={styles.postContainer}
+          onLayout={(e) => handlePostLayout(String(post.id), e)}
+        >
+          <FeedCard
+            post={post}
+            onLikeUpdate={() => fetchFeed(true)}
+            onStoryCreated={() => {}}
+            shouldPlay={shouldPlay}
+            shouldPreload={shouldPreload}
+            isMuted={isMuted}
+            onMuteToggle={handleMuteToggle}
           />
         </View>
-      </LinearGradient>
-    ) : (
-      // No story - show normal avatar
-      <UserAvatar
-        profilePicture={user.profile_picture}
-        username={user.username}
-        size={70}
-        showLevelBadge={false}
-        level={user.level}
-        style={{}}
-      />
-    )}
-  </TouchableOpacity>
+      );
+    },
+    [visibleVideoId, isMuted, handleMuteToggle, handlePostLayout]
+  );
 
-  <TouchableOpacity
-    style={styles.dpAddButton}
-    onPress={() => setShowAddMenu(true)}
-  >
-    <Ionicons name="add" size={19} color="#0f0303ff" />
-  </TouchableOpacity>
-</View>
+  // List Header Component
+  const ListHeader = useCallback(() => (
+    <>
+      {/* ================= HEADER WITH GRADIENT ================= */}
+      <View style={styles.headerContainer}>
+        <LinearGradient
+          colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientHeader}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              style={styles.leftIcon}
+              onPress={() => router.push("/chat")}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chatbox-ellipses" size={20} color="#fff" />
+            </TouchableOpacity>
 
+            <Text style={styles.cofauTitle} pointerEvents="none">
+              Cofau
+            </Text>
 
-        {/* Content */}
-        <View style={styles.levelContent}>
-          <Text style={styles.levelLabel}>Level {user.level}</Text>
-
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              {(() => {
-                const currentLevel = user.level || 1;
-                const currentPoints = user.currentPoints || 0;
-
-                const prevLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel - 1);
-                const prevThreshold = prevLevelData?.required_points || 0;
-
-                const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
-                const currentThreshold = currentLevelData?.required_points || 1250;
-
-                const pointsNeededForLevel = currentThreshold - prevThreshold;
-
-                const progressPercent =
-                  pointsNeededForLevel > 0
-                    ? Math.min((currentPoints / pointsNeededForLevel) * 100, 100)
-                    : 0;
-
-                let gradientColors;
-                let gradientLocations;
-
-                if (progressPercent <= 33) {
-                  gradientColors = ["#E94A37", "#E94A37"];
-                  gradientLocations = [0, 1];
-                } else if (progressPercent <= 66) {
-                  gradientColors = ["#E94A37", "#F2CF68"];
-                  gradientLocations = [0, 1];
-                } else {
-                  gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
-                  gradientLocations = [0, 0.5, 1];
-                }
-
-                return (
-                  <LinearGradient
-                    colors={gradientColors}
-                    locations={gradientLocations}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
-                  />
-                );
-              })()}
+            <View style={styles.headerIcons}>
+              <TouchableOpacity
+                onPress={() => router.push("/notifications")}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="notifications" size={20} color="#fff" />
+                {unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
-          {/* Progress Text - Shows total_points / next_level_threshold */}
-<Text style={styles.progressText}>
-  {user.total_points || user.points || 0}/{(() => {
-    const currentLevel = user.level || 1;
-    const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
-    return currentLevelData?.required_points || 1250;
-  })()}
-</Text>
-  
           </View>
-        </View>
-      </BlurView>
-    ) : (
-      <View style={[styles.levelCard, styles.levelCardAndroid]}>
-        {/* Profile picture */}
-        <View style={styles.dpContainer}>
-          {ownStoryData ? (
-      // Show gradient ring if user has story
-      <LinearGradient
-        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-        locations={[0, 0.35, 0.9]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.dpGradientRing}
-      >
-        <View style={styles.dpWhiteRing}>
-          <UserAvatar
-            profilePicture={user.profile_picture}
-            username={user.username}
-            size={66}
-            showLevelBadge={false}
-            level={user.level}
-            style={{}}
-          />
-        </View>
-      </LinearGradient>
-    ) : (
-      // No story - show normal avatar
-      <UserAvatar
-        profilePicture={user.profile_picture}
-        username={user.username}
-        size={70}
-        showLevelBadge={false}
-        level={user.level}
-        style={{}}
-      />
-    )}
+        </LinearGradient>
 
-          <TouchableOpacity
-            style={styles.dpAddButton}
-            onPress={() => setShowAddMenu(true)}
-          >
-            <Ionicons name="add" size={19} color="#0f0303ff" />
-          </TouchableOpacity>
-        </View>
+        {/* ===== LEVEL CARD ===== */}
+        {user && (
+          <View style={styles.levelCardWrapper}>
+            {Platform.OS === "ios" ? (
+              <BlurView intensity={60} tint="light" style={styles.levelCard}>
+                <View style={styles.dpContainer}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (ownStoryData) {
+                        router.push({
+                          pathname: "/story-viewer",
+                          params: {
+                            userId: user.id,
+                            stories: JSON.stringify(ownStoryData.stories),
+                            user: JSON.stringify(ownStoryData.user),
+                          },
+                        });
+                      } else {
+                        setShowAddMenu(true);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    {ownStoryData ? (
+                      <LinearGradient
+                        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                        locations={[0, 0.35, 0.9]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.dpGradientRing}
+                      >
+                        <View style={styles.dpWhiteRing}>
+                          <UserAvatar
+                            profilePicture={user.profile_picture}
+                            username={user.username}
+                            size={66}
+                            showLevelBadge={false}
+                            level={user.level}
+                            style={{}}
+                          />
+                        </View>
+                      </LinearGradient>
+                    ) : (
+                      <UserAvatar
+                        profilePicture={user.profile_picture}
+                        username={user.username}
+                        size={70}
+                        showLevelBadge={false}
+                        level={user.level}
+                        style={{}}
+                      />
+                    )}
+                  </TouchableOpacity>
 
-        {/* Content */}
-        <View style={styles.levelContent}>
-          <Text style={styles.levelLabel}>Level {user.level}</Text>
+                  <TouchableOpacity
+                    style={styles.dpAddButton}
+                    onPress={() => setShowAddMenu(true)}
+                  >
+                    <Ionicons name="add" size={19} color="#0f0303ff" />
+                  </TouchableOpacity>
+                </View>
 
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              {(() => {
-                const currentLevel = user.level || 1;
-                const currentPoints = user.currentPoints || 0;
+                <View style={styles.levelContent}>
+                  <Text style={styles.levelLabel}>Level {user.level}</Text>
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      {(() => {
+                        const currentLevel = user.level || 1;
+                        const currentPoints = user.currentPoints || 0;
+                        const prevLevelData = LEVEL_TABLE.find(
+                          (l) => l.level === currentLevel - 1
+                        );
+                        const prevThreshold = prevLevelData?.required_points || 0;
+                        const currentLevelData = LEVEL_TABLE.find(
+                          (l) => l.level === currentLevel
+                        );
+                        const currentThreshold =
+                          currentLevelData?.required_points || 1250;
+                        const pointsNeededForLevel =
+                          currentThreshold - prevThreshold;
+                        const progressPercent =
+                          pointsNeededForLevel > 0
+                            ? Math.min(
+                                (currentPoints / pointsNeededForLevel) * 100,
+                                100
+                              )
+                            : 0;
 
-                const prevLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel - 1);
-                const prevThreshold = prevLevelData?.required_points || 0;
+                        let gradientColors;
+                        let gradientLocations;
 
-                const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
-                const currentThreshold = currentLevelData?.required_points || 1250;
+                        if (progressPercent <= 33) {
+                          gradientColors = ["#E94A37", "#E94A37"];
+                          gradientLocations = [0, 1];
+                        } else if (progressPercent <= 66) {
+                          gradientColors = ["#E94A37", "#F2CF68"];
+                          gradientLocations = [0, 1];
+                        } else {
+                          gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
+                          gradientLocations = [0, 0.5, 1];
+                        }
 
-                const pointsNeededForLevel = currentThreshold - prevThreshold;
+                        return (
+                          <LinearGradient
+                            colors={gradientColors}
+                            locations={gradientLocations}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={[
+                              styles.progressFill,
+                              { width: `${progressPercent}%` },
+                            ]}
+                          />
+                        );
+                      })()}
+                    </View>
+                    <Text style={styles.progressText}>
+                      {user.total_points || user.points || 0}/
+                      {(() => {
+                        const currentLevel = user.level || 1;
+                        const currentLevelData = LEVEL_TABLE.find(
+                          (l) => l.level === currentLevel
+                        );
+                        return currentLevelData?.required_points || 1250;
+                      })()}
+                    </Text>
+                  </View>
+                </View>
+              </BlurView>
+            ) : (
+              <View style={[styles.levelCard, styles.levelCardAndroid]}>
+                <View style={styles.dpContainer}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (ownStoryData) {
+                        router.push({
+                          pathname: "/story-viewer",
+                          params: {
+                            userId: user.id,
+                            stories: JSON.stringify(ownStoryData.stories),
+                            user: JSON.stringify(ownStoryData.user),
+                          },
+                        });
+                      } else {
+                        setShowAddMenu(true);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    {ownStoryData ? (
+                      <LinearGradient
+                        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                        locations={[0, 0.35, 0.9]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.dpGradientRing}
+                      >
+                        <View style={styles.dpWhiteRing}>
+                          <UserAvatar
+                            profilePicture={user.profile_picture}
+                            username={user.username}
+                            size={66}
+                            showLevelBadge={false}
+                            level={user.level}
+                            style={{}}
+                          />
+                        </View>
+                      </LinearGradient>
+                    ) : (
+                      <UserAvatar
+                        profilePicture={user.profile_picture}
+                        username={user.username}
+                        size={70}
+                        showLevelBadge={false}
+                        level={user.level}
+                        style={{}}
+                      />
+                    )}
+                  </TouchableOpacity>
 
-                const progressPercent =
-                  pointsNeededForLevel > 0
-                    ? Math.min((currentPoints / pointsNeededForLevel) * 100, 100)
-                    : 0;
+                  <TouchableOpacity
+                    style={styles.dpAddButton}
+                    onPress={() => setShowAddMenu(true)}
+                  >
+                    <Ionicons name="add" size={19} color="#0f0303ff" />
+                  </TouchableOpacity>
+                </View>
 
-                let gradientColors;
-                let gradientLocations;
+                <View style={styles.levelContent}>
+                  <Text style={styles.levelLabel}>Level {user.level}</Text>
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      {(() => {
+                        const currentLevel = user.level || 1;
+                        const currentPoints = user.currentPoints || 0;
+                        const prevLevelData = LEVEL_TABLE.find(
+                          (l) => l.level === currentLevel - 1
+                        );
+                        const prevThreshold = prevLevelData?.required_points || 0;
+                        const currentLevelData = LEVEL_TABLE.find(
+                          (l) => l.level === currentLevel
+                        );
+                        const currentThreshold =
+                          currentLevelData?.required_points || 1250;
+                        const pointsNeededForLevel =
+                          currentThreshold - prevThreshold;
+                        const progressPercent =
+                          pointsNeededForLevel > 0
+                            ? Math.min(
+                                (currentPoints / pointsNeededForLevel) * 100,
+                                100
+                              )
+                            : 0;
 
-                if (progressPercent <= 33) {
-                  gradientColors = ["#E94A37", "#E94A37"];
-                  gradientLocations = [0, 1];
-                } else if (progressPercent <= 66) {
-                  gradientColors = ["#E94A37", "#F2CF68"];
-                  gradientLocations = [0, 1];
-                } else {
-                  gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
-                  gradientLocations = [0, 0.5, 1];
-                }
+                        let gradientColors;
+                        let gradientLocations;
 
-                return (
-                  <LinearGradient
-                    colors={gradientColors}
-                    locations={gradientLocations}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
-                  />
-                );
-              })()}
-            </View>
-            {/* Progress Text - Shows total_points / next_level_threshold */}
-<Text style={styles.progressText}>
-  {user.total_points || user.points || 0}/{(() => {
-    const currentLevel = user.level || 1;
-    const currentLevelData = LEVEL_TABLE.find((l) => l.level === currentLevel);
-    return currentLevelData?.required_points || 1250;
-  })()}
-</Text>
+                        if (progressPercent <= 33) {
+                          gradientColors = ["#E94A37", "#E94A37"];
+                          gradientLocations = [0, 1];
+                        } else if (progressPercent <= 66) {
+                          gradientColors = ["#E94A37", "#F2CF68"];
+                          gradientLocations = [0, 1];
+                        } else {
+                          gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
+                          gradientLocations = [0, 0.5, 1];
+                        }
+
+                        return (
+                          <LinearGradient
+                            colors={gradientColors}
+                            locations={gradientLocations}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={[
+                              styles.progressFill,
+                              { width: `${progressPercent}%` },
+                            ]}
+                          />
+                        );
+                      })()}
+                    </View>
+                    <Text style={styles.progressText}>
+                      {user.total_points || user.points || 0}/
+                      {(() => {
+                        const currentLevel = user.level || 1;
+                        const currentLevelData = LEVEL_TABLE.find(
+                          (l) => l.level === currentLevel
+                        );
+                        return currentLevelData?.required_points || 1250;
+                      })()}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
-        </View>
+        )}
       </View>
-    )}
-  </View>
-)}
-</View> 
 
+      {/* ================= STORIES ================= */}
+      <StoriesBar refreshTrigger={refreshing} />
 
-{/* ↑ This closes headerContainer */}
+      {/* ================= LOADING ================= */}
+      {loading && feedPosts.length === 0 && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4dd0e1" />
+          <Text style={styles.loadingText}>Loading feed...</Text>
+        </View>
+      )}
+    </>
+  ), [user, ownStoryData, unreadCount, refreshing, loading, feedPosts.length, router]);
 
-{/* ================= STORIES ================= */}
-<StoriesBar refreshTrigger={refreshing} />
+  // List Footer Component
+  const ListFooter = useCallback(() => (
+    loadingMore ? (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color="#4dd0e1" />
+      </View>
+    ) : null
+  ), [loadingMore]);
 
-{/* ================= FEED ================= */}
-{loading && feedPosts.length === 0 && (
-<View style={styles.loadingContainer}>
-<ActivityIndicator size="large" color="#4dd0e1" />
-<Text style={styles.loadingText}>Loading feed...</Text>
-</View>
-)}
+  return (
+    <View style={styles.container}>
+      {/* Fixed Line */}
+      {showFixedLine && <View style={styles.fixedLine} />}
 
-{feedPosts.map((post, index) => {
-const isVideo =
-post.media_type === "video" ||
-post.media_url?.toLowerCase().endsWith(".mp4");
+      {/* FlatList */}
+      <FlatList
+        ref={flatListRef}
+        data={feedPosts}
+        keyExtractor={(item, index) => `post-${item.id}-${index}`}
+        renderItem={renderPost}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchFeed(true);
+            }}
+          />
+        }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 90 }}
+        // Android Performance Optimizations
+        removeClippedSubviews={Platform.OS === "android"}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={3}
+        updateCellsBatchingPeriod={50}
+      />
 
-// iOS: Allow playing while scrolling (Instagram-style)
-// Android: Only play when not scrolling
-const shouldPlay = isVideo && visibleVideoId === String(post.id) && 
-  (Platform.OS === 'ios' || !isScrollingRef.current);
-const shouldPreload = isVideo && visibleVideoId === String(post.id);
+      {/* ================= BOTTOM TABS ================= */}
+      <View style={styles.navBar}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/feed")}
+        >
+          <Ionicons name="home" size={20} color="#000" />
+          <Text style={styles.navLabelActive}>Home</Text>
+        </TouchableOpacity>
 
-return (
-<View
-key={`post-${post.id}-${index}`}
-style={styles.postContainer}
-onLayout={(e) => handlePostLayout(String(post.id), e)}
->
-<FeedCard
-  post={post}
-  onLikeUpdate={fetchFeed}
-  onStoryCreated={() => {}}
-  shouldPlay={shouldPlay}
-  shouldPreload={shouldPreload}
-  isMuted={isMuted}
-  onMuteToggle={handleMuteToggle}
-/>
-</View>
-);
-})}
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/explore")}
+        >
+          <Ionicons name="compass-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Explore</Text>
+        </TouchableOpacity>
 
-{/* Load More Indicator */}
-{loadingMore && (
-<View style={styles.loadingContainer}>
-<ActivityIndicator size="small" color="#4dd0e1" />
-</View>
-)}
-</ScrollView>
+        <TouchableOpacity
+          style={styles.centerNavItem}
+          onPress={() => router.push("/leaderboard")}
+        >
+          <View style={styles.centerIconCircle}>
+            <Ionicons name="camera" size={22} color="#000" />
+          </View>
+          <Text style={styles.navLabel}>Top Posts</Text>
+        </TouchableOpacity>
 
-{/* ================= BOTTOM TABS (UPDATED) ================= */}
-<View style={styles.navBar}>
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/feed")}
->
-<Ionicons name="home" size={20} color="#000" />
-<Text style={styles.navLabelActive}>Home</Text>
-</TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/happening")}
+        >
+          <Ionicons name="location-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Happening</Text>
+        </TouchableOpacity>
 
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/explore")}
->
-<Ionicons name="compass-outline" size={20} color="#000" />
-<Text style={styles.navLabel}>Explore</Text>
-</TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/profile")}
+        >
+          <Ionicons name="person-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Profile</Text>
+        </TouchableOpacity>
+      </View>
 
-{/* ✅ ELEVATED CENTER BUTTON */}
-<TouchableOpacity
-style={styles.centerNavItem}
-onPress={() => router.push("/leaderboard")}
->
-<View style={styles.centerIconCircle}>
-<Ionicons name="camera" size={22} color="#000" />
-</View>
-<Text style={styles.navLabel}>Top Posts</Text>
-</TouchableOpacity>
+      {/* Add Post/Story Modal */}
+      <Modal
+        visible={showAddMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAddMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAddMenu(false)}
+        >
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowAddMenu(false);
+                router.push("/add-post");
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="image-outline" size={24} color="#333" />
+              <Text style={styles.menuItemText}>Add Post</Text>
+            </TouchableOpacity>
 
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/happening")}
->
-<Ionicons name="location-outline" size={20} color="#000" />
-<Text style={styles.navLabel}>Happening</Text>
-</TouchableOpacity>
+            <View style={styles.menuDivider} />
 
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/profile")}
->
-<Ionicons name="person-outline" size={20} color="#000" />
-<Text style={styles.navLabel}>Profile</Text>
-</TouchableOpacity>
-</View>
-
-{/* Add Post/Story Menu Modal */}
-<Modal
-visible={showAddMenu}
-transparent={true}
-animationType="fade"
-onRequestClose={() => setShowAddMenu(false)}
->
-<TouchableOpacity
-style={styles.modalOverlay}
-activeOpacity={1}
-onPress={() => setShowAddMenu(false)}
->
-<View style={styles.modalContent}>
-<TouchableOpacity
-style={styles.menuItem}
-onPress={() => {
-setShowAddMenu(false);
-router.push("/add-post");
-}}
-activeOpacity={0.7}
->
-<Ionicons name="image-outline" size={24} color="#333" />
-<Text style={styles.menuItemText}>Add Post</Text>
-</TouchableOpacity>
-
-<View style={styles.menuDivider} />
-
-<TouchableOpacity
-style={styles.menuItem}
-onPress={() => {
-setShowAddMenu(false);
-router.push("/story-upload");
-}}
-activeOpacity={0.7}
->
-<Ionicons name="camera-outline" size={24} color="#333" />
-<Text style={styles.menuItemText}>Add Story</Text>
-</TouchableOpacity>
-</View>
-</TouchableOpacity>
-</Modal>
-</View>
-);
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowAddMenu(false);
+                router.push("/story-upload");
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="camera-outline" size={24} color="#333" />
+              <Text style={styles.menuItemText}>Add Story</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
 }
 
 /* ================= STYLES ================= */
-
 const styles = StyleSheet.create({
-container: {
-flex: 1,
-backgroundColor: "#fff",
-},
-
-// Fixed line below status bar - appears on scroll
-fixedLine: {
-position: "absolute",
-top: 0,
-left: 0,
-right: 0,
-height: 50,
-backgroundColor: "#fff",
-borderBottomWidth: 4,
-borderBottomColor: "#E0E0E0",
-zIndex: 1000,
-shadowColor: "#000",
-shadowOffset: { width: 0, height: 2 },
-shadowOpacity: 0.1,
-shadowRadius: 3,
-elevation: 5,
-},
-
-headerContainer: {
-position: "relative",
-marginBottom: 4,
-},
-
-gradientHeader: {
-paddingTop: 60,
-paddingBottom: 60,
-paddingHorizontal: 20,
-borderBottomLeftRadius: 30,
-borderBottomRightRadius: 30,
-shadowColor: "#000",
-shadowOffset: { width: 4, height: 4 },
-shadowOpacity: 0.15,
-shadowRadius: 8,
-elevation: 6,
-},
-
-headerRow: {
-flexDirection: "row",
-alignItems: "center",
-justifyContent: "space-between",
-},
-
-leftIcon: {
-width: 40,
-height: 40,
-justifyContent: "center",
-alignItems: "center",
-zIndex: 10, // Ensure it's above the title
-},
-
-cofauTitle: {
-position: "absolute",
-left: 0,
-right: 0,
-textAlign: "center",
-fontFamily: "Lobster",
-fontSize: 32,
-color: "#fff",
-letterSpacing: 1,
-zIndex: 3,
-textShadowColor: "rgba(0, 0, 0, 0.15)",
-textShadowOffset: { width: 6, height: 4 },
-textShadowRadius: 4,
-pointerEvents: "none", // Don't block touch events
-},
-
-headerIcons: {
-flexDirection: "row",
-gap: 20,
-zIndex: 10, // Ensure it's above the title
-},
-
-badge: {
-position: "absolute",
-top: -4,
-right: -4,
-backgroundColor: "#FF4444",
-borderRadius: 10,
-minWidth: 20,
-height: 20,
-alignItems: "center",
-justifyContent: "center",
-paddingHorizontal: 4,
-},
-
-badgeText: {
-color: "#fff",
-fontSize: 11,
-fontWeight: "700",
-},
-
-levelCardWrapper: {
-marginHorizontal: 20,
-marginTop: -40,
-marginBottom: 3,
-borderRadius: 25,
-overflow: 'hidden',
-zIndex: 10,
-// Add subtle border
-borderWidth: 1,
-borderColor: 'rgba(255, 255, 255, 0.9)',
-// Shadow for depth
-shadowColor: "#000",
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.15,
-shadowRadius: 8,
-elevation: 8,
-},
-
-levelCard: {
-borderRadius: 25,
-paddingVertical: 22,
-paddingLeft: 90,
-paddingRight: 25,
-flexDirection: "row",
-alignItems: "center",
-position: "relative",
-backgroundColor: 'rgba(255, 255, 255, 0.95)',
-// Inner subtle border
-borderWidth: 1,
-borderColor: 'rgba(200, 200, 200, 0.3)',
-},
-
-levelCardAndroid: {
-backgroundColor: 'rgba(255, 255, 255, 0.9)',
-},
-
-dpContainer: {
-position: "absolute",
-left: 10,
-top: "133%",
-transform: [{ translateY: -40 }],
-zIndex: 6,
-},
-
-dpAddButton: {
-position: "absolute",
-bottom: 0,
-right: 0,
-width: 26,
-height: 26,
-borderRadius: 13,
-backgroundColor: "#f2f4f5ff",
-justifyContent: "center",
-alignItems: "center",
-borderWidth: 0.5,
-borderColor: "#050202ff",
-},
-
-levelContent: {
-flex: 1,
-},
-
-levelLabel: {
-fontSize: 12,
-fontWeight: "700",
-color: "#333",
-marginBottom: 2,
-},
-
-progressContainer: {
-flexDirection: "row",
-alignItems: "center",
-gap: 5,
-},
-
-progressBar: {
-flex: 1,
-height: 8,
-backgroundColor: "#E8E8E8",
-borderRadius: 6,
-overflow: "hidden",
-},
-
-progressFill: {
-height: "100%",
-borderRadius: 4,
-},
-
-progressText: {
-fontSize: 12,
-color: "rgba(10, 10, 10, 1)",
-fontWeight: "600",
-},
-
-loadingContainer: {
-padding: 40,
-alignItems: "center",
-},
-
-loadingText: {
-marginTop: 22,
-color: "#d51010ff",
-},
-
-postContainer: {
-marginBottom: -4,
-},
-
-navBar: {
-flexDirection: "row",
-justifyContent: "space-around",
-alignItems: "center",
-paddingVertical: 8,
-paddingTop: 6,
-borderTopWidth: 1,
-borderTopColor: "#E8E8E8",
-backgroundColor: "#FFFFFF",
-position: "absolute",
-bottom: 0,
-left: 0,
-right: 0,
-elevation: 8,
-shadowColor: "#f7f3f3ff",
-shadowOffset: { width: 0, height: -2 },
-shadowOpacity: 0.08,
-shadowRadius: 4,
-},
-dpGradientRing: {
-  width: 72,
-  height: 72,
-  borderRadius: 34,
-  padding: 4,
-  justifyContent: "center",
-  alignItems: "center",
-},
-
-dpWhiteRing: {
-  width: 68,
-  height: 68,
-  borderRadius: 35,
-  backgroundColor: "#FFF",
-  justifyContent: "center",
-  alignItems: "center",
-},
-
-navItem: {
-alignItems: "center",
-justifyContent: "center",
-paddingVertical: 8,
-paddingHorizontal: 12,
-},
-
-// ✅ Center elevated item
-centerNavItem: {
-alignItems: "center",
-justifyContent: "center",
-paddingVertical: 8,
-paddingHorizontal: 12,
-marginTop: -30,
-},
-
-// ✅ Circle background for center icon
-centerIconCircle: {
-width: 50,
-height: 50,
-borderRadius: 28,
-backgroundColor: "#FFFFFF",
-borderWidth: 2,
-borderColor: "#000",
-justifyContent: "center",
-alignItems: "center",
-marginBottom: 2,
-elevation: 8,
-shadowColor: "#f0ebebff",
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.3,
-shadowRadius: 6,
-},
-
-navLabel: {
-fontSize: 11,
-color: "#000",
-marginTop: 2,
-textAlign: "center",
-fontWeight: "500",
-},
-
-navLabelActive: {
-fontSize: 11,
-color: "#000",
-marginTop: 2,
-textAlign: "center",
-fontWeight: "700",
-},
-
-// Modal styles
-modalOverlay: {
-flex: 1,
-backgroundColor: "rgba(0, 0, 0, 0.5)",
-justifyContent: "center",
-alignItems: "center",
-},
-
-modalContent: {
-backgroundColor: "#fff",
-borderRadius: 20,
-paddingVertical: 10,
-minWidth: 200,
-shadowColor: "#000",
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.3,
-shadowRadius: 8,
-elevation: 8,
-},
-
-menuItem: {
-flexDirection: "row",
-alignItems: "center",
-paddingVertical: 16,
-paddingHorizontal: 24,
-gap: 16,
-},
-
-menuItemText: {
-fontSize: 16,
-color: "#333",
-fontWeight: "600",
-},
-
-menuDivider: {
-height: 1,
-backgroundColor: "#E8E8E8",
-marginHorizontal: 10,
-},
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  fixedLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: "#fff",
+    borderBottomWidth: 4,
+    borderBottomColor: "#E0E0E0",
+    zIndex: 1000,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  headerContainer: {
+    position: "relative",
+    marginBottom: 4,
+  },
+  gradientHeader: {
+    paddingTop: 60,
+    paddingBottom: 60,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  leftIcon: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  cofauTitle: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    fontFamily: "Lobster",
+    fontSize: 32,
+    color: "#fff",
+    letterSpacing: 1,
+    zIndex: 3,
+    textShadowColor: "rgba(0, 0, 0, 0.15)",
+    textShadowOffset: { width: 6, height: 4 },
+    textShadowRadius: 4,
+    pointerEvents: "none",
+  },
+  headerIcons: {
+    flexDirection: "row",
+    gap: 20,
+    zIndex: 10,
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#FF4444",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  levelCardWrapper: {
+    marginHorizontal: 20,
+    marginTop: -40,
+    marginBottom: 3,
+    borderRadius: 25,
+    overflow: "hidden",
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.9)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  levelCard: {
+    borderRadius: 25,
+    paddingVertical: 22,
+    paddingLeft: 90,
+    paddingRight: 25,
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderWidth: 1,
+    borderColor: "rgba(200, 200, 200, 0.3)",
+  },
+  levelCardAndroid: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+  },
+  dpContainer: {
+    position: "absolute",
+    left: 10,
+    top: "133%",
+    transform: [{ translateY: -40 }],
+    zIndex: 6,
+  },
+  dpAddButton: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#f2f4f5ff",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 0.5,
+    borderColor: "#050202ff",
+  },
+  dpGradientRing: {
+    width: 72,
+    height: 72,
+    borderRadius: 34,
+    padding: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dpWhiteRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 35,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  levelContent: {
+    flex: 1,
+  },
+  levelLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 2,
+  },
+  progressContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  progressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: "#E8E8E8",
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 12,
+    color: "rgba(10, 10, 10, 1)",
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 22,
+    color: "#d51010ff",
+  },
+  postContainer: {
+    marginBottom: -4,
+  },
+  navBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#E8E8E8",
+    backgroundColor: "#FFFFFF",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    elevation: 8,
+    shadowColor: "#f7f3f3ff",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  navItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  centerNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -30,
+  },
+  centerIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+    elevation: 8,
+    shadowColor: "#f0ebebff",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  navLabel: {
+    fontSize: 11,
+    color: "#000",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  navLabelActive: {
+    fontSize: 11,
+    color: "#000",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingVertical: 10,
+    minWidth: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    gap: 16,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "600",
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: "#E8E8E8",
+    marginHorizontal: 10,
+  },
 });

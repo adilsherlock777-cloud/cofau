@@ -18,7 +18,6 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Video, ResizeMode } from 'expo-av';
 import axios from 'axios';
-import Constants from 'expo-constants';
 import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
 import { normalizeStoryUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
@@ -38,7 +37,7 @@ export default function StoryViewerScreen() {
   const [stories, setStories] = useState<any[]>([]);
   const [storyUser, setStoryUser] = useState<any>(null);
   const [paused, setPaused] = useState(false);
-  const [actualMediaType, setActualMediaType] = useState<"video" | "image" | null>(null); // Track actual working media type
+  const [actualMediaType, setActualMediaType] = useState<"video" | "image" | null>(null);
   const [viewCount, setViewCount] = useState(0);
   const [viewers, setViewers] = useState<any[]>([]);
   const [viewedStories, setViewedStories] = useState(new Set<string>());
@@ -49,6 +48,16 @@ export default function StoryViewerScreen() {
 
   const progressAnims = useRef<any[]>([]);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
+  const [contentLayout, setContentLayout] = useState({ width: 0, height: 0, y: 0 });
+
+  // Helper function to detect video content
+  const isVideoContent = (story: any) => {
+    if (!story) return false;
+    if (actualMediaType === "video") return true;
+    if (story.media_type === "video") return true;
+    const url = story.media_url?.toLowerCase() || '';
+    return url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') || url.endsWith('.avi');
+  };
 
   /* ----------------------------------------------------------
      LOAD STORIES FROM PARAMS
@@ -63,19 +72,15 @@ export default function StoryViewerScreen() {
       console.log("📦 Parsed stories:", parsedStories.length);
       console.log("👤 Parsed user:", parsedUser.username);
 
-      // Normalize media URLs and ensure media_type is set
       const fixedStories = parsedStories.map((s: any, idx: number) => {
         const fixedUrl = normalizeStoryUrl(s.media_url);
 
-        // Better media type detection
         let mediaType = s.media_type;
         if (!mediaType && fixedUrl) {
           const urlLower = fixedUrl.toLowerCase();
-          // Check for video extensions
           if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.avi') || urlLower.endsWith('.webm')) {
             mediaType = 'video';
           } else {
-            // Default to image for jpeg, jpg, png, webp, gif
             mediaType = 'image';
           }
         }
@@ -86,18 +91,16 @@ export default function StoryViewerScreen() {
           media_type: mediaType,
         });
 
-        // Calculate story length if not provided (5s for images, 30s for videos)
         const storyLength = s.story_length || (mediaType === 'video' ? 30 : 5);
 
         return {
           ...s,
           media_url: fixedUrl,
-          media_type: mediaType || 'image', // Default to image if still unknown
+          media_type: mediaType || 'image',
           story_length: storyLength,
         };
       });
 
-      // Fix DP
       const fixedUser = {
         ...parsedUser,
         profile_picture: normalizeProfilePicture(parsedUser.profile_picture),
@@ -106,7 +109,6 @@ export default function StoryViewerScreen() {
       setStories(fixedStories);
       setStoryUser(fixedUser);
 
-      // Create progress bars
       progressAnims.current = [];
       fixedStories.forEach(() => {
         progressAnims.current.push(new Animated.Value(0));
@@ -121,24 +123,19 @@ export default function StoryViewerScreen() {
      AUTO ADVANCE STORY
   -----------------------------------------------------------*/
   useEffect(() => {
-    // Reset media type and loading state when story changes
     if (stories[currentIndex]) {
       setActualMediaType(stories[currentIndex].media_type);
       setMediaLoading(true);
       setMediaError(false);
-      // Load view count for current story
       loadStoryViews(stories[currentIndex].id);
-      // Mark story as viewed if not already viewed
       if (!viewedStories.has(stories[currentIndex].id)) {
         markStoryAsViewed(stories[currentIndex].id);
       }
     }
 
-    // Only start progress when media is loaded and not paused
     if (stories.length > 0 && !paused && !mediaLoading && !mediaError) {
       startProgress();
     } else if (paused) {
-      // Stop timer when paused
       if (autoAdvanceTimer.current) {
         clearTimeout(autoAdvanceTimer.current);
       }
@@ -156,7 +153,6 @@ export default function StoryViewerScreen() {
     try {
       await markStoryViewed(storyId);
       setViewedStories(prev => new Set([...prev, storyId]));
-      // Reload view count after marking as viewed
       loadStoryViews(storyId);
     } catch (error) {
       console.error('❌ Error marking story as viewed:', error);
@@ -184,15 +180,12 @@ export default function StoryViewerScreen() {
     const currentStory = stories[currentIndex];
     if (!currentStory || mediaLoading || mediaError) return;
 
-    // Clear any existing timer
     if (autoAdvanceTimer.current) {
       clearTimeout(autoAdvanceTimer.current);
     }
 
-    const duration =
-      (actualMediaType || currentStory.media_type) === "video" ? 30000 : 5000;
+    const duration = isVideoContent(currentStory) ? 10000 : 5000;
 
-    // Reset progress bar
     progressAnims.current[currentIndex].setValue(0);
 
     Animated.timing(progressAnims.current[currentIndex], {
@@ -384,128 +377,191 @@ export default function StoryViewerScreen() {
       </View>
 
       {/* Story Media with Blurred Background */}
-<View style={styles.contentContainer}>
-  {/* Blurred Background */}
-  <Image
-    source={{ uri: currentStory.media_url }}
-    style={styles.blurredBackground}
-    blurRadius={25}
-  />
+      <View style={styles.contentContainer}>
+        {/* Blurred Background */}
+        {!isVideoContent(currentStory) && (
+          <Image
+            source={{ uri: currentStory.media_url }}
+            style={styles.blurredBackground}
+            blurRadius={25}
+          />
+        )}
+        {isVideoContent(currentStory) && (
+          <View style={[styles.blurredBackground, { backgroundColor: '#000' }]} />
+        )}
 
-  {mediaError && (
-    <View style={styles.errorContainer}>
-      <Ionicons name="alert-circle" size={48} color="#FFF" />
-      <Text style={styles.errorText}>Failed to load story</Text>
+        {mediaError && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={48} color="#FFF" />
+            <Text style={styles.errorText}>Failed to load story</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                setMediaError(false);
+                setMediaLoading(true);
+                setActualMediaType(currentStory.media_type);
+              }}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!mediaError && isVideoContent(currentStory) ? (
+          <Video
+            key={`video-${currentStory.id}-${currentIndex}`}
+            source={{ 
+              uri: currentStory.media_url,
+              headers: {
+                'Accept': 'video/mp4, video/quicktime, video/*',
+              }
+            }}
+            style={styles.storyVideo}
+            shouldPlay={!paused}
+            resizeMode={ResizeMode.CONTAIN}
+            isMuted={false}
+            volume={1.0}
+            onError={(error) => {
+              console.error("❌ Video playback error:", error);
+              if (autoAdvanceTimer.current) {
+                clearTimeout(autoAdvanceTimer.current);
+              }
+              setMediaError(true);
+              setMediaLoading(false);
+            }}
+            onLoadStart={() => {
+              console.log("📹 Video loading:", currentStory.media_url);
+              setMediaLoading(true);
+              setMediaError(false);
+              if (autoAdvanceTimer.current) {
+                clearTimeout(autoAdvanceTimer.current);
+              }
+            }}
+            onLoad={(event) => {
+  console.log("✅ Image loaded successfully");
+  setActualMediaType("image");
+  setMediaLoading(false);
+  setMediaError(false);
+  
+  // Calculate actual rendered size
+  const { width: imgWidth, height: imgHeight } = event.nativeEvent.source;
+  const containerWidth = SCREEN_WIDTH;
+  const containerHeight = SCREEN_HEIGHT - 150;
+  
+  const imageRatio = imgWidth / imgHeight;
+  const containerRatio = containerWidth / containerHeight;
+  
+  let renderedHeight;
+  if (imageRatio > containerRatio) {
+    // Image is wider - width fills container
+    renderedHeight = containerWidth / imageRatio;
+  } else {
+    // Image is taller - height fills container
+    renderedHeight = containerHeight;
+  }
+  
+  const yPosition = (containerHeight - renderedHeight) / 2;
+  setContentLayout({ 
+    width: containerWidth, 
+    height: renderedHeight, 
+    y: yPosition 
+  });
+  
+  if (!paused) {
+    startProgress();
+  }
+}}
+            onPlaybackStatusUpdate={(status) => {
+  if (status.isLoaded) {
+    // Auto-advance after 10 seconds
+    if (status.positionMillis >= 10000) {
+      handleNext();
+    }
+    // Also handle if video naturally finishes before 10 seconds
+    if (status.didJustFinish) {
+      handleNext();
+    }
+  }
+}}
+
+onReadyForDisplay={(event) => {
+  const { width: vidWidth, height: vidHeight } = event.naturalSize;
+  const containerWidth = SCREEN_WIDTH;
+  const containerHeight = SCREEN_HEIGHT - 150;
+  
+  const videoRatio = vidWidth / vidHeight;
+  const containerRatio = containerWidth / containerHeight;
+  
+  let renderedHeight;
+  if (videoRatio > containerRatio) {
+    renderedHeight = containerWidth / videoRatio;
+  } else {
+    renderedHeight = containerHeight;
+  }
+  
+  const yPosition = (containerHeight - renderedHeight) / 2;
+  setContentLayout({ 
+    width: containerWidth, 
+    height: renderedHeight, 
+    y: yPosition 
+  });
+}}
+          />
+        ) : (
+          !mediaError && !isVideoContent(currentStory) && (
+            <Image
+              key={`image-${currentStory.id}-${currentIndex}`}
+              source={{ uri: currentStory.media_url }}
+              style={styles.storyImage}
+              resizeMode="contain"
+              onError={(error) => {
+                console.error("❌ Image load error:", error);
+                if (autoAdvanceTimer.current) {
+                  clearTimeout(autoAdvanceTimer.current);
+                }
+                setMediaError(true);
+                setMediaLoading(false);
+              }}
+              onLoadStart={() => {
+                console.log("🖼️ Image loading:", currentStory.media_url);
+                setMediaLoading(true);
+                setMediaError(false);
+                if (autoAdvanceTimer.current) {
+                  clearTimeout(autoAdvanceTimer.current);
+                }
+              }}
+              onLoad={() => {
+                console.log("✅ Image loaded successfully");
+                setActualMediaType("image");
+                setMediaLoading(false);
+                setMediaError(false);
+                if (!paused) {
+                  startProgress();
+                }
+              }}
+            />
+          )
+        )}
+
+        {/* COFAU Watermark */}
+        <Text style={[
+  styles.watermark,
+  contentLayout.height > 0 && {
+    bottom: undefined,
+    top: contentLayout.y + contentLayout.height - 50, // 50px from bottom of content
+  }
+]}>COFAU</Text>
+      </View>
+
+      {/* Bottom Eye Icon with View Count */}
       <TouchableOpacity
-        style={styles.retryButton}
-        onPress={() => {
-          setMediaError(false);
-          setMediaLoading(true);
-          setActualMediaType(currentStory.media_type);
-        }}
+        style={styles.eyeIconContainer}
+        onPress={() => setShowViewersModal(true)}
+        activeOpacity={0.7}
       >
-        <Text style={styles.retryButtonText}>Retry</Text>
+        <Ionicons name="eye" size={20} color="#FFF" />
+        <Text style={styles.eyeIconText}>{viewCount}</Text>
       </TouchableOpacity>
-    </View>
-  )}
-
-  {!mediaError && (actualMediaType || currentStory.media_type) === "video" ? (
-    <Video
-      key={`video-${currentStory.id}-${currentIndex}`}
-      source={{ uri: currentStory.media_url }}
-      style={styles.storyVideo}
-      shouldPlay={!paused}
-      resizeMode={ResizeMode.COVER}
-      isLooping={false}
-      useNativeControls={false}
-      onError={(error) => {
-        console.error("❌ Video playback error:", error);
-        if (autoAdvanceTimer.current) {
-          clearTimeout(autoAdvanceTimer.current);
-        }
-        setMediaError(true);
-        setMediaLoading(false);
-        console.log("🔄 Trying as image instead...");
-        setActualMediaType("image");
-        setMediaLoading(true);
-      }}
-      onLoadStart={() => {
-        console.log("📹 Video loading:", currentStory.media_url);
-        setMediaLoading(true);
-        setMediaError(false);
-        if (autoAdvanceTimer.current) {
-          clearTimeout(autoAdvanceTimer.current);
-        }
-      }}
-      onLoad={() => {
-        console.log("✅ Video loaded successfully");
-        setActualMediaType("video");
-        setMediaLoading(false);
-        setMediaError(false);
-        if (!paused) {
-          startProgress();
-        }
-      }}
-      onPlaybackStatusUpdate={(status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          handleNext();
-        }
-      }}
-    />
-  ) : (
-    !mediaError && (
-      <Image
-        key={`image-${currentStory.id}-${currentIndex}`}
-        source={{ uri: currentStory.media_url }}
-        style={styles.storyImage}
-        resizeMode="contain"
-        onError={(error) => {
-          console.error("❌ Image load error:", error);
-          if (autoAdvanceTimer.current) {
-            clearTimeout(autoAdvanceTimer.current);
-          }
-          setMediaError(true);
-          setMediaLoading(false);
-          console.log("🔄 Trying as video instead...");
-          setActualMediaType("video");
-          setMediaLoading(true);
-        }}
-        onLoadStart={() => {
-          console.log("🖼️ Image loading:", currentStory.media_url);
-          setMediaLoading(true);
-          setMediaError(false);
-          if (autoAdvanceTimer.current) {
-            clearTimeout(autoAdvanceTimer.current);
-          }
-        }}
-        onLoad={() => {
-          console.log("✅ Image loaded successfully");
-          setActualMediaType("image");
-          setMediaLoading(false);
-          setMediaError(false);
-          if (!paused) {
-            startProgress();
-          }
-        }}
-      />
-    )
-  )}
-
-  {/* COFAU Watermark */}
-  <Text style={styles.watermark}>COFAU</Text>
-</View>
-
-      {/* Bottom Eye Icon with View Count and Story Length */}
-      {/* {isOwner && ( */}
-        <TouchableOpacity
-  style={styles.eyeIconContainer}
-  onPress={() => setShowViewersModal(true)}
-  activeOpacity={0.7}
->
-  <Ionicons name="eye" size={20} color="#FFF" />
-  <Text style={styles.eyeIconText}>{viewCount}</Text>
-</TouchableOpacity>
-      {/* )} */}
 
       {/* Tap zones */}
       <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
@@ -614,18 +670,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
   },
-
   blurredBackground: {
+    position: 'absolute',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    top: 0,
+    left: 0,
+  },
+ watermark: {
   position: 'absolute',
-  width: SCREEN_WIDTH,
-  height: SCREEN_HEIGHT,
-  top: 0,
-  left: 0,
-},
-
-watermark: {
-  position: 'absolute',
-  bottom: SCREEN_HEIGHT * 0.21,
+  bottom: SCREEN_HEIGHT * 0.19, // fallback
   right: 30,
   fontSize: 18,
   fontWeight: '700',
@@ -644,7 +698,7 @@ watermark: {
   headerButton: { padding: 4 },
   contentContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   storyImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
-  storyVideo: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
+  storyVideo: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150, backgroundColor: '#000' },
   errorContainer: {
     position: "absolute",
     width: SCREEN_WIDTH,
@@ -753,43 +807,23 @@ watermark: {
     color: '#999',
   },
   eyeIconContainer: {
-  position: 'absolute',
-  bottom: 30,
-  alignSelf: 'center',
-  paddingHorizontal: 16,
-  paddingVertical: 8,
-  borderRadius: 20,
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 6,
-  zIndex: 10,
-},
-
-eyeIconText: {
-  color: '#FFF',
-  fontSize: 14,
-  fontWeight: '600',
-},
+    position: 'absolute',
+    bottom: 30,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 10,
+  },
   eyeIconText: {
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
   },
-
- storyImage: { 
-  width: SCREEN_WIDTH * 0.92,
-  height: SCREEN_HEIGHT * 0.60,
-  borderRadius: 32,
-  zIndex: 2,
-},
-
-storyVideo: { 
-  width: SCREEN_WIDTH * 0.92,
-  height: SCREEN_HEIGHT * 0.60,
-  borderRadius: 24,
-  zIndex: 2,
-},
   storyLengthText: {
     color: '#FFF',
     fontSize: 14,
