@@ -385,7 +385,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                     styles.responsiveMedia,
                     videoLoaded && shouldPlay && styles.hiddenImage
                   ] as any}
-                  contentFit="cover"
+                  contentFit="contain"
                   onError={() => {
                     console.error("❌ Thumbnail error in post details");
                     setThumbnailError(true);
@@ -409,7 +409,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                     styles.responsiveMedia,
                     !videoLoaded && styles.hiddenVideo
                   ]}
-                  resizeMode={ResizeMode.COVER}
+                  resizeMode={ResizeMode.CONTAIN}
                   shouldPlay={shouldPlay}
                   isLooping
                   isMuted={isMuted}
@@ -550,7 +550,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                 <View style={styles.muteIndicatorReels}>
                   <Ionicons 
                     name={isMuted ? "volume-mute" : "volume-high"} 
-                    size={24} 
+                    size={18} 
                     color="rgba(255,255,255,0.9)" 
                   />
                 </View>
@@ -940,45 +940,107 @@ export default function PostDetailsScreen() {
     if (postId && token) loadInitialPost();
   }, [postId, token]);
 
-  const loadInitialPost = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(`${API_URL}/feed?skip=0`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+const loadInitialPost = async () => {
+  try {
+    setLoading(true);
+    
+    // ✅ SOLUTION: Fetch ONLY the single post first
+    const singlePostRes = await axios.get(`${API_URL}/posts/${postId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    const singlePost = {
+      ...singlePostRes.data,
+      media_url: normalizeUrl(singlePostRes.data.media_url),
+      image_url: normalizeUrl(singlePostRes.data.image_url || singlePostRes.data.media_url),
+      thumbnail_url: normalizeUrl(singlePostRes.data.thumbnail_url),
+      user_profile_picture: normalizeUrl(singlePostRes.data.user_profile_picture),
+    };
+    
+    // Set the single post immediately - FAST LOAD!
+    setPosts([singlePost]);
+    setInitialPostIndex(0);
+    setCurrentVisiblePost(singlePost);
+    setVisiblePostId(singlePost.id);
+    setLoading(false);  // Stop loading immediately
+    
+    // ✅ Load more posts in the BACKGROUND for scrolling
+    loadMorePostsInBackground();
+    
+  } catch (e) {
+    console.log("❌ Post fetch error", e);
+    
+    // Fallback: If single post endpoint doesn't exist, use old method
+    loadInitialPostFallback();
+  }
+};
 
-      const currentIndex = res.data.findIndex((p: any) => p.id === postId);
-      if (currentIndex === -1) {
-        Alert.alert("Error", "Post not found");
-        router.back();
-        return;
-      }
+// Background loading for smooth scrolling experience
+const loadMorePostsInBackground = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/feed?limit=${LIMIT}&skip=0`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      const normalized = res.data.map((p: any) => ({
-        ...p,
-        media_url: normalizeUrl(p.media_url),
-        image_url: normalizeUrl(p.image_url || p.media_url),
-        thumbnail_url: normalizeUrl(p.thumbnail_url),
-        user_profile_picture: normalizeUrl(p.user_profile_picture),
-      }));
+    const normalized = res.data.map((p: any) => ({
+      ...p,
+      media_url: normalizeUrl(p.media_url),
+      image_url: normalizeUrl(p.image_url || p.media_url),
+      thumbnail_url: normalizeUrl(p.thumbnail_url),
+      user_profile_picture: normalizeUrl(p.user_profile_picture),
+    }));
 
-      const postsFromCurrent = normalized.slice(currentIndex);
-      setPosts(postsFromCurrent);
-      setInitialPostIndex(0);
-      setCurrentVisiblePost(postsFromCurrent[0]);
-      setVisiblePostId(postsFromCurrent[0]?.id || postId);
-      setSkip(postsFromCurrent.length);
+    // Add posts that aren't the current one
+    const otherPosts = normalized.filter((p: any) => p.id !== postId);
+    
+    setPosts(prev => {
+      const existingIds = new Set(prev.map(p => p.id));
+      const newPosts = otherPosts.filter((p: any) => !existingIds.has(p.id));
+      return [...prev, ...newPosts];
+    });
+    
+    setSkip(LIMIT);
+  } catch (e) {
+    console.log("Background load error", e);
+  }
+};
 
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({ index: 0, animated: false });
-      }, 100);
-    } catch (e) {
-      console.log("❌ Post fetch error", e);
-      Alert.alert("Error", "Unable to load post");
-    } finally {
-      setLoading(false);
+// Fallback if single post endpoint doesn't exist
+const loadInitialPostFallback = async () => {
+  try {
+    setLoading(true);
+    const res = await axios.get(`${API_URL}/feed?skip=0`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const currentIndex = res.data.findIndex((p: any) => p.id === postId);
+    if (currentIndex === -1) {
+      Alert.alert("Error", "Post not found");
+      router.back();
+      return;
     }
-  };
+
+    const normalized = res.data.map((p: any) => ({
+      ...p,
+      media_url: normalizeUrl(p.media_url),
+      image_url: normalizeUrl(p.image_url || p.media_url),
+      thumbnail_url: normalizeUrl(p.thumbnail_url),
+      user_profile_picture: normalizeUrl(p.user_profile_picture),
+    }));
+
+    const postsFromCurrent = normalized.slice(currentIndex);
+    setPosts(postsFromCurrent);
+    setInitialPostIndex(0);
+    setCurrentVisiblePost(postsFromCurrent[0]);
+    setVisiblePostId(postsFromCurrent[0]?.id || postId);
+    setSkip(postsFromCurrent.length);
+  } catch (e) {
+    console.log("❌ Fallback fetch error", e);
+    Alert.alert("Error", "Unable to load post");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const loadMorePosts = async () => {
     if (loadingMore || !hasMore) return;
@@ -1099,26 +1161,34 @@ const styles = StyleSheet.create({
   },
 
   postItem: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    backgroundColor: "#000",
-  },
+  width: SCREEN_WIDTH,
+  height: SCREEN_HEIGHT,
+  backgroundColor: "#000",
+  position: "relative",
+},
 
   responsiveMediaContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    backgroundColor: "#000",
-    position: "relative",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  width: SCREEN_WIDTH,
+  height: SCREEN_HEIGHT,
+  backgroundColor: "#000",
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: "center",
+  alignItems: "center",
+},
 
   mediaWrapper: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: "center",
+  alignItems: "center",
+},
 
   responsiveMedia: {
     width: "100%",
@@ -1127,37 +1197,38 @@ const styles = StyleSheet.create({
 
   muteIndicatorReels: {
     position: "absolute",
-    top: 100,
-    right: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderRadius: 20,
-    padding: 8,
+    top: 140,  // Moved to bottom (above the glass overlay)
+    right: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 18,
+    padding: 6,
     zIndex: 50,
+    padding: 6,
+    width: 36,    // Fixed size
+    height: 36,   // Fixed size
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   /* Top User Info Bar */
   topUserInfoBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: Platform.OS === "ios" ? 50 : 40,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    zIndex: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+  position: "absolute",
+  top: Platform.OS === "ios" ? 50 : 30,  // Just the status bar offset
+  left: 0,
+  right: 0,
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  paddingHorizontal: 12,
+  paddingVertical: 46,
+  zIndex: 10,
+  backgroundColor: "transparent",
+},
 
-  backButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: 8,
-    marginRight: 12,
-  },
-
+backButton: {
+  padding: 8,
+  marginRight: 8,
+},
   topUserRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1175,37 +1246,43 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  topFollowButton: {
-    backgroundColor: "#4dd0e1",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
+topFollowButton: {
+  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  paddingHorizontal: 12,
+  paddingVertical: 2.5,
+  borderRadius: 6,
+  borderWidth: 1,
+  borderColor: '#fff',
+},
 
-  topFollowButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
+topFollowButtonText: {
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: '600',
+},
 
   topUsername: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFF",
-  },
+  fontSize: 14,
+  fontWeight: "600",
+  color: "#FFF",
+  textShadowColor: 'rgba(0, 0, 0, 0.75)',
+  textShadowOffset: { width: 1, height: 1 },
+  textShadowRadius: 3,
+},
 
-  topTimestamp: {
-    fontSize: 11,
-    color: "rgba(255, 255, 255, 0.9)",
-    marginTop: 2,
-  },
+topTimestamp: {
+  fontSize: 11,
+  color: "rgba(255, 255, 255, 0.9)",
+  marginTop: 2,
+  textShadowColor: 'rgba(0, 0, 0, 0.75)',
+  textShadowOffset: { width: 1, height: 1 },
+  textShadowRadius: 3,
+},
+ 
 
-  optionsButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: 8,
-    marginLeft: 12,
-  },
+optionsButton: {
+  padding: 8,
+},
 
   optionsMenuBackdrop: {
     position: "absolute",

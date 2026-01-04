@@ -2384,7 +2384,7 @@ favouriteGridImage: {
   reviewerBadgeContainer: {
     position: 'absolute',
     right: 16,
-    top: '50%',
+    top: '100%',
     transform: [{ translateY: -40 }],
     alignItems: 'center',
   },
@@ -2539,7 +2539,7 @@ profileCardAndroid: {
 
   actionButtonsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 70,
+    paddingHorizontal: 20,
     gap: 16,
     marginBottom: 8,
   },
