@@ -3,12 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
   TextInput,
   Modal,
+  FlatList,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -27,14 +29,21 @@ const API_BASE_URL =
 const API_URL = `${API_BASE_URL}/api`;
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const NUM_COLUMNS = 3;
 const SPACING = 2;
-const TILE_SIZE = (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
+
+// 3-Column Layout Dimensions
+const NUM_COLUMNS = 3;
+const COLUMN_WIDTH = (SCREEN_WIDTH - SPACING * 3) / NUM_COLUMNS;
+
+// Tile Heights
+const SQUARE_HEIGHT = COLUMN_WIDTH;
+const VERTICAL_HEIGHT = COLUMN_WIDTH * 1.5;
+const SMALL_HEIGHT = COLUMN_WIDTH * 0.75;
 
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
 // ------------------------------------------------------------
-// 🔥 UNIVERSAL URL FIXER (same as FeedCard & Stories)
+// 🔥 UNIVERSAL URL FIXER
 // ------------------------------------------------------------
 const fixUrl = (url: string | null) => {
   if (!url) return null;
@@ -49,7 +58,6 @@ const fixUrl = (url: string | null) => {
 
 // ------------------------------------------------------------
 // 🔥 UNIVERSAL VIDEO CHECKER
-// Backend may store MOV, MP4, MKV, no extension, etc.
 // ------------------------------------------------------------
 const isVideoFile = (url: string, media_type: string) => {
   if (media_type === "video") return true;
@@ -66,13 +74,39 @@ const isVideoFile = (url: string, media_type: string) => {
 };
 
 // ------------------------------------------------------------
-// 🔥 GRADIENT HEART COMPONENT (Cofau Theme)
+// 🔥 Calculate tile height based on aspect ratio and type
+// ------------------------------------------------------------
+const getTileHeight = (post: any) => {
+  const isVideo = post._isVideo;
+  const aspectRatio = post.aspect_ratio || (isVideo ? 0.5625 : 1);
+
+  if (isVideo) {
+    if (aspectRatio <= 0.6) {
+      return VERTICAL_HEIGHT;
+    } else if (aspectRatio <= 0.8) {
+      return COLUMN_WIDTH * 1.25;
+    } else {
+      return SQUARE_HEIGHT;
+    }
+  } else {
+    if (aspectRatio < 0.8) {
+      return VERTICAL_HEIGHT;
+    } else if (aspectRatio > 1.2) {
+      return SMALL_HEIGHT;
+    } else {
+      return SQUARE_HEIGHT;
+    }
+  }
+};
+
+// ------------------------------------------------------------
+// 🔥 GRADIENT HEART COMPONENT
 // ------------------------------------------------------------
 const GradientHeart = ({ size = 18 }) => {
   return (
     <MaskedView
       maskElement={
-        <View style={{ backgroundColor: 'transparent' }}>
+        <View style={{ backgroundColor: "transparent" }}>
           <Ionicons name="heart" size={size} color="#000" />
         </View>
       }
@@ -84,6 +118,86 @@ const GradientHeart = ({ size = 18 }) => {
         style={{ width: size, height: size }}
       />
     </MaskedView>
+  );
+};
+
+// ------------------------------------------------------------
+// 🔥 MASONRY LAYOUT HELPER
+// ------------------------------------------------------------
+const distributePosts = (posts: any[]) => {
+  const columns: any[][] = [[], [], []];
+  const heights = [0, 0, 0];
+
+  posts.forEach((post) => {
+    const height = getTileHeight(post);
+    const shortestIndex = heights.indexOf(Math.min(...heights));
+    columns[shortestIndex].push({ ...post, tileHeight: height });
+    heights[shortestIndex] += height + SPACING;
+  });
+
+  return columns;
+};
+
+// =======================
+//  GRID TILE COMPONENT
+// =======================
+const GridTile = ({ item, onPress, onLike }: any) => {
+  const displayImg = item._isVideo
+    ? item.full_thumbnail_url || item.full_image_url
+    : item.full_image_url;
+
+  return (
+    <TouchableOpacity
+      style={[styles.tile, { height: item.tileHeight }]}
+      activeOpacity={0.9}
+      onPress={() => onPress(item.id)}
+    >
+      {displayImg ? (
+        <Image
+          source={{ uri: displayImg }}
+          style={styles.tileImage}
+          placeholder={{ blurhash: BLUR_HASH }}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          transition={200}
+        />
+      ) : (
+        <View style={[styles.tileImage, styles.placeholderImage]}>
+          <Ionicons name="image-outline" size={32} color="#ccc" />
+        </View>
+      )}
+
+      {item._isVideo && (
+        <View style={styles.playIconContainer}>
+          <Ionicons name="play" size={24} color="#fff" />
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={styles.likeBtn}
+        onPress={(e) => {
+          e.stopPropagation();
+          onLike(item.id, item.is_liked);
+        }}
+      >
+        {item.is_liked ? (
+          <GradientHeart size={18} />
+        ) : (
+          <Ionicons name="heart-outline" size={18} color="#ffffff" />
+        )}
+      </TouchableOpacity>
+
+      {item._isVideo && item.views_count > 0 && (
+        <View style={styles.viewsContainer}>
+          <Ionicons name="play" size={12} color="#fff" />
+          <Text style={styles.viewsText}>
+            {item.views_count > 1000
+              ? `${(item.views_count / 1000).toFixed(1)}K`
+              : item.views_count}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
   );
 };
 
@@ -101,65 +215,64 @@ export default function ExploreScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]); // For modal selection
+  const [appliedCategories, setAppliedCategories] = useState<string[]>([]);   // Actually applied filters
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  
+  const [refreshing, setRefreshing] = useState(false);
+
   const POSTS_PER_PAGE = 30;
 
   // Categories list
   const CATEGORIES = [
-    'All',
-    'Vegetarian/Vegan',
-    'Non vegetarian',
-    'Biryani',
-    'SeaFood',
-    'Chinese',
-    'Desserts',
-    'Arabic',
-    'BBQ/Tandoor',
-    'Fast Food',
-    'Salad',
-    'Karnataka Style',
-    'Kerala Style',
-    'Andhra Style',
-    'North Indian Style',
-    'Mangaluru Style',
-    'Italian',
-    'Japanese',
-    'Korean',
-    'Mexican',
-    'Drinks / sodas',
+    "All",
+    "Vegetarian/Vegan",
+    "Non vegetarian",
+    "Biryani",
+    "Desserts",
+    "SeaFood",
+    "Chinese",
+    "Chats",
+    "Arabic",
+    "BBQ/Tandoor",
+    "Fast Food",
+    "Tea/Coffee",
+    "Salad",
+    "Karnataka Style",
+    "Hyderabadi Style",
+    "Kerala Style",
+    "Andhra Style",
+    "North Indian Style",
+    "South Indian Style",
+    "Punjabi Style",
+    "Bengali Style",
+    "Odia Style",
+    "Gujurati Style",
+    "Rajasthani Style",
+    "Mangaluru Style",
+    "Goan",
+    "Kashmiri",
+    "Continental",
+    "Italian",
+    "Japanese",
+    "Korean",
+    "Mexican",
+    "Persian",
+    "Drinks / sodas",
   ];
 
   useFocusEffect(
     useCallback(() => {
       if (user && token) {
-        console.log('🔄 Explore screen focused - refreshing posts');
-        fetchPosts(true);
+        console.log("🔄 Explore screen focused - refreshing posts");
+        fetchPosts(true, appliedCategories);
       }
-    }, [user, token])
+    }, [user, token, appliedCategories])
   );
-
-  // Refetch posts when category changes
-  useEffect(() => {
-    if (user && token) {
-      console.log('🔄 Category changed, refetching posts:', selectedCategory);
-      // Reset state before fetching
-      setPosts([]);
-      setPage(1);
-      setHasMore(true);
-      fetchPosts(true);
-    }
-  }, [selectedCategory]);
-
-  // Posts are already filtered by backend when category is selected
-  // No need for client-side filtering since backend handles it
-  const filteredPosts = posts;
 
   // ================================
   // 🔥 Fetch Explore Posts
   // ================================
-  const fetchPosts = async (refresh = false) => {
+  const fetchPosts = async (refresh = false, categories: string[] = []) => {
     try {
       if (refresh) {
         setLoading(true);
@@ -172,14 +285,18 @@ export default function ExploreScreen() {
 
       const skip = refresh ? 0 : (page - 1) * POSTS_PER_PAGE;
 
-      // Build URL with category filter and pagination limit
       let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
-      if (selectedCategory && selectedCategory !== 'All') {
-        feedUrl += `&category=${encodeURIComponent(selectedCategory)}`;
+      
+      // Use passed categories or appliedCategories
+      const categoriesToUse = categories.length > 0 ? categories : appliedCategories;
+      if (categoriesToUse.length > 0) {
+        feedUrl += `&categories=${encodeURIComponent(categoriesToUse.join(","))}`;
       }
 
+      console.log("📡 Fetching posts with URL:", feedUrl);
+
       const res = await axios.get(feedUrl, {
-        headers: { Authorization: `Bearer ${token || ''}` },
+        headers: { Authorization: `Bearer ${token || ""}` },
       });
 
       if (res.data.length === 0) {
@@ -192,7 +309,6 @@ export default function ExploreScreen() {
 
       const newPosts = res.data.map((post: any) => {
         const rawUrl = post.media_url || post.image_url;
-
         const fullUrl = fixUrl(rawUrl);
         const thumb = fixUrl(post.thumbnail_url);
 
@@ -201,21 +317,21 @@ export default function ExploreScreen() {
           full_image_url: fullUrl,
           full_thumbnail_url: thumb,
           is_liked: post.is_liked_by_user || false,
-          _isVideo: isVideoFile(fullUrl || '', post.media_type),
-          // ✅ Ensure category is preserved and trimmed
+          _isVideo: isVideoFile(fullUrl || "", post.media_type),
           category: post.category ? post.category.trim() : null,
+          aspect_ratio: post.aspect_ratio || null,
         };
       });
 
-      // Backend already sorts by created_at descending (-1), no need for client-side sorting
       if (refresh) {
         setPosts(newPosts);
-        setPage(2); // Set to 2 since we just loaded page 1
+        setPage(2);
       } else {
-        // ✅ Deduplicate posts by ID to prevent duplicates
         setPosts((p) => {
-          const existingIds = new Set(p.map(post => post.id));
-          const uniqueNewPosts = newPosts.filter(post => !existingIds.has(post.id));
+          const existingIds = new Set(p.map((post) => post.id));
+          const uniqueNewPosts = newPosts.filter(
+            (post: any) => !existingIds.has(post.id)
+          );
           return [...p, ...uniqueNewPosts];
         });
         setPage((prev) => prev + 1);
@@ -229,20 +345,74 @@ export default function ExploreScreen() {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setRefreshing(false);
     }
   };
 
   // ==================================
-  // 🔍 Search Logic - Navigate to Search Results Page
+  // 🔍 Search Logic
   // ==================================
   const performSearch = () => {
     if (searchQuery.trim()) {
-      // Navigate to search results page with the query
       router.push({
         pathname: "/search-results",
         params: { query: searchQuery.trim() },
       });
     }
+  };
+
+  // ==================================
+  // 🏷️ Category Toggle (Multi-Select) - Only for modal
+  // ==================================
+  const toggleCategory = (item: string) => {
+    if (item === "All") {
+      setSelectedCategories([]);
+    } else {
+      setSelectedCategories((prev) =>
+        prev.includes(item)
+          ? prev.filter((c) => c !== item)
+          : [...prev, item]
+      );
+    }
+  };
+
+  // ==================================
+  // 🏷️ Remove applied category tag
+  // ==================================
+  const removeAppliedCategory = (cat: string) => {
+    const newApplied = appliedCategories.filter((c) => c !== cat);
+    setAppliedCategories(newApplied);
+    setSelectedCategories(newApplied);
+    // Fetch with new filters
+    setPosts([]);
+    setPage(1);
+    setHasMore(true);
+    fetchPosts(true, newApplied);
+  };
+
+  // ==================================
+  // 🏷️ Clear all applied categories
+  // ==================================
+  const clearAllCategories = () => {
+    setAppliedCategories([]);
+    setSelectedCategories([]);
+    setPosts([]);
+    setPage(1);
+    setHasMore(true);
+    fetchPosts(true, []);
+  };
+
+  // ==================================
+  // 🏷️ Apply Filters from Modal
+  // ==================================
+  const applyFilters = () => {
+    console.log("✅ Applying filters:", selectedCategories);
+    setAppliedCategories(selectedCategories);
+    setShowCategoryModal(false);
+    setPosts([]);
+    setPage(1);
+    setHasMore(true);
+    fetchPosts(true, selectedCategories);
   };
 
   // ==================================
@@ -254,10 +424,10 @@ export default function ExploreScreen() {
         prev.map((p) =>
           p.id === id
             ? {
-              ...p,
-              is_liked: !liked,
-              likes_count: p.likes_count + (liked ? -1 : 1),
-            }
+                ...p,
+                is_liked: !liked,
+                likes_count: p.likes_count + (liked ? -1 : 1),
+              }
             : p
         )
       );
@@ -269,59 +439,43 @@ export default function ExploreScreen() {
   };
 
   // ==================================
-  // 🔳 Render Grid Tile
+  // 🔄 Pull to refresh
   // ==================================
-  const renderGridItem = ({ item }: any) => {
-    const displayImg = item._isVideo
-      ? item.full_thumbnail_url || item.full_image_url
-      : item.full_image_url;
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchPosts(true, appliedCategories);
+  }, [appliedCategories]);
 
-    return (
-      <TouchableOpacity
-        style={styles.tile}
-        activeOpacity={0.85}
-        onPress={() => router.push(`/post-details/${item.id}`)}
-      >
-        {displayImg ? (
-          <Image
-            source={{ uri: displayImg }}
-            style={styles.gridImage}
-            placeholder={{ blurhash: BLUR_HASH }}
-            cachePolicy="memory-disk"
-            contentFit="cover"
-            transition={300}
-            onError={(error) => {
-              console.error("❌ Image load error in explore:", displayImg, error);
-            }}
-          />
-        ) : (
-          <View style={[styles.gridImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-            <Ionicons name="image-outline" size={32} color="#ccc" />
-          </View>
-        )}
+  // ==================================
+  // 📜 Handle scroll for infinite loading
+  // ==================================
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 200;
 
-        {item._isVideo && (
-          <View style={styles.playIcon}>
-            <Ionicons name="play-circle" size={28} color="#fff" />
-          </View>
-        )}
+    if (
+      layoutMeasurement.height + contentOffset.y >=
+      contentSize.height - paddingToBottom
+    ) {
+      if (hasMore && !loadingMore && !loading) {
+        fetchPosts(false, appliedCategories);
+      }
+    }
+  };
 
-        {/* Like Button with Gradient Heart */}
-        <TouchableOpacity
-          style={styles.likeBtn}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleLike(item.id, item.is_liked);
-          }}
-        >
-          {item.is_liked ? (
-            <GradientHeart size={18} />
-          ) : (
-            <Ionicons name="heart-outline" size={18} color="#ffffff" />
-          )}
-        </TouchableOpacity>
-      </TouchableOpacity>
-    );
+  // ==================================
+  // Navigate to post
+  // ==================================
+  const handlePostPress = (postId: string) => {
+    router.push(`/post-details/${postId}`);
+  };
+
+  // ==================================
+  // Open modal - sync selectedCategories with appliedCategories
+  // ==================================
+  const openCategoryModal = () => {
+    setSelectedCategories([...appliedCategories]); // Copy applied to selected
+    setShowCategoryModal(true);
   };
 
   // ==================================
@@ -335,7 +489,7 @@ export default function ExploreScreen() {
       </View>
     );
 
-  if (loading)
+  if (loading && posts.length === 0)
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#4dd0e1" />
@@ -343,12 +497,15 @@ export default function ExploreScreen() {
       </View>
     );
 
+  // Distribute posts into 3 columns
+  const columns = distributePosts(posts);
+
   // ==================================
   // MAIN UI
   // ==================================
   return (
     <View style={styles.container}>
-      {/* Header Container - Gradient + Overlapping Search */}
+      {/* Header Container */}
       <View style={styles.headerContainer}>
         <LinearGradient
           colors={["#E94A37", "#F2CF68", "#1B7C82"]}
@@ -359,11 +516,16 @@ export default function ExploreScreen() {
         >
           <Text style={styles.headerTitle}>Cofau</Text>
         </LinearGradient>
-        
-        {/* Search bar with inline category filter */}
+
+        {/* Search bar */}
         <View style={styles.searchBoxWrapper}>
           <View style={styles.searchBox}>
-            <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+            <Ionicons
+              name="search"
+              size={18}
+              color="#999"
+              style={styles.searchIcon}
+            />
             <TextInput
               style={styles.searchInput}
               placeholder="Search"
@@ -373,83 +535,129 @@ export default function ExploreScreen() {
               returnKeyType="search"
               onSubmitEditing={performSearch}
             />
-            {/* ✅ Category Filter Button Inside Search Bar with Gradient Border */}
-<TouchableOpacity 
-  onPress={() => setShowCategoryModal(true)}
-  activeOpacity={0.8}
->
-  <LinearGradient
-    colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 0 }}
-    style={styles.gradientBorder}
-  >
-    <View style={styles.inlineFilterButton}>
-      <Ionicons name="options-outline" size={18} color="#FFF" />
-      <Text style={styles.inlineFilterText}>
-        {selectedCategory && selectedCategory !== 'All' 
-          ? selectedCategory.substring(0, 8) + '...' 
-          : 'Category'}
-      </Text>
-    </View>
-  </LinearGradient>
-</TouchableOpacity>
+            <TouchableOpacity
+              onPress={openCategoryModal}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorder}
+              >
+                <View style={styles.inlineFilterButton}>
+                  <Ionicons name="options-outline" size={18} color="#FFF" />
+                  <Text style={styles.inlineFilterText}>
+                    {appliedCategories.length > 0
+                      ? `${appliedCategories.length} selected`
+                      : "Category"}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* Grid - No gap from search bar */}
-      <FlatList
-        data={filteredPosts}
-        renderItem={renderGridItem}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
-        numColumns={NUM_COLUMNS}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        columnWrapperStyle={{
-          gap: SPACING,
-          paddingHorizontal: SPACING,
-        }}
-        onEndReached={() => {
-          if (hasMore && !loadingMore && !loading) {
-            fetchPosts(false);
-          }
-        }}
-        onEndReachedThreshold={0.4}
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={{ padding: 20 }}>
-              <ActivityIndicator size="small" />
-            </View>
-          ) : null
-        }
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={10}
-      />
+      {/* Applied Categories Tags (shown below search) */}
+      {appliedCategories.length > 0 && (
+        <View style={styles.selectedTagsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.selectedTagsContainer}
+          >
+            {appliedCategories.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.selectedTag}
+                onPress={() => removeAppliedCategory(cat)}
+              >
+                <Text style={styles.selectedTagText}>{cat}</Text>
+                <Ionicons name="close-circle" size={16} color="#666" />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.clearAllButton}
+              onPress={clearAllCategories}
+            >
+              <Text style={styles.clearAllText}>Clear All</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
 
-      {/* Bottom Navigation - Updated Style */}
+      {/* 🔥 Masonry Grid Layout */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#4dd0e1"
+          />
+        }
+      >
+        <View style={styles.masonryContainer}>
+          {columns.map((column, index) => (
+            <View key={index} style={styles.column}>
+              {column.map((item) => (
+                <GridTile
+                  key={item.id}
+                  item={item}
+                  onPress={handlePostPress}
+                  onLike={handleLike}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+
+        {/* Loading More Indicator */}
+        {loadingMore && (
+          <View style={styles.loadingMore}>
+            <ActivityIndicator size="small" color="#4dd0e1" />
+          </View>
+        )}
+
+        {/* Empty State */}
+        {!loading && posts.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="restaurant-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyStateText}>No posts found</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Try selecting different categories
+            </Text>
+          </View>
+        )}
+
+        {/* Bottom Spacing */}
+        <View style={{ height: 120 }} />
+      </ScrollView>
+
+      {/* Bottom Navigation */}
       <View style={styles.navBar}>
-        {/* Home */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push("/feed")}
         >
           <Ionicons name="home-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
-        
-        {/* Explore */}
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push("/explore")}
         >
           <Ionicons name="compass" size={20} color="#000" />
           <Text style={styles.navLabelActive}>Explore</Text>
         </TouchableOpacity>
-        
-        {/* Center - Top Posts with Camera Icon */}
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.centerNavItem}
           onPress={() => router.push("/leaderboard")}
         >
@@ -458,18 +666,16 @@ export default function ExploreScreen() {
           </View>
           <Text style={styles.navLabel}>Top Posts</Text>
         </TouchableOpacity>
-        
-        {/* Happening */}
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push("/happening")}
         >
           <Ionicons name="location-outline" size={20} color="#000" />
           <Text style={styles.navLabel}>Happening</Text>
         </TouchableOpacity>
-        
-        {/* Profile */}
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push("/profile")}
         >
@@ -478,7 +684,7 @@ export default function ExploreScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Category Filter Modal */}
+      {/* Category Filter Modal - MULTI-SELECT */}
       <Modal
         visible={showCategoryModal}
         transparent={true}
@@ -493,41 +699,90 @@ export default function ExploreScreen() {
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
-            
+
+            {/* Selected Count */}
+            {selectedCategories.length > 0 && (
+              <View style={styles.selectedCountContainer}>
+                <Text style={styles.selectedCountText}>
+                  {selectedCategories.length} categories selected
+                </Text>
+                <TouchableOpacity onPress={() => setSelectedCategories([])}>
+                  <Text style={styles.clearAllModalText}>Clear All</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <FlatList
               data={CATEGORIES}
               keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.categoryItem,
-                    (selectedCategory === item || (item === 'All' && !selectedCategory)) && styles.categoryItemSelected
-                  ]}
-                  onPress={() => {
-                    setSelectedCategory(item === 'All' ? '' : item);
-                    setShowCategoryModal(false);
-                  }}
-                >
-                  <View style={styles.categoryItemContent}>
-                    <Ionicons 
-                      name={getCategoryIcon(item)} 
-                      size={24} 
-                      color={(selectedCategory === item || (item === 'All' && !selectedCategory)) ? "#4ECDC4" : "#666"} 
-                    />
-                    <Text style={[
-                      styles.categoryItemText,
-                      (selectedCategory === item || (item === 'All' && !selectedCategory)) && styles.categoryItemTextSelected
-                    ]}>
-                      {item}
-                    </Text>
-                  </View>
-                  {(selectedCategory === item || (item === 'All' && !selectedCategory)) && (
-                    <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
-                  )}
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) => {
+                const isSelected =
+                  item === "All"
+                    ? selectedCategories.length === 0
+                    : selectedCategories.includes(item);
+
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryItem,
+                      isSelected && styles.categoryItemSelected,
+                    ]}
+                    onPress={() => {
+                      if (item === "All") {
+                        setSelectedCategories([]);
+                      } else {
+                        toggleCategory(item);
+                      }
+                    }}
+                  >
+                    <View style={styles.categoryItemContent}>
+                      <Ionicons
+                        name={getCategoryIcon(item)}
+                        size={24}
+                        color={isSelected ? "#fff" : "#666"}
+                      />
+                      <Text
+                        style={[
+                          styles.categoryItemText,
+                          isSelected && styles.categoryItemTextSelected,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </View>
+                    {isSelected ? (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={24}
+                        color="#4ECDC4"
+                      />
+                    ) : (
+                      <Ionicons
+                        name="ellipse-outline"
+                        size={24}
+                        color="#CCC"
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
               contentContainerStyle={styles.categoryList}
             />
+
+            {/* Apply Filters Button */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.doneButton}
+                onPress={applyFilters}
+              >
+                <Text style={styles.doneButtonText}>
+                  Apply Filters{" "}
+                  {selectedCategories.length > 0
+                    ? `(${selectedCategories.length})`
+                    : ""}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -538,52 +793,66 @@ export default function ExploreScreen() {
 // Helper function to get icons for categories
 function getCategoryIcon(category: string): any {
   const icons: { [key: string]: string } = {
-    'All': 'grid-outline',
-    'Vegetarian/Vegan': 'leaf-outline',
-    'Non vegetarian': 'restaurant-outline',
-    'Biryani': 'restaurant',
-    'SeaFood': 'fish-outline',
-    'Chinese': 'restaurant-outline',
-    'Arabic': 'restaurant-outline',
-    'BBQ/Tandoor': 'flame-outline',
-    'Fast Food': 'fast-food-outline',
-    'Salad': 'nutrition-outline',
-    'Karnataka Style': 'location-outline',
-    'Kerala Style': 'location-outline',
-    'Andhra Style': 'location-outline',
-    'North Indian Style': 'location-outline',
-    'Mangaluru Style': 'location-outline',
-    'Italian': 'pizza-outline',
-    'Japanese': 'restaurant-outline',
-    'Korean': 'restaurant-outline',
-    'Mexican': 'restaurant-outline',
-    'Drinks / sodas': 'wine-outline',
+    All: "grid-outline",
+    "Vegetarian/Vegan": "leaf-outline",
+    "Non vegetarian": "restaurant-outline",
+    Biryani: "restaurant",
+    SeaFood: "fish-outline",
+    Chinese: "restaurant-outline",
+    Chats: "cafe-outline",
+    Desserts: "ice-cream-outline",
+    Arabic: "restaurant-outline",
+    "BBQ/Tandoor": "flame-outline",
+    "Fast Food": "fast-food-outline",
+    "Tea/Coffee": "cafe-outline",
+    Salad: "nutrition-outline",
+    "Karnataka Style": "location-outline",
+    "Hyderabadi Style": "location-outline",
+    "Kerala Style": "location-outline",
+    "Andhra Style": "location-outline",
+    "North Indian Style": "location-outline",
+    "South Indian Style": "location-outline",
+    "Punjabi Style": "location-outline",
+    "Bengali Style": "location-outline",
+    "Odia Style": "location-outline",
+    "Gujurati Style": "location-outline",
+    "Rajasthani Style": "location-outline",
+    "Mangaluru Style": "location-outline",
+    Goan: "location-outline",
+    Kashmiri: "location-outline",
+    Continental: "globe-outline",
+    Italian: "pizza-outline",
+    Japanese: "restaurant-outline",
+    Korean: "restaurant-outline",
+    Mexican: "restaurant-outline",
+    Persian: "restaurant-outline",
+    "Drinks / sodas": "wine-outline",
   };
-  return icons[category] || 'restaurant-outline';
+  return icons[category] || "restaurant-outline";
 }
 
 // =======================
 //  STYLES
 // =======================
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#fff" 
-  },
-  
-  center: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center" 
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
   },
 
-  /* Header Container */
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+
   headerContainer: {
     position: "relative",
     marginBottom: 30,
+    zIndex: 10,
   },
 
-  /* Gradient Header - With Rounded Bottom Corners */
   gradientHeader: {
     paddingTop: 65,
     paddingBottom: 55,
@@ -591,11 +860,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    shadowColor: "#000",                
-    shadowOffset: { width: 0, height: 4 },   
-    shadowOpacity: 0.15,                  
-    shadowRadius: 8,                    
-    elevation: 6,    
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
 
   headerTitle: {
@@ -605,12 +874,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     letterSpacing: 1,
     zIndex: 1,
-    textShadowColor: "rgba(0, 0, 0, 0.15)",      
-    textShadowOffset: { width: 2, height: 6 },   
-    textShadowRadius: 4, 
+    textShadowColor: "rgba(0, 0, 0, 0.15)",
+    textShadowOffset: { width: 2, height: 6 },
+    textShadowRadius: 4,
   },
 
-  /* Search Bar - Overlapping gradient edge */
   searchBoxWrapper: {
     position: "absolute",
     bottom: -25,
@@ -643,19 +911,6 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
-  searchInputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 25,
-    paddingLeft: 16,
-    paddingRight: 8,  // Reduced right padding to fit category button
-    paddingVertical: 8,  // Reduced vertical padding
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-
-  // ✅ Inline filter button inside search bar
   inlineFilterButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -663,57 +918,167 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 5,
     paddingHorizontal: 12,
-    marginLeft: 0,
-    gap: 0,
+    gap: 4,
   },
+
   gradientBorder: {
     borderRadius: 20,
-    padding: 2,  // This creates the border thickness
-    marginLeft: -60,
+    padding: 2,
   },
 
   inlineFilterText: {
     fontSize: 12,
     color: "#FFF",
     fontWeight: "600",
-    maxWidth: 60,
+    maxWidth: 70,
   },
 
-  /* Grid Tiles */
+  selectedTagsWrapper: {
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+
+  selectedTagsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+
+  selectedTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF5E6",
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 8,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#F2CF68",
+  },
+
+  selectedTagText: {
+    fontSize: 12,
+    color: "#333",
+    fontWeight: "500",
+  },
+
+  clearAllButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+
+  clearAllText: {
+    fontSize: 12,
+    color: "#E94A37",
+    fontWeight: "600",
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingHorizontal: SPACING,
+  },
+
+  masonryContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  column: {
+    width: COLUMN_WIDTH,
+    gap: SPACING,
+  },
+
   tile: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    borderRadius: 4,
+    width: "100%",
+    borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#eaeaea",
+    backgroundColor: "#1a1a1a",
     position: "relative",
     marginBottom: SPACING,
   },
 
-  gridImage: {
+  tileImage: {
     width: "100%",
     height: "100%",
   },
 
-  playIcon: {
+  placeholderImage: {
+    backgroundColor: "#2a2a2a",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  playIconContainer: {
     position: "absolute",
-    bottom: 6,
-    left: 6,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    padding: 4,
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -20 }, { translateY: -20 }],
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   likeBtn: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    padding: 6,
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    padding: 8,
     borderRadius: 20,
   },
 
-  /* Bottom Navigation - Updated */
+  viewsContainer: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+
+  viewsText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  loadingMore: {
+    padding: 20,
+    alignItems: "center",
+  },
+
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 16,
+  },
+
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 8,
+  },
+
   navBar: {
     position: "absolute",
     bottom: 0,
@@ -757,7 +1122,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // ✅ Center elevated item
   centerNavItem: {
     alignItems: "center",
     justifyContent: "center",
@@ -766,14 +1130,13 @@ const styles = StyleSheet.create({
     marginTop: -30,
   },
 
-  // ✅ Circle background for center icon
   centerIconCircle: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#fff",
     borderWidth: 2,
-    borderColor: "#000",
+    borderColor: "#333",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 4,
@@ -786,15 +1149,17 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "flex-end",
   },
+
   categoryModal: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: "70%",
+    maxHeight: "80%",
   },
+
   categoryModalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -803,14 +1168,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E5E5E5",
   },
+
   categoryModalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#000",
   },
+
+  selectedCountContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: "#F0F9F9",
+  },
+
+  selectedCountText: {
+    fontSize: 14,
+    color: "#4ECDC4",
+    fontWeight: "600",
+  },
+
+  clearAllModalText: {
+    fontSize: 14,
+    color: "#E94A37",
+    fontWeight: "600",
+  },
+
   categoryList: {
     padding: 12,
   },
+
   categoryItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -820,24 +1209,47 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: "#F9F9F9",
   },
+
   categoryItemSelected: {
     backgroundColor: "#1B7C82",
     borderWidth: 2,
-    borderColor: "#FFF",
+    borderColor: "#4ECDC4",
   },
+
   categoryItemContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     flex: 1,
   },
+
   categoryItemText: {
     fontSize: 16,
-    color: "#333",
+    color: "#000",
     flex: 1,
   },
+
   categoryItemTextSelected: {
     fontWeight: "600",
+    color: "#fff",
+  },
+
+  modalFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E5E5",
+  },
+
+  doneButton: {
+    backgroundColor: "#4ECDC4",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  doneButtonText: {
     color: "#FFF",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

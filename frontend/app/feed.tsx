@@ -1,3 +1,18 @@
+// ============================================
+// UPDATED FEED SCREEN WITH SKELETON LOADING
+// ============================================
+// 
+// Changes made:
+// 1. Import the FeedSkeleton component
+// 2. Replace the ActivityIndicator loading state with skeleton
+// 3. Keep the skeleton in ListHeaderComponent for smooth experience
+//
+// HOW TO INTEGRATE:
+// 1. Copy FeedSkeleton.tsx to your components folder
+// 2. Update the import path below
+// 3. Replace your loading UI section with the skeleton component
+// ============================================
+
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
@@ -25,6 +40,9 @@ import {
   normalizeProfilePicture,
   BACKEND_URL,
 } from "../utils/imageUrlFix";
+
+// ⭐ ADD THIS IMPORT - adjust path based on where you place the file
+import { FeedSkeleton } from "../components/FeedSkeleton";
 
 const BACKEND = BACKEND_URL;
 let globalMuteState = true;
@@ -115,6 +133,40 @@ export default function FeedScreen() {
       setUnreadCount(count);
     } catch {}
   };
+
+
+// ADD this ref near your other refs
+const visibleVideoIdRef = useRef<string | null>(null);
+const viewabilityDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+const viewabilityConfigRef = useRef({
+  itemVisiblePercentThreshold: 60,
+  minimumViewTime: 300,
+});
+
+const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+  if (viewabilityDebounceRef.current) {
+    clearTimeout(viewabilityDebounceRef.current);
+  }
+
+  viewabilityDebounceRef.current = setTimeout(() => {
+    const visibleVideo = viewableItems.find((item) => {
+      const post = item.item;
+      const isVideo =
+        post.media_type === "video" ||
+        post.media_url?.toLowerCase().endsWith(".mp4");
+      return isVideo && item.isViewable;
+    });
+
+    const newVisibleId = visibleVideo ? String(visibleVideo.item.id) : null;
+    
+    if (newVisibleId !== visibleVideoIdRef.current) {
+      console.log(`[Video] Setting visible video: ${newVisibleId}`);
+      visibleVideoIdRef.current = newVisibleId;
+      setVisibleVideoId(newVisibleId);
+    }
+  }, 150);
+}).current;
 
   const fetchOwnStory = async () => {
     if (!token || !user?.id) return;
@@ -228,147 +280,122 @@ export default function FeedScreen() {
 
   // Find visible video
   const findVisibleVideo = useCallback(
-    (scrollY: number, viewportHeight: number) => {
-      const viewportTop = scrollY;
-      const viewportBottom = scrollY + viewportHeight;
+  (scrollY: number, viewportHeight: number) => {
+    const viewportTop = scrollY;
+    const viewportBottom = scrollY + viewportHeight;
 
-      let bestVideo: { id: string; visibilityRatio: number } | null = null;
+    let bestVideo: { id: string; visibilityRatio: number } | null = null;
 
-      const positions = Array.from(postPositionsRef.current.entries());
-      for (const [postId, position] of positions) {
-        const post = feedPosts.find((p) => String(p.id) === String(postId));
-        if (!post) continue;
+    const positions = Array.from(postPositionsRef.current.entries());
+    
+    const videoPosts = feedPosts.filter(p => 
+      p.media_type === "video" || p.media_url?.toLowerCase().endsWith(".mp4")
+    );
 
-        const isVideo =
-          post.media_type === "video" ||
-          post.media_url?.toLowerCase().endsWith(".mp4");
+    for (const [postId, position] of positions) {
+      const post = feedPosts.find((p) => String(p.id) === String(postId));
+      if (!post) continue;
 
-        if (!isVideo) continue;
-
-        const postTop = position.y;
-        const postBottom = position.y + position.height;
-        const postHeight = position.height;
-
-        const visibleTop = Math.max(postTop, viewportTop);
-        const visibleBottom = Math.min(postBottom, viewportBottom);
-        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-
-        const visibilityRatio =
-          postHeight > 0 ? visibleHeight / postHeight : 0;
-
-        if (visibilityRatio >= VISIBILITY_THRESHOLD) {
-          const candidate = { id: String(postId), visibilityRatio };
-          if (!bestVideo || visibilityRatio > bestVideo.visibilityRatio) {
-            bestVideo = candidate;
-          }
-        }
-      }
-
-      return bestVideo?.id ?? null;
-    },
-    [feedPosts]
-  );
-
-  // Handle scroll
-  const handleScroll = useCallback(
-    (event: any) => {
-      isScrollingRef.current = true;
-
-      const scrollY = event.nativeEvent.contentOffset.y;
-      const viewportHeight = event.nativeEvent.layoutMeasurement.height;
-      const contentHeight = event.nativeEvent.contentSize.height;
-
-      setShowFixedLine(scrollY > 100);
-
-      if (scrollY < lastScrollYRef.current - 100) {
-        paginationTriggeredRef.current = false;
-      }
-      lastScrollYRef.current = scrollY;
-
-      if (Platform.OS === "ios") {
-        const visibleId = findVisibleVideo(scrollY, viewportHeight);
-        if (visibleId !== visibleVideoId) {
-          setVisibleVideoId(visibleId);
-        }
-      } else {
-        if (visibleVideoId) {
-          setVisibleVideoId(null);
-        }
-      }
-
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-
-      scrollTimeoutRef.current = setTimeout(() => {
-        isScrollingRef.current = false;
-
-        const visibleId = findVisibleVideo(scrollY, viewportHeight);
-        setVisibleVideoId(visibleId);
-
-        const paddingToBottom = 100;
-        const isNearBottom =
-          scrollY + viewportHeight >= contentHeight - paddingToBottom;
-
-        if (
-          isNearBottom &&
-          hasMore &&
-          !loadingMore &&
-          !loading &&
-          !paginationTriggeredRef.current
-        ) {
-          paginationTriggeredRef.current = true;
-          fetchFeed(false).finally(() => {
-            setTimeout(() => {
-              paginationTriggeredRef.current = false;
-            }, 1000);
-          });
-        }
-      }, Platform.OS === "ios" ? 100 : 200);
-    },
-    [findVisibleVideo, visibleVideoId, hasMore, loadingMore, loading]
-  );
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Render post item
-  const renderPost = useCallback(
-    ({ item: post, index }: { item: any; index: number }) => {
       const isVideo =
         post.media_type === "video" ||
         post.media_url?.toLowerCase().endsWith(".mp4");
-      const shouldPlay =
-        isVideo &&
-        visibleVideoId === String(post.id) &&
-        (Platform.OS === "ios" || !isScrollingRef.current);
-      const shouldPreload = isVideo && visibleVideoId === String(post.id);
 
-      return (
-        <View
-          style={styles.postContainer}
-          onLayout={(e) => handlePostLayout(String(post.id), e)}
-        >
-          <FeedCard
-            post={post}
-            onLikeUpdate={() => fetchFeed(true)}
-            onStoryCreated={() => {}}
-            shouldPlay={shouldPlay}
-            shouldPreload={shouldPreload}
-            isMuted={isMuted}
-            onMuteToggle={handleMuteToggle}
-          />
-        </View>
-      );
-    },
-    [visibleVideoId, isMuted, handleMuteToggle, handlePostLayout]
-  );
+      if (!isVideo) continue;
+
+      const postTop = position.y;
+      const postBottom = position.y + position.height;
+      const postHeight = position.height;
+
+      const visibleTop = Math.max(postTop, viewportTop);
+      const visibleBottom = Math.min(postBottom, viewportBottom);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+
+      const visibilityRatio = postHeight > 0 ? visibleHeight / postHeight : 0;
+
+      if (visibilityRatio >= VISIBILITY_THRESHOLD) {
+        const candidate = { id: String(postId), visibilityRatio };
+        if (!bestVideo || visibilityRatio > bestVideo.visibilityRatio) {
+          bestVideo = candidate;
+        }
+      }
+    }
+
+    return bestVideo?.id ?? null;
+  },
+  [feedPosts]
+);
+
+  // Handle scroll
+const handleScroll = useCallback(
+  (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const viewportHeight = event.nativeEvent.layoutMeasurement.height;
+    const contentHeight = event.nativeEvent.contentSize.height;
+
+    setShowFixedLine(scrollY > 100);
+
+    if (scrollY < lastScrollYRef.current - 100) {
+      paginationTriggeredRef.current = false;
+    }
+    lastScrollYRef.current = scrollY;
+
+    // Pagination check
+    const paddingToBottom = 100;
+    const isNearBottom = scrollY + viewportHeight >= contentHeight - paddingToBottom;
+
+    if (
+      isNearBottom &&
+      hasMore &&
+      !loadingMore &&
+      !loading &&
+      !paginationTriggeredRef.current
+    ) {
+      paginationTriggeredRef.current = true;
+      fetchFeed(false).finally(() => {
+        setTimeout(() => {
+          paginationTriggeredRef.current = false;
+        }, 1000);
+      });
+    }
+  },
+  [hasMore, loadingMore, loading]
+);
+
+ useEffect(() => {
+  return () => {
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    if (viewabilityDebounceRef.current) {
+      clearTimeout(viewabilityDebounceRef.current);
+    }
+  };
+}, []);
+
+  // Render post item
+const renderPost = useCallback(
+  ({ item: post }: { item: any }) => {
+    const isVideo =
+      post.media_type === "video" ||
+      post.media_url?.toLowerCase().endsWith(".mp4");
+    const shouldPlay = isVideo && visibleVideoId === String(post.id);
+
+    return (
+      <View style={styles.postContainer}>
+        <FeedCard
+          post={post}
+          onLikeUpdate={() => fetchFeed(true)}
+          onStoryCreated={() => {}}
+          shouldPlay={shouldPlay}
+          shouldPreload={shouldPlay}
+          isMuted={isMuted}
+          onMuteToggle={handleMuteToggle}
+        />
+      </View>
+    );
+  },
+  [visibleVideoId, isMuted, handleMuteToggle]
+);
 
   // List Header Component
   const ListHeader = useCallback(() => (
@@ -678,12 +705,9 @@ export default function FeedScreen() {
       {/* ================= STORIES ================= */}
       <StoriesBar refreshTrigger={refreshing} />
 
-      {/* ================= LOADING ================= */}
+      {/* ⭐ SKELETON LOADING - Replace ActivityIndicator with FeedSkeleton */}
       {loading && feedPosts.length === 0 && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4dd0e1" />
-          <Text style={styles.loadingText}>Loading feed...</Text>
-        </View>
+        <FeedSkeleton showStories={false} />
       )}
     </>
   ), [user, ownStoryData, unreadCount, refreshing, loading, feedPosts.length, router]);
@@ -703,33 +727,34 @@ export default function FeedScreen() {
       {showFixedLine && <View style={styles.fixedLine} />}
 
       {/* FlatList */}
-      <FlatList
-        ref={flatListRef}
-        data={feedPosts}
-        keyExtractor={(item, index) => `post-${item.id}-${index}`}
-        renderItem={renderPost}
-        ListHeaderComponent={ListHeader}
-        ListFooterComponent={ListFooter}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchFeed(true);
-            }}
-          />
-        }
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 90 }}
-        // Android Performance Optimizations
-        removeClippedSubviews={Platform.OS === "android"}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        initialNumToRender={3}
-        updateCellsBatchingPeriod={50}
-      />
+     <FlatList
+  ref={flatListRef}
+  data={feedPosts}
+  keyExtractor={(item, index) => `post-${item.id}-${index}`}
+  renderItem={renderPost}
+  ListHeaderComponent={ListHeader}
+  ListFooterComponent={ListFooter}
+  refreshControl={
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={() => {
+        setRefreshing(true);
+        fetchFeed(true);
+      }}
+    />
+  }
+  onScroll={handleScroll}
+  scrollEventThrottle={16}
+  showsVerticalScrollIndicator={false}
+  contentContainerStyle={{ paddingBottom: 90 }}
+  viewabilityConfig={viewabilityConfigRef.current}
+  onViewableItemsChanged={handleViewableItemsChanged}
+  removeClippedSubviews={Platform.OS === "android"}
+  maxToRenderPerBatch={5}
+  windowSize={7}
+  initialNumToRender={5}
+  updateCellsBatchingPeriod={50}
+/>
 
       {/* ================= BOTTOM TABS ================= */}
       <View style={styles.navBar}>
