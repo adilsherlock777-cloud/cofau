@@ -69,6 +69,8 @@ const router = useRouter();
 const { user } = useAuth();
 const videoRef = useRef(null);
 
+console.log('Post user:', post.username, 'is_following:', post.is_following);
+
 const [isLiked, setIsLiked] = useState(post.is_liked || false);
 const [likesCount, setLikes] = useState(post.likes || 0);
 const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);

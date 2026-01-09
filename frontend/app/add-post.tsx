@@ -36,9 +36,9 @@ export default function AddPostScreen() {
   const [rating, setRating] = useState('');
   const [review, setReview] = useState('');
 
-  const [locationName, setLocationName] = useState('');  // NEW
-  const [mapsLink, setMapsLink] = useState('');          // UPDATED
-  const [category, setCategory] = useState('');          // CATEGORY
+  const [locationName, setLocationName] = useState('');
+  const [mapsLink, setMapsLink] = useState('');
+  const [categories, setCategories] = useState<string[]>([]); // CHANGED: Now an array
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -53,19 +53,26 @@ export default function AddPostScreen() {
     'Desserts',
     'SeaFood',
     'Chinese',
+    'Chats',
     'Arabic',
     'BBQ/Tandoor',
     'Fast Food',
+    'Tea/Coffee',
     'Salad',
     'Karnataka Style',
+    'Hyderabadi Style',
     'Kerala Style',
     'Andhra Style',
     'North Indian Style',
+    'South Indian Style',
     'Mangaluru Style',
+    'Kashmiri',
+    'Continental',
     'Italian',
     'Japanese',
     'Korean',
     'Mexican',
+    'Persian',
     'Drinks / sodas',
   ];
 
@@ -132,11 +139,9 @@ export default function AddPostScreen() {
   };
 
   const showMediaOptions = () => {
-    // On web, directly open file picker
     if (Platform.OS === 'web') {
       pickImageOrVideo();
     } else {
-      // On mobile, show options
       Alert.alert('Add Media', 'Choose an option:', [
         { text: 'Take Photo', onPress: takePhoto },
         { text: 'Choose Photo', onPress: pickImage },
@@ -146,11 +151,10 @@ export default function AddPostScreen() {
     }
   };
 
-  // Universal picker for web (supports both images and videos)
   const pickImageOrVideo = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All, // Both images and videos
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: true,
         aspect: [4, 5],
         quality: 0.8,
@@ -160,7 +164,6 @@ export default function AddPostScreen() {
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         
-        // Detect if it's video or image
         if (asset.type === 'video' || asset.uri.includes('.mp4') || asset.uri.includes('.mov')) {
           setMediaType('video');
         } else {
@@ -198,6 +201,16 @@ export default function AddPostScreen() {
       return;
     }
     Linking.openURL(mapsLink);
+  };
+
+  // ------------------------------ CATEGORY TOGGLE ------------------------------
+
+  const toggleCategory = (item: string) => {
+    setCategories(prev => 
+      prev.includes(item) 
+        ? prev.filter(c => c !== item)  // Remove if already selected
+        : [...prev, item]               // Add if not selected
+    );
   };
 
   // ------------------------------ POST SUBMISSION ------------------------------
@@ -250,74 +263,59 @@ export default function AddPostScreen() {
       const postData = {
         rating: numericRating,
         review_text: review.trim(),
-        map_link: mapsLink.trim(),         // FINAL MAP LINK
-        location_name: locationName.trim(), // LOCATION NAME
-        category: category || undefined,    // CATEGORY (optional)
+        map_link: mapsLink.trim(),
+        location_name: locationName.trim(),
+        categories: categories.length > 0 ? categories : undefined, // CHANGED: Send array
         file: fileToUpload,
         media_type: mediaType,
       };
 
-      console.log('📤 Sending post with category:', category);
+      console.log('📤 Sending post with categories:', categories);
       console.log('📤 Full post data:', postData);
 
       const result = await createPost(postData);
 
       setLoading(false);
 
-      // Refresh user data immediately to show updated points
       await refreshUser();
       
-      // Get the old level before refresh
       const oldLevel = auth?.user?.level || 1;
       
-      // Wait a bit for state to update, then get updated user
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Fetch updated user data to get new level
       const userResponse = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/auth/me`, {
         headers: { Authorization: `Bearer ${auth?.token}` },
       });
       const updatedUser = userResponse.data;
       const newLevel = updatedUser?.level || oldLevel;
       
-      // Get the user's current level to calculate points earned (use old level for calculation)
       const currentLevel = oldLevel;
       
-      // Calculate points earned based on level
-      // Levels 1-4 (Reviewer): 25 points
-      // Levels 5-8 (Top Reviewer): 15 points
-      // Levels 9-12 (Influencer): 5 points
-      let earnedPoints = 25; // Default
+      let earnedPoints = 25;
       if (currentLevel >= 5 && currentLevel <= 8) {
         earnedPoints = 15;
       } else if (currentLevel >= 9 && currentLevel <= 12) {
         earnedPoints = 5;
       }
 
-      // Check for level up
       const leveledUp = newLevel > oldLevel;
 
       if (leveledUp) {
         showLevelUpAnimation(newLevel);
-        // Use replace instead of push to force refresh, and add small delay for DB to commit
         setTimeout(() => {
           router.replace('/feed');
         }, 3000);
         return;
       }
 
-      // Show points earned animation based on points earned
       if (earnedPoints > 0) {
         setPointsEarned(earnedPoints);
         setShowPointsAnimation(true);
-        // Navigate to feed after animation (3 seconds) - use replace to force refresh
         setTimeout(() => {
           setShowPointsAnimation(false);
           router.replace('/feed');
         }, 3000);
       } else {
-        // Fallback if no points - use replace to force refresh
-        // Add small delay to ensure post is committed to database
         setTimeout(() => {
           router.replace('/feed');
         }, 500);
@@ -413,27 +411,48 @@ export default function AddPostScreen() {
           />
         </View>
 
-        {/* CATEGORY (OPTIONAL) */}
+        {/* CATEGORY (OPTIONAL) - MULTI-SELECT */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Category (Optional)</Text>
+          <Text style={styles.sectionLabel}>Categories (Optional)</Text>
           <TouchableOpacity 
             style={styles.categoryButton}
             onPress={() => setShowCategoryModal(true)}
           >
             <View style={styles.categoryButtonContent}>
               <Ionicons name="fast-food-outline" size={20} color="#666" />
-              <Text style={[styles.categoryButtonText, category && styles.categoryButtonTextSelected]}>
-                {category || 'Select Category'}
+              <Text 
+                style={[
+                  styles.categoryButtonText, 
+                  categories.length > 0 && styles.categoryButtonTextSelected
+                ]}
+                numberOfLines={2}
+              >
+                {categories.length > 0 ? categories.join(', ') : 'Select Categories'}
               </Text>
               <Ionicons name="chevron-down" size={20} color="#666" />
             </View>
           </TouchableOpacity>
-          {category && (
+          
+          {/* Selected Categories Tags */}
+          {categories.length > 0 && (
+            <View style={styles.selectedTagsContainer}>
+              {categories.map((cat) => (
+                <View key={cat} style={styles.selectedTag}>
+                  <Text style={styles.selectedTagText}>{cat}</Text>
+                  <TouchableOpacity onPress={() => toggleCategory(cat)}>
+                    <Ionicons name="close-circle" size={18} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          
+          {categories.length > 0 && (
             <TouchableOpacity 
               style={styles.clearCategoryButton}
-              onPress={() => setCategory('')}
+              onPress={() => setCategories([])}
             >
-              <Text style={styles.clearCategoryText}>Clear Category</Text>
+              <Text style={styles.clearCategoryText}>Clear All Categories</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -485,11 +504,11 @@ export default function AddPostScreen() {
           disabled={loading}
         >
           <LinearGradient
-  colors={['#E94A37', '#F2CF68', '#1B7C82']}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 0 }}
-  style={styles.postButton}
->
+            colors={['#E94A37', '#F2CF68', '#1B7C82']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.postButton}
+          >
             {loading ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
@@ -512,7 +531,7 @@ export default function AddPostScreen() {
         }}
       />
 
-      {/* Category Selection Modal */}
+      {/* Category Selection Modal - MULTI-SELECT */}
       <Modal
         visible={showCategoryModal}
         transparent={true}
@@ -522,11 +541,20 @@ export default function AddPostScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.categoryModal}>
             <View style={styles.categoryModalHeader}>
-              <Text style={styles.categoryModalTitle}>Select Category</Text>
+              <Text style={styles.categoryModalTitle}>Select Categories</Text>
               <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
+            
+            {/* Selected Count */}
+            {categories.length > 0 && (
+              <View style={styles.selectedCountContainer}>
+                <Text style={styles.selectedCountText}>
+                  {categories.length} selected
+                </Text>
+              </View>
+            )}
             
             <FlatList
               data={CATEGORIES}
@@ -535,26 +563,37 @@ export default function AddPostScreen() {
                 <TouchableOpacity
                   style={[
                     styles.categoryItem,
-                    category === item && styles.categoryItemSelected
+                    categories.includes(item) && styles.categoryItemSelected
                   ]}
-                  onPress={() => {
-                    setCategory(item);
-                    setShowCategoryModal(false);
-                  }}
+                  onPress={() => toggleCategory(item)}
                 >
                   <Text style={[
                     styles.categoryItemText,
-                    category === item && styles.categoryItemTextSelected
+                    categories.includes(item) && styles.categoryItemTextSelected
                   ]}>
                     {item}
                   </Text>
-                  {category === item && (
+                  {categories.includes(item) ? (
                     <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+                  ) : (
+                    <Ionicons name="ellipse-outline" size={24} color="#CCC" />
                   )}
                 </TouchableOpacity>
               )}
               contentContainerStyle={styles.categoryList}
             />
+            
+            {/* Done Button */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.doneButton}
+                onPress={() => setShowCategoryModal(false)}
+              >
+                <Text style={styles.doneButtonText}>
+                  Done {categories.length > 0 ? `(${categories.length})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -704,8 +743,34 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
+  
+  // Selected Tags
+  selectedTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    gap: 8,
+  },
+  selectedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5E6',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#F2CF68',
+  },
+  selectedTagText: {
+    fontSize: 13,
+    color: '#333',
+    fontWeight: '500',
+  },
+  
   clearCategoryButton: {
-    marginTop: 8,
+    marginTop: 12,
     alignSelf: 'flex-start',
   },
   clearCategoryText: {
@@ -724,7 +789,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '70%',
+    maxHeight: '80%',
   },
   categoryModalHeader: {
     flexDirection: 'row',
@@ -739,6 +804,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  selectedCountContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#F0F9F9',
+  },
+  selectedCountText: {
+    fontSize: 14,
+    color: '#4ECDC4',
+    fontWeight: '600',
+  },
   categoryList: {
     padding: 12,
   },
@@ -752,7 +827,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9F9F9',
   },
   categoryItemSelected: {
-    backgroundColor: '#FFF5E6',
+    backgroundColor: '#F9F9F9',
     borderWidth: 2,
     borderColor: '#F2CF68',
   },
@@ -763,5 +838,23 @@ const styles = StyleSheet.create({
   categoryItemTextSelected: {
     fontWeight: '600',
     color: '#4ECDC4',
+  },
+  
+  // Modal Footer
+  modalFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+  },
+  doneButton: {
+    backgroundColor: '#1B7C82',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  doneButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

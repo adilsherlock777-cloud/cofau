@@ -31,6 +31,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
+import { BlurView } from 'expo-blur';
 
 const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
@@ -363,9 +364,61 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
     <View style={styles.postItem}>
       {/* MEDIA CONTAINER */}
       <View style={[
-  styles.responsiveMediaContainer,
-  showDetails && styles.mediaContainerShrunk
-]}>
+        styles.responsiveMediaContainer,
+        showDetails && styles.mediaContainerShrunk
+      ]}>
+        {/* BLURRED BACKGROUND LAYER */}
+        {!isVideo ? (
+          // For images - blurred background
+          Platform.OS === 'ios' ? (
+            <View style={styles.blurredBackground}>
+              <Image
+                source={{ uri: imageUrl || displayUrl || '' }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                blurRadius={50}
+              />
+              <BlurView 
+                intensity={100}
+                style={StyleSheet.absoluteFill}
+                tint="dark"
+              />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: imageUrl || displayUrl || '' }}
+              style={styles.blurredBackground}
+              contentFit="cover"
+              blurRadius={25}
+            />
+          )
+        ) : (
+          // For videos - use thumbnail or first frame as blurred background
+          Platform.OS === 'ios' ? (
+            <View style={styles.blurredBackground}>
+              <Image
+                source={{ uri: thumbnailUrl || mediaUrl || displayUrl || '' }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                blurRadius={50}
+              />
+              <BlurView 
+                intensity={100}
+                style={StyleSheet.absoluteFill}
+                tint="dark"
+              />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: thumbnailUrl || mediaUrl || displayUrl || '' }}
+              style={styles.blurredBackground}
+              contentFit="cover"
+              blurRadius={25}
+            />
+          )
+        )}
+
+        {/* MAIN MEDIA - on top */}
         <TouchableOpacity 
           style={styles.mediaWrapper}
           activeOpacity={1}
@@ -399,7 +452,6 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   ref={videoRef}
                   source={{
                     uri: mediaUrl || displayUrl || '',
-                    // iOS requires headers for proper video loading
                     headers: {
                       'Accept': 'video/mp4, video/quicktime, video/*',
                       'User-Agent': 'Cofau/1.0',
@@ -416,30 +468,24 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   useNativeControls={false}
                   allowsExternalPlayback={false}
                   playInSilentModeIOS={true}
-                  // iOS-specific props for better compatibility
                   usePoster={false}
                   posterSource={null}
                   onLoad={(status: any) => {
                     console.log("✅ Video loaded in post details", status);
-                    // Only update state if it changed to prevent flickering
                     if (!videoLoaded) {
                       setVideoLoaded(true);
                     }
                     if (videoError) {
                       setVideoError(false);
                     }
-                    // Ensure video plays after load (iOS needs explicit play)
                     if (videoRef.current && shouldPlay) {
                       setTimeout(async () => {
                         try {
                           const currentStatus = await (videoRef.current as any).getStatusAsync();
                           if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
-                            // iOS needs explicit play call
                             await (videoRef.current as any).playAsync();
-                            // Ensure it's actually playing
                             const afterPlayStatus = await (videoRef.current as any).getStatusAsync();
                             if (!afterPlayStatus.isPlaying && shouldPlay) {
-                              // Retry play if it didn't start (iOS sometimes needs this)
                               setTimeout(async () => {
                                 try {
                                   await (videoRef.current as any).playAsync();
@@ -452,7 +498,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                         } catch (err) {
                           console.log("Auto-play error in post details:", err);
                         }
-                      }, 200); // Reduced delay to prevent flickering (matching FeedCard)
+                      }, 200);
                     }
                   }}
                   onError={(error: any) => {
@@ -465,7 +511,6 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                     if (videoLoaded) {
                       setVideoLoaded(false);
                     }
-                    // Try to reload video on error (iOS sometimes needs this)
                     if (videoRef.current) {
                       setTimeout(async () => {
                         try {
@@ -488,23 +533,17 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   }}
                   onLoadStart={() => {
                     console.log("📹 Video loading started in post details:", mediaUrl || displayUrl);
-                    // Don't reset videoLoaded here to prevent flickering
-                    // Only set error to false if it was true
                     if (videoError) {
                       setVideoError(false);
                     }
                   }}
                   onPlaybackStatusUpdate={(status: any) => {
-                    // Ensure video stops if shouldPlay becomes false
                     if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
                       (videoRef.current as any).pauseAsync().catch(() => {});
                       (videoRef.current as any).setPositionAsync(0).catch(() => {});
                     }
-                    // Only attempt to play if video is loaded and should play
                     if (status.isLoaded && !status.isPlaying && shouldPlay && videoLoaded) {
-                      (videoRef.current as any)?.playAsync().catch((err: any) => {
-                        // Silently handle - don't log to prevent spam
-                      });
+                      (videoRef.current as any)?.playAsync().catch((err: any) => {});
                     }
                   }}
                   progressUpdateIntervalMillis={1000}
@@ -940,107 +979,107 @@ export default function PostDetailsScreen() {
     if (postId && token) loadInitialPost();
   }, [postId, token]);
 
-const loadInitialPost = async () => {
-  try {
-    setLoading(true);
-    
-    // ✅ SOLUTION: Fetch ONLY the single post first
-    const singlePostRes = await axios.get(`${API_URL}/posts/${postId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    const singlePost = {
-      ...singlePostRes.data,
-      media_url: normalizeUrl(singlePostRes.data.media_url),
-      image_url: normalizeUrl(singlePostRes.data.image_url || singlePostRes.data.media_url),
-      thumbnail_url: normalizeUrl(singlePostRes.data.thumbnail_url),
-      user_profile_picture: normalizeUrl(singlePostRes.data.user_profile_picture),
-    };
-    
-    // Set the single post immediately - FAST LOAD!
-    setPosts([singlePost]);
-    setInitialPostIndex(0);
-    setCurrentVisiblePost(singlePost);
-    setVisiblePostId(singlePost.id);
-    setLoading(false);  // Stop loading immediately
-    
-    // ✅ Load more posts in the BACKGROUND for scrolling
-    loadMorePostsInBackground();
-    
-  } catch (e) {
-    console.log("❌ Post fetch error", e);
-    
-    // Fallback: If single post endpoint doesn't exist, use old method
-    loadInitialPostFallback();
-  }
-};
-
-// Background loading for smooth scrolling experience
-const loadMorePostsInBackground = async () => {
-  try {
-    const res = await axios.get(`${API_URL}/feed?limit=${LIMIT}&skip=0`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const normalized = res.data.map((p: any) => ({
-      ...p,
-      media_url: normalizeUrl(p.media_url),
-      image_url: normalizeUrl(p.image_url || p.media_url),
-      thumbnail_url: normalizeUrl(p.thumbnail_url),
-      user_profile_picture: normalizeUrl(p.user_profile_picture),
-    }));
-
-    // Add posts that aren't the current one
-    const otherPosts = normalized.filter((p: any) => p.id !== postId);
-    
-    setPosts(prev => {
-      const existingIds = new Set(prev.map(p => p.id));
-      const newPosts = otherPosts.filter((p: any) => !existingIds.has(p.id));
-      return [...prev, ...newPosts];
-    });
-    
-    setSkip(LIMIT);
-  } catch (e) {
-    console.log("Background load error", e);
-  }
-};
-
-// Fallback if single post endpoint doesn't exist
-const loadInitialPostFallback = async () => {
-  try {
-    setLoading(true);
-    const res = await axios.get(`${API_URL}/feed?skip=0`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const currentIndex = res.data.findIndex((p: any) => p.id === postId);
-    if (currentIndex === -1) {
-      Alert.alert("Error", "Post not found");
-      router.back();
-      return;
+  const loadInitialPost = async () => {
+    try {
+      setLoading(true);
+      
+      // ✅ SOLUTION: Fetch ONLY the single post first
+      const singlePostRes = await axios.get(`${API_URL}/posts/${postId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      const singlePost = {
+        ...singlePostRes.data,
+        media_url: normalizeUrl(singlePostRes.data.media_url),
+        image_url: normalizeUrl(singlePostRes.data.image_url || singlePostRes.data.media_url),
+        thumbnail_url: normalizeUrl(singlePostRes.data.thumbnail_url),
+        user_profile_picture: normalizeUrl(singlePostRes.data.user_profile_picture),
+      };
+      
+      // Set the single post immediately - FAST LOAD!
+      setPosts([singlePost]);
+      setInitialPostIndex(0);
+      setCurrentVisiblePost(singlePost);
+      setVisiblePostId(singlePost.id);
+      setLoading(false);  // Stop loading immediately
+      
+      // ✅ Load more posts in the BACKGROUND for scrolling
+      loadMorePostsInBackground();
+      
+    } catch (e) {
+      console.log("❌ Post fetch error", e);
+      
+      // Fallback: If single post endpoint doesn't exist, use old method
+      loadInitialPostFallback();
     }
+  };
 
-    const normalized = res.data.map((p: any) => ({
-      ...p,
-      media_url: normalizeUrl(p.media_url),
-      image_url: normalizeUrl(p.image_url || p.media_url),
-      thumbnail_url: normalizeUrl(p.thumbnail_url),
-      user_profile_picture: normalizeUrl(p.user_profile_picture),
-    }));
+  // Background loading for smooth scrolling experience
+  const loadMorePostsInBackground = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/feed?limit=${LIMIT}&skip=0`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    const postsFromCurrent = normalized.slice(currentIndex);
-    setPosts(postsFromCurrent);
-    setInitialPostIndex(0);
-    setCurrentVisiblePost(postsFromCurrent[0]);
-    setVisiblePostId(postsFromCurrent[0]?.id || postId);
-    setSkip(postsFromCurrent.length);
-  } catch (e) {
-    console.log("❌ Fallback fetch error", e);
-    Alert.alert("Error", "Unable to load post");
-  } finally {
-    setLoading(false);
-  }
-};
+      const normalized = res.data.map((p: any) => ({
+        ...p,
+        media_url: normalizeUrl(p.media_url),
+        image_url: normalizeUrl(p.image_url || p.media_url),
+        thumbnail_url: normalizeUrl(p.thumbnail_url),
+        user_profile_picture: normalizeUrl(p.user_profile_picture),
+      }));
+
+      // Add posts that aren't the current one
+      const otherPosts = normalized.filter((p: any) => p.id !== postId);
+      
+      setPosts(prev => {
+        const existingIds = new Set(prev.map(p => p.id));
+        const newPosts = otherPosts.filter((p: any) => !existingIds.has(p.id));
+        return [...prev, ...newPosts];
+      });
+      
+      setSkip(LIMIT);
+    } catch (e) {
+      console.log("Background load error", e);
+    }
+  };
+
+  // Fallback if single post endpoint doesn't exist
+  const loadInitialPostFallback = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_URL}/feed?skip=0`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const currentIndex = res.data.findIndex((p: any) => p.id === postId);
+      if (currentIndex === -1) {
+        Alert.alert("Error", "Post not found");
+        router.back();
+        return;
+      }
+
+      const normalized = res.data.map((p: any) => ({
+        ...p,
+        media_url: normalizeUrl(p.media_url),
+        image_url: normalizeUrl(p.image_url || p.media_url),
+        thumbnail_url: normalizeUrl(p.thumbnail_url),
+        user_profile_picture: normalizeUrl(p.user_profile_picture),
+      }));
+
+      const postsFromCurrent = normalized.slice(currentIndex);
+      setPosts(postsFromCurrent);
+      setInitialPostIndex(0);
+      setCurrentVisiblePost(postsFromCurrent[0]);
+      setVisiblePostId(postsFromCurrent[0]?.id || postId);
+      setSkip(postsFromCurrent.length);
+    } catch (e) {
+      console.log("❌ Fallback fetch error", e);
+      Alert.alert("Error", "Unable to load post");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadMorePosts = async () => {
     if (loadingMore || !hasMore) return;
@@ -1161,74 +1200,84 @@ const styles = StyleSheet.create({
   },
 
   postItem: {
-  width: SCREEN_WIDTH,
-  height: SCREEN_HEIGHT,
-  backgroundColor: "#000",
-  position: "relative",
-},
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: "#000",
+    position: "relative",
+  },
 
   responsiveMediaContainer: {
-  width: SCREEN_WIDTH,
-  height: SCREEN_HEIGHT,
-  backgroundColor: "#000",
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: "center",
-  alignItems: "center",
-},
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: "#000",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   mediaWrapper: {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: "center",
-  alignItems: "center",
-},
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   responsiveMedia: {
     width: "100%",
     height: "100%",
   },
 
+  blurredBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+
   muteIndicatorReels: {
     position: "absolute",
-    top: 140,  // Moved to bottom (above the glass overlay)
+    top: 140,
     right: 16,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 18,
     padding: 6,
     zIndex: 50,
-    padding: 6,
-    width: 36,    // Fixed size
-    height: 36,   // Fixed size
+    width: 36,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
   },
 
   /* Top User Info Bar */
   topUserInfoBar: {
-  position: "absolute",
-  top: Platform.OS === "ios" ? 50 : 30,  // Just the status bar offset
-  left: 0,
-  right: 0,
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  paddingHorizontal: 12,
-  paddingVertical: 46,
-  zIndex: 10,
-  backgroundColor: "transparent",
-},
+    position: "absolute",
+    top: Platform.OS === "ios" ? 50 : 30,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 46,
+    zIndex: 10,
+    backgroundColor: "transparent",
+  },
 
-backButton: {
-  padding: 8,
-  marginRight: 8,
-},
+  backButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+
   topUserRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1246,43 +1295,42 @@ backButton: {
     gap: 8,
   },
 
-topFollowButton: {
-  backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  paddingHorizontal: 12,
-  paddingVertical: 2.5,
-  borderRadius: 6,
-  borderWidth: 1,
-  borderColor: '#fff',
-},
+  topFollowButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
 
-topFollowButtonText: {
-  color: '#fff',
-  fontSize: 10,
-  fontWeight: '600',
-},
+  topFollowButtonText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
 
   topUsername: {
-  fontSize: 14,
-  fontWeight: "600",
-  color: "#FFF",
-  textShadowColor: 'rgba(0, 0, 0, 0.75)',
-  textShadowOffset: { width: 1, height: 1 },
-  textShadowRadius: 3,
-},
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFF",
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
 
-topTimestamp: {
-  fontSize: 11,
-  color: "rgba(255, 255, 255, 0.9)",
-  marginTop: 2,
-  textShadowColor: 'rgba(0, 0, 0, 0.75)',
-  textShadowOffset: { width: 1, height: 1 },
-  textShadowRadius: 3,
-},
- 
+  topTimestamp: {
+    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginTop: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
 
-optionsButton: {
-  padding: 8,
-},
+  optionsButton: {
+    padding: 8,
+  },
 
   optionsMenuBackdrop: {
     position: "absolute",
@@ -1341,7 +1389,6 @@ optionsButton: {
     borderRadius: 20,
     borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.3)",
-    backdropFilter: "blur(20px)",
   },
 
   glassContentRow: {
@@ -1363,7 +1410,7 @@ optionsButton: {
   glassInfoText: {
     color: "#FFF",
     fontSize: 14,
-    fontWeight: "660",
+    fontWeight: "600",
   },
 
   glassChevronContainer: {
@@ -1372,7 +1419,7 @@ optionsButton: {
     justifyContent: "center",
   },
 
-  /* NEW: Glass Overlay Details - Full screen with bottom sheet */
+  /* Glass Overlay Details - Full screen with bottom sheet */
   detailsGlassOverlay: {
     position: "absolute",
     top: 0,
@@ -1409,7 +1456,6 @@ optionsButton: {
     right: 0,
     bottom: 0,
     backgroundColor: "rgba(255, 255, 255, 0.85)",
-    backdropFilter: "blur(20px)",
   },
 
   dragHandleContainer: {
@@ -1505,7 +1551,6 @@ optionsButton: {
     padding: 12,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.5)",
-    backdropFilter: "blur(10px)",  
   },
 
   detailsCardHeader: {
@@ -1628,12 +1673,13 @@ optionsButton: {
     alignItems: "center",
     justifyContent: "center",
   },
+
   mediaContainerShrunk: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.6,  // Adjust this value (0.35 to 0.45) to fit perfectly above banner
+    height: SCREEN_HEIGHT * 0.6,
     zIndex: 5,
   },
 
@@ -1641,6 +1687,7 @@ optionsButton: {
     padding: 20,
     alignItems: "center",
   },
+
   videoErrorContainer: {
     width: "100%",
     height: "100%",
@@ -1648,23 +1695,27 @@ optionsButton: {
     justifyContent: "center",
     alignItems: "center",
   },
+
   videoErrorText: {
     color: "#999",
     fontSize: 16,
     marginTop: 12,
     marginBottom: 20,
   },
+
   retryButton: {
     backgroundColor: "#4dd0e1",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
+
   retryButtonText: {
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
   },
+
   hiddenImage: {
     position: "absolute",
     opacity: 0,
@@ -1672,6 +1723,7 @@ optionsButton: {
     height: "100%",
     zIndex: 0,
   },
+
   hiddenVideo: {
     position: "absolute",
     opacity: 0,
@@ -1679,6 +1731,7 @@ optionsButton: {
     height: "100%",
     zIndex: 1,
   },
+
   playIconOverlay: {
     position: "absolute",
     top: 0,
@@ -1689,6 +1742,7 @@ optionsButton: {
     alignItems: "center",
     zIndex: 2,
   },
+
   videoPlaceholder: {
     width: "100%",
     height: "100%",
@@ -1696,6 +1750,7 @@ optionsButton: {
     justifyContent: "center",
     alignItems: "center",
   },
+
   videoPlaceholderText: {
     color: "#999",
     fontSize: 14,

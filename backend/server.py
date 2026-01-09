@@ -609,28 +609,30 @@ async def create_post(
 # FEED
 # ======================================================
 @app.get("/api/feed")
-async def get_feed(skip: int = 0, limit: int = None, category: str = None, current_user: dict = Depends(get_current_user)):
+@app.get("/api/feed")
+async def get_feed(skip: int = 0, limit: int = None, category: str = None, categories: str = None, current_user: dict = Depends(get_current_user)):
     """Get feed posts, optionally filtered by category"""
     db = get_database()
     
-    # Build query - filter by category if provided
-    query = {}
-    if category and category.strip() and category.lower() != 'all':
-        # Case-insensitive exact match for category
-        category_clean = category.strip()
-        # Use regex for case-insensitive matching, but escape special characters
-        import re
-        category_escaped = re.escape(category_clean)
-        query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
-        print(f"🔍 Filtering posts by category: '{category_clean}' (query: {query})")
-    
-    # If no limit specified, return all posts (no limit)
-    if limit is None:
-        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).to_list(None)
-    else:
-        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    
-    print(f"📊 Found {len(posts)} posts (category filter: {category if category else 'none'})")
+   # Build query - filter by category/categories if provided
+query = {}
+import re
+
+# Handle multiple categories (from new frontend)
+if categories and categories.strip():
+    category_list = [cat.strip() for cat in categories.split(",") if cat.strip() and cat.strip().lower() != 'all']
+    if category_list:
+        # Match ANY of the selected categories (case-insensitive)
+        regex_patterns = [{"category": {"$regex": f"^{re.escape(cat)}$", "$options": "i"}} for cat in category_list]
+        query["$or"] = regex_patterns
+        print(f"🔍 Filtering posts by categories: {category_list}")
+
+# Handle single category (backward compatibility)
+elif category and category.strip() and category.lower() != 'all':
+    category_clean = category.strip()
+    category_escaped = re.escape(category_clean)
+    query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
+    print(f"🔍 Filtering posts by category: '{category_clean}' (query: {query})")
 
     result = []
     for post in posts:
@@ -648,11 +650,11 @@ async def get_feed(skip: int = 0, limit: int = None, category: str = None, curre
             "user_id": str(current_user["_id"])
         }) is not None
 
-        # Check if current user is following the post author
-        is_following = await db.follows.find_one({
-            "follower_id": str(current_user["_id"]),
-            "following_id": user_id
-        }) is not None
+      # Check if current user is following the post author
+is_following = await db.follows.find_one({
+    "followerId": str(current_user["_id"]),
+    "followingId": user_id
+}) is not None
 
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
@@ -721,10 +723,10 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
         }) is not None
 
         # Check if current user is following the post author
-        is_following = await db.follows.find_one({
-            "follower_id": str(current_user["_id"]),
-            "following_id": user_id
-        }) is not None
+is_following = await db.follows.find_one({
+    "followerId": str(current_user["_id"]),
+    "followingId": user_id
+}) is not None
 
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
@@ -1820,20 +1822,20 @@ async def follow_user(user_id: str, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     
     # Check if already following
-    existing_follow = await db.follows.find_one({
-        "follower_id": str(current_user["_id"]),
-        "following_id": user_id
-    })
+   existing_follow = await db.follows.find_one({
+    "followerId": str(current_user["_id"]),
+    "followingId": user_id
+})
     
     if existing_follow:
         raise HTTPException(status_code=400, detail="Already following this user")
     
     # Add follow
     await db.follows.insert_one({
-        "follower_id": str(current_user["_id"]),
-        "following_id": user_id,
-        "created_at": datetime.utcnow()
-    })
+    "followerId": str(current_user["_id"]),
+    "followingId": user_id,
+    "createdAt": datetime.utcnow()
+})
     
     # Update counts
     await db.users.update_one(
@@ -1853,10 +1855,10 @@ async def unfollow_user(user_id: str, current_user: dict = Depends(get_current_u
     """Unfollow a user"""
     db = get_database()
     
-    result = await db.follows.delete_one({
-        "follower_id": str(current_user["_id"]),
-        "following_id": user_id
-    })
+   result = await db.follows.delete_one({
+    "followerId": str(current_user["_id"]),
+    "followingId": user_id
+})
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=400, detail="Not following this user")
@@ -1917,11 +1919,11 @@ async def get_following(user_id: str):
     """Get users that this user is following"""
     db = get_database()
     
-    follows = await db.follows.find({"follower_id": user_id}).to_list(100)
+   follows = await db.follows.find({"followerId": user_id}).to_list(100)
     
     result = []
     for follow in follows:
-        user = await db.users.find_one({"_id": ObjectId(follow["following_id"])})
+       user = await db.users.find_one({"_id": ObjectId(follow["followingId"])})
         if user:
             result.append({
                 "id": str(user["_id"]),
