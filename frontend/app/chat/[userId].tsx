@@ -10,6 +10,9 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  Alert,
+  Modal,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -31,6 +34,14 @@ interface Message {
   to_user: string;
   message: string;
   post_id?: string | null;
+  story_id?: string | null;
+  story_data?: {
+    media_url: string;
+    media_type: string;
+    story_owner_id: string;
+    story_owner_username: string;
+    story_owner_profile_picture?: string;
+  } | null;
   created_at: string;
 }
 
@@ -44,10 +55,44 @@ export default function ChatScreen() {
   const [postData, setPostData] = useState<{ [key: string]: any }>({});
   const [loadingPosts, setLoadingPosts] = useState<{ [key: string]: boolean }>({});
   const [showMenu, setShowMenu] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
 
   const currentUserId = user?.id || user?._id;
+  const otherUserId = userId as string;
+
+  // Check if user is blocked on mount
+  useEffect(() => {
+    checkBlockStatus();
+    checkMuteStatus();
+  }, []);
+
+  const checkBlockStatus = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/chat/is-blocked/${otherUserId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setIsBlocked(response.data.i_blocked_them);
+    } catch (error) {
+      console.error("Error checking block status:", error);
+    }
+  };
+
+  const checkMuteStatus = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/chat/is-muted/${otherUserId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setIsMuted(response.data.is_muted);
+    } catch (error) {
+      // Mute endpoint might not exist yet, default to false
+      setIsMuted(false);
+    }
+  };
 
   // Fetch post data when post_id is present
   const fetchPost = async (postId: string) => {
@@ -129,6 +174,11 @@ export default function ChatScreen() {
     const text = input.trim();
     if (!text) return;
 
+    if (isBlocked) {
+      Alert.alert("Blocked", "You have blocked this user. Unblock them to send messages.");
+      return;
+    }
+
     if (!wsRef.current) {
       console.log("❌ WebSocket not initialized");
       return;
@@ -166,6 +216,130 @@ export default function ChatScreen() {
       setInput("");
     } catch (error) {
       console.log("❌ Error sending message:", error);
+    }
+  };
+
+  // =============================================
+  // MENU ACTION HANDLERS
+  // =============================================
+
+  const handleViewProfile = () => {
+    setShowMenu(false);
+    router.push(`/profile?userId=${otherUserId}`);
+  };
+
+  const handleToggleMute = async () => {
+    setShowMenu(false);
+    
+    try {
+      if (isMuted) {
+        await axios.delete(`${API_URL}/chat/unmute/${otherUserId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setIsMuted(false);
+        Alert.alert("Unmuted", `You will now receive notifications from ${fullName}`);
+      } else {
+        await axios.post(`${API_URL}/chat/mute/${otherUserId}`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setIsMuted(true);
+        Alert.alert("Muted", `You will no longer receive notifications from ${fullName}`);
+      }
+    } catch (error) {
+      console.error("Error toggling mute:", error);
+      Alert.alert("Error", "Failed to update mute settings");
+    }
+  };
+
+  const handleClearChat = () => {
+    setShowMenu(false);
+    
+    Alert.alert(
+      "Clear Chat",
+      "Are you sure you want to delete all messages? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            setIsClearing(true);
+            try {
+              await axios.delete(`${API_URL}/chat/clear/${otherUserId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              setMessages([]);
+              Alert.alert("Success", "Chat cleared successfully");
+            } catch (error) {
+              console.error("Error clearing chat:", error);
+              Alert.alert("Error", "Failed to clear chat");
+            } finally {
+              setIsClearing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBlockUser = () => {
+    setShowMenu(false);
+    
+    if (isBlocked) {
+      // Unblock user
+      Alert.alert(
+        "Unblock User",
+        `Are you sure you want to unblock ${fullName}?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Unblock",
+            onPress: async () => {
+              setIsBlocking(true);
+              try {
+                await axios.delete(`${API_URL}/chat/unblock/${otherUserId}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                setIsBlocked(false);
+                Alert.alert("Unblocked", `${fullName} has been unblocked`);
+              } catch (error) {
+                console.error("Error unblocking user:", error);
+                Alert.alert("Error", "Failed to unblock user");
+              } finally {
+                setIsBlocking(false);
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      // Block user
+      Alert.alert(
+        "Block User",
+        `Are you sure you want to block ${fullName}? They won't be able to message you.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Block",
+            style: "destructive",
+            onPress: async () => {
+              setIsBlocking(true);
+              try {
+                await axios.post(`${API_URL}/chat/block/${otherUserId}`, {}, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                setIsBlocked(true);
+                Alert.alert("Blocked", `${fullName} has been blocked`);
+              } catch (error) {
+                console.error("Error blocking user:", error);
+                Alert.alert("Error", "Failed to block user");
+              } finally {
+                setIsBlocking(false);
+              }
+            },
+          },
+        ]
+      );
     }
   };
 
@@ -247,6 +421,22 @@ export default function ChatScreen() {
               )}
             </TouchableOpacity>
           )}
+
+          {/* Story Reply Preview */}
+          {item.story_data && (
+            <View style={styles.storyReplyPreview}>
+              <Image
+                source={{ uri: normalizeMediaUrl(item.story_data.media_url) }}
+                style={styles.storyReplyImage}
+                resizeMode="cover"
+              />
+              <View style={styles.storyReplyOverlay}>
+                <Text style={[styles.storyReplyLabel, isMe && styles.storyReplyLabelRight]}>
+                  Replied to {item.story_data.story_owner_username}'s story
+                </Text>
+              </View>
+            </View>
+          )}
           
           <Text style={[styles.time, isMe && styles.timeRight]}>
             {new Date(item.created_at).toLocaleTimeString([], {
@@ -297,7 +487,11 @@ export default function ChatScreen() {
       </LinearGradient>
 
       {/* User Info Header - Below Gradient */}
-      <View style={styles.userInfoHeader}>
+      <TouchableOpacity 
+        style={styles.userInfoHeader}
+        onPress={handleViewProfile}
+        activeOpacity={0.7}
+      >
         <View style={styles.userInfoContent}>
           <UserAvatar
             profilePicture={profilePicture as string}
@@ -320,21 +514,64 @@ export default function ChatScreen() {
         {/* Dropdown Menu */}
         {showMenu && (
           <View style={styles.dropdownMenu}>
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleViewProfile}>
               <Ionicons name="person-outline" size={18} color="#333" />
               <Text style={styles.menuText}>View Profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <Ionicons name="notifications-off-outline" size={18} color="#333" />
-              <Text style={styles.menuText}>Mute</Text>
+            
+            <TouchableOpacity style={styles.menuItem} onPress={handleToggleMute}>
+              <Ionicons 
+                name={isMuted ? "notifications-outline" : "notifications-off-outline"} 
+                size={18} 
+                color="#333" 
+              />
+              <Text style={styles.menuText}>{isMuted ? "Unmute" : "Mute"}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
+            
+            <TouchableOpacity style={styles.menuItem} onPress={handleClearChat}>
               <Ionicons name="trash-outline" size={18} color="#FF3B30" />
               <Text style={[styles.menuText, { color: "#FF3B30" }]}>Clear Chat</Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.menuItem} onPress={handleBlockUser}>
+              <Ionicons 
+                name={isBlocked ? "lock-open-outline" : "ban-outline"} 
+                size={18} 
+                color={isBlocked ? "#333" : "#FF3B30"} 
+              />
+              <Text style={[styles.menuText, !isBlocked && { color: "#FF3B30" }]}>
+                {isBlocked ? "Unblock User" : "Block User"}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
+
+      {/* Close menu when tapping outside */}
+      {showMenu && (
+        <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
+          <View style={styles.menuOverlay} />
+        </TouchableWithoutFeedback>
+      )}
+
+      {/* Blocked Banner */}
+      {isBlocked && (
+        <View style={styles.blockedBanner}>
+          <Ionicons name="ban-outline" size={16} color="#FF3B30" />
+          <Text style={styles.blockedText}>You have blocked this user</Text>
+          <TouchableOpacity onPress={handleBlockUser}>
+            <Text style={styles.unblockText}>Unblock</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Loading indicator for clearing */}
+      {isClearing && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#4DD0E1" />
+          <Text style={styles.loadingText}>Clearing chat...</Text>
+        </View>
+      )}
 
       <FlatList
         ref={flatListRef}
@@ -348,20 +585,21 @@ export default function ChatScreen() {
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
-            placeholder="Type a message…"
+            placeholder={isBlocked ? "You blocked this user" : "Type a message…"}
             placeholderTextColor="#999"
             value={input}
             onChangeText={setInput}
             multiline
             maxLength={500}
+            editable={!isBlocked}
           />
           
           <TouchableOpacity
             style={[
               styles.sendBtn,
-              !input.trim() && styles.sendBtnDisabled,
+              (!input.trim() || isBlocked) && styles.sendBtnDisabled,
             ]}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isBlocked}
             onPress={sendMsg}
           >
             <Ionicons name="send" size={20} color="#fff" />
@@ -426,6 +664,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     position: "relative",
+    zIndex: 1001,
   },
   userInfoContent: {
     flexDirection: "row",
@@ -467,7 +706,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     minWidth: 180,
-    zIndex: 1000,
+    zIndex: 1002,
   },
   menuItem: {
     flexDirection: "row",
@@ -479,6 +718,52 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 15,
     color: "#333",
+  },
+  menuOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  // Blocked Banner
+  blockedBanner: {
+    backgroundColor: "#FFF5F5",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#FFE0E0",
+  },
+  blockedText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#FF3B30",
+  },
+  unblockText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
+  // Loading Overlay
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2000,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#666",
   },
   // Message List Styles
   messageList: { 
@@ -525,6 +810,35 @@ const styles = StyleSheet.create({
   },
   msgRight: {
     color: "#fff",
+  },
+  storyReplyPreview: {
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  storyReplyImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f0f0f0',
+  },
+  storyReplyOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  storyReplyLabel: {
+    fontSize: 11,
+    color: '#fff',
+    fontStyle: 'italic',
+  },
+  storyReplyLabelRight: {
+    color: 'rgba(255,255,255,0.9)',
   },
   time: { 
     fontSize: 11, 

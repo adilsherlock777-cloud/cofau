@@ -13,6 +13,11 @@ import {
   FlatList,
   ActionSheetIOS,
   Platform,
+  TextInput,
+  ActivityIndicator,
+  Share,
+  KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -22,6 +27,30 @@ import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
 import { normalizeStoryUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
 import { markStoryViewed, getStoryViews } from '../../utils/api';
+import { LinearGradient } from "expo-linear-gradient";
+import MaskedView from "@react-native-masked-view/masked-view";
+
+// ------------------------------------------------------------
+// 🔥 GRADIENT HEART COMPONENT
+// ------------------------------------------------------------
+const GradientHeart = ({ size = 28 }) => {
+  return (
+    <MaskedView
+      maskElement={
+        <View style={{ backgroundColor: "transparent" }}>
+          <Ionicons name="heart" size={size} color="#000" />
+        </View>
+      }
+    >
+      <LinearGradient
+        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ width: size, height: size }}
+      />
+    </MaskedView>
+  );
+};
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,6 +78,39 @@ export default function StoryViewerScreen() {
   const progressAnims = useRef<any[]>([]);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
   const [contentLayout, setContentLayout] = useState({ width: 0, height: 0, y: 0 });
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
+  // Keyboard state for Android
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Keyboard listener for Android
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardVisible(true);
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // Helper function to detect video content
   const isVideoContent = (story: any) => {
@@ -57,6 +119,163 @@ export default function StoryViewerScreen() {
     if (story.media_type === "video") return true;
     const url = story.media_url?.toLowerCase() || '';
     return url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') || url.endsWith('.avi');
+  };
+
+  // Check if current user is owner (defined early for use in effects)
+  const isOwner = user && storyUser && 
+    String(user._id || user.id) === String(storyUser._id || storyUser.id);
+
+  /* ----------------------------------------------------------
+     CHECK IF STORY IS LIKED
+  -----------------------------------------------------------*/
+  const checkIfLiked = async (storyId: string) => {
+    try {
+      const response = await axios.get(`${API_URL}/stories/${storyId}/like-status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setIsLiked(response.data.is_liked);
+      setLikeCount(response.data.like_count || 0);
+    } catch (error) {
+      console.error('❌ Error checking like status:', error);
+    }
+  };
+
+  /* ----------------------------------------------------------
+     HANDLE LIKE/UNLIKE STORY
+  -----------------------------------------------------------*/
+  const handleLikeStory = async () => {
+    const currentStory = stories[currentIndex];
+    if (!currentStory) return;
+
+    try {
+      if (isLiked) {
+        await axios.delete(`${API_URL}/stories/${currentStory.id}/like`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setIsLiked(false);
+        setLikeCount(prev => Math.max(0, prev - 1));
+      } else {
+        await axios.post(`${API_URL}/stories/${currentStory.id}/like`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setIsLiked(true);
+        setLikeCount(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('❌ Error liking/unliking story:', error);
+    }
+  };
+
+ /* ----------------------------------------------------------
+   HANDLE SEND MESSAGE - Story Reply
+-----------------------------------------------------------*/
+
+const handleSendMessage = () => {
+  setShowReplyInput(true);
+};
+
+const handleSendStoryReply = async () => {
+  if (!replyText.trim() || !storyUser || sendingReply) return;
+  
+  const currentStory = stories[currentIndex];
+  if (!currentStory) return;
+
+  setSendingReply(true);
+  
+  try {
+    // Connect to WebSocket and send message with story data
+    const wsUrl = `${API_URL.replace('/api', '').replace('https', 'wss').replace('http', 'ws')}/api/chat/ws/${storyUser._id || storyUser.id}?token=${encodeURIComponent(token || '')}`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        message: replyText.trim(),
+        story_id: currentStory.id,
+        story_data: {
+          media_url: currentStory.media_url,
+          media_type: currentStory.media_type,
+          story_owner_id: storyUser._id || storyUser.id,
+          story_owner_username: storyUser.username,
+          story_owner_profile_picture: storyUser.profile_picture,
+        }
+      }));
+      
+      setTimeout(() => {
+        ws.close();
+        setShowReplyInput(false);
+        setReplyText("");
+        Alert.alert("Sent!", "Your reply has been sent");
+      }, 500);
+    };
+
+    ws.onerror = (error) => {
+      console.error("❌ WebSocket error:", error);
+      Alert.alert("Error", "Failed to send reply");
+    };
+  } catch (error) {
+    console.error("❌ Error sending story reply:", error);
+    Alert.alert("Error", "Failed to send reply");
+  } finally {
+    setSendingReply(false);
+  }
+};
+
+  /* ----------------------------------------------------------
+     HANDLE SHARE STORY OPTIONS
+  -----------------------------------------------------------*/
+  const handleShareStory = () => {
+    setShowShareModal(true);
+  };
+
+  const handleAddToMyStory = async () => {
+    const currentStory = stories[currentIndex];
+    if (!currentStory) return;
+
+    try {
+      await axios.post(
+        `${API_URL}/stories/${currentStory.id}/share`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setShowShareModal(false);
+      Alert.alert('Shared!', 'Story added to your stories');
+    } catch (error: any) {
+      console.error('❌ Error sharing story:', error);
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to share story');
+    }
+  };
+
+  const handleShareToCofauUsers = () => {
+    setShowShareModal(false);
+    const currentStory = stories[currentIndex];
+    router.push({
+      pathname: '/share-to-users',
+      params: {
+        mediaUrl: currentStory.media_url,
+        mediaType: currentStory.media_type,
+        storyId: currentStory.id,
+        fromUser: storyUser?.username || 'Someone',
+      }
+    });
+  };
+
+  const handleShareToWhatsAppInstagram = async () => {
+    const currentStory = stories[currentIndex];
+    if (!currentStory) return;
+
+    setShowShareModal(false);
+    
+    try {
+      const shareUrl = `https://api.cofau.com/share/story/${currentStory.id}`;
+      
+      await Share.share({
+        message: `Check out this story on Cofau! ${shareUrl}`,
+        url: shareUrl,
+      });
+    } catch (error) {
+      console.error('❌ Error sharing:', error);
+    }
   };
 
   /* ----------------------------------------------------------
@@ -128,6 +347,14 @@ export default function StoryViewerScreen() {
       setMediaLoading(true);
       setMediaError(false);
       loadStoryViews(stories[currentIndex].id);
+      
+      // Check if story is liked (only for non-owners)
+      const currentIsOwner = user && storyUser && 
+        String(user._id || user.id) === String(storyUser._id || storyUser.id);
+      if (!currentIsOwner && storyUser) {
+        checkIfLiked(stories[currentIndex].id);
+      }
+      
       if (!viewedStories.has(stories[currentIndex].id)) {
         markStoryAsViewed(stories[currentIndex].id);
       }
@@ -144,7 +371,7 @@ export default function StoryViewerScreen() {
     return () => {
       if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     };
-  }, [currentIndex, stories, paused, mediaLoading, mediaError]);
+  }, [currentIndex, stories, paused, mediaLoading, mediaError, storyUser]);
 
   /* ----------------------------------------------------------
      MARK STORY AS VIEWED
@@ -287,11 +514,11 @@ export default function StoryViewerScreen() {
   };
 
   const handleStoryOptions = () => {
-    const isOwner =
+    const checkIsOwner =
       user && storyUser &&
       String(user._id || user.id) === String(storyUser._id || storyUser.id);
 
-    if (!isOwner) {
+    if (!checkIsOwner) {
       Alert.alert('Story Options', 'No options available.');
       return;
     }
@@ -318,14 +545,13 @@ export default function StoryViewerScreen() {
   if (!stories.length || !storyUser) return null;
 
   const currentStory = stories[currentIndex];
-  const isOwner = user && storyUser && 
+  const currentIsOwner = user && storyUser && 
     String(user._id || user.id) === String(storyUser._id || storyUser.id);
 
-  console.log("🔍 Current story - isOwner:", isOwner, "user:", user?._id || user?.id, "storyUser:", storyUser?._id || storyUser?.id)
+  console.log("🔍 Current story - isOwner:", currentIsOwner, "user:", user?._id || user?.id, "storyUser:", storyUser?._id || storyUser?.id)
 
   return (
     <SafeAreaView style={styles.container}>
-
       {/* Progress bars */}
       <View style={styles.progressContainer}>
         {stories.map((_, index) => (
@@ -356,8 +582,8 @@ export default function StoryViewerScreen() {
           />
           <View>
             <Text style={styles.username}>{storyUser.username}</Text>
-            {isOwner && (
-              <Text style={styles.viewCount}>
+            {currentIsOwner && (
+              <Text style={styles.viewCountHeader}>
                 👁 {viewCount} {viewCount === 1 ? 'view' : 'views'}
               </Text>
             )}
@@ -365,7 +591,7 @@ export default function StoryViewerScreen() {
         </View>
 
         <View style={styles.headerActions}>
-          {isOwner && (
+          {currentIsOwner && (
             <TouchableOpacity onPress={handleStoryOptions} style={styles.headerButton}>
               <Feather name="more-vertical" size={24} color="#FFF" />
             </TouchableOpacity>
@@ -438,74 +664,47 @@ export default function StoryViewerScreen() {
               }
             }}
             onLoad={(event) => {
-  console.log("✅ Image loaded successfully");
-  setActualMediaType("image");
-  setMediaLoading(false);
-  setMediaError(false);
-  
-  // Calculate actual rendered size
-  const { width: imgWidth, height: imgHeight } = event.nativeEvent.source;
-  const containerWidth = SCREEN_WIDTH;
-  const containerHeight = SCREEN_HEIGHT - 150;
-  
-  const imageRatio = imgWidth / imgHeight;
-  const containerRatio = containerWidth / containerHeight;
-  
-  let renderedHeight;
-  if (imageRatio > containerRatio) {
-    // Image is wider - width fills container
-    renderedHeight = containerWidth / imageRatio;
-  } else {
-    // Image is taller - height fills container
-    renderedHeight = containerHeight;
-  }
-  
-  const yPosition = (containerHeight - renderedHeight) / 2;
-  setContentLayout({ 
-    width: containerWidth, 
-    height: renderedHeight, 
-    y: yPosition 
-  });
-  
-  if (!paused) {
-    startProgress();
-  }
-}}
+              console.log("✅ Video loaded successfully");
+              setActualMediaType("video");
+              setMediaLoading(false);
+              setMediaError(false);
+              
+              if (!paused) {
+                startProgress();
+              }
+            }}
             onPlaybackStatusUpdate={(status) => {
-  if (status.isLoaded) {
-    // Auto-advance after 10 seconds
-    if (status.positionMillis >= 10000) {
-      handleNext();
-    }
-    // Also handle if video naturally finishes before 10 seconds
-    if (status.didJustFinish) {
-      handleNext();
-    }
-  }
-}}
-
-onReadyForDisplay={(event) => {
-  const { width: vidWidth, height: vidHeight } = event.naturalSize;
-  const containerWidth = SCREEN_WIDTH;
-  const containerHeight = SCREEN_HEIGHT - 150;
-  
-  const videoRatio = vidWidth / vidHeight;
-  const containerRatio = containerWidth / containerHeight;
-  
-  let renderedHeight;
-  if (videoRatio > containerRatio) {
-    renderedHeight = containerWidth / videoRatio;
-  } else {
-    renderedHeight = containerHeight;
-  }
-  
-  const yPosition = (containerHeight - renderedHeight) / 2;
-  setContentLayout({ 
-    width: containerWidth, 
-    height: renderedHeight, 
-    y: yPosition 
-  });
-}}
+              if (status.isLoaded) {
+                if (status.positionMillis >= 10000) {
+                  handleNext();
+                }
+                if (status.didJustFinish) {
+                  handleNext();
+                }
+              }
+            }}
+            onReadyForDisplay={(event) => {
+              const { width: vidWidth, height: vidHeight } = event.naturalSize;
+              const containerWidth = SCREEN_WIDTH;
+              const containerHeight = SCREEN_HEIGHT - 150;
+              
+              const videoRatio = vidWidth / vidHeight;
+              const containerRatio = containerWidth / containerHeight;
+              
+              let renderedHeight;
+              if (videoRatio > containerRatio) {
+                renderedHeight = containerWidth / videoRatio;
+              } else {
+                renderedHeight = containerHeight;
+              }
+              
+              const yPosition = (containerHeight - renderedHeight) / 2;
+              setContentLayout({ 
+                width: containerWidth, 
+                height: renderedHeight, 
+                y: yPosition 
+              });
+            }}
           />
         ) : (
           !mediaError && !isVideoContent(currentStory) && (
@@ -530,11 +729,38 @@ onReadyForDisplay={(event) => {
                   clearTimeout(autoAdvanceTimer.current);
                 }
               }}
-              onLoad={() => {
+              onLoad={(event) => {
                 console.log("✅ Image loaded successfully");
                 setActualMediaType("image");
                 setMediaLoading(false);
                 setMediaError(false);
+                
+                // Calculate image dimensions for watermark positioning
+                if (event.nativeEvent?.source) {
+                  const { width: imgWidth, height: imgHeight } = event.nativeEvent.source;
+                  const containerWidth = SCREEN_WIDTH;
+                  const containerHeight = SCREEN_HEIGHT - 150;
+                  
+                  const imageRatio = imgWidth / imgHeight;
+                  const containerRatio = containerWidth / containerHeight;
+                  
+                  let renderedHeight;
+                  let yPosition;
+                  
+                  if (imageRatio > containerRatio) {
+                    renderedHeight = containerWidth / imageRatio;
+                  } else {
+                    renderedHeight = containerHeight;
+                  }
+                  
+                  yPosition = (containerHeight - renderedHeight) / 2;
+                  setContentLayout({ 
+                    width: containerWidth, 
+                    height: renderedHeight, 
+                    y: yPosition 
+                  });
+                }
+                
                 if (!paused) {
                   startProgress();
                 }
@@ -545,27 +771,85 @@ onReadyForDisplay={(event) => {
 
         {/* COFAU Watermark */}
         <Text style={[
-  styles.watermark,
-  contentLayout.height > 0 && {
-    bottom: undefined,
-    top: contentLayout.y + contentLayout.height - 50, // 50px from bottom of content
-  }
-]}>COFAU</Text>
+          styles.watermark,
+          contentLayout.height > 0 ? {
+            position: 'absolute',
+            bottom: undefined,
+            top: contentLayout.y + contentLayout.height - 40,
+            right: 20,
+          } : {}
+        ]}>COFAU</Text>
+
+        {/* Tap zones */}
+        <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
+        <TouchableOpacity style={styles.tapRight} onPress={handleNext} />
       </View>
 
-      {/* Bottom Eye Icon with View Count */}
-      <TouchableOpacity
-        style={styles.eyeIconContainer}
-        onPress={() => setShowViewersModal(true)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="eye" size={20} color="#FFF" />
-        <Text style={styles.eyeIconText}>{viewCount}</Text>
-      </TouchableOpacity>
-
-      {/* Tap zones */}
-      <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
-      <TouchableOpacity style={styles.tapRight} onPress={handleNext} />
+      {/* Bottom Section - OUTSIDE contentContainer */}
+      {currentIsOwner ? (
+        <TouchableOpacity
+          style={styles.eyeIconContainer}
+          onPress={() => setShowViewersModal(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="eye" size={20} color="#FFF" />
+          <Text style={styles.eyeIconText}>{viewCount}</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={[
+          styles.interactionBar,
+          keyboardVisible && { bottom: keyboardHeight + 10 }
+        ]}>
+          {showReplyInput ? (
+            <View style={styles.replyInputWrapper}>
+              <TextInput
+                style={styles.replyInput}
+                placeholder="Reply to story..."
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                value={replyText}
+                onChangeText={setReplyText}
+                autoFocus
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity 
+                style={styles.sendReplyButton}
+                onPress={handleSendStoryReply}
+                disabled={!replyText.trim() || sendingReply}
+              >
+                {sendingReply ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#FFF" />
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.messageInputContainer}
+              onPress={handleSendMessage}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.messageInputPlaceholder}>Send message</Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity onPress={handleLikeStory} style={styles.interactionButton}>
+            {isLiked ? (
+              <GradientHeart size={28} />
+            ) : (
+              <Ionicons name="heart-outline" size={28} color="#FFF" />
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.interactionButton}
+            onPress={handleShareStory}
+          >
+            <Ionicons name="paper-plane-outline" size={26} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Viewers Modal */}
       <Modal
@@ -639,6 +923,61 @@ onReadyForDisplay={(event) => {
           </View>
         </View>
       </Modal>
+
+      {/* Share Options Modal */}
+      <Modal
+        visible={showShareModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowShareModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.shareModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowShareModal(false)}
+        >
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.shareModalContent}>
+              <Text style={styles.shareModalTitle}>Share Story</Text>
+              <Text style={styles.shareModalSubtitle}>Choose how you want to share</Text>
+              
+              <TouchableOpacity 
+                style={styles.shareOptionButton}
+                onPress={handleAddToMyStory}
+              >
+                <Ionicons name="add-circle-outline" size={22} color="#FFF" style={styles.shareOptionIconStyle} />
+                <Text style={styles.shareOptionText}>Add to Story</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.shareOptionButton}
+                onPress={handleShareToCofauUsers}
+              >
+                <Ionicons name="people-outline" size={22} color="#FFF" style={styles.shareOptionIconStyle} />
+                <Text style={styles.shareOptionText}>Share to Cofau Users</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.shareOptionButton}
+                onPress={handleShareToWhatsAppInstagram}
+              >
+                <Ionicons name="share-social-outline" size={22} color="#FFF" style={styles.shareOptionIconStyle} />
+                <Text style={styles.shareOptionText}>Share to WhatsApp/Instagram</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.shareOptionButton, styles.cancelButton]}
+                onPress={() => setShowShareModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -677,23 +1016,23 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
- watermark: {
-  position: 'absolute',
-  bottom: SCREEN_HEIGHT * 0.19, // fallback
-  right: 30,
-  fontSize: 18,
-  fontWeight: '700',
-  color: 'rgba(255, 255, 255, 0.7)',
-  fontFamily: Platform.OS === 'ios' ? 'Lobster-Regular' : 'Lobster',
-  letterSpacing: 2,
-  zIndex: 10,
-  textShadowColor: 'rgba(0, 0, 0, 0.5)',
-  textShadowOffset: { width: 1, height: 1 },
-  textShadowRadius: 3,
-},
+  watermark: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontFamily: Platform.OS === 'ios' ? 'Lobster-Regular' : 'Lobster',
+    letterSpacing: 2,
+    zIndex: 10,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
   userInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
   username: { color: "#FFF", fontSize: 16, fontWeight: "600" },
-  viewCount: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 },
+  viewCountHeader: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 },
   headerActions: { flexDirection: "row", gap: 16 },
   headerButton: { padding: 4 },
   contentContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -728,16 +1067,18 @@ const styles = StyleSheet.create({
   tapLeft: {
     position: "absolute",
     left: 0,
-    top: 150,
+    top: 0,
     bottom: 0,
     width: SCREEN_WIDTH * 0.3,
+    zIndex: 1,
   },
   tapRight: {
     position: "absolute",
     right: 0,
-    top: 150,
+    top: 0,
     bottom: 0,
     width: SCREEN_WIDTH * 0.7,
+    zIndex: 1,
   },
   modalOverlay: {
     flex: 1,
@@ -808,7 +1149,7 @@ const styles = StyleSheet.create({
   },
   eyeIconContainer: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 40,
     alignSelf: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -824,54 +1165,113 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  storyLengthText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '500',
+  interactionBar: {
+    position: 'absolute',
+    bottom: 40,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 100,
   },
-  shareModalBackdrop: {
+  messageInputContainer: {
     flex: 1,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  shareModalContent: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 20,
+  messageInputPlaceholder: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 15,
   },
-  shareModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+  interactionButton: {
+    padding: 8,
   },
-  shareModalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-  },
-  shareOptionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 24,
-    paddingHorizontal: 12,
-  },
-  shareOptionItem: {
-    alignItems: 'center',
-    width: 70,
-  },
-  shareOptionIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  // Share Modal Styles
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 20,
+  },
+  shareModalContent: {
+    backgroundColor: 'rgba(60, 60, 60, 0.95)',
+    borderRadius: 16,
+    padding: 20,
+    width: SCREEN_WIDTH - 40,
+    maxWidth: 340,
+  },
+  shareModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFF',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  replyInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    paddingLeft: 16,
+    paddingRight: 4,
+  },
+  replyInput: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 15,
+    paddingVertical: 10,
+    maxHeight: 80,
+  },
+  sendReplyButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4DD0E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  shareModalSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  shareOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  shareOptionIconStyle: {
+    marginRight: 10,
   },
   shareOptionText: {
-    fontSize: 12,
-    color: '#333',
-    textAlign: 'center',
+    fontSize: 16,
+    color: '#FFF',
+    fontWeight: '500',
+  },
+  cancelButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 5,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
   },
 });
