@@ -609,30 +609,37 @@ async def create_post(
 # FEED
 # ======================================================
 @app.get("/api/feed")
-@app.get("/api/feed")
 async def get_feed(skip: int = 0, limit: int = None, category: str = None, categories: str = None, current_user: dict = Depends(get_current_user)):
     """Get feed posts, optionally filtered by category"""
     db = get_database()
     
-   # Build query - filter by category/categories if provided
-query = {}
-import re
+    # Build query - filter by category/categories if provided
+    query = {}
+    import re
 
-# Handle multiple categories (from new frontend)
-if categories and categories.strip():
-    category_list = [cat.strip() for cat in categories.split(",") if cat.strip() and cat.strip().lower() != 'all']
-    if category_list:
-        # Match ANY of the selected categories (case-insensitive)
-        regex_patterns = [{"category": {"$regex": f"^{re.escape(cat)}$", "$options": "i"}} for cat in category_list]
-        query["$or"] = regex_patterns
-        print(f"🔍 Filtering posts by categories: {category_list}")
+    # Handle multiple categories (from new frontend)
+    if categories and categories.strip():
+        category_list = [cat.strip() for cat in categories.split(",") if cat.strip() and cat.strip().lower() != 'all']
+        if category_list:
+            # Match ANY of the selected categories (case-insensitive)
+            regex_patterns = [{"category": {"$regex": f"^{re.escape(cat)}$", "$options": "i"}} for cat in category_list]
+            query["$or"] = regex_patterns
+            print(f"🔍 Filtering posts by categories: {category_list}")
 
-# Handle single category (backward compatibility)
-elif category and category.strip() and category.lower() != 'all':
-    category_clean = category.strip()
-    category_escaped = re.escape(category_clean)
-    query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
-    print(f"🔍 Filtering posts by category: '{category_clean}' (query: {query})")
+    # Handle single category (backward compatibility)
+    elif category and category.strip() and category.lower() != 'all':
+        category_clean = category.strip()
+        category_escaped = re.escape(category_clean)
+        query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
+        print(f"🔍 Filtering posts by category: '{category_clean}' (query: {query})")
+
+    # If no limit specified, return all posts (no limit)
+    if limit is None:
+        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).to_list(None)
+    else:
+        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    print(f"📊 Found {len(posts)} posts (category filter: {category if category else 'none'})")
 
     result = []
     for post in posts:
@@ -650,11 +657,11 @@ elif category and category.strip() and category.lower() != 'all':
             "user_id": str(current_user["_id"])
         }) is not None
 
-      # Check if current user is following the post author
-is_following = await db.follows.find_one({
-    "followerId": str(current_user["_id"]),
-    "followingId": user_id
-}) is not None
+        # Check if current user is following the post author
+        is_following = await db.follows.find_one({
+            "followerId": str(current_user["_id"]),
+            "followingId": user_id
+        }) is not None
 
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
@@ -670,20 +677,19 @@ is_following = await db.follows.find_one({
             "user_badge": user.get("badge") if user else None,
             "user_level": user.get("level", 1),
             "media_url": media_url,
-            "image_url": image_url,  # Only for images, None for videos
-            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
+            "image_url": image_url,
+            "thumbnail_url": post.get("thumbnail_url"),
             "media_type": media_type,
             "rating": post.get("rating", 0),
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
-            "location_name": post.get("location_name"),  # Add location_name
-            "category": post.get("category"),  # Add category
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "is_following": is_following,
-            # Convert created_at to ISO string for frontend (handles both datetime objects and existing ISO strings)
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
 
@@ -723,10 +729,10 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
         }) is not None
 
         # Check if current user is following the post author
-is_following = await db.follows.find_one({
-    "followerId": str(current_user["_id"]),
-    "followingId": user_id
-}) is not None
+        is_following = await db.follows.find_one({
+            "followerId": str(current_user["_id"]),
+            "followingId": user_id
+        }) is not None
 
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
@@ -742,8 +748,8 @@ is_following = await db.follows.find_one({
             "user_badge": user.get("badge") if user else None,
             "user_level": user.get("level", 1),
             "media_url": media_url,
-            "image_url": image_url,  # Only for images, None for videos
-            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
+            "image_url": image_url,
+            "thumbnail_url": post.get("thumbnail_url"),
             "media_type": media_type,
             "rating": post.get("rating", 0),
             "review_text": post.get("review_text", ""),
@@ -755,7 +761,6 @@ is_following = await db.follows.find_one({
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "is_following": is_following,
-            # Convert created_at to ISO string for frontend (handles both datetime objects and existing ISO strings)
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
 
@@ -1813,6 +1818,8 @@ async def search_locations(
 
 # ==================== FOLLOW ENDPOINTS ====================
 
+# ==================== FOLLOW ENDPOINTS ====================
+
 @app.post("/api/users/{user_id}/follow")
 async def follow_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """Follow a user"""
@@ -1822,20 +1829,20 @@ async def follow_user(user_id: str, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     
     # Check if already following
-   existing_follow = await db.follows.find_one({
-    "followerId": str(current_user["_id"]),
-    "followingId": user_id
-})
+    existing_follow = await db.follows.find_one({
+        "followerId": str(current_user["_id"]),
+        "followingId": user_id
+    })
     
     if existing_follow:
         raise HTTPException(status_code=400, detail="Already following this user")
     
     # Add follow
     await db.follows.insert_one({
-    "followerId": str(current_user["_id"]),
-    "followingId": user_id,
-    "createdAt": datetime.utcnow()
-})
+        "followerId": str(current_user["_id"]),
+        "followingId": user_id,
+        "createdAt": datetime.utcnow()
+    })
     
     # Update counts
     await db.users.update_one(
@@ -1855,10 +1862,10 @@ async def unfollow_user(user_id: str, current_user: dict = Depends(get_current_u
     """Unfollow a user"""
     db = get_database()
     
-   result = await db.follows.delete_one({
-    "followerId": str(current_user["_id"]),
-    "followingId": user_id
-})
+    result = await db.follows.delete_one({
+        "followerId": str(current_user["_id"]),
+        "followingId": user_id
+    })
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=400, detail="Not following this user")
@@ -1919,11 +1926,11 @@ async def get_following(user_id: str):
     """Get users that this user is following"""
     db = get_database()
     
-   follows = await db.follows.find({"followerId": user_id}).to_list(100)
+    follows = await db.follows.find({"followerId": user_id}).to_list(100)
     
     result = []
     for follow in follows:
-       user = await db.users.find_one({"_id": ObjectId(follow["followingId"])})
+        user = await db.users.find_one({"_id": ObjectId(follow["followingId"])})
         if user:
             result.append({
                 "id": str(user["_id"]),
@@ -2161,8 +2168,8 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
         
         # Check if current user is following the post author
         is_following = await db.follows.find_one({
-            "follower_id": current_user_id,
-            "following_id": post["user_id"]
+            "followerId": current_user_id,
+            "followingId": post["user_id"]
         }) is not None
         
         media_type = post.get("media_type", "image")
@@ -2193,50 +2200,6 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
         if isinstance(e, HTTPException):
             raise
         raise HTTPException(status_code=500, detail=f"Error fetching post: {str(e)}")
-
-@app.get("/api/users/{user_id}/collaborations")
-async def get_user_collaborations(user_id: str, skip: int = 0, limit: int = None):
-    """Get user's collaborations (posts where user is tagged or mentioned). Returns all if limit is not specified."""
-    db = get_database()
-    
-    # For now, return posts where the user has commented
-    comments = await db.comments.find({"user_id": user_id}).to_list(None)
-    post_ids = list(set([comment["post_id"] for comment in comments]))
-    
-    # Get posts - return all if limit is None
-    if limit is None:
-        posts = await db.posts.find({
-            "_id": {"$in": [ObjectId(pid) for pid in post_ids if ObjectId.is_valid(pid)]},
-            "user_id": {"$ne": user_id}  # Exclude own posts
-        }).sort("created_at", -1).skip(skip).to_list(None)
-    else:
-        posts = await db.posts.find({
-            "_id": {"$in": [ObjectId(pid) for pid in post_ids if ObjectId.is_valid(pid)]},
-            "user_id": {"$ne": user_id}  # Exclude own posts
-        }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    
-    result = []
-    for post in posts:
-        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-        
-        media_type = post.get("media_type", "image")
-        image_url = post.get("image_url") if media_type == "image" else None
-        
-        result.append({
-            "id": str(post["_id"]),
-            "user_id": post["user_id"],
-            "username": user["full_name"] if user else "Unknown",
-            "media_url": post.get("media_url", ""),
-            "image_url": image_url,  # Only for images, None for videos
-            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
-            "rating": post["rating"],
-            "review_text": post["review_text"],
-            "likes_count": post["likes_count"],
-            "comments_count": post["comments_count"],
-            "created_at": post["created_at"]
-        })
-    
-    return result
 
 # ==================== REPORT ENDPOINTS ====================
 
