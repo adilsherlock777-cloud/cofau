@@ -702,3 +702,109 @@ async def share_story(
     except Exception as e:
         print(f"❌ Error sharing story: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to share story: {str(e)}")
+
+# ==================== STORY LIKE ENDPOINTS ====================
+
+@router.get("/{story_id}/like-status")
+async def get_story_like_status(
+    story_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check if current user has liked this story"""
+    try:
+        db = get_database()
+        
+        like = await db.story_likes.find_one({
+            "story_id": story_id,
+            "user_id": str(current_user["_id"])
+        })
+        
+        like_count = await db.story_likes.count_documents({"story_id": story_id})
+        
+        return {
+            "is_liked": like is not None,
+            "like_count": like_count
+        }
+    except Exception as e:
+        print(f"❌ Error checking story like status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to check like status: {str(e)}")
+
+
+@router.post("/{story_id}/like")
+async def like_story(
+    story_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Like a story"""
+    try:
+        db = get_database()
+        
+        # Check if story exists
+        story = await db.stories.find_one({"_id": ObjectId(story_id)})
+        if not story:
+            raise HTTPException(status_code=404, detail="Story not found")
+        
+        # Check if already liked
+        existing = await db.story_likes.find_one({
+            "story_id": story_id,
+            "user_id": str(current_user["_id"])
+        })
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Already liked this story")
+        
+        # Add like
+        await db.story_likes.insert_one({
+            "story_id": story_id,
+            "user_id": str(current_user["_id"]),
+            "story_owner_id": story["user_id"],
+            "created_at": datetime.utcnow()
+        })
+        
+        # Send push notification to story owner (optional)
+        if story["user_id"] != str(current_user["_id"]):
+            try:
+                from routers.notifications import create_notification
+                await create_notification(
+                    db=db,
+                    notification_type="story_like",
+                    from_user_id=str(current_user["_id"]),
+                    to_user_id=story["user_id"],
+                    message=f"{current_user.get('full_name', 'Someone')} liked your story"
+                )
+            except Exception as notif_error:
+                print(f"⚠️ Failed to send story like notification: {notif_error}")
+        
+        return {"message": "Story liked"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error liking story: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to like story: {str(e)}")
+
+
+@router.delete("/{story_id}/like")
+async def unlike_story(
+    story_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Unlike a story"""
+    try:
+        db = get_database()
+        
+        result = await db.story_likes.delete_one({
+            "story_id": story_id,
+            "user_id": str(current_user["_id"])
+        })
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=400, detail="Like not found")
+        
+        return {"message": "Story unliked"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error unliking story: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to unlike story: {str(e)}")
