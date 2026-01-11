@@ -16,6 +16,7 @@ import {
   Platform,
   SafeAreaView,
   PanResponder,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -111,6 +112,8 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const [videoError, setVideoError] = useState(false);
   const [thumbnailError, setThumbnailError] = useState(false);
   const videoRef = useRef(null);
+  const [lastTap, setLastTap] = useState(0);
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   
   // Update isFollowing state when post data changes
   useEffect(() => {
@@ -359,7 +362,26 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
     if (days < 7) return `${days}d ago`;
     return date.toLocaleDateString();
   };
+ const handleDoubleTap = () => {
+  const now = Date.now();
+  const DOUBLE_TAP_DELAY = 300; // milliseconds
 
+  if (now - lastTap < DOUBLE_TAP_DELAY) {
+    // Double tap detected - like the post
+    if (!isLiked) {
+      handleLikeToggle();
+    }
+    // Show heart animation
+    setShowHeartAnimation(true);
+    setTimeout(() => setShowHeartAnimation(false), 1000);
+  } else {
+    // Single tap - mute/unmute video (only for videos)
+    if (isVideo) {
+      setIsMuted(!isMuted);
+    }
+  }
+  setLastTap(now);
+};
   return (
     <View style={styles.postItem}>
       {/* MEDIA CONTAINER */}
@@ -418,15 +440,10 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
           )
         )}
 
-        {/* MAIN MEDIA - on top */}
-        <TouchableOpacity 
+       {/* MAIN MEDIA - on top */}
+        <Pressable 
           style={styles.mediaWrapper}
-          activeOpacity={1}
-          onPress={() => {
-            if (isVideo) {
-              setIsMuted(!isMuted);
-            }
-          }}
+          onPress={handleDoubleTap}
         >
           {isVideo ? (
             <>
@@ -602,7 +619,14 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
               contentFit="contain"
             />
           )}
-        </TouchableOpacity>
+          
+          {/* Double Tap Heart Animation */}
+          {showHeartAnimation && (
+            <View style={styles.heartAnimationContainer}>
+              <GradientHeart size={120} />
+            </View>
+          )}
+        </Pressable>
 
         {/* User Info at Top with Back Button */}
         {!showDetails && (
@@ -1303,7 +1327,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fff',
   },
-
+heartAnimationContainer: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  zIndex: 100,
+  pointerEvents: 'none',
+},
   topFollowButtonText: {
     color: '#fff',
     fontSize: 10,

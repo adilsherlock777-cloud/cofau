@@ -18,6 +18,7 @@ import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
+import CommentsModal from './CommentsModal';
 
 import UserAvatar from "./UserAvatar";
 import * as VideoThumbnails from 'expo-video-thumbnails';
@@ -87,6 +88,9 @@ const [followLoading, setFollowLoading] = useState(false);
 const [generatedThumbnail, setGeneratedThumbnail] = useState(null);
 const [imageDimensions, setImageDimensions] = useState(null);
 const dimensionCache = useRef({});
+const [lastTap, setLastTap] = useState(0);
+const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+const [showCommentsModal, setShowCommentsModal] = useState(false);
 
 // Update isFollowing state when post data changes
 useEffect(() => {
@@ -303,6 +307,22 @@ setFollowLoading(false);
 }
 };
 
+const handleDoubleTap = () => {
+  const now = Date.now();
+  const DOUBLE_TAP_DELAY = 300; // milliseconds
+
+  if (now - lastTap < DOUBLE_TAP_DELAY) {
+    // Double tap detected
+    if (!isLiked) {
+      handleLike();
+    }
+    // Show heart animation
+    setShowHeartAnimation(true);
+    setTimeout(() => setShowHeartAnimation(false), 1000);
+  }
+  setLastTap(now);
+};
+
 return (
 <View style={styles.card}>
 {/* HEADER - Only show above media for images */}
@@ -372,218 +392,225 @@ postId={post.id}
 
 {/* MEDIA */}
 {!!mediaUrl && (
-<TouchableOpacity
-activeOpacity={0.9}
-onPress={() => router.push(`/post-details/${post.id}`)}
-style={isVideo ? styles.videoWrapper : null}
->
-{isVideo ? (
-<>
-{/* VIDEO OVERLAY HEADER - Inside video container */}
-<View style={styles.videoOverlayHeader}>
-<TouchableOpacity
-style={styles.videoUserInfo}
-onPress={() => router.push(`/profile?userId=${post.user_id}`)}
->
-<UserAvatar
-profilePicture={dpRaw}
-username={post.username}
-size={32}
-level={post.user_level}
-showLevelBadge
-/>
-<Text style={styles.videoUsername}>{post.username}</Text>
-
-{!isOwnPost && !isFollowing && (
-<TouchableOpacity
-style={styles.videoFollowButton}
-onPress={(e) => {
-e.stopPropagation();
-handleFollowToggle();
-}}
-disabled={followLoading}
->
-<Text style={styles.videoFollowButtonText}>
-{followLoading ? "..." : "Follow"}
-</Text>
-</TouchableOpacity>
-)}
-</TouchableOpacity>
-
-<TouchableOpacity
-style={styles.videoOptionsButton}
-onPress={(e) => {
-e.stopPropagation();
-setShowOptionsMenu(!showOptionsMenu);
-}}
->
-<Ionicons name="ellipsis-vertical" size={18} color="#fff" />
-</TouchableOpacity>
-</View>
-
-{/* Thumbnail - Show when video is not preloaded */}
-{(!shouldPlay || !videoLoaded) && (
-  <View style={[styles.video, styles.videoPlaceholder]}>
-    <Image
-      source={{ uri: thumbnailUrl || generatedThumbnail || mediaUrl }}
-      style={StyleSheet.absoluteFill}
-      resizeMode="contain"
-      blurRadius={0}
-    />
-    <View style={styles.playIconContainer}>
-      <Ionicons name="play-circle" size={56} color="rgba(255,255,255,0.7)" />
-    </View>
-  </View>
-)}
-
-{/* Video - Only render when shouldPlay is true and no error */}
-{shouldPlay && !videoError && (
-<Video
-key="video"
-ref={videoRef}
-source={{
-uri: mediaUrl,
-// iOS requires headers for proper video loading
-headers: {
-'Accept': 'video/mp4, video/quicktime, video/*',
-'User-Agent': 'Cofau/1.0',
-}
-}}
-
-style={styles.video}
-resizeMode="contain"
-shouldPlay={shouldPlay}
-isLooping
-isMuted={isMuted}
-useNativeControls={false}
-allowsExternalPlayback={false}
-playInSilentModeIOS={true}
-// iOS-specific props for better compatibility
-usePoster={false}
-posterSource={null}
-videoStyle={{ backgroundColor: 'black' }} 
-// Preload video for iOS
-onLoad={(status) => {
-console.log("✅ Video loaded on iOS/Android", status);
-// Only update state if it changed to prevent flickering
-if (!videoLoaded) {
-setVideoLoaded(true);
-}
-if (videoError) {
-setVideoError(false);
-}
-// Ensure video plays after load (iOS needs explicit play)
-if (shouldPlay && videoRef.current) {
-setTimeout(async () => {
-try {
-const currentStatus = await videoRef.current.getStatusAsync();
-if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
-  // iOS needs explicit play call
-  await videoRef.current.playAsync();
-  // Set mute state
-  await videoRef.current.setIsMutedAsync(isMuted);
-  // Ensure it's actually playing
-const afterPlayStatus = await videoRef.current.getStatusAsync();
-if (!afterPlayStatus.isPlaying && shouldPlay) {
-// Retry play if it didn't start
-setTimeout(async () => {
-try {
-await videoRef.current.playAsync();
-} catch (retryErr) {
-console.log("Video play retry error:", retryErr);
-}
-}, 300);
-}
-}
-} catch (err) {
-console.log("Auto-play error:", err);
-}
-}, 200); // Reduced delay to prevent flickering
-}
-}}
-onError={(error) => {
-console.error("❌ Video error:", error);
-console.error("❌ Video URL:", mediaUrl);
-if (!videoError) {
-setVideoError(true);
-}
-if (videoLoaded) {
-setVideoLoaded(false);
-}
-}}
-onPlaybackStatusUpdate={(status) => {
-// Ensure video stops if shouldPlay becomes false
-if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
-videoRef.current.pauseAsync().catch(() => { });
-videoRef.current.setPositionAsync(0).catch(() => { });
-}
-// Only attempt to play if video is loaded and should play
-if (status.isLoaded && !status.isPlaying && shouldPlay && videoLoaded) {
-videoRef.current?.playAsync().catch((err) => {
-// Silently handle - don't log to prevent spam
-});
-}
-}}
-progressUpdateIntervalMillis={1000}
-/>
-)}
-{/* iOS HDR Brightness Fix - Semi-transparent overlay */}
-{Platform.OS === 'ios' && shouldPlay && (
-  <View 
-    style={styles.hdrOverlay} 
-    pointerEvents="none" 
-  />
-)}
-{/* Mute/Unmute Button - Bottom right corner, only show when video is playing */}
-{shouldPlay && videoLoaded && !videoError && (
-  <TouchableOpacity
-    style={styles.muteButton}
-    onPress={(e) => {
-      e.stopPropagation();
-      handleMutePress();
-    }}
-    activeOpacity={0.7}
+  <Pressable 
+    style={isVideo ? styles.videoWrapper : null}
+    onPress={handleDoubleTap}
   >
-    <View style={styles.muteButtonBackground}>
-      <Ionicons
-        name={isMuted ? "volume-mute" : "volume-high"}
-        size={18}
-        color="#fff"
-      />
-    </View>
-  </TouchableOpacity>
-)}
-</>
-) : (
-  mediaUrl ? (
-    <Image
-      source={{ uri: mediaUrl }}
-      style={[
-        styles.image,
-        imageDimensions && { aspectRatio: imageDimensions.width / imageDimensions.height }
-      ]}
-      resizeMode="cover"
-      onLoad={(e) => {
-       if (!dimensionCache.current[mediaUrl]) {
-      const { width, height } = e.nativeEvent.source;
-      dimensionCache.current[mediaUrl] = { width, height };
-      setImageDimensions({ width, height });
-    }
-      }}
-      onError={(error) => {
-        console.error("❌ Image load error in FeedCard:", mediaUrl, error);
-      }}
-      onLoadStart={() => {
-        console.log("🖼️ Loading image:", mediaUrl);
-      }}
-    />
-  ) : (
-    <View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', aspectRatio: 0.75 }]}>
-      <Ionicons name="image-outline" size={40} color="#ccc" />
-    </View>
-  )
-)}
-</TouchableOpacity>
+    {isVideo ? (
+      <>
+        {/* VIDEO OVERLAY HEADER - Inside video container */}
+        <View style={styles.videoOverlayHeader}>
+          <TouchableOpacity
+            style={styles.videoUserInfo}
+            onPress={() => router.push(`/profile?userId=${post.user_id}`)}
+          >
+            <UserAvatar
+              profilePicture={dpRaw}
+              username={post.username}
+              size={32}
+              level={post.user_level}
+              showLevelBadge
+            />
+            <Text style={styles.videoUsername}>{post.username}</Text>
+
+            {!isOwnPost && !isFollowing && (
+              <TouchableOpacity
+                style={styles.videoFollowButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleFollowToggle();
+                }}
+                disabled={followLoading}
+              >
+                <Text style={styles.videoFollowButtonText}>
+                  {followLoading ? "..." : "Follow"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.videoOptionsButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              setShowOptionsMenu(!showOptionsMenu);
+            }}
+          >
+            <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Thumbnail - Show when video is not preloaded */}
+        {(!shouldPlay || !videoLoaded) && (
+          <View style={[styles.video, styles.videoPlaceholder]}>
+            <Image
+              source={{ uri: thumbnailUrl || generatedThumbnail || mediaUrl }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="contain"
+              blurRadius={0}
+            />
+            <View style={styles.playIconContainer}>
+              <Ionicons name="play-circle" size={56} color="rgba(255,255,255,0.7)" />
+            </View>
+          </View>
+        )}
+
+        {/* Video - Only render when shouldPlay is true and no error */}
+        {shouldPlay && !videoError && (
+          <Video
+            key="video"
+            ref={videoRef}
+            source={{
+              uri: mediaUrl,
+              // iOS requires headers for proper video loading
+              headers: {
+                'Accept': 'video/mp4, video/quicktime, video/*',
+                'User-Agent': 'Cofau/1.0',
+              }
+            }}
+            style={styles.video}
+            resizeMode="contain"
+            shouldPlay={shouldPlay}
+            isLooping
+            isMuted={isMuted}
+            useNativeControls={false}
+            allowsExternalPlayback={false}
+            playInSilentModeIOS={true}
+            // iOS-specific props for better compatibility
+            usePoster={false}
+            posterSource={null}
+            videoStyle={{ backgroundColor: 'black' }} 
+            // Preload video for iOS
+            onLoad={(status) => {
+              console.log("✅ Video loaded on iOS/Android", status);
+              // Only update state if it changed to prevent flickering
+              if (!videoLoaded) {
+                setVideoLoaded(true);
+              }
+              if (videoError) {
+                setVideoError(false);
+              }
+              // Ensure video plays after load (iOS needs explicit play)
+              if (shouldPlay && videoRef.current) {
+                setTimeout(async () => {
+                  try {
+                    const currentStatus = await videoRef.current.getStatusAsync();
+                    if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
+                      // iOS needs explicit play call
+                      await videoRef.current.playAsync();
+                      // Set mute state
+                      await videoRef.current.setIsMutedAsync(isMuted);
+                      // Ensure it's actually playing
+                      const afterPlayStatus = await videoRef.current.getStatusAsync();
+                      if (!afterPlayStatus.isPlaying && shouldPlay) {
+                        // Retry play if it didn't start
+                        setTimeout(async () => {
+                          try {
+                            await videoRef.current.playAsync();
+                          } catch (retryErr) {
+                            console.log("Video play retry error:", retryErr);
+                          }
+                        }, 300);
+                      }
+                    }
+                  } catch (err) {
+                    console.log("Auto-play error:", err);
+                  }
+                }, 200); // Reduced delay to prevent flickering
+              }
+            }}
+            onError={(error) => {
+              console.error("❌ Video error:", error);
+              console.error("❌ Video URL:", mediaUrl);
+              if (!videoError) {
+                setVideoError(true);
+              }
+              if (videoLoaded) {
+                setVideoLoaded(false);
+              }
+            }}
+            onPlaybackStatusUpdate={(status) => {
+              // Ensure video stops if shouldPlay becomes false
+              if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
+                videoRef.current.pauseAsync().catch(() => { });
+                videoRef.current.setPositionAsync(0).catch(() => { });
+              }
+              // Only attempt to play if video is loaded and should play
+              if (status.isLoaded && !status.isPlaying && shouldPlay && videoLoaded) {
+                videoRef.current?.playAsync().catch((err) => {
+                  // Silently handle - don't log to prevent spam
+                });
+              }
+            }}
+            progressUpdateIntervalMillis={1000}
+          />
+        )}
+        
+        {/* iOS HDR Brightness Fix - Semi-transparent overlay */}
+        {Platform.OS === 'ios' && shouldPlay && (
+          <View 
+            style={styles.hdrOverlay} 
+            pointerEvents="none" 
+          />
+        )}
+        
+        {/* Mute/Unmute Button - Bottom right corner, only show when video is playing */}
+        {shouldPlay && videoLoaded && !videoError && (
+          <TouchableOpacity
+            style={styles.muteButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleMutePress();
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.muteButtonBackground}>
+              <Ionicons
+                name={isMuted ? "volume-mute" : "volume-high"}
+                size={18}
+                color="#fff"
+              />
+            </View>
+          </TouchableOpacity>
+        )}
+      </>
+    ) : (
+      mediaUrl ? (
+        <Image
+          source={{ uri: mediaUrl }}
+          style={[
+            styles.image,
+            imageDimensions && { aspectRatio: imageDimensions.width / imageDimensions.height }
+          ]}
+          resizeMode="cover"
+          onLoad={(e) => {
+            if (!dimensionCache.current[mediaUrl]) {
+              const { width, height } = e.nativeEvent.source;
+              dimensionCache.current[mediaUrl] = { width, height };
+              setImageDimensions({ width, height });
+            }
+          }}
+          onError={(error) => {
+            console.error("❌ Image load error in FeedCard:", mediaUrl, error);
+          }}
+          onLoadStart={() => {
+            console.log("🖼️ Loading image:", mediaUrl);
+          }}
+        />
+      ) : (
+        <View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', aspectRatio: 0.75 }]}>
+          <Ionicons name="image-outline" size={40} color="#ccc" />
+        </View>
+      )
+    )}
+    
+    {/* Double Tap Heart Animation */}
+    {showHeartAnimation && (
+      <View style={styles.heartAnimationContainer}>
+        <GradientHeart size={120} />
+      </View>
+    )}
+  </Pressable>
 )}
 
 {/* DETAILS */}
@@ -661,11 +688,11 @@ progressUpdateIntervalMillis={1000}
 
 {/* COMMENT */}
 <TouchableOpacity
-style={styles.actionButton}
-onPress={() => router.push(`/comments/${post.id}`)}
+  style={styles.actionButton}
+  onPress={() => setShowCommentsModal(true)}
 >
-<Ionicons name="chatbubble-outline" size={18} color="#666" />
-<Text style={styles.actionCount}>{post.comments || 0}</Text>
+  <Ionicons name="chatbubble-outline" size={18} color="#666" />
+  <Text style={styles.actionCount}>{post.comments || 0}</Text>
 </TouchableOpacity>
 
 {/* SHARE */}
@@ -715,7 +742,7 @@ style: "cancel",
 );
 }}
 >
-<Ionicons name="paper-plane-outline" size={18} color="#666" />
+<Ionicons name="share-outline" size={18} color="#666" />
 <Text style={styles.actionCount}>{post.shares || 0}</Text>
 </TouchableOpacity>
 
@@ -745,6 +772,13 @@ console.error("Error sharing post:", error);
 }}
 />
 
+{/* Comments Modal */}
+<CommentsModal
+  postId={post.id}
+  isVisible={showCommentsModal}
+  onClose={() => setShowCommentsModal(false)}
+/>
+
 {/* Simple Share Modal (WhatsApp/Instagram) */}
 <SimpleShareModal
 visible={showSimpleShareModal}
@@ -759,9 +793,9 @@ post={post}
 
 const styles = StyleSheet.create({
 card: {
-backgroundColor: "#fff",
-marginBottom: 2,
-elevation: 6,
+  backgroundColor: "#fff",
+  marginBottom: 2,
+  elevation: 0,  // ← Just change this from 6 to 0
 },
 
 userHeader: {
@@ -769,6 +803,8 @@ flexDirection: "row",
 padding: 8,
 alignItems: "center",
 justifyContent: "space-between",
+borderTopWidth: 0,  // ← Add this to remove top border
+borderTopColor: 'transparent',  // ← Add this for safety
 },
 
 userInfo: {
@@ -1083,6 +1119,19 @@ locationRow: {
 flexDirection: "row",
 alignItems: "center",
 gap: 7,
+},
+
+heartAnimationContainer: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  zIndex: 100,
+  pointerEvents: 'none',
 },
 
 locationText: {

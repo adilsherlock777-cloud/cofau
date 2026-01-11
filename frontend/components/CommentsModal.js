@@ -7,16 +7,18 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Modal,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
+  Modal,
+  FlatList,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getComments, addComment } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from './UserAvatar';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const normalizeDP = (input) => {
   if (!input) return null;
@@ -40,10 +42,6 @@ const normalizeDP = (input) => {
 export default function CommentsModal({ postId, isVisible, onClose }) {
   const { token } = useAuth();
 
-  // Safety check - don't render if no postId or not visible
-  if (!isVisible || !postId) {
-    return null;
-  }
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -131,102 +129,111 @@ export default function CommentsModal({ postId, isVisible, onClose }) {
   return (
     <Modal
       visible={isVisible}
-      animationType="slide"
       transparent={true}
+      animationType="slide"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.handleBar} />
-              <Text style={styles.headerTitle}>Comments</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
+      <KeyboardAvoidingView 
+        style={styles.modalContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+      >
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={styles.bottomSheet}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.handleBar} />
+            <Text style={styles.headerTitle}>Comments</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
 
-            {/* Comments List */}
-            <FlatList
-              data={comments}
-              renderItem={renderComment}
-              keyExtractor={(item) => item.id.toString()}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                loading ? (
-                  <ActivityIndicator size="large" color="#4dd0e1" style={{ marginTop: 40 }} />
-                ) : (
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
-                    <Text style={styles.emptyText}>No comments yet</Text>
-                    <Text style={styles.emptySubtext}>Be the first to comment!</Text>
-                  </View>
-                )
-              }
+          {/* Comments List */}
+          <FlatList
+            data={comments}
+            renderItem={renderComment}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              loading ? (
+                <ActivityIndicator size="large" color="#4dd0e1" style={{ marginTop: 40 }} />
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
+                  <Text style={styles.emptyText}>No comments yet</Text>
+                  <Text style={styles.emptySubtext}>Be the first to comment!</Text>
+                </View>
+              )
+            }
+          />
+
+          {/* Input */}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Add a comment..."
+              placeholderTextColor="#999"
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+              maxLength={500}
             />
-
-            {/* Input */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Add a comment..."
-                placeholderTextColor="#999"
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-                maxLength={500}
-              />
-              <TouchableOpacity
-                style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
-                onPress={handleAddComment}
-                disabled={submitting || !commentText.trim()}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#4dd0e1" />
-                ) : (
-                  <Ionicons 
-                    name="send" 
-                    size={24} 
-                    color={commentText.trim() ? "#4dd0e1" : "#CCC"} 
-                  />
-                )}
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </Pressable>
-      </Pressable>
+            <TouchableOpacity
+              style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
+              onPress={handleAddComment}
+              disabled={submitting || !commentText.trim()}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#4dd0e1" />
+              ) : (
+                <Ionicons 
+                  name="send" 
+                  size={24} 
+                  color={commentText.trim() ? "#4dd0e1" : "#CCC"} 
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
   },
-  modalContent: {
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  bottomSheet: {
+    marginTop: 'auto',
+    maxHeight: SCREEN_HEIGHT * 0.5,
     backgroundColor: '#FFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    height: '75%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
-    elevation: 5,
-  },
-  container: {
-    flex: 1,
+    elevation: 10,
   },
   header: {
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
@@ -246,11 +253,12 @@ const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute',
     right: 16,
-    top: 8,
+    top: 12,
   },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 20,
+    flexGrow: 1,
   },
   commentCard: {
     paddingVertical: 16,
@@ -297,15 +305,16 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 8,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    backgroundColor: '#FFF',
-  },
+inputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingTop: 12,
+  paddingBottom: 12,
+  borderTopWidth: 1,
+  borderTopColor: '#E0E0E0',
+  backgroundColor: '#FFF',
+},
   input: {
     flex: 1,
     paddingHorizontal: 16,

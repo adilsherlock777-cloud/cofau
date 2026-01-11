@@ -331,16 +331,11 @@ export default function LeaderboardScreen() {
                       onPress={() => handlePostPress(entry.post_id)}
                       activeOpacity={0.7}
                     >
-                      <LinearGradient
-                        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.rankBadgeGradient}
-                      >
-                        <Text style={styles.topThreeRankText}>
-                          #{entry.rank}
-                        </Text>
-                      </LinearGradient>
+                      <Image
+  source={require('../assets/badges/top1.png')}
+  style={styles.rankBadgeImage}
+  resizeMode="contain"
+/>
 
                       <View style={styles.rankOneContainer}>
                         <View style={styles.confettiContainer}>
@@ -480,21 +475,12 @@ export default function LeaderboardScreen() {
                   onPress={() => handlePostPress(entry.post_id)}
                   activeOpacity={0.7}
                 >
-                  {index < 3 ? (
-  <LinearGradient
-    colors={
-      index === 0 
-        ? ["#E94A37", "#F2CF68", "#1B7C82"]  // Rank 1: Cofau gradient
-        : index === 1
-        ? ["#E94A37", "#F2CF68", "#1B7C82"]   // Rank 2: Silver gradient
-        : ["#E94A37", "#F2CF68", "#1B7C82"]    // Rank 3: Bronze gradient
-    }
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={styles.rankOneBadge}
-  >
-    <Text style={styles.rankOneBadgeText}>#{entry.rank}</Text>
-  </LinearGradient>
+                  {index === 0 ? (
+  <Image
+    source={require('../assets/badges/top1.png')}
+    style={styles.rankBadgeImage}
+    resizeMode="contain"
+  />
 ) : (
   <View style={styles.rankBadge}>
     <Text style={styles.rankText}>
@@ -734,6 +720,15 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 15,
   },
+
+  rankBadgeImage: {
+  position: "absolute",
+  top: -20,
+  right: -70,
+  width: 200,
+  height: 110,
+  zIndex: 10,
+},
   rankOneGradientBorder: {
     borderRadius: 20,
     padding: 2,

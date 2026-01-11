@@ -102,6 +102,7 @@ export default function FeedScreen() {
   const isScrollingRef = useRef(false);
   const paginationTriggeredRef = useRef(false);
   const lastScrollYRef = useRef(0);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   const POSTS_PER_PAGE = 30;
   const VISIBILITY_THRESHOLD = 0.2;
@@ -112,19 +113,22 @@ export default function FeedScreen() {
     setIsMuted(newMuteState);
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
+  if (!hasInitiallyLoaded) {
     fetchFeed(true);
     loadUnreadCount();
-  }, []);
+    setHasInitiallyLoaded(true);
+  }
+}, []);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadUnreadCount();
-      refreshUser();
-      fetchFeed(true);
-      fetchOwnStory();
-    }, [token])
-  );
+// Replace your useFocusEffect with this SIMPLER version
+useFocusEffect(
+  React.useCallback(() => {
+    // Only update notifications and story, DON'T call refreshUser or fetchFeed
+    loadUnreadCount();
+    fetchOwnStory();
+  }, [token])
+);
 
   const loadUnreadCount = async () => {
     if (!token) return;
@@ -384,7 +388,10 @@ const renderPost = useCallback(
       <View style={styles.postContainer}>
         <FeedCard
           post={post}
-          onLikeUpdate={() => fetchFeed(true)}
+          onLikeUpdate={() => {
+            // Don't refresh entire feed on like
+            // Just update the specific post
+          }}
           onStoryCreated={() => {}}
           shouldPlay={shouldPlay}
           shouldPreload={shouldPlay}
@@ -735,14 +742,16 @@ const renderPost = useCallback(
   ListHeaderComponent={ListHeader}
   ListFooterComponent={ListFooter}
   refreshControl={
-    <RefreshControl
-      refreshing={refreshing}
-      onRefresh={() => {
-        setRefreshing(true);
-        fetchFeed(true);
-      }}
-    />
-  }
+  <RefreshControl
+    refreshing={refreshing}
+    onRefresh={() => {
+      setRefreshing(true);
+      setHasInitiallyLoaded(false); // Reset the flag
+      fetchFeed(true);
+      setHasInitiallyLoaded(true); // Set it back
+    }}
+  />
+}
   onScroll={handleScroll}
   scrollEventThrottle={16}
   showsVerticalScrollIndicator={false}
