@@ -439,11 +439,7 @@ async def share_post_preview(request: Request, post_id: str):
         {"request": request, "post": post, "post_id": post_id}
     )
 
-# ======================================================
 
-@app.get("/api")
-async def root():
-    return {"message": "Cofau API is running", "version": "1.0.0"}
 
 @app.get("/api")
 async def root():
@@ -595,10 +591,20 @@ async def create_post(
     if category:
         print(f"📝 Category after strip: '{category.strip()}')")
 
-    # Validate file
+    # Get file extension
     file_ext = file.filename.split(".")[-1].lower()
-    if file_ext not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+    
+    # Debug: Log the file extension
+    print(f"📁 Uploaded file: {file.filename}, extension: {file_ext}")
+    
+    # Define allowed extensions (including iOS formats)
+    ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif"]
+    ALLOWED_VIDEO_EXTENSIONS = ["mp4", "mov", "m4v"]
+    ALL_ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS + ALLOWED_VIDEO_EXTENSIONS
+    
+    if file_ext not in ALL_ALLOWED_EXTENSIONS:
+        print(f"❌ Invalid file type: {file_ext}")
+        raise HTTPException(status_code=400, detail=f"Invalid file type: {file_ext}. Allowed: {ALL_ALLOWED_EXTENSIONS}")
 
     unique_id = str(ObjectId())
     filename = f"{unique_id}_{file.filename}"
@@ -624,7 +630,6 @@ async def create_post(
         print(f"✅ File saved successfully: {file_path} (size: {file_size} bytes)")
     except Exception as e:
         print(f"❌ Error saving file: {str(e)}")
-        # Clean up if file was partially created
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -632,8 +637,62 @@ async def create_post(
                 pass
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
 
+    # ======================================================
+    # HEIC/HEIF CONVERSION - Convert iOS photos to JPEG
+    # ======================================================
+    if file_ext in ["heic", "heif"]:
+        print(f"📱 iOS HEIC/HEIF detected - converting to JPEG...")
+        try:
+            from PIL import Image
+            import pillow_heif
+            
+            # Register HEIF opener with Pillow
+            pillow_heif.register_heif_opener()
+            
+            # Open HEIC and convert to JPEG
+            img = Image.open(file_path)
+            
+            # Convert to RGB if necessary (HEIC can have alpha channel)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            # Create new filename with .jpg extension
+            new_filename = f"{unique_id}_{os.path.splitext(file.filename)[0]}.jpg"
+            new_file_path = os.path.join(settings.UPLOAD_DIR, new_filename)
+            
+            # Save as JPEG with good quality
+            img.save(new_file_path, 'JPEG', quality=90, optimize=True)
+            img.close()
+            
+            # Remove original HEIC file
+            os.remove(file_path)
+            
+            # Update variables to point to new file
+            file_path = new_file_path
+            filename = new_filename
+            file_ext = "jpg"
+            
+            print(f"✅ Converted HEIC to JPEG: {new_filename}")
+        except ImportError:
+            print("❌ pillow-heif not installed. Install with: pip install pillow-heif")
+            os.remove(file_path)
+            raise HTTPException(
+                status_code=500, 
+                detail="HEIC conversion not available. Please convert your photo to JPEG before uploading."
+            )
+        except Exception as e:
+            print(f"❌ HEIC conversion failed: {str(e)}")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Failed to convert HEIC image: {str(e)}"
+            )
+
     # Detect media type
-    media_type = "video" if file_ext in ["mp4", "mov"] else "image"
+    media_type = "video" if file_ext in ["mp4", "mov", "m4v"] else "image"
+    
+
 
     # ======================================================
     # VIDEO OPTIMIZATION - Transcode to 720p H.264 and generate thumbnail
@@ -1867,7 +1926,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
         })
     
     return result
-    
+
 @app.get("/api/explore/nearby")
 async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get posts near a location using Haversine formula"""
