@@ -118,7 +118,6 @@ export default function CommentsScreen() {
     setSubmitting(true);
     try {
       console.log('📤 Submitting comment for postId:', normalizedPostId);
-      // Use addComment with token explicitly, or use direct axios call like post-details
       await addComment(normalizedPostId, commentText, token);
       setCommentText('');
       await fetchComments();
@@ -147,11 +146,8 @@ export default function CommentsScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* HEADER */}
+    <View style={styles.container}>
+      {/* HEADER - OUTSIDE KeyboardAvoidingView so it stays fixed */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -160,66 +156,73 @@ export default function CommentsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* COMMENTS */}
-      <ScrollView style={styles.commentsContainer}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4dd0e1" />
-          </View>
-        ) : comments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
-            <Text style={styles.emptyText}>No comments yet</Text>
-            <Text style={styles.emptySubtext}>Be the first to comment!</Text>
-          </View>
-        ) : (
-          comments.map((comment) => (
-            <View key={comment.id} style={styles.commentCard}>
-              <View style={styles.commentHeader}>
-                <UserAvatar
-                  profilePicture={comment.profile_pic}
-                  username={comment.username}
-                  size={36}
-                  level={comment.level}
-                  showLevelBadge={true}
-                />
-                <View style={styles.commentInfo}>
-                  <Text style={styles.username}>{comment.username}</Text>
-                  <Text style={styles.timestamp}>
-                    {formatTimestamp(comment.created_at)}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.commentText}>{comment.comment_text}</Text>
+      {/* Wrap only scrollable content and input */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        {/* COMMENTS */}
+        <ScrollView style={styles.commentsContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#4dd0e1" />
             </View>
-          ))
-        )}
-      </ScrollView>
-
-      {/* ADD COMMENT */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Add a comment..."
-          placeholderTextColor="#999"
-          value={commentText}
-          onChangeText={setCommentText}
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
-          onPress={handleAddComment}
-          disabled={submitting || !commentText.trim()}
-        >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#4dd0e1" />
+          ) : comments.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
+              <Text style={styles.emptyText}>No comments yet</Text>
+              <Text style={styles.emptySubtext}>Be the first to comment!</Text>
+            </View>
           ) : (
-            <Ionicons name="send" size={24} color={commentText.trim() ? "#4dd0e1" : "#CCC"} />
+            comments.map((comment) => (
+              <View key={comment.id} style={styles.commentCard}>
+                <View style={styles.commentHeader}>
+                  <UserAvatar
+                    profilePicture={comment.profile_pic}
+                    username={comment.username}
+                    size={36}
+                    level={comment.level}
+                    showLevelBadge={true}
+                  />
+                  <View style={styles.commentInfo}>
+                    <Text style={styles.username}>{comment.username}</Text>
+                    <Text style={styles.timestamp}>
+                      {formatTimestamp(comment.created_at)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.commentText}>{comment.comment_text}</Text>
+              </View>
+            ))
           )}
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        </ScrollView>
+
+        {/* ADD COMMENT */}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Add a comment..."
+            placeholderTextColor="#999"
+            value={commentText}
+            onChangeText={setCommentText}
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
+            onPress={handleAddComment}
+            disabled={submitting || !commentText.trim()}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="#4dd0e1" />
+            ) : (
+              <Ionicons name="send" size={24} color={commentText.trim() ? "#4dd0e1" : "#CCC"} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -283,6 +286,17 @@ const styles = StyleSheet.create({
     borderTopColor: '#E0E0E0',
     backgroundColor: '#FFF',
   },
+
+  header: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 16,
+  paddingTop: 66,        // ← Very minimal top padding
+  paddingBottom: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#E0E0E0',
+},
 
   input: {
     flex: 1,

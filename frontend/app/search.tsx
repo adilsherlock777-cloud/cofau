@@ -3,1069 +3,677 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
-  Image,
   ActivityIndicator,
-  FlatList,
+  Alert,
+  Linking,
   Dimensions,
   Modal,
-  Alert,
+  ScrollView,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from '../components/UserAvatar';
-import PostBottomSheet from '../components/PostBottomSheet';
-import { searchUsers, searchLocations, reportPost, reportUser } from '../utils/api';
+import axios from 'axios';
+import { Image } from 'expo-image';
+import { Video } from 'expo-av';
 import { normalizeMediaUrl, normalizeProfilePicture } from '../utils/imageUrlFix';
 
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
+const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
+const API_URL = `${BACKEND}/api`;
 
-export default function SearchScreen() {
+interface PostBottomSheetProps {
+  visible: boolean;
+  postId: string | null;
+  onClose: () => void;
+}
+
+export default function PostBottomSheet({ visible, postId, onClose }: PostBottomSheetProps) {
   const router = useRouter();
   const { token } = useAuth() as { token: string | null };
-  const [searchText, setSearchText] = useState('');
-  const [userResults, setUserResults] = useState<any[]>([]);
-  const [locationResults, setLocationResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<Array<{type: 'user' | 'location', id: string, name: string, profilePicture?: string | null, subtitle?: string}>>([]);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const suggestionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Report modal state
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showMenuModal, setShowMenuModal] = useState(false);
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [reportDescription, setReportDescription] = useState('');
-  const [reportType, setReportType] = useState<'post' | 'user' | null>(null);
-  const [submittingReport, setSubmittingReport] = useState(false);
   
-  // Bottom sheet state for post details
-  const [showPostBottomSheet, setShowPostBottomSheet] = useState(false);
-  const [bottomSheetPostId, setBottomSheetPostId] = useState<string | null>(null);
+  const [post, setPost] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [isSaved, setIsSaved] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const videoRef = useRef<any>(null);
 
-  // Debounced suggestions (lightweight - just names)
+  // Fetch post data
   useEffect(() => {
-    if (suggestionsTimeoutRef.current) {
-      clearTimeout(suggestionsTimeoutRef.current);
+    if (visible && postId && token) {
+      fetchPostDetails();
+    } else if (!visible) {
+      setPost(null);
+      setComments([]);
+      setCommentText('');
+      setShowComments(false);
     }
+  }, [visible, postId, token]);
 
-    if (searchText.trim().length > 0) {
-      setShowSuggestions(true);
-      suggestionsTimeoutRef.current = setTimeout(() => {
-        fetchSuggestions(searchText.trim());
-      }, 200); // Faster debounce for suggestions
-    } else {
-      setShowSuggestions(false);
-      setSuggestions([]);
-      setShowResults(false);
-      setUserResults([]);
-      setLocationResults([]);
-    }
-
-    return () => {
-      if (suggestionsTimeoutRef.current) {
-        clearTimeout(suggestionsTimeoutRef.current);
-      }
-    };
-  }, [searchText, token]);
-
-  // Fetch lightweight suggestions (just names and profile images, no post previews)
-  const fetchSuggestions = async (query: string) => {
-    if (!query || !token) {
-      setSuggestions([]);
-      return;
-    }
-
-    try {
-      // Fetch suggestions with limit to reduce DB load
-      const [users, locations] = await Promise.all([
-        searchUsers(query).catch(() => []),
-        searchLocations(query).catch(() => []),
-      ]);
-
-      // Create simple suggestions array (max 5 users + 5 locations = 10 total)
-      const userSuggestions = (users || []).slice(0, 5).map((user: any) => ({
-        type: 'user' as const,
-        id: user.id,
-        name: user.username,
-        profilePicture: user.profile_picture || user.user_profile_picture || null,
-        subtitle: user.posts_count ? `${user.posts_count} posts` : undefined,
-      }));
-
-      const locationSuggestions = (locations || []).slice(0, 5).map((location: any) => ({
-        type: 'location' as const,
-        id: location.name,
-        name: location.name,
-        subtitle: location.total_posts ? `${location.total_posts} posts` : undefined,
-      }));
-
-      setSuggestions([...userSuggestions, ...locationSuggestions]);
-    } catch (error) {
-      console.error('❌ Suggestions error:', error);
-      setSuggestions([]);
-    }
-  };
-
-  // Full search with post previews (only called when user clicks a suggestion)
-  const performSearch = async (query: string, suggestionType?: 'user' | 'location', suggestionId?: string) => {
-    if (!query || !token) {
-      setLoading(false);
-      return;
-    }
+  const fetchPostDetails = async () => {
+    if (!postId || !token) return;
 
     setLoading(true);
-    setShowSuggestions(false);
-    setShowResults(true);
-
     try {
-      // If a specific suggestion was clicked, search for that specific item
-      if (suggestionType === 'user' && suggestionId) {
-        const users: any[] = await searchUsers(query).catch(() => []);
-        const foundUser = users.find((u: any) => u.id === suggestionId);
-        setUserResults(foundUser ? [foundUser] : [] as any[]);
-        setLocationResults([]);
-      } else if (suggestionType === 'location' && suggestionId) {
-        const locations: any[] = await searchLocations(query).catch(() => []);
-        const foundLocation = locations.find((l: any) => l.name === suggestionId);
-        setLocationResults(foundLocation ? [foundLocation] : [] as any[]);
-        setUserResults([]);
-      } else {
-        // Full search for all results
-        const [users, locations] = await Promise.all([
-          searchUsers(query).catch(() => []),
-          searchLocations(query).catch(() => []),
-        ]);
-
-        setUserResults(users || []);
-        setLocationResults(locations || []);
+      let postData;
+      
+      // Try single post endpoint first
+      try {
+        const res = await axios.get(`${API_URL}/posts/${postId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        postData = res.data;
+      } catch (e) {
+        // Fallback: fetch from feed and find the post
+        const feedRes = await axios.get(`${API_URL}/feed?limit=100&skip=0`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const foundPost = feedRes.data.find((p: any) => p.id === postId);
+        if (!foundPost) {
+          throw new Error('Post not found');
+        }
+        postData = foundPost;
       }
+
+      setPost(postData);
+      setIsLiked(postData.is_liked_by_user || false);
+      setLikesCount(postData.likes_count || 0);
+      setIsSaved(postData.is_saved_by_user || false);
     } catch (error) {
-      console.error('❌ Search error:', error);
-      setUserResults([]);
-      setLocationResults([]);
+      console.error('❌ Error fetching post:', error);
+      Alert.alert('Error', 'Failed to load post');
+      onClose();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSuggestionPress = (suggestion: {type: 'user' | 'location', id: string, name: string, profilePicture?: string | null}) => {
-    setSelectedSuggestion(suggestion.id);
-    setSearchText(suggestion.name);
-    // Trigger full search with post previews
-    performSearch(suggestion.name, suggestion.type as 'user' | 'location', suggestion.id);
-  };
+  const handleLikeToggle = async () => {
+    if (!post || !token) return;
 
-  const handleUserPress = (userId: string) => {
-    setSearchText('');
-    setShowResults(false);
-    setShowSuggestions(false);
-    router.push(`/profile?userId=${userId}`);
-  };
+    const prevLiked = isLiked;
+    const prevCount = likesCount;
 
-  const handleLocationPress = (locationName: string) => {
-    setSearchText('');
-    setShowResults(false);
-    setShowSuggestions(false);
-    router.push(`/location-details?name=${encodeURIComponent(locationName)}`);
-  };
+    setIsLiked(!prevLiked);
+    setLikesCount(prevLiked ? prevCount - 1 : prevCount + 1);
 
-  const handlePostPress = (postId: string) => {
-    setBottomSheetPostId(postId);
-    setShowPostBottomSheet(true);
-  };
-  
-  const handleClosePostBottomSheet = () => {
-    setShowPostBottomSheet(false);
-    setBottomSheetPostId(null);
-  };
-
-  const handlePostMenuPress = (postId: string, event?: any) => {
-    if (event) {
-      event.stopPropagation();
-    }
-    setSelectedPostId(postId);
-    setSelectedUserId(null);
-    setReportType('post');
-    setShowMenuModal(true);
-  };
-
-  const handleUserMenuPress = (userId: string, event?: any) => {
-    if (event) {
-      event.stopPropagation();
-    }
-    setSelectedUserId(userId);
-    setSelectedPostId(null);
-    setReportType('user');
-    setShowMenuModal(true);
-  };
-
-  const handleReportOption = (type: 'post' | 'user') => {
-    setShowMenuModal(false);
-    setReportType(type);
-    setReportDescription('');
-    setShowReportModal(true);
-  };
-
-  const handleSubmitReport = async () => {
-    if (!reportDescription.trim()) {
-      Alert.alert('Error', 'Please provide a description for your report');
-      return;
-    }
-
-    setSubmittingReport(true);
     try {
-      if (reportType === 'post' && selectedPostId) {
-        await reportPost(selectedPostId, reportDescription);
-        Alert.alert('Success', 'Post reported successfully');
-      } else if (reportType === 'user' && selectedUserId) {
-        await reportUser(selectedUserId, reportDescription);
-        Alert.alert('Success', 'User reported successfully');
+      if (prevLiked) {
+        await axios.delete(`${API_URL}/posts/${post.id}/like`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(
+          `${API_URL}/posts/${post.id}/like`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
-      setShowReportModal(false);
-      setReportDescription('');
-      setSelectedPostId(null);
-      setSelectedUserId(null);
-      setReportType(null);
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || error.message || 'Failed to submit report');
-    } finally {
-      setSubmittingReport(false);
+    } catch (e) {
+      setIsLiked(prevLiked);
+      setLikesCount(prevCount);
     }
   };
 
-  const renderUserItem = ({ item }: { item: any }) => (
-    <View style={styles.userItem}>
-      <TouchableOpacity
-        style={styles.userHeader}
-        onPress={() => handleUserPress(item.id)}
-        activeOpacity={0.7}
-      >
-        <UserAvatar
-          profilePicture={item.profile_picture}
-          username={item.username}
-          size={56}
-          level={item.level}
-          showLevelBadge={true}
-          style={{}}
-        />
-        <View style={styles.userInfo}>
-          <Text style={styles.username}>{item.username}</Text>
-          <Text style={styles.userMeta}>
-            {item.posts_count} {item.posts_count === 1 ? 'post' : 'posts'}
-            {item.followers_count > 0 && ` • ${item.followers_count} followers`}
-          </Text>
-        </View>
-        {item.is_following && (
-          <View style={styles.followingBadge}>
-            <Text style={styles.followingText}>Following</Text>
-          </View>
-        )}
-        <TouchableOpacity
-          style={styles.userMenuButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleUserMenuPress(item.id, e);
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
-        </TouchableOpacity>
-      </TouchableOpacity>
+  const handleSaveToggle = async () => {
+    if (!post || !token) return;
 
-      {/* Instagram-like Post Preview Grid */}
-      {item.sample_posts && item.sample_posts.length > 0 && (
-        <View style={styles.userPostGrid}>
-          {item.sample_posts.slice(0, 6).map((post: any, index: number) => {
-            const postUrl = normalizeMediaUrl(post.media_url);
-            return (
-              <View key={index} style={styles.userPostPreviewContainer}>
-                <TouchableOpacity
-                  style={styles.userPostPreview}
-                  onPress={() => handlePostPress(post.post_id)}
-                  activeOpacity={0.8}
-                >
-                  {postUrl ? (
-                    <Image
-                      source={{ uri: postUrl }}
-                      style={styles.userPostImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.userPostPlaceholder}>
-                      <Ionicons name="image-outline" size={20} color="#ccc" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.postMenuButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handlePostMenuPress(post.post_id, e);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="ellipsis-horizontal" size={16} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
+    const prevSaved = isSaved;
+    setIsSaved(!prevSaved);
 
-  const renderLocationItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.locationItem}
-      onPress={() => handleLocationPress(item.name)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.locationHeader}>
-        <Ionicons name="location" size={20} color="#4ECDC4" />
-        <View style={styles.locationInfo}>
-          <Text style={styles.locationName}>{item.name}</Text>
-          <Text style={styles.locationMeta}>
-            {item.total_posts} {item.total_posts === 1 ? 'post' : 'posts'}
-            {item.average_rating > 0 && ` • ⭐ ${item.average_rating}/10`}
-          </Text>
-        </View>
-      </View>
+    try {
+      if (prevSaved) {
+        await axios.delete(`${API_URL}/posts/${post.id}/save`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(
+          `${API_URL}/posts/${post.id}/save`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+    } catch (e) {
+      setIsSaved(prevSaved);
+    }
+  };
 
-      {/* Photo Preview Grid - Enhanced for better visibility */}
-      {item.sample_photos && item.sample_photos.length > 0 && (
-        <View style={styles.photoGrid}>
-          {item.sample_photos.slice(0, 6).map((photo: any, index: number) => {
-            const photoUrl = normalizeMediaUrl(photo.media_url);
-            return (
-              <View key={index} style={styles.photoPreviewContainer}>
-                <TouchableOpacity
-                  style={styles.photoPreview}
-                  onPress={() => handlePostPress(photo.post_id)}
-                  activeOpacity={0.8}
-                >
-                  {photoUrl ? (
-                    <Image
-                      source={{ uri: photoUrl }}
-                      style={styles.photoImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons name="image-outline" size={24} color="#ccc" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.postMenuButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handlePostMenuPress(photo.post_id, e);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="ellipsis-horizontal" size={16} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+  const fetchComments = async () => {
+    if (!post || !token) return;
+
+    try {
+      const res = await axios.get(`${API_URL}/posts/${post.id}/comments`);
+      const normalized = res.data.map((c: any) => ({
+        ...c,
+        profile_pic: normalizeProfilePicture(c.profile_pic),
+      }));
+      setComments(normalized);
+    } catch (e) {
+      console.log('❌ Comment fetch error', e);
+    }
+  };
+
+  useEffect(() => {
+    if (showComments && post) {
+      fetchComments();
+    }
+  }, [showComments, post?.id]);
+
+  const handleSubmitComment = async () => {
+    if (!commentText.trim() || !post || !token) return;
+
+    setSubmittingComment(true);
+    try {
+      const formData = new FormData();
+      formData.append('comment_text', commentText.trim());
+
+      await axios.post(`${API_URL}/posts/${post.id}/comment`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setCommentText('');
+      fetchComments();
+    } catch (e) {
+      Alert.alert('Error', 'Unable to add comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const formatTime = (timestamp: string | null | undefined): string => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+
+    const mins = Math.floor(diff / 60000);
+    const hrs = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (hrs < 24) return `${hrs}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const handleSharePost = async () => {
+    if (!post) return;
+
+    try {
+      const postUrl = `${BACKEND}/post/${post.id}`;
+      const shareText = `${post.username} shared a post on Cofau!\n\n${post.review_text || ''}\n\nRating: ${post.rating}/10${post.location_name ? `\n📍 ${post.location_name}` : ''}\n\nView post: ${postUrl}`;
+
+      const shareOptions = {
+        message: shareText,
+        url: postUrl,
+        title: `Check out ${post.username}'s post on Cofau`,
+      };
+
+      const result = await Share.share(shareOptions);
+
+      if (result.action === Share.sharedAction) {
+        setShowShareModal(false);
+      }
+    } catch (error) {
+      console.error('❌ Error sharing post:', error);
+      Alert.alert('Error', 'Unable to share post. Please try again.');
+    }
+  };
+
+  if (!visible) return null;
+
+  const isVideo = post && (post.media_type || '').toLowerCase() === 'video';
+  const mediaUrl = post ? normalizeMediaUrl(post.media_url || post.image_url) : null;
+  const imageUrl = post ? normalizeMediaUrl(post.image_url || post.media_url) : null;
+  const profilePic = post ? normalizeProfilePicture(post.user_profile_picture) : null;
 
   return (
-    <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search users, locations, restaurants..."
-            placeholderTextColor="#999"
-            value={searchText}
-            onChangeText={setSearchText}
-            autoFocus={false}
-            onFocus={() => {
-              if (searchText.trim().length > 0) {
-                setShowSuggestions(true);
-              }
-            }}
-            onBlur={() => {
-              // Delay hiding suggestions to allow clicks
-              setTimeout(() => setShowSuggestions(false), 200);
-            }}
-          />
-          {searchText.length > 0 && (
-            <TouchableOpacity
-              onPress={() => {
-                setSearchText('');
-                setShowResults(false);
-                setShowSuggestions(false);
-                setSuggestions([]);
-              }}
-              style={styles.clearButton}
-            >
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Suggestions Dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <View style={styles.suggestionsContainer}>
-            <ScrollView 
-              style={styles.suggestionsList}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled={true}
-            >
-              {suggestions.map((suggestion, index) => {
-                const suggestionItem = suggestion as {type: 'user' | 'location', id: string, name: string, profilePicture?: string | null, subtitle?: string};
-                return (
-                  <TouchableOpacity
-                    key={`${suggestionItem.type}-${suggestionItem.id}-${index}`}
-                    style={styles.suggestionItem}
-                    onPress={() => handleSuggestionPress(suggestionItem)}
-                    activeOpacity={0.7}
-                  >
-                    {suggestionItem.type === 'user' ? (
-                      // Show profile image for users
-                      <View style={styles.suggestionAvatarContainer}>
-                        {suggestionItem.profilePicture ? (
-                          <Image
-                            source={{ uri: normalizeProfilePicture(suggestionItem.profilePicture) || '' }}
-                            style={styles.suggestionAvatar}
-                          />
-                        ) : (
-                          <View style={styles.suggestionAvatarPlaceholder}>
-                            <Ionicons name="person" size={20} color="#999" />
-                          </View>
-                        )}
-                      </View>
-                    ) : (
-                      // Show location icon for locations
-                      <View style={styles.suggestionIconContainer}>
-                        <Ionicons name="location" size={20} color="#4ECDC4" />
-                      </View>
-                    )}
-                    <View style={styles.suggestionContent}>
-                      <Text style={styles.suggestionName}>{suggestionItem.name}</Text>
-                      {suggestionItem.subtitle && (
-                        <Text style={styles.suggestionSubtitle}>{suggestionItem.subtitle}</Text>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#ccc" />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={styles.bottomSheet}>
+          {/* Drag Handle */}
+          <View style={styles.dragHandleContainer}>
+            <View style={styles.dragHandle} />
           </View>
-        )}
-      </View>
 
-      {/* Search Results */}
-      {showResults ? (
-        <View style={styles.resultsContainer}>
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#4dd0e1" />
-              <Text style={styles.loadingText}>Searching...</Text>
+              <Text style={styles.loadingText}>Loading post...</Text>
             </View>
-          ) : (
+          ) : post ? (
             <ScrollView
-              style={styles.resultsScroll}
+              style={styles.content}
               showsVerticalScrollIndicator={false}
+              bounces={false}
             >
-              {/* User Results */}
-              {userResults.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Users</Text>
-                  <FlatList
-                    data={userResults}
-                    renderItem={renderUserItem}
-                    keyExtractor={(item) => item.id}
-                    scrollEnabled={false}
+              {/* Header with Follow Button */}
+              <View style={styles.header}>
+                <TouchableOpacity
+                  style={styles.headerUser}
+                  onPress={() => {
+                    onClose();
+                    router.push(`/profile?userId=${post.user_id}`);
+                  }}
+                >
+                  <UserAvatar
+                    profilePicture={profilePic}
+                    username={post.username}
+                    level={post.user_level}
+                    size={40}
+                    showLevelBadge
                   />
+                  <Text style={styles.headerUsername}>{post.username}</Text>
+                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                  <TouchableOpacity style={styles.followButton}>
+                    <Text style={styles.followButtonText}>Follow</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.menuButton} onPress={onClose}>
+                    <Ionicons name="close" size={24} color="#000" />
+                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
 
-              {/* Location Results */}
-              {locationResults.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Locations & Restaurants</Text>
-                  <FlatList
-                    data={locationResults}
-                    renderItem={renderLocationItem}
-                    keyExtractor={(item, index) => `${item.name}-${index}`}
-                    scrollEnabled={false}
+              {/* Media */}
+              <View style={styles.mediaContainer}>
+                {isVideo ? (
+                  <Video
+                    ref={videoRef}
+                    source={{ uri: mediaUrl || '' }}
+                    style={styles.media}
+                    resizeMode="cover"
+                    useNativeControls
+                    isLooping
                   />
-                </View>
-              )}
+                ) : (
+                  <Image
+                    source={{ uri: imageUrl || mediaUrl || '' }}
+                    style={styles.media}
+                    contentFit="cover"
+                  />
+                )}
+              </View>
 
-              {/* No Results */}
-              {!loading && userResults.length === 0 && locationResults.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="search-outline" size={64} color="#ccc" />
-                  <Text style={styles.emptyText}>No results found</Text>
-                  <Text style={styles.emptySubtext}>
-                    Try searching for a username or location
+              {/* Rest of your existing JSX... */}
+              {/* Action Buttons */}
+              <View style={styles.actionsRow}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleLikeToggle}>
+                  <Ionicons
+                    name={isLiked ? 'heart' : 'heart-outline'}
+                    size={28}
+                    color={isLiked ? '#FF6B6B' : '#000'}
+                  />
+                  <Text style={styles.actionText}>{likesCount}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => setShowComments(!showComments)}
+                >
+                  <Ionicons name="chatbubble-outline" size={26} color="#000" />
+                  <Text style={styles.actionText}>{post.comments_count || comments.length}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => setShowShareModal(true)}
+                >
+                  <Ionicons name="share-outline" size={26} color="#000" />
+                  <Text style={styles.actionText}>{post.shares_count || 0}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.actionButton} onPress={handleSaveToggle}>
+                  <Ionicons
+                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                    size={26}
+                    color={isSaved ? '#4dd0e1' : '#000'}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Post Info */}
+              <View style={styles.postInfo}>
+                <View style={styles.captionContainer}>
+                  <Text style={styles.caption}>
+                    <Text style={styles.captionUsername}>{post.username}</Text>
+                    {post.review_text && ` ${post.review_text}`}
                   </Text>
+                </View>
+
+                {post.rating && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="star" size={18} color="#FFD700" />
+                    <Text style={styles.infoText}>{post.rating}/10</Text>
+                  </View>
+                )}
+
+                {post.location_name && (
+                  <TouchableOpacity
+                    style={styles.infoRow}
+                    onPress={() => {
+                      if (post.map_link) {
+                        Linking.openURL(post.map_link);
+                      }
+                    }}
+                  >
+                    <Ionicons name="location" size={18} color="#FFD700" />
+                    <Text style={styles.locationText}>{post.location_name}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <Text style={styles.timestamp}>{formatTime(post.created_at)}</Text>
+              </View>
+
+              {/* Comments Section */}
+              {showComments && (
+                <View style={styles.commentsSection}>
+                  <Text style={styles.commentsTitle}>
+                    Comments ({comments.length})
+                  </Text>
+
+                  {comments.length === 0 ? (
+                    <Text style={styles.noComments}>No comments yet</Text>
+                  ) : (
+                    comments.map((c: any) => (
+                      <View key={c.id} style={styles.commentItem}>
+                        <UserAvatar
+                          profilePicture={c.profile_pic}
+                          username={c.username}
+                          size={32}
+                        />
+                        <View style={styles.commentContent}>
+                          <Text style={styles.commentUsername}>{c.username}</Text>
+                          <Text style={styles.commentText}>{c.comment_text}</Text>
+                          <Text style={styles.commentTime}>
+                            {formatTime(c.created_at)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                  )}
+
+                  {/* Comment Input */}
+                  <View style={styles.commentInputContainer}>
+                    <TextInput
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      placeholder="Add a comment…"
+                      style={styles.commentInput}
+                      multiline
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.sendButton,
+                        !commentText.trim() && { backgroundColor: '#ccc' },
+                      ]}
+                      disabled={!commentText.trim() || submittingComment}
+                      onPress={handleSubmitComment}
+                    >
+                      {submittingComment ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Ionicons name="send" size={20} color="#fff" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </ScrollView>
-          )}
+          ) : null}
         </View>
-      ) : (
-        /* Default View - Recent/Explore */
-        <ScrollView
-          style={styles.defaultScroll}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.defaultContent}
-        >
-          <View style={styles.defaultContainer}>
-            <Ionicons name="search-outline" size={48} color="#ccc" />
-            <Text style={styles.defaultText}>Search for users or locations</Text>
-            <Text style={styles.defaultSubtext}>
-              Find people, restaurants, and places
-            </Text>
-          </View>
-        </ScrollView>
-      )}
-
-      {/* Bottom Navigation */}
-      <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/explore')}>
-          <Ionicons name="compass" size={28} color="#000" />
-          <Text style={styles.navLabel}>Explore</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/leaderboard')}>
-          <Ionicons name="trophy-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Leaderboard</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/happening')}>
-          <Ionicons name="restaurant-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Restaurant</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/profile')}>
-          <Ionicons name="person-outline" size={28} color="#000" />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* Menu Modal */}
-      <Modal
-        visible={showMenuModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowMenuModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMenuModal(false)}
-        >
-          <View style={styles.menuModalContent}>
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={() => handleReportOption(reportType || 'post')}
-            >
-              <Ionicons name="flag-outline" size={20} color="#FF3B30" />
-              <Text style={styles.menuOptionText}>
-                Report {reportType === 'post' ? 'Post' : 'User'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuCancel}
-              onPress={() => setShowMenuModal(false)}
-            >
-              <Text style={styles.menuCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Report Modal */}
-      <Modal
-        visible={showReportModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowReportModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.reportModalContent}>
-            <View style={styles.reportModalHeader}>
-              <Text style={styles.reportModalTitle}>
-                Report {reportType === 'post' ? 'Post' : 'User'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowReportModal(false);
-                  setReportDescription('');
-                }}
-              >
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.reportModalSubtitle}>
-              Please describe why you're reporting this {reportType === 'post' ? 'post' : 'user'}
-            </Text>
-
-            <TextInput
-              style={styles.reportDescriptionInput}
-              placeholder="Enter description..."
-              placeholderTextColor="#999"
-              value={reportDescription}
-              onChangeText={setReportDescription}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={[styles.reportSubmitButton, submittingReport && styles.reportSubmitButtonDisabled]}
-              onPress={handleSubmitReport}
-              disabled={submittingReport}
-            >
-              {submittingReport ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.reportSubmitButtonText}>Submit Report</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Post Bottom Sheet Modal */}
-      <PostBottomSheet
-        visible={showPostBottomSheet}
-        postId={bottomSheetPostId}
-        onClose={handleClosePostBottomSheet}
-      />
-    </View>
+      {/* Share Modal - keep your existing share modal code */}
+    </Modal>
   );
 }
 
+// Keep all your existing styles...
 const styles = StyleSheet.create({
-  container: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: '#FFF',
   },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: '#FFF',
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.9,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  dragHandleContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
-    position: 'relative',
-    zIndex: 1000,
   },
-  suggestionsContainer: {
-    position: 'absolute',
-    top: '100%',
-    left: 16,
-    right: 16,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    marginTop: 4,
-    maxHeight: 300,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    zIndex: 1001,
-  },
-  suggestionsList: {
-    maxHeight: 300,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-  },
-  suggestionIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  suggestionAvatarContainer: {
-    marginRight: 12,
-  },
-  suggestionAvatar: {
+  dragHandle: {
     width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-  },
-  suggestionAvatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  suggestionContent: {
-    flex: 1,
-  },
-  suggestionName: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 2,
-  },
-  suggestionSubtitle: {
-    fontSize: 12,
-    color: '#999',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#333',
-  },
-  clearButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  resultsContainer: {
-    flex: 1,
-    backgroundColor: '#FFF',
-  },
-  resultsScroll: {
-    flex: 1,
+    height: 4,
+    backgroundColor: '#D0D0D0',
+    borderRadius: 2,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
     color: '#999',
   },
-  section: {
-    marginBottom: 24,
+  content: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  userItem: {
     paddingVertical: 12,
-    paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  userHeader: {
+  headerUser: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  userInfo: {
     flex: 1,
-    marginLeft: 12,
   },
-  username: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
-  },
-  userMeta: {
-    fontSize: 13,
-    color: '#999',
-  },
-  followingBadge: {
-    backgroundColor: '#F0F0F0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  followingText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-  },
-  locationItem: {
-    backgroundColor: '#FAFAFA',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-  },
-  locationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  locationInfo: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  locationName: {
+  headerUsername: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
+    marginLeft: 10,
+    color: '#000',
   },
-  locationMeta: {
-    fontSize: 13,
-    color: '#666',
-  },
-  photoGrid: {
+  headerActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
+    alignItems: 'center',
+    gap: 12,
+  },
+  followButton: {
+    backgroundColor: '#0095F6',
+    paddingHorizontal: 24,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  followButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  menuButton: {
+    padding: 4,
+  },
+  mediaContainer: {
+    width: '100%',
+    backgroundColor: '#000',
+    aspectRatio: 1,
+  },
+  media: {
+    width: '100%',
+    height: '100%',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  actionText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#000',
+  },
+  postInfo: {
+    padding: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingVertical: 6,
+  },
+  infoText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  locationText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    flex: 1,
+  },
+  captionContainer: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  caption: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#333',
+  },
+  captionUsername: {
+    fontWeight: '600',
+    color: '#000',
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#999',
     marginTop: 8,
   },
-  photoPreview: {
-    width: (SCREEN_WIDTH - 64) / 3 - 3,
-    height: (SCREEN_WIDTH - 64) / 3 - 3,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#F0F0F0',
-  },
-  photoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  photoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  userPostGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 12,
-    paddingTop: 12,
+  commentsSection: {
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
   },
-  userPostPreview: {
-    width: (SCREEN_WIDTH - 80) / 3 - 3,
-    height: (SCREEN_WIDTH - 80) / 3 - 3,
-    borderRadius: 6,
-    overflow: 'hidden',
-    backgroundColor: '#F0F0F0',
-  },
-  userPostImage: {
-    width: '100%',
-    height: '100%',
-  },
-  userPostPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  emptySubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  defaultScroll: {
-    flex: 1,
-  },
-  defaultContent: {
-    flex: 1,
-  },
-  defaultContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  defaultText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  defaultSubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#fff',
-  },
-  navLabel: {
-    fontSize: 10,
-    color: '#000',
-    marginTop: 4,
-  },
-  userPostPreviewContainer: {
-    position: 'relative',
-    width: (SCREEN_WIDTH - 80) / 3 - 3,
-    height: (SCREEN_WIDTH - 80) / 3 - 3,
-  },
-  photoPreviewContainer: {
-    position: 'relative',
-    width: (SCREEN_WIDTH - 64) / 3 - 3,
-    height: (SCREEN_WIDTH - 64) / 3 - 3,
-  },
-  postMenuButton: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 12,
-    padding: 4,
-    zIndex: 10,
-  },
-  userMenuButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  menuModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-  },
-  menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  menuOptionText: {
+  commentsTitle: {
     fontSize: 16,
-    color: '#FF3B30',
-    marginLeft: 12,
-    fontWeight: '500',
-  },
-  menuCancel: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  menuCancelText: {
-    fontSize: 16,
-    color: '#333',
     fontWeight: '600',
-  },
-  reportModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  reportModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 12,
+    color: '#000',
   },
-  reportModalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
+  noComments: {
+    textAlign: 'center',
+    color: '#777',
+    marginTop: 10,
+    paddingVertical: 20,
   },
-  reportModalSubtitle: {
+  commentItem: {
+    flexDirection: 'row',
+    marginBottom: 14,
+  },
+  commentContent: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  commentUsername: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
+    fontWeight: '600',
+    color: '#000',
   },
-  reportDescriptionInput: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
+  commentText: {
+    marginTop: 2,
+    fontSize: 14,
     color: '#333',
-    minHeight: 120,
-    marginBottom: 20,
-    backgroundColor: '#FAFAFA',
   },
-  reportSubmitButton: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    padding: 14,
+  commentTime: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#666',
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: '#f2f2f2',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    marginRight: 10,
+    maxHeight: 100,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#4dd0e1',
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  reportSubmitButtonDisabled: {
-    opacity: 0.6,
-  },
-  reportSubmitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

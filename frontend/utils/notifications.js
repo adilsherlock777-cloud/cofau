@@ -22,15 +22,16 @@ export const fetchNotifications = async (token, limit = 50, skip = 0) => {
 /**
  * Get unread notification count
  */
+// In your utils/notifications.js file
 export const fetchUnreadCount = async (token) => {
   try {
-    const response = await axios.get(`${API_URL}/notifications/unread-count`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const response = await axios.get(`${BACKEND_URL}/api/notifications/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
-    return response.data.unreadCount;
+    return response.data.unread_count || 0;
   } catch (error) {
-    console.error('❌ Error fetching unread count:', error.response?.data || error.message);
-    throw error;
+    console.error('Error fetching unread count:', error);
+    return 0;
   }
 };
 
