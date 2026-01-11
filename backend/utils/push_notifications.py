@@ -73,7 +73,7 @@ async def send_push_notification(
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 EXPO_PUSH_API_URL,
-                json={"messages": messages},
+                json=messages,
                 headers={
                     "Accept": "application/json",
                     "Accept-Encoding": "gzip, deflate",

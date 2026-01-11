@@ -7,7 +7,10 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { LevelProvider } from "../context/LevelContext";
 import LevelUpAnimation from "../components/LevelUpAnimation";
 import { useEffect } from "react";
-import { setupNotificationListeners } from "../utils/pushNotifications";
+import { 
+  setupNotificationListeners, 
+  registerForPushNotificationsAsync  // ⬅️ ADD THIS IMPORT
+} from "../utils/pushNotifications";
 
 function RootLayoutNav() {
   const { isAuthenticated, loading, user, token } = useAuth();
@@ -26,6 +29,24 @@ function RootLayoutNav() {
       return cleanup;
     }
   }, [isAuthenticated, router]);
+
+
+ useEffect(() => {
+    if (isAuthenticated && token) {
+      console.log('🔔 Attempting to register push notifications...');
+      registerForPushNotificationsAsync(token)
+        .then((pushToken) => {
+          if (pushToken) {
+            console.log('✅ Push token obtained:', pushToken);
+          } else {
+            console.log('⚠️ No push token returned');
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Push registration error:', error);
+        });
+    }
+  }, [isAuthenticated, token]);
 
   useEffect(() => {
     if (loading) return;
