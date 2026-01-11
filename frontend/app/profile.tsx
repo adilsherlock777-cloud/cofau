@@ -100,6 +100,145 @@ const fixUrl = (url?: string | null) => {
   return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
 };
 
+const ProfileSkeleton = () => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, []);
+
+  const backgroundColor = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E0E0E0', '#F5F5F5'],
+  });
+
+  const SkeletonBox = ({ width, height, borderRadius = 4, style = {} }) => (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor,
+        },
+        style,
+      ]}
+    />
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <LinearGradient
+          colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientHeader}
+        >
+          <View style={styles.headerRow}>
+            <View style={styles.leftSpacer} />
+            <Text style={styles.cofauTitle}>Cofau</Text>
+            <View style={{ width: 40 }} />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.profileCardWrapper}>
+          <View style={[styles.profileCard, styles.profileCardAndroid]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', padding: 15 }}>
+              {/* DP Skeleton */}
+              <View style={{ alignItems: 'center' }}>
+                <SkeletonBox width={80} height={80} borderRadius={40} />
+                <SkeletonBox width={70} height={14} borderRadius={4} style={{ marginTop: 10 }} />
+              </View>
+              {/* Badge Skeleton */}
+              <View style={{ alignItems: 'center' }}>
+                <SkeletonBox width={80} height={80} borderRadius={40} />
+                <SkeletonBox width={80} height={14} borderRadius={4} style={{ marginTop: 10 }} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Stats Skeleton */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20, marginTop: 15, marginBottom: 15 }}>
+        <View style={{ alignItems: 'center' }}>
+          <SkeletonBox width={40} height={20} borderRadius={4} />
+          <SkeletonBox width={50} height={12} borderRadius={4} style={{ marginTop: 5 }} />
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <SkeletonBox width={40} height={20} borderRadius={4} />
+          <SkeletonBox width={50} height={12} borderRadius={4} style={{ marginTop: 5 }} />
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <SkeletonBox width={40} height={20} borderRadius={4} />
+          <SkeletonBox width={70} height={12} borderRadius={4} style={{ marginTop: 5 }} />
+        </View>
+      </View>
+
+      {/* Action Buttons Skeleton */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 15 }}>
+        <SkeletonBox width={'48%'} height={36} borderRadius={18} />
+        <View style={{ width: '4%' }} />
+        <SkeletonBox width={'48%'} height={36} borderRadius={18} />
+      </View>
+
+      {/* Bio Skeleton */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+        <SkeletonBox width={40} height={16} borderRadius={4} />
+        <SkeletonBox width={'100%'} height={14} borderRadius={4} style={{ marginTop: 8 }} />
+        <SkeletonBox width={'70%'} height={14} borderRadius={4} style={{ marginTop: 5 }} />
+      </View>
+
+      {/* Tabs Skeleton */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-around', borderBottomWidth: 1, borderBottomColor: '#e0e0e0', paddingBottom: 14, marginBottom: 10 }}>
+        <SkeletonBox width={60} height={16} borderRadius={4} />
+        <SkeletonBox width={60} height={16} borderRadius={4} />
+        <SkeletonBox width={60} height={16} borderRadius={4} />
+      </View>
+
+      {/* Posts Skeleton */}
+      <View style={{ paddingHorizontal: 16 }}>
+        {/* Post Item 1 */}
+        <View style={{ flexDirection: 'row', marginBottom: 15, paddingVertical: 12 }}>
+          <SkeletonBox width={140} height={160} borderRadius={12} />
+          <View style={{ flex: 1, justifyContent: 'center', marginLeft: 16 }}>
+            <SkeletonBox width={60} height={14} borderRadius={4} />
+            <SkeletonBox width={50} height={14} borderRadius={4} style={{ marginTop: 12 }} />
+            <SkeletonBox width={80} height={14} borderRadius={4} style={{ marginTop: 12 }} />
+            <SkeletonBox width={'90%'} height={14} borderRadius={4} style={{ marginTop: 12 }} />
+          </View>
+        </View>
+        {/* Post Item 2 */}
+        <View style={{ flexDirection: 'row', marginBottom: 15, paddingVertical: 12 }}>
+          <SkeletonBox width={140} height={160} borderRadius={12} />
+          <View style={{ flex: 1, justifyContent: 'center', marginLeft: 16 }}>
+            <SkeletonBox width={60} height={14} borderRadius={4} />
+            <SkeletonBox width={50} height={14} borderRadius={4} style={{ marginTop: 12 }} />
+            <SkeletonBox width={80} height={14} borderRadius={4} style={{ marginTop: 12 }} />
+            <SkeletonBox width={'90%'} height={14} borderRadius={4} style={{ marginTop: 12 }} />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
 export default function ProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams();
@@ -1233,16 +1372,9 @@ export default function ProfileScreen() {
 };
    
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#4dd0e1" />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </View>
-    );
-  }
+if (loading) {
+  return <ProfileSkeleton />;
+}
 
   if (error || !userData) {
     return (
@@ -1336,7 +1468,8 @@ export default function ProfileScreen() {
   profilePicture={userData.profile_picture}
   username={userData.full_name || userData.username}
   level={userData.level || 1}
-  dpSize={80}
+  dpSize={78}
+  isOwnProfile={isOwnProfile}
   cameraIcon={
     isOwnProfile ? (
       <TouchableOpacity
@@ -1360,11 +1493,12 @@ export default function ProfileScreen() {
     <View style={[styles.profileCard, styles.profileCardAndroid]}>
       {/* Profile Picture */}
       <View style={styles.profilePictureContainer}>
-        <ProfileBadge
+       <ProfileBadge
   profilePicture={userData.profile_picture}
   username={userData.full_name || userData.username}
   level={userData.level || 1}
-  dpSize={80}
+  dpSize={78}
+  isOwnProfile={isOwnProfile}
   cameraIcon={
     isOwnProfile ? (
       <TouchableOpacity
@@ -2448,29 +2582,28 @@ favouriteGridImage: {
     elevation: 5,
   },
 
-  profileCardWrapper: {
-  marginHorizontal: 60,
+ profileCardWrapper: {
+  marginHorizontal: 55,       // Change from 60 to 40
   marginTop: -40,
   marginBottom: 2,
-  borderRadius: 20,
+  borderRadius: 25,
   overflow: 'hidden',
-  // Add subtle border
   borderWidth: 1,
-  borderColor: 'rgba(255, 255, 255, 0.2)',
-  // Shadow for depth
+  borderColor: "#fff",
   shadowColor: "#000",
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.15,
   shadowRadius: 8,
   elevation: 8,
 },
-  profileCard: {
+ profileCard: {
   borderRadius: 20,
-  paddingVertical: 65,
-  paddingHorizontal: 30,
-  paddingLeft: 60,
-  paddingRight: -100,
+  paddingVertical: 10,        // Change from 65 to 50
+  paddingHorizontal: 10,      // Change from 30 to 20
+  paddingLeft: 30,            // Change from 60 to 20
+  paddingRight: 30,           // Change from -100 to 20
   justifyContent: 'center',
+  alignItems: 'center',       // Add this
   position: 'relative',
   backgroundColor: 'rgba(255, 255, 255, 0.9)',
   borderWidth: 1,
@@ -2480,12 +2613,10 @@ favouriteGridImage: {
 profileCardAndroid: {
   backgroundColor: 'rgba(255, 255, 255, 1)',
 },
- profilePictureContainer: {
-  position: 'absolute',
-  left: 12,
-  top: '100%',
-  transform: [{ translateY: 5 }],
-  zIndex: 8,
+profilePictureContainer: {
+  top: '8%',
+  alignItems: 'center',
+  justifyContent: 'center',
 },
   cameraIcon: {
     position: 'absolute',

@@ -1,5 +1,15 @@
-import React from 'react';
-import { View, Image, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  View, 
+  Image, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Modal,
+  Pressable,
+  ScrollView
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import UserAvatar from './UserAvatar';
 
 // Import badge images
@@ -19,15 +29,18 @@ const InfluencerBadge = require('../assets/badges/influencer.png');
  * @param {number} level - User's level (1-12)
  * @param {number} dpSize - Size of the DP (default: 115)
  * @param {number} badgeSize - Size of the badge (default: 100)
+ * @param {boolean} isOwnProfile - Whether viewing own profile (shows info button)
  */
 export default function ProfileBadge({
   profilePicture,
   username,
   level = 1,
-  dpSize = 115,
-  badgeSize = 110,
-  cameraIcon = null
+  dpSize = 90,
+  badgeSize = 120,
+  cameraIcon = null,
+  isOwnProfile = false
 }) {
+  const [showLevelInfo, setShowLevelInfo] = useState(false);
 
   /**
    * Get category badge image based on user level
@@ -50,55 +63,153 @@ export default function ProfileBadge({
     return 'INFLUENCER';
   };
 
-  return (
-  <View style={styles.container}>
-    {/* Left side: DP + Username stacked */}
-    <View style={styles.leftSection}>
-      {/* Profile Picture Container */}
-      <View style={styles.avatarContainer}>
-        <UserAvatar
-          profilePicture={profilePicture}
-          username={username}
-          size={dpSize}
-          showLevelBadge={false}
-        />
-        {cameraIcon}
-      </View>
-      
-      {/* Username below DP */}
-      <Text style={styles.usernameText} numberOfLines={1}>
-        {username}
-      </Text>
-    </View>
+  /**
+   * Level System Info Modal
+   */
+  const LevelInfoModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={showLevelInfo}
+      onRequestClose={() => setShowLevelInfo(false)}
+    >
+      <Pressable 
+        style={styles.modalOverlay}
+        onPress={() => setShowLevelInfo(false)}
+      >
+        <Pressable 
+          style={styles.modalContent}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <Text style={styles.modalTitle}>Level System</Text>
+          
+          {/* Reviewer Level */}
+          <View style={styles.levelRow}>
+            <Image 
+              source={ReviewerBadge} 
+              style={styles.modalBadgeIcon}
+            />
+            <View style={styles.levelTextContainer}>
+              <Text style={styles.levelName}>Levels 1-4: Reviewer</Text>
+              <Text style={styles.levelPoints}>25 points per post</Text>
+            </View>
+          </View>
 
-    {/* Right side: Badge + Title */}
-    <View style={styles.badgeContainer}>
-      <Image
-        source={getCategoryBadge()}
-        style={{
-          width: badgeSize,
-          height: badgeSize,
-          resizeMode: 'contain',
-        }}
-      />
-      <Text style={styles.badgeTitle}>
-        {getBadgeTitle()}
-      </Text>
+          {/* Top Reviewer Level */}
+          <View style={styles.levelRow}>
+            <Image 
+              source={TopReviewerBadge} 
+              style={styles.modalBadgeIcon}
+            />
+            <View style={styles.levelTextContainer}>
+              <Text style={styles.levelName}>Levels 5-8: Top Reviewer</Text>
+              <Text style={styles.levelPoints}>15 points per post</Text>
+            </View>
+          </View>
+
+          {/* Influencer Level */}
+          <View style={styles.levelRow}>
+            <Image 
+              source={InfluencerBadge} 
+              style={styles.modalBadgeIcon}
+            />
+            <View style={styles.levelTextContainer}>
+              <Text style={styles.levelName}>Levels 9-12: Influencer</Text>
+              <Text style={styles.levelPoints}>5 points per post</Text>
+            </View>
+          </View>
+
+          {/* Info text */}
+          <Text style={styles.infoText}>
+            Earn points by creating posts and engaging with content
+          </Text>
+
+          {/* Close button */}
+          <TouchableOpacity 
+            style={styles.closeButtonWrapper}
+            onPress={() => setShowLevelInfo(false)}
+          >
+            <LinearGradient
+              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              locations={[0, 0.35, 0.9]}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>Got it</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Left side: DP + Username stacked */}
+      <View style={styles.leftSection}>
+        {/* Profile Picture Container */}
+        <View style={styles.avatarContainer}>
+          <UserAvatar
+            profilePicture={profilePicture}
+            username={username}
+            size={dpSize}
+            showLevelBadge={false}
+          />
+          {cameraIcon}
+        </View>
+        
+        {/* Username below DP */}
+        <Text style={styles.usernameText} numberOfLines={1}>
+          {username}
+        </Text>
+      </View>
+
+      {/* Right side: Badge + Title */}
+      <View style={styles.badgeContainer}>
+        <Image
+          source={getCategoryBadge()}
+          style={{
+            width: badgeSize,
+            height: badgeSize,
+            resizeMode: 'contain',
+          }}
+        />
+        <View style={styles.badgeTitleRow}>
+          <Text style={styles.badgeTitle}>
+            {getBadgeTitle()}
+          </Text>
+          {/* Info button - only shown on own profile */}
+          {isOwnProfile && (
+            <TouchableOpacity 
+              onPress={() => setShowLevelInfo(true)}
+              style={styles.infoButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <View style={styles.infoIconContainer}>
+                <Text style={styles.infoIcon}>i</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Level Info Modal */}
+      <LevelInfoModal />
     </View>
-  </View>
-);
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  width: '100%',
-  paddingLeft: 10,
-  paddingRight: 25,
-  paddingVertical: 10,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    width: '100%',
+    paddingLeft: 15,
+    paddingRight: 15,
+    paddingVertical: 10,
+  },
   leftSection: {
     alignItems: 'center',
   },
@@ -106,23 +217,127 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   usernameText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#333',
+    color: '#444',
     marginTop: 8,
     maxWidth: 100,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   badgeContainer: {
-  alignItems: 'center',
-  marginRight: -50,
-  marginTop: -12, 
-},
+    alignItems: 'center',
+    marginTop: -20,
+    marginLeft: 50
+  },
+  badgeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -15,
+    paddingLeft: 8,
+  },
   badgeTitle: {
     fontSize: 12,
     fontWeight: '600',
-    marginTop: -10,
     color: '#444',
     letterSpacing: 0.5,
+  },
+  infoButton: {
+    marginLeft: 6,
+  },
+  infoIconContainer: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoIcon: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 30,
+    width: '85%',
+    maxWidth: 350,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 20,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingVertical: 4,
+  },
+  modalBadgeIcon: {
+    width: 44,
+    height: 44,
+    resizeMode: 'contain',
+    marginRight: 14,
+  },
+  levelTextContainer: {
+    flex: 1,
+  },
+  levelName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  levelPoints: {
+    fontSize: 13,
+    color: '#666',
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  closeButtonWrapper: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  closeButton: {
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
