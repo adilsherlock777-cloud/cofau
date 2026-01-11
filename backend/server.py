@@ -30,6 +30,141 @@ from utils.level_system import calculate_level, add_post_points, calculateUserLe
 from utils.moderation import check_image_moderation, save_moderation_result
 from utils.scheduler import start_scheduler, stop_scheduler
 from utils.location_matcher import normalize_location_name, find_similar_location, get_location_suggestions
+import random
+from datetime import datetime, timedelta
+
+def calculate_explore_score(post, current_time):
+    """
+    Calculate explore score with:
+    - Base engagement score (likes, comments, saves)
+    - Freshness bonus (new posts get boosted)
+    - Random boost (for variety)
+    
+    This creates Instagram-like "Exploration vs Exploitation" balance.
+    """
+    # Base engagement score
+    likes = post.get("likes_count", 0)
+    comments = post.get("comments_count", 0)
+    rating = post.get("rating", 0)
+    
+    # Weighted engagement: comments are more valuable than likes
+    base_score = (likes * 3) + (comments * 4) + (rating * 2)
+    
+    # Freshness bonus - newer posts get a significant boost
+    created_at = post.get("created_at")
+    freshness_bonus = 0
+    hours_since_posted = 9999  # Default for posts without date
+    
+    if created_at:
+        if isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                created_at = created_at.replace(tzinfo=None)
+            except:
+                created_at = None
+        
+        if created_at and isinstance(created_at, datetime):
+            time_diff = current_time - created_at
+            hours_since_posted = time_diff.total_seconds() / 3600
+            
+            # Freshness bonus: max 72 points for brand new posts, decreasing over 72 hours
+            # Posts < 24h get big boost, 24-48h medium boost, 48-72h small boost
+            if hours_since_posted < 24:
+                freshness_bonus = 72  # Maximum boost for very new posts
+            elif hours_since_posted < 48:
+                freshness_bonus = 48
+            elif hours_since_posted < 72:
+                freshness_bonus = max(0, 72 - hours_since_posted)
+            else:
+                freshness_bonus = 0
+    
+    # Random boost for variety (0-25 points)
+    # This ensures feed changes on every refresh
+    random_boost = random.uniform(0, 25)
+    
+    # Final score
+    final_score = base_score + freshness_bonus + random_boost
+    
+    return {
+        "final_score": final_score,
+        "base_score": base_score,
+        "freshness_bonus": freshness_bonus,
+        "random_boost": random_boost,
+        "hours_since_posted": hours_since_posted
+    }
+
+
+def get_diverse_explore_posts(posts, current_time, limit=20):
+    """
+    Get diverse explore posts using 70/30 split:
+    - 70% top performing posts
+    - 30% random posts (for discovery)
+    
+    Also ensures creator diversity (max 2 posts per user in top results)
+    """
+    if not posts:
+        return []
+    
+    # Calculate scores for all posts
+    scored_posts = []
+    for post in posts:
+        score_data = calculate_explore_score(post, current_time)
+        scored_posts.append({
+            "post": post,
+            **score_data
+        })
+    
+    # Sort by final_score (descending)
+    scored_posts.sort(key=lambda x: x["final_score"], reverse=True)
+    
+    # Split into top performers and random pool
+    top_count = int(limit * 0.7)  # 70% top performers
+    random_count = limit - top_count  # 30% random
+    
+    # Get top performers with creator diversity
+    top_posts = []
+    user_post_count = {}
+    max_posts_per_user = 2  # Limit posts per creator for diversity
+    
+    for item in scored_posts:
+        user_id = item["post"].get("user_id")
+        
+        # Enforce creator diversity
+        if user_post_count.get(user_id, 0) >= max_posts_per_user:
+            continue
+        
+        top_posts.append(item)
+        user_post_count[user_id] = user_post_count.get(user_id, 0) + 1
+        
+        if len(top_posts) >= top_count:
+            break
+    
+    # Get random posts from remaining (excluding already selected)
+    selected_ids = {str(p["post"]["_id"]) for p in top_posts}
+    remaining_posts = [p for p in scored_posts if str(p["post"]["_id"]) not in selected_ids]
+    
+    # Randomly select from remaining posts
+    if remaining_posts and random_count > 0:
+        random_selection = random.sample(
+            remaining_posts, 
+            min(random_count, len(remaining_posts))
+        )
+    else:
+        random_selection = []
+    
+    # Combine and shuffle top portion for variety
+    final_posts = top_posts + random_selection
+    
+    # Shuffle the top 10 positions slightly for perceived freshness
+    if len(final_posts) > 10:
+        top_10 = final_posts[:10]
+        rest = final_posts[10:]
+        random.shuffle(top_10)
+        final_posts = top_10 + rest
+    else:
+        random.shuffle(final_posts)
+    
+    return final_posts
 
 
 @asynccontextmanager
@@ -1435,19 +1570,39 @@ async def get_comments(post_id: str):
 
 @app.get("/api/explore/trending")
 async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
-    """Get trending posts sorted by engagement"""
+    """
+    Get trending posts with improved algorithm:
+    - 70% top performing posts (by engagement + freshness)
+    - 30% random posts (for discovery)
+    - Creator diversity (max 2 posts per user)
+    - Random rotation on each refresh
+    """
     db = get_database()
+    current_time = datetime.utcnow()
     
-    # Sort by likes_count, rating, and recency
-    posts = await db.posts.find().sort([
-        ("likes_count", -1),
-        ("rating", -1),
-        ("created_at", -1)
-    ]).skip(skip).limit(limit).to_list(limit)
+    # Fetch more posts than needed for better selection pool
+    # Get posts from last 30 days for trending
+    thirty_days_ago = current_time - timedelta(days=30)
+    
+    all_posts = await db.posts.find({
+        "created_at": {"$gte": thirty_days_ago}
+    }).to_list(500)  # Larger pool for better diversity
+    
+    # If not enough recent posts, include older ones
+    if len(all_posts) < 50:
+        all_posts = await db.posts.find().sort("created_at", -1).to_list(500)
+    
+    # Apply diverse explore algorithm
+    diverse_posts = get_diverse_explore_posts(all_posts, current_time, limit=skip + limit + 20)
+    
+    # Apply pagination
+    paginated = diverse_posts[skip:skip + limit]
     
     result = []
-    for post in posts:
+    for item in paginated:
+        post = item["post"]
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
         is_liked = await db.likes.find_one({
             "post_id": str(post["_id"]),
             "user_id": str(current_user["_id"])
@@ -1466,35 +1621,48 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
+            "user_level": user.get("level", 1) if user else 1,
             "media_url": post.get("media_url", ""),
-            "image_url": image_url,  # Only for images, None for videos
-            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
-            "rating": post["rating"],
-            "review_text": post["review_text"],
+            "image_url": image_url,
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
-            "likes_count": post["likes_count"],
-            "comments_count": post["comments_count"],
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
-            "created_at": post["created_at"]
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+            # Debug info (remove in production if needed)
+            "_explore_score": round(item["final_score"], 2),
+            "_freshness_bonus": round(item["freshness_bonus"], 2),
         })
     
+    print(f"📊 Explore/Trending: Returned {len(result)} posts with diversity algorithm")
     return result
 
 @app.get("/api/explore/top-rated")
 async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
-    """Get top-rated posts (rating >= 8)"""
+    """Get top-rated posts (rating >= 8) with freshness and randomness"""
     db = get_database()
+    current_time = datetime.utcnow()
     
-    # Filter posts with rating >= 8 and sort
-    posts = await db.posts.find({"rating": {"$gte": 8}}).sort([
-        ("rating", -1),
-        ("likes_count", -1)
-    ]).skip(skip).limit(limit).to_list(limit)
+    # Get high-rated posts
+    posts = await db.posts.find({"rating": {"$gte": 8}}).to_list(300)
+    
+    # Apply diverse algorithm
+    diverse_posts = get_diverse_explore_posts(posts, current_time, limit=skip + limit + 20)
+    paginated = diverse_posts[skip:skip + limit]
     
     result = []
-    for post in posts:
+    for item in paginated:
+        post = item["post"]
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
         is_liked = await db.likes.find_one({
             "post_id": str(post["_id"]),
             "user_id": str(current_user["_id"])
@@ -1514,19 +1682,23 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
-            "image_url": image_url,  # Only for images, None for videos
-            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
-            "rating": post["rating"],
-            "review_text": post["review_text"],
+            "image_url": image_url,
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
-            "likes_count": post["likes_count"],
-            "comments_count": post["comments_count"],
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
-            "created_at": post["created_at"]
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
     
     return result
+
 
 @app.get("/api/explore/reviewers")
 async def get_top_reviewers(skip: int = 0, limit: int = 20):
@@ -1560,27 +1732,34 @@ async def get_top_reviewers(skip: int = 0, limit: int = 20):
 
 @app.get("/api/explore/all")
 async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
-    """Get all posts sorted by engagement (likes + comments + rating)"""
+    """
+    Main Explore endpoint with full diversity algorithm:
+    - 70/30 top/random split
+    - Freshness boost for new posts
+    - Random rotation on refresh
+    - Creator diversity
+    """
     db = get_database()
+    current_time = datetime.utcnow()
     
-    # Get all posts and calculate engagement score
-    posts = await db.posts.find().to_list(None)
+    # Get all posts (or limit to reasonable pool)
+    all_posts = await db.posts.find().sort("created_at", -1).limit(1000).to_list(1000)
     
-    # Calculate engagement score for each post
-    for post in posts:
-        engagement_score = post["likes_count"] + post["comments_count"] + (post["rating"] * 2)
-        post["engagement_score"] = engagement_score
-    
-    # Sort by engagement score
-    posts.sort(key=lambda x: x["engagement_score"], reverse=True)
-    
-    # Apply pagination
-    paginated_posts = posts[skip:skip + limit]
+    # Apply diverse explore algorithm
+    diverse_posts = get_diverse_explore_posts(all_posts, current_time, limit=skip + limit + 30)
+    paginated = diverse_posts[skip:skip + limit]
     
     result = []
-    for post in paginated_posts:
+    for item in paginated:
+        post = item["post"]
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
         is_liked = await db.likes.find_one({
+            "post_id": str(post["_id"]),
+            "user_id": str(current_user["_id"])
+        }) is not None
+        
+        is_saved = await db.saved_posts.find_one({
             "post_id": str(post["_id"]),
             "user_id": str(current_user["_id"])
         }) is not None
@@ -1593,34 +1772,52 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
+            "user_level": user.get("level", 1) if user else 1,
             "media_url": post.get("media_url", ""),
-            "image_url": image_url,  # Only for images, None for videos
-            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
-            "rating": post["rating"],
-            "review_text": post["review_text"],
+            "image_url": image_url,
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
-            "likes_count": post["likes_count"],
-            "comments_count": post["comments_count"],
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
-            "engagement_score": post["engagement_score"],
-            "created_at": post["created_at"]
+            "is_saved_by_user": is_saved,
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+            "_explore_score": round(item["final_score"], 2),
         })
     
+    print(f"📊 Explore/All: Returned {len(result)} posts with diversity algorithm")
     return result
+
 
 @app.get("/api/explore/category")
 async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
-    """Get posts filtered by category keyword in review text"""
+    """Get posts filtered by category with diversity algorithm"""
     db = get_database()
+    current_time = datetime.utcnow()
     
-    # Search for category keyword in review_text (case-insensitive)
+    # Search in both category field and review_text
     posts = await db.posts.find({
-        "review_text": {"$regex": name, "$options": "i"}
-    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        "$or": [
+            {"category": {"$regex": name, "$options": "i"}},
+            {"review_text": {"$regex": name, "$options": "i"}}
+        ]
+    }).to_list(300)
+    
+    # Apply diverse algorithm
+    diverse_posts = get_diverse_explore_posts(posts, current_time, limit=skip + limit + 20)
+    paginated = diverse_posts[skip:skip + limit]
     
     result = []
-    for post in posts:
+    for item in paginated:
+        post = item["post"]
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
         is_liked = await db.likes.find_one({
             "post_id": str(post["_id"]),
             "user_id": str(current_user["_id"])
@@ -1640,16 +1837,19 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
             "media_url": post.get("media_url", ""),
-            "image_url": image_url,  # Only for images, None for videos
-            "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
-            "rating": post["rating"],
-            "review_text": post["review_text"],
+            "image_url": image_url,
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": media_type,
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
-            "likes_count": post["likes_count"],
-            "comments_count": post["comments_count"],
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
-            "created_at": post["created_at"]
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
     
     return result

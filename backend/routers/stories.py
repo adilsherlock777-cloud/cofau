@@ -808,3 +808,34 @@ async def unlike_story(
     except Exception as e:
         print(f"❌ Error unliking story: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to unlike story: {str(e)}")
+
+@router.get("/{story_id}/views")
+async def get_story_views(story_id: str, current_user: dict = Depends(get_current_user)):
+    db = get_database()
+    
+    # ... existing code to get views ...
+    
+    viewers_list = []
+    for view in views:
+        user = await db.users.find_one({"_id": ObjectId(view["user_id"])})
+        if user:
+            # Check if this viewer has liked the story
+            has_liked = await db.story_likes.find_one({
+                "story_id": story_id,
+                "user_id": view["user_id"]
+            }) is not None
+            
+            viewers_list.append({
+                "user_id": view["user_id"],
+                "username": user.get("username") or user.get("full_name"),
+                "full_name": user.get("full_name"),
+                "profile_picture": user.get("profile_picture"),
+                "viewed_at": view["viewed_at"],
+                "has_liked": has_liked  # Add this field
+            })
+    
+    return {
+        "view_count": len(viewers_list),
+        "viewers": viewers_list,
+        "is_owner": True
+    }
