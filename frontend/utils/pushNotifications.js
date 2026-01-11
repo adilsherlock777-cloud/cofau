@@ -8,19 +8,33 @@ const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    // Show notification even when app is in foreground
+    console.log('📬 Notification received in foreground:', notification);
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+    };
+  },
 });
 
 /**
  * Register for push notifications and get the device token
+ * This works even when app is in background or closed
  */
-export async function registerForPushNotificationsAsync(token) {
+export async function registerForPushNotificationsAsync(token, retryCount = 0) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+
   if (!Device.isDevice) {
     console.log('⚠️ Push notifications only work on physical devices');
+    return null;
+  }
+
+  if (!token) {
+    console.log('⚠️ No auth token provided for push notification registration');
     return null;
   }
 
@@ -30,87 +44,183 @@ export async function registerForPushNotificationsAsync(token) {
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
+      console.log('📱 Requesting push notification permissions...');
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {
-      console.log('❌ Failed to get push token for push notification!');
+      console.log('❌ Push notification permission denied by user');
       return null;
     }
+
+    console.log('✅ Push notification permissions granted');
 
     // Get the Expo push token
     const expoPushToken = await Notifications.getExpoPushTokenAsync({
       projectId: Constants.expoConfig?.extra?.eas?.projectId,
     });
 
+    if (!expoPushToken?.data) {
+      console.log('❌ Failed to get Expo push token');
+      return null;
+    }
+
     console.log('📱 Expo Push Token:', expoPushToken.data);
 
-    // Register token with backend
+    // Register token with backend with retry logic
     if (token && expoPushToken.data) {
-      try {
-        await axios.post(
-          `${API_URL}/notifications/register-device`,
-          {
-            deviceToken: expoPushToken.data,
-            platform: Platform.OS,
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` },
+      let registered = false;
+      
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const response = await axios.post(
+            `${API_URL}/notifications/register-device`,
+            {
+              deviceToken: expoPushToken.data,
+              platform: Platform.OS,
+            },
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              timeout: 10000, // 10 second timeout
+            }
+          );
+          
+          if (response.data?.success) {
+            console.log('✅ Device token registered with backend successfully');
+            console.log(`   Token count: ${response.data.tokenCount || 1}`);
+            registered = true;
+            break;
           }
-        );
-        console.log('✅ Device token registered with backend');
-      } catch (error) {
-        // Only log error if it's not a 404 (endpoint might not exist) or 401 (not authenticated)
-        if (error.response?.status !== 404 && error.response?.status !== 401) {
-          console.error('❌ Error registering device token:', error.response?.data || error.message);
-        } else if (error.response?.status === 404) {
-          console.log('⚠️ Push notification endpoint not found - this is OK if backend is not updated');
-        } else {
-          console.log('⚠️ Push notification registration failed - user not authenticated');
+        } catch (error) {
+          const status = error.response?.status;
+          const isLastAttempt = attempt === MAX_RETRIES;
+          
+          if (status === 401) {
+            console.log('⚠️ Push notification registration failed - user not authenticated');
+            break; // Don't retry auth errors
+          } else if (status === 404) {
+            console.log('⚠️ Push notification endpoint not found');
+            break; // Don't retry 404 errors
+          } else {
+            if (isLastAttempt) {
+              console.error('❌ Error registering device token after retries:', error.response?.data || error.message);
+            } else {
+              console.log(`⚠️ Error registering device token (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying...`);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (attempt + 1)));
+            }
+          }
         }
+      }
+
+      if (!registered && retryCount < MAX_RETRIES) {
+        // If registration failed, try again after a delay (for app startup scenarios)
+        console.log(`🔄 Retrying token registration in ${RETRY_DELAY * 2}ms...`);
+        setTimeout(() => {
+          registerForPushNotificationsAsync(token, retryCount + 1);
+        }, RETRY_DELAY * 2);
       }
     }
 
     return expoPushToken.data;
   } catch (error) {
     console.error('❌ Error registering for push notifications:', error);
+    
+    // Retry on unexpected errors
+    if (retryCount < MAX_RETRIES) {
+      console.log(`🔄 Retrying push notification registration in ${RETRY_DELAY * 2}ms...`);
+      setTimeout(() => {
+        registerForPushNotificationsAsync(token, retryCount + 1);
+      }, RETRY_DELAY * 2);
+    }
+    
     return null;
   }
 }
 
 /**
  * Setup notification listeners
+ * Handles notifications when app is in foreground, background, or completely closed
  */
 export function setupNotificationListeners(navigation) {
+  console.log('🔔 Setting up notification listeners...');
+
   // Handle notification received while app is in foreground
   const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
-    console.log('📬 Notification received:', notification);
+    console.log('📬 Notification received in foreground:', notification);
+    const data = notification.request.content.data;
+    console.log('   Type:', data?.type);
+    console.log('   From:', data?.fromUserName || data?.fromUserId);
+    
+    // Badge count will be handled automatically by Expo
+    // The notification will be shown based on the handler configuration
   });
 
-  // Handle notification tapped/opened
+  // Handle notification tapped/opened (works for foreground, background, and killed app)
   const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
     console.log('👆 Notification tapped:', response);
     const data = response.notification.request.content.data;
+    
+    // Wait a bit for navigation to be ready
+    setTimeout(() => {
+      try {
+        // Navigate based on notification type
+        // Note: navigation is actually the router from expo-router
+        if (data?.type === 'message' && data?.fromUserId) {
+          console.log('   Navigating to chat with:', data.fromUserId);
+          navigation?.push(`/chat/${data.fromUserId}`);
+        } else if (data?.type === 'like' && data?.postId) {
+          console.log('   Navigating to post:', data.postId);
+          navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'comment' && data?.postId) {
+          console.log('   Navigating to post:', data.postId);
+          navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'new_post' && data?.postId) {
+          console.log('   Navigating to post:', data.postId);
+          navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'follow' && data?.fromUserId) {
+          console.log('   Navigating to profile:', data.fromUserId);
+          navigation?.push(`/profile?userId=${data.fromUserId}`);
+        } else if (data?.type === 'compliment' && data?.fromUserId) {
+          console.log('   Navigating to profile:', data.fromUserId);
+          navigation?.push(`/profile?userId=${data.fromUserId}`);
+        } else {
+          console.log('   Unknown notification type, navigating to feed');
+          navigation?.push('/feed');
+        }
+      } catch (error) {
+        console.error('❌ Error navigating from notification:', error);
+      }
+    }, 500);
+  });
 
-    // Navigate based on notification type
-    // Note: navigation is actually the router from expo-router
-    if (data?.type === 'message' && data?.fromUserId) {
-      navigation?.push(`/chat/${data.fromUserId}`);
-    } else if (data?.type === 'like' && data?.postId) {
-      navigation?.push(`/post-details/${data.postId}`);
-    } else if (data?.type === 'comment' && data?.postId) {
-      navigation?.push(`/post-details/${data.postId}`);
-    } else if (data?.type === 'new_post' && data?.postId) {
-      navigation?.push(`/post-details/${data.postId}`);
-    } else if (data?.type === 'follow' && data?.fromUserId) {
-      navigation?.push(`/profile?userId=${data.fromUserId}`);
-    } else if (data?.type === 'compliment' && data?.fromUserId) {
-      navigation?.push(`/profile?userId=${data.fromUserId}`);
+  // Handle notifications when app is opened from a killed state
+  Notifications.getLastNotificationResponseAsync().then((response) => {
+    if (response) {
+      console.log('📱 App opened from notification:', response);
+      const data = response.notification.request.content.data;
+      
+      // Navigate after app is fully loaded
+      setTimeout(() => {
+        if (data?.type === 'message' && data?.fromUserId) {
+          navigation?.push(`/chat/${data.fromUserId}`);
+        } else if (data?.type === 'like' && data?.postId) {
+          navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'comment' && data?.postId) {
+          navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'new_post' && data?.postId) {
+          navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'follow' && data?.fromUserId) {
+          navigation?.push(`/profile?userId=${data.fromUserId}`);
+        } else if (data?.type === 'compliment' && data?.fromUserId) {
+          navigation?.push(`/profile?userId=${data.fromUserId}`);
+        }
+      }, 1000);
     }
   });
 
   return () => {
+    console.log('🔕 Cleaning up notification listeners...');
     // The subscription objects have a remove() method
     if (notificationListener && notificationListener.remove) {
       notificationListener.remove();

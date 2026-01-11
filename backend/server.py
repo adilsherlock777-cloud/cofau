@@ -748,16 +748,88 @@ async def create_post(
 
 
 # ======================================================
+# ENGAGEMENT SCORE CALCULATION (Instagram-like algorithm)
+# ======================================================
+def calculate_engagement_score(post, current_time):
+    """
+    Calculate engagement score based on likes, comments, and recency.
+    Higher score = more likely to appear at top.
+    
+    Formula:
+    - Likes weight: 1.0 per like
+    - Comments weight: 2.0 per comment (comments are more valuable)
+    - Recency decay: exponential decay over time (posts from last 24h get full boost)
+    - Base score: 1.0 (so new posts with 0 engagement still have a chance)
+    """
+    import math
+    
+    likes_count = post.get("likes_count", 0)
+    comments_count = post.get("comments_count", 0)
+    created_at = post.get("created_at")
+    
+    # Engagement from interactions
+    engagement_score = (likes_count * 1.0) + (comments_count * 2.0)
+    
+    # Recency factor (decay over time)
+    if created_at and isinstance(created_at, datetime):
+        time_diff = (current_time - created_at).total_seconds() / 3600  # Hours since creation
+        
+        # Exponential decay: 
+        # - Posts < 24h old: full weight (1.0)
+        # - Posts 1-7 days old: 0.7x weight
+        # - Posts 7-30 days old: 0.5x weight  
+        # - Posts > 30 days old: 0.3x weight
+        if time_diff < 24:
+            recency_factor = 1.0
+        elif time_diff < 168:  # 7 days
+            recency_factor = 0.7
+        elif time_diff < 720:  # 30 days
+            recency_factor = 0.5
+        else:
+            recency_factor = 0.3
+        
+        # Apply recency factor to engagement
+        engagement_score *= recency_factor
+        
+        # Add small recency boost (newer posts get small advantage even with 0 engagement)
+        recency_boost = max(0, (24 - time_diff) / 24) * 0.5  # Max 0.5 boost for posts < 24h
+        engagement_score += recency_boost
+    else:
+        # If no created_at, use base score only
+        recency_factor = 0.5
+        engagement_score *= recency_factor
+    
+    # Add base score so posts with 0 engagement still have a chance
+    final_score = engagement_score + 1.0
+    
+    return final_score
+
+
+# ======================================================
 # FEED
 # ======================================================
 @app.get("/api/feed")
-async def get_feed(skip: int = 0, limit: int = None, category: str = None, categories: str = None, current_user: dict = Depends(get_current_user)):
-    """Get feed posts, optionally filtered by category"""
+async def get_feed(
+    skip: int = 0, 
+    limit: int = None, 
+    category: str = None, 
+    categories: str = None,
+    sort: str = "engagement",  # "engagement" or "chronological"
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get feed posts, optionally filtered by category.
+    
+    Sorting options:
+    - "engagement": Sort by engagement score (likes + comments + recency) - Instagram-like
+    - "chronological": Sort by created_at (newest first) - traditional feed
+    """
     db = get_database()
     
     # Build query - filter by category/categories if provided
     query = {}
     import re
+    import random
 
     # Handle multiple categories (from new frontend)
     if categories and categories.strip():
@@ -775,13 +847,72 @@ async def get_feed(skip: int = 0, limit: int = None, category: str = None, categ
         query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
         print(f"🔍 Filtering posts by category: '{category_clean}' (query: {query})")
 
-    # If no limit specified, return all posts (no limit)
-    if limit is None:
-        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).to_list(None)
-    else:
-        posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Fetch posts based on sort mode
+    current_time = datetime.utcnow()
     
-    print(f"📊 Found {len(posts)} posts (category filter: {category if category else 'none'})")
+    if sort == "engagement":
+        # For engagement-based sorting, fetch more posts than needed, calculate scores, then sort
+        # This allows old posts with high engagement to bubble up
+        # Fetch a reasonable pool size (3x the requested limit, or 300 posts max, or last 1000 posts)
+        if limit:
+            fetch_limit = min(limit * 3, 300)  # Fetch 3x requested, max 300
+        else:
+            fetch_limit = 300  # Default: fetch last 300 posts for engagement sorting
+        
+        raw_posts = await db.posts.find(query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
+        
+        print(f"📊 Found {len(raw_posts)} posts for engagement sorting")
+        
+        # Calculate engagement scores (store with posts)
+        posts_with_scores = []
+        for post in raw_posts:
+            score = calculate_engagement_score(post, current_time)
+            posts_with_scores.append((post, score))
+        
+        # Sort by engagement score (descending - highest first)
+        posts_with_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Add some randomness to prevent exact same order every time
+        # Shuffle posts within similar score ranges (posts with scores within 10% of each other)
+        shuffled_posts_with_scores = []
+        if len(posts_with_scores) > 1:
+            i = 0
+            while i < len(posts_with_scores):
+                current_post, current_score = posts_with_scores[i]
+                # Group posts with similar scores (within 10% range)
+                similar_group = [(current_post, current_score)]
+                j = i + 1
+                while j < len(posts_with_scores):
+                    next_post, next_score = posts_with_scores[j]
+                    if abs(next_score - current_score) / max(current_score, 1) <= 0.1:  # Within 10%
+                        similar_group.append((next_post, next_score))
+                        j += 1
+                    else:
+                        break
+                
+                # Shuffle the group to add randomness
+                random.shuffle(similar_group)
+                shuffled_posts_with_scores.extend(similar_group)
+                i = j
+        else:
+            shuffled_posts_with_scores = posts_with_scores
+        
+        # Extract posts (without scores)
+        posts = [p[0] for p in shuffled_posts_with_scores]
+        
+        # Apply skip and limit
+        posts = posts[skip:]
+        if limit:
+            posts = posts[:limit]
+        
+        print(f"✅ Engagement-based sorting applied (showing {len(posts)} posts from {len(raw_posts)} pool)")
+    else:
+        # Chronological sorting (default/traditional)
+        if limit is None:
+            posts = await db.posts.find(query).sort("created_at", -1).skip(skip).to_list(None)
+        else:
+            posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        print(f"📊 Found {len(posts)} posts (chronological sorting)")
 
     result = []
     for post in posts:

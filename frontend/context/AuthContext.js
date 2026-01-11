@@ -36,9 +36,16 @@ export const AuthProvider = ({ children }) => {
           setUser(response.data);
           setToken(storedToken);
 
-          // Register for push notifications
+          // Register for push notifications (works even without navigation)
+          // This ensures token is registered on app startup
+          console.log('🔔 Registering for push notifications on app startup...');
           registerForPushNotificationsAsync(storedToken).catch(err => {
             console.log('⚠️ Push notification registration failed:', err);
+            // Retry after a delay if it fails
+            setTimeout(() => {
+              console.log('🔄 Retrying push notification registration...');
+              registerForPushNotificationsAsync(storedToken).catch(() => {});
+            }, 3000);
           });
         } catch (error) {
           // Token invalid - delete it
@@ -105,9 +112,16 @@ export const AuthProvider = ({ children }) => {
         console.log('✅ User object:', userResponse.data);
         console.log('✅ isAuthenticated will be:', !!userResponse.data);
 
-        // Register for push notifications
+        // Register for push notifications immediately after login
+        // This works even without navigation - token registration happens in background
+        console.log('🔔 Registering for push notifications after login...');
         registerForPushNotificationsAsync(access_token).catch(err => {
           console.log('⚠️ Push notification registration failed:', err);
+          // Retry after a delay if it fails
+          setTimeout(() => {
+            console.log('🔄 Retrying push notification registration...');
+            registerForPushNotificationsAsync(access_token).catch(() => {});
+          }, 3000);
         });
 
         console.log('🎉 Login successful! Returning success...');
@@ -154,9 +168,15 @@ export const AuthProvider = ({ children }) => {
       const userResponse = await axios.get(`${API_URL}/api/auth/me`);
       setUser(userResponse.data);
 
-      // Register for push notifications
+      // Register for push notifications immediately after signup
+      console.log('🔔 Registering for push notifications after signup...');
       registerForPushNotificationsAsync(access_token).catch(err => {
         console.log('⚠️ Push notification registration failed:', err);
+        // Retry after a delay if it fails
+        setTimeout(() => {
+          console.log('🔄 Retrying push notification registration...');
+          registerForPushNotificationsAsync(access_token).catch(() => {});
+        }, 3000);
       });
 
       return { success: true };
