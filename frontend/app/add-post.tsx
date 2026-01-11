@@ -275,7 +275,7 @@ export default function AddPostScreen() {
         review_text: review.trim(),
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
-        categories: categories.length > 0 ? categories : undefined, // CHANGED: Send array
+        category: categories.length > 0 ? categories.join(', ') : undefined,  // Join array to string
         file: fileToUpload,
         media_type: mediaType,
       };
