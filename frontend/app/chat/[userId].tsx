@@ -568,7 +568,7 @@ export default function ChatScreen() {
       {/* Loading indicator for clearing */}
       {isClearing && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#4DD0E1" />
+          <ActivityIndicator size="large" color="#1B7C82" />
           <Text style={styles.loadingText}>Clearing chat...</Text>
         </View>
       )}
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   bubble: { 
-    maxWidth: "70%", 
+    maxWidth: "75%", 
     padding: 12, 
     borderRadius: 20, 
     shadowColor: "#000",
@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   bubbleRight: { 
-    backgroundColor: "#4DD0E1",
+    backgroundColor: "#2A9D9D",
     borderBottomRightRadius: 4,
   },
   msg: { 
@@ -817,10 +817,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: 'rgba(0,0,0,0.1)',
+    width: 180,  // Fixed width for better appearance
   },
   storyReplyImage: {
     width: '100%',
-    height: 120,
+    height: 220,
     backgroundColor: '#f0f0f0',
   },
   storyReplyOverlay: {
@@ -932,10 +933,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#4DD0E1",
+    backgroundColor: "#2A9D9D",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#4DD0E1",
+    shadowColor: "#2A9D9D",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
