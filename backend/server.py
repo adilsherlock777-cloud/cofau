@@ -29,6 +29,7 @@ from routers.leaderboard import router as leaderboard_router
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
 from utils.moderation import check_image_moderation, save_moderation_result
 from utils.scheduler import start_scheduler, stop_scheduler
+from utils.location_matcher import normalize_location_name, find_similar_location, get_location_suggestions
 
 
 @asynccontextmanager
@@ -336,6 +337,107 @@ async def direct_chat_ws(websocket: WebSocket, user_id: str):
 
 
 # ======================================================
+# LOCATION SUGGESTIONS (for fuzzy matching)
+# ======================================================
+
+@app.get("/api/locations/suggestions")
+async def get_location_suggestions_endpoint(
+    q: str,
+    limit: int = 5,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get location suggestions based on user input (fuzzy matching).
+    Used for "Did you mean?" feature when typing location.
+    """
+    if not q or len(q.strip()) < 2:
+        return []
+    
+    db = get_database()
+    
+    # Get all unique locations from posts
+    pipeline = [
+        {"$match": {"location_name": {"$exists": True, "$ne": None, "$ne": ""}}},
+        {"$group": {
+            "_id": "$location_name",
+            "count": {"$sum": 1},
+            "latest_map_link": {"$last": "$map_link"}
+        }},
+        {"$project": {
+            "location_name": "$_id",
+            "post_count": "$count",
+            "map_link": "$latest_map_link",
+            "_id": 0
+        }}
+    ]
+    
+    existing_locations_cursor = db.posts.aggregate(pipeline)
+    existing_locations = await existing_locations_cursor.to_list(None)
+    
+    # Add normalized names
+    for loc in existing_locations:
+        loc['normalized_name'] = normalize_location_name(loc['location_name'])
+    
+    # Get suggestions using fuzzy matching
+    suggestions = get_location_suggestions(q.strip(), existing_locations, limit)
+    
+    return suggestions
+
+
+@app.get("/api/locations/check-duplicate")
+async def check_location_duplicate(
+    location_name: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Check if a similar location already exists.
+    Returns the matching location if found (80%+ similarity).
+    """
+    if not location_name or len(location_name.strip()) < 2:
+        return {"match_found": False, "suggestion": None}
+    
+    db = get_database()
+    
+    # Get all unique locations from posts
+    pipeline = [
+        {"$match": {"location_name": {"$exists": True, "$ne": None, "$ne": ""}}},
+        {"$group": {
+            "_id": "$location_name",
+            "count": {"$sum": 1},
+            "latest_map_link": {"$last": "$map_link"}
+        }},
+        {"$project": {
+            "location_name": "$_id",
+            "post_count": "$count",
+            "map_link": "$latest_map_link",
+            "_id": 0
+        }}
+    ]
+    
+    existing_locations_cursor = db.posts.aggregate(pipeline)
+    existing_locations = await existing_locations_cursor.to_list(None)
+    
+    # Add normalized names
+    for loc in existing_locations:
+        loc['normalized_name'] = normalize_location_name(loc['location_name'])
+    
+    # Find similar location
+    match = find_similar_location(location_name.strip(), existing_locations, threshold=80)
+    
+    if match:
+        return {
+            "match_found": True,
+            "suggestion": {
+                "location_name": match['location_name'],
+                "post_count": match['post_count'],
+                "map_link": match.get('map_link'),
+                "similarity_score": match['similarity_score']
+            }
+        }
+    
+    return {"match_found": False, "suggestion": None}
+
+# ======================================================
 # POST CREATION
 # ======================================================
 @app.post("/api/posts/create")
@@ -516,6 +618,45 @@ async def create_post(
     print(f"📁 Media URL: {media_url}")
 
     # ======================================================
+    # LOCATION NAME NORMALIZATION (prevent duplicates)
+    # ======================================================
+    final_location_name = None
+    normalized_location = None
+    
+    if location_name and location_name.strip():
+        final_location_name = location_name.strip()
+        
+        # Get existing locations for matching
+        pipeline = [
+            {"$match": {"location_name": {"$exists": True, "$ne": None, "$ne": ""}}},
+            {"$group": {
+                "_id": "$location_name",
+                "count": {"$sum": 1}
+            }},
+            {"$project": {
+                "location_name": "$_id",
+                "_id": 0
+            }}
+        ]
+        
+        existing_locations_cursor = db.posts.aggregate(pipeline)
+        existing_locations = await existing_locations_cursor.to_list(None)
+        
+        # Add normalized names
+        for loc in existing_locations:
+            loc['normalized_name'] = normalize_location_name(loc['location_name'])
+        
+        # Check for similar existing location
+        match = find_similar_location(final_location_name, existing_locations, threshold=80)
+        
+        if match:
+            # Use existing location name (canonical version)
+            final_location_name = match['location_name']
+            print(f"📍 Location matched: '{location_name.strip()}' → '{final_location_name}' ({match.get('similarity_score', 0)}% similar)")
+        
+        normalized_location = normalize_location_name(final_location_name)
+
+    # ======================================================
     # QUALITY SCORING - Analyze media quality for leaderboard
     # ======================================================
     quality_score = 50.0  # Default score
@@ -543,7 +684,8 @@ async def create_post(
         "rating": rating,
         "review_text": review_text,
         "map_link": clean_map_link,
-        "location_name": location_name.strip() if location_name else None,
+        "location_name": final_location_name, 
+        "normalized_location_name": normalized_location,
         "category": category.strip() if category else None,  # Add category
         "likes_count": 0,
         "comments_count": 0,

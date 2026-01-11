@@ -45,6 +45,10 @@ export default function AddPostScreen() {
   const [showPointsAnimation, setShowPointsAnimation] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
 
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
   // Categories list
   const CATEGORIES = [
     'Vegetarian/Vegan',
@@ -65,7 +69,13 @@ export default function AddPostScreen() {
     'Andhra Style',
     'North Indian Style',
     'South Indian Style',
+    'Punjabi Style',
+    'Bengali Style',
+    'Odia Style',
+    'Gujurati Style',
+    'Rajasthani Style',
     'Mangaluru Style',
+    'Goan',
     'Kashmiri',
     'Continental',
     'Italian',
@@ -328,6 +338,67 @@ export default function AddPostScreen() {
     }
   };
 
+  // ------------------------------ LOCATION SUGGESTIONS ------------------------------
+
+const fetchLocationSuggestions = async (text: string) => {
+  if (!text || text.trim().length < 2) {
+    setLocationSuggestions([]);
+    setShowSuggestions(false);
+    return;
+  }
+
+  setLoadingSuggestions(true);
+  try {
+    const response = await axios.get(
+      `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/locations/suggestions`,
+      {
+        params: { q: text.trim(), limit: 5 },
+        headers: { Authorization: `Bearer ${auth?.token}` },
+      }
+    );
+
+    if (response.data && response.data.length > 0) {
+      setLocationSuggestions(response.data);
+      setShowSuggestions(true);
+    } else {
+      setLocationSuggestions([]);
+      setShowSuggestions(false);
+    }
+  } catch (error) {
+    console.log('Error fetching suggestions:', error);
+    setLocationSuggestions([]);
+    setShowSuggestions(false);
+  } finally {
+    setLoadingSuggestions(false);
+  }
+};
+
+const selectLocationSuggestion = (suggestion: any) => {
+  setLocationName(suggestion.location_name);
+  if (suggestion.map_link) {
+    setMapsLink(suggestion.map_link);
+  }
+  setShowSuggestions(false);
+  setLocationSuggestions([]);
+};
+
+// Debounce function for location search
+const debounceTimeout = React.useRef<NodeJS.Timeout | null>(null);
+
+const handleLocationNameChange = (text: string) => {
+  setLocationName(text);
+  setMapsLink(''); // Clear map link when typing new location
+
+  // Debounce API call
+  if (debounceTimeout.current) {
+    clearTimeout(debounceTimeout.current);
+  }
+
+  debounceTimeout.current = setTimeout(() => {
+    fetchLocationSuggestions(text);
+  }, 300); // 300ms debounce
+};
+
   // ------------------------------ UI ------------------------------
 
   return (
@@ -458,44 +529,90 @@ export default function AddPostScreen() {
         </View>
 
         {/* FREE GOOGLE MAPS LOCATION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
+<View style={styles.section}>
+  <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
 
-          <TextInput
-            style={styles.linkInput}
-            placeholder="Type place name (e.g., Starbucks MG Road)"
-            placeholderTextColor="#999"
-            value={locationName}
-            onChangeText={(t) => {
-              setLocationName(t);
-              setMapsLink('');
-            }}
-          />
+  <View style={styles.locationInputContainer}>
+    <TextInput
+      style={styles.linkInput}
+      placeholder="Type place name (e.g., Starbucks MG Road)"
+      placeholderTextColor="#999"
+      value={locationName}
+      onChangeText={handleLocationNameChange}
+      onFocus={() => {
+        if (locationSuggestions.length > 0) {
+          setShowSuggestions(true);
+        }
+      }}
+    />
+    
+    {loadingSuggestions && (
+      <ActivityIndicator 
+        size="small" 
+        color="#4ECDC4" 
+        style={styles.suggestionLoader} 
+      />
+    )}
 
-          <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
-            <Ionicons name="map" size={20} color="#4ECDC4" />
-            <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
+    {/* Location Suggestions Dropdown */}
+    {showSuggestions && locationSuggestions.length > 0 && (
+      <View style={styles.suggestionsContainer}>
+        <Text style={styles.suggestionsTitle}>Did you mean?</Text>
+        {locationSuggestions.map((suggestion, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.suggestionItem}
+            onPress={() => selectLocationSuggestion(suggestion)}
+          >
+            <View style={styles.suggestionContent}>
+              <Ionicons name="location" size={18} color="#4ECDC4" />
+              <View style={styles.suggestionTextContainer}>
+                <Text style={styles.suggestionName}>{suggestion.location_name}</Text>
+                <Text style={styles.suggestionMeta}>
+                  {suggestion.post_count} post{suggestion.post_count !== 1 ? 's' : ''} • {suggestion.similarity_score}% match
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#CCC" />
           </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={styles.suggestionItemNew}
+          onPress={() => {
+            setShowSuggestions(false);
+            setLocationSuggestions([]);
+          }}
+        >
+          <Ionicons name="add-circle-outline" size={18} color="#666" />
+          <Text style={styles.suggestionNewText}>Add "{locationName}" as new location</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+  </View>
 
-          <TextInput
-            style={styles.linkInput}
-            placeholder="Or paste existing Google Maps link"
-            placeholderTextColor="#999"
-            value={mapsLink}
-            onChangeText={(t) => {
-              setMapsLink(t);
-              setLocationName('');
-            }}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+  <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
+    <Ionicons name="map" size={20} color="#4ECDC4" />
+    <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
+  </TouchableOpacity>
 
-          <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
-            <Ionicons name="location" size={20} color="#4ECDC4" />
-            <Text style={styles.mapsButtonText}>Open Location in Maps</Text>
-            <Ionicons name="chevron-forward" size={20} color="#4ECDC4" />
-          </TouchableOpacity>
-        </View>
+  <TextInput
+    style={styles.linkInput}
+    placeholder="Or paste existing Google Maps link"
+    placeholderTextColor="#999"
+    value={mapsLink}
+    onChangeText={(t) => {
+      setMapsLink(t);
+    }}
+    autoCapitalize="none"
+    autoCorrect={false}
+  />
+
+  <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
+    <Ionicons name="location" size={20} color="#4ECDC4" />
+    <Text style={styles.mapsButtonText}>Open Location in Maps</Text>
+    <Ionicons name="chevron-forward" size={20} color="#4ECDC4" />
+  </TouchableOpacity>
+</View>
 
         {/* POST BUTTON */}
         <TouchableOpacity
@@ -778,6 +895,94 @@ const styles = StyleSheet.create({
     color: '#E94A37',
     fontWeight: '600',
   },
+
+  // Location Suggestions Styles
+locationInputContainer: {
+  position: 'relative',
+  zIndex: 1000,
+},
+
+suggestionLoader: {
+  position: 'absolute',
+  right: 16,
+  top: 18,
+},
+
+suggestionsContainer: {
+  backgroundColor: '#FFF',
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#E5E5E5',
+  marginTop: -8,
+  marginBottom: 12,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+
+suggestionsTitle: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#666',
+  paddingHorizontal: 16,
+  paddingTop: 12,
+  paddingBottom: 8,
+  backgroundColor: '#F9F9F9',
+  borderTopLeftRadius: 12,
+  borderTopRightRadius: 12,
+},
+
+suggestionItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F0F0F0',
+},
+
+suggestionContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+  gap: 12,
+},
+
+suggestionTextContainer: {
+  flex: 1,
+},
+
+suggestionName: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#333',
+},
+
+suggestionMeta: {
+  fontSize: 12,
+  color: '#999',
+  marginTop: 2,
+},
+
+suggestionItemNew: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  gap: 12,
+  backgroundColor: '#F9F9F9',
+  borderBottomLeftRadius: 12,
+  borderBottomRightRadius: 12,
+},
+
+suggestionNewText: {
+  fontSize: 14,
+  color: '#666',
+  fontStyle: 'italic',
+},
 
   // Category Modal
   modalOverlay: {
