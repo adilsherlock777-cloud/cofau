@@ -61,8 +61,11 @@ async def create_notification(
     # Send push notification if enabled
     if send_push:
         try:
+            print(f"🔔 Creating {notification_type} notification: {from_user_id} -> {to_user_id}")
             device_tokens = await get_user_device_tokens(to_user_id)
+            
             if device_tokens:
+                print(f"📱 Found {len(device_tokens)} device token(s) for recipient")
                 # Prepare notification data for navigation
                 notification_data = {
                     "type": notification_type,
@@ -95,8 +98,13 @@ async def create_notification(
                     body=message,
                     data=notification_data
                 )
+            else:
+                print(f"⚠️ No device tokens found for user {to_user_id} - push notification skipped")
+                print(f"   User needs to register their device token via /api/notifications/register-device")
         except Exception as e:
             print(f"⚠️ Error sending push notification: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     return notification_id
 
@@ -209,10 +217,32 @@ async def register_device(
     """Register device token for push notifications"""
     user_id = str(current_user["_id"])
     
+    if not request.deviceToken:
+        raise HTTPException(status_code=400, detail="Device token is required")
+    
+    print(f"📱 Registering device token for user {user_id}")
+    print(f"   Platform: {request.platform}")
+    print(f"   Token: {request.deviceToken[:50]}...")
+    
     success = await register_device_token(
         user_id=user_id,
         device_token=request.deviceToken,
         platform=request.platform
     )
     
-    return {"success": success, "message": "Device registered successfully"}
+    if success:
+        # Verify the token was actually stored
+        tokens = await get_user_device_tokens(user_id)
+        token_count = len(tokens)
+        print(f"✅ Device token registration completed. User now has {token_count} device token(s)")
+        
+        return {
+            "success": True,
+            "message": "Device registered successfully",
+            "tokenCount": token_count
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to register device token. Please try again."
+        )
