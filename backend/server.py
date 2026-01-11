@@ -36,9 +36,9 @@ from datetime import datetime, timedelta
 def calculate_explore_score(post, current_time):
     """
     Calculate explore score with:
-    - Base engagement score (likes, comments, saves)
+    - Base engagement score (likes, comments, rating)
     - Freshness bonus (new posts get boosted)
-    - Random boost (for variety)
+    - Random boost (for variety on each refresh)
     
     This creates Instagram-like "Exploration vs Exploitation" balance.
     """
@@ -67,10 +67,13 @@ def calculate_explore_score(post, current_time):
             time_diff = current_time - created_at
             hours_since_posted = time_diff.total_seconds() / 3600
             
-            # Freshness bonus: max 72 points for brand new posts, decreasing over 72 hours
-            # Posts < 24h get big boost, 24-48h medium boost, 48-72h small boost
+            # Freshness bonus system:
+            # - Posts < 24h: +72 points (big boost for brand new)
+            # - Posts 24-48h: +48 points
+            # - Posts 48-72h: decreasing from 24 to 0
+            # - Posts > 72h: 0 points
             if hours_since_posted < 24:
-                freshness_bonus = 72  # Maximum boost for very new posts
+                freshness_bonus = 72
             elif hours_since_posted < 48:
                 freshness_bonus = 48
             elif hours_since_posted < 72:
@@ -97,10 +100,10 @@ def calculate_explore_score(post, current_time):
 def get_diverse_explore_posts(posts, current_time, limit=20):
     """
     Get diverse explore posts using 70/30 split:
-    - 70% top performing posts
-    - 30% random posts (for discovery)
+    - 70% top performing posts (by score)
+    - 30% random posts (for discovery of new content)
     
-    Also ensures creator diversity (max 2 posts per user in top results)
+    Also ensures creator diversity (max 2 posts per user in results)
     """
     if not posts:
         return []
@@ -129,7 +132,7 @@ def get_diverse_explore_posts(posts, current_time, limit=20):
     for item in scored_posts:
         user_id = item["post"].get("user_id")
         
-        # Enforce creator diversity
+        # Enforce creator diversity - skip if user already has max posts
         if user_post_count.get(user_id, 0) >= max_posts_per_user:
             continue
         
@@ -143,7 +146,7 @@ def get_diverse_explore_posts(posts, current_time, limit=20):
     selected_ids = {str(p["post"]["_id"]) for p in top_posts}
     remaining_posts = [p for p in scored_posts if str(p["post"]["_id"]) not in selected_ids]
     
-    # Randomly select from remaining posts
+    # Randomly select from remaining posts for the 30% discovery portion
     if remaining_posts and random_count > 0:
         random_selection = random.sample(
             remaining_posts, 
@@ -152,10 +155,10 @@ def get_diverse_explore_posts(posts, current_time, limit=20):
     else:
         random_selection = []
     
-    # Combine and shuffle top portion for variety
+    # Combine top posts and random selection
     final_posts = top_posts + random_selection
     
-    # Shuffle the top 10 positions slightly for perceived freshness
+    # Shuffle the top 10 positions for perceived freshness on each refresh
     if len(final_posts) > 10:
         top_10 = final_posts[:10]
         rest = final_posts[10:]
@@ -1586,11 +1589,13 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
     
     all_posts = await db.posts.find({
         "created_at": {"$gte": thirty_days_ago}
-    }).to_list(500)  # Larger pool for better diversity
+    }).to_list(500)
     
     # If not enough recent posts, include older ones
     if len(all_posts) < 50:
         all_posts = await db.posts.find().sort("created_at", -1).to_list(500)
+    
+    print(f"📊 Explore/Trending: Found {len(all_posts)} posts in pool")
     
     # Apply diverse explore algorithm
     diverse_posts = get_diverse_explore_posts(all_posts, current_time, limit=skip + limit + 20)
@@ -1637,14 +1642,15 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
-            # Debug info (remove in production if needed)
-            "_explore_score": round(item["final_score"], 2),
-            "_freshness_bonus": round(item["freshness_bonus"], 2),
         })
     
-    print(f"📊 Explore/Trending: Returned {len(result)} posts with diversity algorithm")
+    print(f"✅ Explore/Trending: Returned {len(result)} posts with diversity algorithm")
     return result
 
+
+# ----------------------------------------------
+# REPLACE: /api/explore/top-rated
+# ----------------------------------------------
 @app.get("/api/explore/top-rated")
 async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get top-rated posts (rating >= 8) with freshness and randomness"""
@@ -1653,6 +1659,8 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
     
     # Get high-rated posts
     posts = await db.posts.find({"rating": {"$gte": 8}}).to_list(300)
+    
+    print(f"📊 Explore/TopRated: Found {len(posts)} posts with rating >= 8")
     
     # Apply diverse algorithm
     diverse_posts = get_diverse_explore_posts(posts, current_time, limit=skip + limit + 20)
@@ -1742,8 +1750,10 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
     db = get_database()
     current_time = datetime.utcnow()
     
-    # Get all posts (or limit to reasonable pool)
+    # Get all posts (limit to reasonable pool for performance)
     all_posts = await db.posts.find().sort("created_at", -1).limit(1000).to_list(1000)
+    
+    print(f"📊 Explore/All: Found {len(all_posts)} posts in pool")
     
     # Apply diverse explore algorithm
     diverse_posts = get_diverse_explore_posts(all_posts, current_time, limit=skip + limit + 30)
@@ -1788,13 +1798,15 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
-            "_explore_score": round(item["final_score"], 2),
         })
     
-    print(f"📊 Explore/All: Returned {len(result)} posts with diversity algorithm")
+    print(f"✅ Explore/All: Returned {len(result)} posts with diversity algorithm")
     return result
 
 
+# ----------------------------------------------
+# REPLACE: /api/explore/category
+# ----------------------------------------------
 @app.get("/api/explore/category")
 async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get posts filtered by category with diversity algorithm"""
@@ -1808,6 +1820,8 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             {"review_text": {"$regex": name, "$options": "i"}}
         ]
     }).to_list(300)
+    
+    print(f"📊 Explore/Category '{name}': Found {len(posts)} posts")
     
     # Apply diverse algorithm
     diverse_posts = get_diverse_explore_posts(posts, current_time, limit=skip + limit + 20)
@@ -1853,7 +1867,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
         })
     
     return result
-
+    
 @app.get("/api/explore/nearby")
 async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get posts near a location using Haversine formula"""
