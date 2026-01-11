@@ -70,16 +70,18 @@ setStories(filtered);
     }
   };
 
-  const handleStoryPress = (userStories) => {
-    router.push({
-      pathname: "/story-viewer",
-      params: {
-        userId: userStories.user.id,
-        stories: JSON.stringify(userStories.stories),
-        user: JSON.stringify(userStories.user),
-      },
-    });
-  };
+  const handleStoryPress = (userStories, index) => {
+  router.push({
+    pathname: "/story-viewer",
+    params: {
+      userId: userStories.user.id,
+      stories: JSON.stringify(userStories.stories),
+      user: JSON.stringify(userStories.user),
+      allUsersStories: JSON.stringify(stories), // Pass ALL users' stories
+      currentUserIndex: index, // Pass the index of tapped user
+    },
+  });
+};
 
   const handleAddStory = () => router.push("/story-upload");
 
@@ -100,14 +102,14 @@ setStories(filtered);
     >
 
       {/* ===== Other Users ===== */}
-      {stories.map((u) => {
+      {stories.map((u, index) => {
         if (!u.user?.id) return null;
 
         return (
           <TouchableOpacity
             key={u.user.id}
             style={styles.storyItem}
-            onPress={() => handleStoryPress(u)}
+            onPress={() => handleStoryPress(u, index)}
           >
             <View style={styles.avatarWrapper}>
               <LinearGradient

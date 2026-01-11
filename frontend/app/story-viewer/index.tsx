@@ -84,6 +84,8 @@ export default function StoryViewerScreen() {
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [allUsersStories, setAllUsersStories] = useState<any[]>([]);
+  const [currentUserIndex, setCurrentUserIndex] = useState(0);
 
   // Keyboard state for Android
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -298,97 +300,120 @@ const handleSendStoryReply = async () => {
   /* ----------------------------------------------------------
      LOAD STORIES FROM PARAMS
   -----------------------------------------------------------*/
-  useEffect(() => {
-    try {
-      const storiesParam = Array.isArray(params.stories) ? params.stories[0] : params.stories;
-      const userParam = Array.isArray(params.user) ? params.user[0] : params.user;
-      const parsedStories = JSON.parse(storiesParam as string);
-      const parsedUser = JSON.parse(userParam as string);
+useEffect(() => {
+  try {
+    const storiesParam = Array.isArray(params.stories) ? params.stories[0] : params.stories;
+    const userParam = Array.isArray(params.user) ? params.user[0] : params.user;
+    const allUsersParam = Array.isArray(params.allUsersStories) ? params.allUsersStories[0] : params.allUsersStories;
+    const userIndexParam = Array.isArray(params.currentUserIndex) ? params.currentUserIndex[0] : params.currentUserIndex;
 
-      console.log("📦 Parsed stories:", parsedStories.length);
-      console.log("👤 Parsed user:", parsedUser.username);
+    const parsedStories = JSON.parse(storiesParam as string);
+    const parsedUser = JSON.parse(userParam as string);
 
-      const fixedStories = parsedStories.map((s: any, idx: number) => {
-        const fixedUrl = normalizeStoryUrl(s.media_url);
-
-        let mediaType = s.media_type;
-        if (!mediaType && fixedUrl) {
-          const urlLower = fixedUrl.toLowerCase();
-          if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.avi') || urlLower.endsWith('.webm')) {
-            mediaType = 'video';
-          } else {
-            mediaType = 'image';
-          }
-        }
-
-        console.log(`📹 Story ${idx + 1}:`, {
-          original_url: s.media_url,
-          fixed_url: fixedUrl,
-          media_type: mediaType,
-        });
-
-        const storyLength = s.story_length || (mediaType === 'video' ? 30 : 5);
-
-        return {
-          ...s,
-          media_url: fixedUrl,
-          media_type: mediaType || 'image',
-          story_length: storyLength,
-        };
-      });
-
-      const fixedUser = {
-        ...parsedUser,
-        profile_picture: normalizeProfilePicture(parsedUser.profile_picture),
-      };
-
-      setStories(fixedStories);
-      setStoryUser(fixedUser);
-
-      progressAnims.current = [];
-      fixedStories.forEach(() => {
-        progressAnims.current.push(new Animated.Value(0));
-      });
-    } catch (error) {
-      console.error("❌ STORY PARSE ERROR:", error);
-      router.back();
+    // Parse all users' stories if available
+    if (allUsersParam) {
+      try {
+        const parsedAllUsers = JSON.parse(allUsersParam as string);
+        setAllUsersStories(parsedAllUsers);
+        setCurrentUserIndex(parseInt(userIndexParam as string) || 0);
+        console.log("📦 Loaded all users stories:", parsedAllUsers.length, "users");
+      } catch (e) {
+        console.log("⚠️ Could not parse allUsersStories");
+      }
     }
-  }, []);
+
+    console.log("📦 Parsed stories:", parsedStories.length);
+    console.log("👤 Parsed user:", parsedUser.username);
+
+    const fixedStories = parsedStories.map((s: any, idx: number) => {
+      const fixedUrl = normalizeStoryUrl(s.media_url);
+
+      let mediaType = s.media_type;
+      if (!mediaType && fixedUrl) {
+        const urlLower = fixedUrl.toLowerCase();
+        if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.avi') || urlLower.endsWith('.webm')) {
+          mediaType = 'video';
+        } else {
+          mediaType = 'image';
+        }
+      }
+
+      console.log(`📹 Story ${idx + 1}:`, {
+        original_url: s.media_url,
+        fixed_url: fixedUrl,
+        media_type: mediaType,
+      });
+
+      const storyLength = s.story_length || (mediaType === 'video' ? 30 : 5);
+
+      return {
+        ...s,
+        media_url: fixedUrl,
+        media_type: mediaType || 'image',
+        story_length: storyLength,
+      };
+    });
+
+    const fixedUser = {
+      ...parsedUser,
+      profile_picture: normalizeProfilePicture(parsedUser.profile_picture),
+    };
+
+    setStories(fixedStories);
+    setStoryUser(fixedUser);
+
+    progressAnims.current = [];
+    fixedStories.forEach(() => {
+      progressAnims.current.push(new Animated.Value(0));
+    });
+  } catch (error) {
+    console.error("❌ STORY PARSE ERROR:", error);
+    router.back();
+  }
+}, []);
 
   /* ----------------------------------------------------------
      AUTO ADVANCE STORY
   -----------------------------------------------------------*/
-  useEffect(() => {
-    if (stories[currentIndex]) {
-      setActualMediaType(stories[currentIndex].media_type);
-      setMediaLoading(true);
-      setMediaError(false);
-      loadStoryViews(stories[currentIndex].id);
-      
-      // Check if story is liked (only for non-owners)
-      const currentIsOwner = user && storyUser && 
-        String(user._id || user.id) === String(storyUser._id || storyUser.id);
-      if (!currentIsOwner && storyUser) {
-        checkIfLiked(stories[currentIndex].id);
-      }
-      
-      if (!viewedStories.has(stories[currentIndex].id)) {
-        markStoryAsViewed(stories[currentIndex].id);
-      }
+useEffect(() => {
+  if (stories[currentIndex]) {
+    setActualMediaType(stories[currentIndex].media_type);
+    setMediaLoading(true);
+    setMediaError(false);
+    loadStoryViews(stories[currentIndex].id);
+    
+    // Check if story is liked (only for non-owners)
+    const currentIsOwner = user && storyUser && 
+      String(user._id || user.id) === String(storyUser._id || storyUser.id);
+    if (!currentIsOwner && storyUser) {
+      checkIfLiked(stories[currentIndex].id);
     }
-
-    if (stories.length > 0 && !paused && !mediaLoading && !mediaError) {
-      startProgress();
-    } else if (paused) {
-      if (autoAdvanceTimer.current) {
-        clearTimeout(autoAdvanceTimer.current);
-      }
+    
+    if (!viewedStories.has(stories[currentIndex].id)) {
+      markStoryAsViewed(stories[currentIndex].id);
     }
+  }
 
-    return () => {
-      if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
-    };
-  }, [currentIndex, stories, paused, mediaLoading, mediaError, storyUser]);
+  // Cleanup timer when index changes or component unmounts
+  return () => {
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
+  };
+}, [currentIndex, stories, storyUser]);
+
+// Separate useEffect for starting progress after media loads
+useEffect(() => {
+  if (stories.length > 0 && !paused && !mediaLoading && !mediaError) {
+    startProgress();
+  }
+  
+  if (paused && autoAdvanceTimer.current) {
+    clearTimeout(autoAdvanceTimer.current);
+    autoAdvanceTimer.current = null;
+  }
+}, [mediaLoading, mediaError, paused]);
 
   /* ----------------------------------------------------------
      MARK STORY AS VIEWED
@@ -420,48 +445,195 @@ const handleSendStoryReply = async () => {
     }
   };
 
-  const startProgress = () => {
-    const currentStory = stories[currentIndex];
-    if (!currentStory || mediaLoading || mediaError) return;
+const startProgress = () => {
+  const currentStory = stories[currentIndex];
+  if (!currentStory || mediaLoading || mediaError) {
+    console.log("⏸️ Cannot start progress:", { mediaLoading, mediaError, hasStory: !!currentStory });
+    return;
+  }
 
-    if (autoAdvanceTimer.current) {
-      clearTimeout(autoAdvanceTimer.current);
+  // Clear any existing timer
+  if (autoAdvanceTimer.current) {
+    clearTimeout(autoAdvanceTimer.current);
+    autoAdvanceTimer.current = null;
+  }
+
+  const duration = isVideoContent(currentStory) ? 10000 : 5000;
+  console.log(`▶️ Starting progress for story ${currentIndex + 1}/${stories.length}, duration: ${duration}ms`);
+
+  // Reset and start animation
+  progressAnims.current[currentIndex]?.setValue(0);
+
+  Animated.timing(progressAnims.current[currentIndex], {
+    toValue: 1,
+    duration,
+    useNativeDriver: false,
+  }).start(({ finished }) => {
+    // Animation completed naturally (not interrupted)
+    if (finished) {
+      console.log(`✅ Animation finished for story ${currentIndex + 1}`);
     }
+  });
 
-    const duration = isVideoContent(currentStory) ? 10000 : 5000;
+  // Set timer to advance to next story
+  autoAdvanceTimer.current = setTimeout(() => {
+    console.log(`⏰ Timer fired, advancing from story ${currentIndex + 1}`);
+    handleNext();
+  }, duration);
+};
 
+// Fallback: If media doesn't load within 10 seconds, skip to next
+useEffect(() => {
+  let fallbackTimer: NodeJS.Timeout | null = null;
+  
+  if (mediaLoading) {
+    fallbackTimer = setTimeout(() => {
+      console.log("⚠️ Media loading timeout, forcing next story");
+      setMediaLoading(false);
+      setMediaError(true);
+      // Auto-skip after showing error briefly
+      setTimeout(() => handleNext(), 1500);
+    }, 10000); // 10 second timeout
+  }
+  
+  return () => {
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+  };
+}, [mediaLoading, currentIndex]);
+
+const handleNext = () => {
+  if (autoAdvanceTimer.current) {
+    clearTimeout(autoAdvanceTimer.current);
+    autoAdvanceTimer.current = null;
+  }
+
+  if (currentIndex < stories.length - 1) {
+    // More stories from current user
+    progressAnims.current[currentIndex].setValue(1);
+    setCurrentIndex(currentIndex + 1);
+  } else {
+    // Finished current user's stories - check for next user
+    if (allUsersStories.length > 0 && currentUserIndex < allUsersStories.length - 1) {
+      // Switch to next user
+      const nextUserIndex = currentUserIndex + 1;
+      const nextUserData = allUsersStories[nextUserIndex];
+      
+      console.log(`➡️ Switching to next user: ${nextUserData.user.username}`);
+      
+      // Fix the next user's stories
+      const fixedStories = nextUserData.stories.map((s: any) => {
+        const fixedUrl = normalizeStoryUrl(s.media_url);
+        let mediaType = s.media_type;
+        if (!mediaType && fixedUrl) {
+          const urlLower = fixedUrl.toLowerCase();
+          if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.avi') || urlLower.endsWith('.webm')) {
+            mediaType = 'video';
+          } else {
+            mediaType = 'image';
+          }
+        }
+        return {
+          ...s,
+          media_url: fixedUrl,
+          media_type: mediaType || 'image',
+          story_length: s.story_length || (mediaType === 'video' ? 30 : 5),
+        };
+      });
+
+      const fixedUser = {
+        ...nextUserData.user,
+        profile_picture: normalizeProfilePicture(nextUserData.user.profile_picture),
+      };
+
+      // Reset progress animations for new user
+      progressAnims.current = [];
+      fixedStories.forEach(() => {
+        progressAnims.current.push(new Animated.Value(0));
+      });
+
+      // Update state
+      setCurrentUserIndex(nextUserIndex);
+      setStories(fixedStories);
+      setStoryUser(fixedUser);
+      setCurrentIndex(0);
+      setMediaLoading(true);
+      setMediaError(false);
+      setIsLiked(false);
+      setLikeCount(0);
+      setViewCount(0);
+      setViewers([]);
+    } else {
+      // No more users, exit story viewer
+      console.log("✅ All stories finished, exiting");
+      router.back();
+    }
+  }
+};
+
+const handlePrevious = () => {
+  if (autoAdvanceTimer.current) {
+    clearTimeout(autoAdvanceTimer.current);
+    autoAdvanceTimer.current = null;
+  }
+
+  if (currentIndex > 0) {
+    // Go to previous story of current user
     progressAnims.current[currentIndex].setValue(0);
+    setCurrentIndex(currentIndex - 1);
+  } else if (allUsersStories.length > 0 && currentUserIndex > 0) {
+    // Go to previous user's last story
+    const prevUserIndex = currentUserIndex - 1;
+    const prevUserData = allUsersStories[prevUserIndex];
+    
+    console.log(`⬅️ Switching to previous user: ${prevUserData.user.username}`);
+    
+    // Fix the previous user's stories
+    const fixedStories = prevUserData.stories.map((s: any) => {
+      const fixedUrl = normalizeStoryUrl(s.media_url);
+      let mediaType = s.media_type;
+      if (!mediaType && fixedUrl) {
+        const urlLower = fixedUrl.toLowerCase();
+        if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.avi') || urlLower.endsWith('.webm')) {
+          mediaType = 'video';
+        } else {
+          mediaType = 'image';
+        }
+      }
+      return {
+        ...s,
+        media_url: fixedUrl,
+        media_type: mediaType || 'image',
+        story_length: s.story_length || (mediaType === 'video' ? 30 : 5),
+      };
+    });
 
-    Animated.timing(progressAnims.current[currentIndex], {
-      toValue: 1,
-      duration,
-      useNativeDriver: false,
-    }).start();
+    const fixedUser = {
+      ...prevUserData.user,
+      profile_picture: normalizeProfilePicture(prevUserData.user.profile_picture),
+    };
 
-    autoAdvanceTimer.current = setTimeout(() => handleNext(), duration);
-  };
+    // Reset progress animations for previous user
+    progressAnims.current = [];
+    fixedStories.forEach(() => {
+      progressAnims.current.push(new Animated.Value(0));
+    });
 
-  const handleNext = () => {
-    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
-
-    if (currentIndex < stories.length - 1) {
-      progressAnims.current[currentIndex].setValue(1);
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      router.back();
-    }
-  };
-
-  const handlePrevious = () => {
-    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
-
-    if (currentIndex > 0) {
-      progressAnims.current[currentIndex].setValue(0);
-      setCurrentIndex(currentIndex - 1);
-    } else {
-      router.back();
-    }
-  };
+    // Update state - go to last story of previous user
+    setCurrentUserIndex(prevUserIndex);
+    setStories(fixedStories);
+    setStoryUser(fixedUser);
+    setCurrentIndex(fixedStories.length - 1); // Go to last story
+    setMediaLoading(true);
+    setMediaError(false);
+    setIsLiked(false);
+    setLikeCount(0);
+    setViewCount(0);
+    setViewers([]);
+  } else {
+    // No previous user, exit
+    router.back();
+  }
+};
 
   /* ----------------------------------------------------------
      DELETE STORY
