@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { BlurView } from 'expo-blur';
+import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 
 export const options = {
   headerShown: false,
@@ -26,6 +27,8 @@ const API_BASE_URL =
 const API_URL = `${API_BASE_URL}/api`;
 
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+const MAX_CONCURRENT_VIDEOS = 2;
 
 // Check if URL is a video file
 const isVideoFile = (url) => {
@@ -39,12 +42,116 @@ const isVideoFile = (url) => {
   );
 };
 
+// Skeleton Loading Component
+const SkeletonCard = () => (
+  <View style={styles.skeletonCard}>
+    <View style={styles.skeletonHeader}>
+      <View style={styles.skeletonRank} />
+      <View style={styles.skeletonTitleContainer}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonSubtitle} />
+      </View>
+    </View>
+    <View style={styles.skeletonImageRow}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.skeletonImage} />
+      <View style={styles.skeletonImage} />
+    </View>
+    <View style={styles.skeletonImageRow}>
+      <View style={styles.skeletonImageLarge} />
+      <View style={styles.skeletonImageLarge} />
+    </View>
+  </View>
+);
+
+const SkeletonLoader = () => (
+  <View style={styles.skeletonContainer}>
+    <SkeletonCard />
+    <SkeletonCard />
+    <SkeletonCard />
+  </View>
+);
+
+// Video Thumbnail Component with autoplay
+const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayout, videoId }) => {
+  const videoRef = useRef(null);
+  const [isActuallyPlaying, setIsActuallyPlaying] = useState(false);
+
+  useEffect(() => {
+    const controlVideo = async () => {
+      if (!videoRef.current) return;
+      try {
+        if (shouldPlay) {
+          // iOS requires loading the video first
+          const status = await videoRef.current.getStatusAsync();
+          if (!status.isLoaded) {
+            await videoRef.current.loadAsync(
+              { uri: videoUrl },
+              { shouldPlay: true, isLooping: true, isMuted: true }
+            );
+          } else {
+            await videoRef.current.setPositionAsync(0);
+            await videoRef.current.playAsync();
+          }
+        } else {
+          await videoRef.current.pauseAsync();
+        }
+      } catch (e) {
+        console.log("Video control error:", e);
+      }
+    };
+    controlVideo();
+  }, [shouldPlay, videoUrl]);
+
+  return (
+    <View style={style} onLayout={(e) => onLayout && onLayout(videoId, e)}>
+      <Video
+        ref={videoRef}
+        source={{ uri: videoUrl }}
+        style={StyleSheet.absoluteFill}
+        resizeMode={ResizeMode.COVER}
+        isLooping
+        isMuted={true}
+        useNativeControls={false}
+        shouldPlay={false}
+        posterSource={{ uri: thumbnailUrl }}
+        usePoster={true}
+        onPlaybackStatusUpdate={(status) => {
+          if (status.isLoaded) setIsActuallyPlaying(status.isPlaying);
+        }}
+      />
+      
+      {/* Thumbnail - hide when video is playing */}
+      {!isActuallyPlaying && thumbnailUrl && (
+        <Image
+          source={{ uri: thumbnailUrl }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          placeholder={{ blurhash: BLUR_HASH }}
+        />
+      )}
+      
+      {/* Play icon - hide when playing */}
+      {!isActuallyPlaying && (
+        <View style={styles.videoPlayIcon}>
+          <Ionicons name="play-circle" size={22} color="#fff" />
+        </View>
+      )}
+    </View>
+  );
+});
+
 export default function HappeningPlaces() {
   const router = useRouter();
   const { token } = useAuth();
   const [topLocations, setTopLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFixedLine, setShowFixedLine] = useState(false);
+  
+  // Video autoplay state
+  const videoPositions = useRef(new Map());
+  const [scrollY, setScrollY] = useState(0);
+  const [playingVideos, setPlayingVideos] = useState([]);
 
   useEffect(() => {
     if (token) {
@@ -60,8 +167,41 @@ export default function HappeningPlaces() {
         );
         fetchTopLocations();
       }
+      // Pause videos when leaving screen
+      return () => {
+        setPlayingVideos([]);
+      };
     }, [token])
   );
+
+  // Track video positions
+  const handleVideoLayout = useCallback((videoId, event) => {
+    const { y, height } = event.nativeEvent.layout;
+    videoPositions.current.set(videoId, { top: y, height });
+  }, []);
+
+  // Calculate visible videos
+  const calculateVisibleVideos = useCallback((currentScrollY) => {
+    const visibleTop = currentScrollY;
+    const visibleBottom = currentScrollY + SCREEN_HEIGHT;
+    const visible = [];
+
+    videoPositions.current.forEach((position, videoId) => {
+      if (position.top + position.height > visibleTop && position.top < visibleBottom - 100) {
+        visible.push(videoId);
+      }
+    });
+
+    setPlayingVideos(visible.slice(0, MAX_CONCURRENT_VIDEOS));
+  }, []);
+
+  // Effect to calculate visible videos when scroll or locations change
+  useEffect(() => {
+    if (topLocations.length > 0) {
+      const timer = setTimeout(() => calculateVisibleVideos(scrollY), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollY, topLocations, calculateVisibleVideos]);
 
   const fetchTopLocations = async () => {
     if (!token) {
@@ -72,6 +212,7 @@ export default function HappeningPlaces() {
 
     try {
       setLoading(true);
+      videoPositions.current.clear(); // Clear video positions on refresh
       const endpoint = `${API_URL}/locations/top`;
       console.log('🔍 Fetching top locations from:', endpoint);
 
@@ -103,6 +244,7 @@ export default function HappeningPlaces() {
   };
 
   const handleLocationPress = (location) => {
+    setPlayingVideos([]); // Pause videos when navigating
     const locationName =
       location.location || location.location_name;
     if (locationName) {
@@ -120,24 +262,131 @@ export default function HappeningPlaces() {
     return `${API_BASE_URL}${cleanUrl}`;
   };
 
-  // Handle scroll to show/hide fixed line
+  // Handle scroll to show/hide fixed line and track scroll position
   const handleScroll = useCallback((event) => {
-    const scrollY = event.nativeEvent.contentOffset.y;
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    setScrollY(currentScrollY);
+    calculateVisibleVideos(currentScrollY);
 
-    if (scrollY > 100) {
+    if (currentScrollY > 100) {
       setShowFixedLine(true);
     } else {
       setShowFixedLine(false);
     }
-  }, []);
+  }, [calculateVisibleVideos]);
+
+  // Helper function to render image or video
+  const renderMediaItem = (imageUrl, imgIndex, imagesData, thumbnails, locationKey) => {
+    const fixedUrl = fixUrl(imageUrl);
+    const imageData = imagesData[imgIndex] || {};
+    const thumbnailUrl = imageData.thumbnail_url
+      ? fixUrl(imageData.thumbnail_url)
+      : (thumbnails[imgIndex] ? fixUrl(thumbnails[imgIndex]) : null);
+    const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
+    
+    const videoId = `${locationKey}-${imgIndex}`;
+
+    if (isVideo) {
+      // For videos - use VideoThumbnail component
+      if (!fixedUrl) return null;
+      return (
+  <VideoThumbnail
+    key={imgIndex}
+    videoId={videoId}
+    videoUrl={fixedUrl}
+    thumbnailUrl={thumbnailUrl}
+    style={styles.gridImageContainer}
+    shouldPlay={playingVideos.includes(videoId)}
+    onLayout={(id, e) => {
+      e.target.measureInWindow((x, y, width, height) => {
+        videoPositions.current.set(id, { top: y, height });
+      });
+    }}
+  />
+);
+    } else {
+      // For images - use Image component
+      if (!fixedUrl) return null;
+      return (
+        <View key={imgIndex} style={styles.gridImageContainer}>
+          <Image
+            source={{ uri: fixedUrl }}
+            style={styles.gridImageSquare}
+            contentFit="cover"
+            placeholder={{ blurhash: BLUR_HASH }}
+            transition={300}
+            onError={(error) => {
+              console.error("❌ Image load error in HappeningPlaces:", fixedUrl, error);
+            }}
+          />
+        </View>
+      );
+    }
+  };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4dd0e1" />
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          {/* Header */}
+          <View style={styles.headerContainer}>
+            <LinearGradient
+              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientHeader}
+            >
+              <Text style={styles.headerTitle}>Cofau</Text>
+            </LinearGradient>
+          </View>
+          
+          {/* Title Box */}
+          <View style={styles.titleBoxWrapper}>
+            <BlurView intensity={60} tint="light" style={styles.titleBox}>
+              <Text style={styles.titleMain}>Happening places</Text>
+              <View style={styles.subtitleRow}>
+                <Ionicons name="location" size={16} color="#E94A37" />
+                <Text style={styles.titleSub}>Most Visited Places Around you</Text>
+              </View>
+            </BlurView>
+          </View>
+          
+          {/* Skeleton Cards */}
+          <SkeletonLoader />
+        </ScrollView>
+        
+        {/* Bottom Navigation */}
+        <View style={styles.navBar}>
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
+            <Ionicons name="home-outline" size={20} color="#000" />
+            <Text style={styles.navLabel}>Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
+            <Ionicons name="compass-outline" size={20} color="#000" />
+            <Text style={styles.navLabel}>Explore</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
+            <View style={styles.centerIconCircle}>
+              <Ionicons name="camera" size={22} color="#000" />
+            </View>
+            <Text style={styles.navLabel}>Top Posts</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
+            <Ionicons name="location" size={20} color="#000" />
+            <Text style={styles.navLabelActive}>Happening</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
+            <Ionicons name="person-outline" size={20} color="#000" />
+            <Text style={styles.navLabel}>Profile</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    );
-  }
+    </>
+  );
+}
 
   return (
     <>
@@ -204,10 +453,11 @@ export default function HappeningPlaces() {
             const images = location.images || [];
             const thumbnails = location.thumbnails || [];
             const imagesData = location.images_data || [];
+            const locationKey = location.location || location.location_name || index;
 
             return (
               <TouchableOpacity
-                key={location.location || location.location_name || index}
+                key={locationKey}
                 style={styles.cardOuter}
                 onPress={() => handleLocationPress(location)}
                 activeOpacity={0.8}
@@ -243,174 +493,35 @@ export default function HappeningPlaces() {
                   <View style={styles.imageGrid}>
                     {images.length > 0 ? (
                       <>
-                        {/* First Row - 3 images */}
+                        {/* First Row - 3 images/videos */}
                         <View style={styles.imageRow}>
-                          {images.slice(0, 3).map((imageUrl, imgIndex) => {
-                            const fixedUrl = fixUrl(imageUrl);
-                            const imageData = imagesData[imgIndex] || {};
-                            // Get thumbnail from images_data first, then fallback to thumbnails array
-                            const thumbnailUrl = imageData.thumbnail_url
-                              ? fixUrl(imageData.thumbnail_url)
-                              : (thumbnails[imgIndex] ? fixUrl(thumbnails[imgIndex]) : null);
-                            const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
-                            const userLevel = imageData.user_level || null;
-
-                            // For videos, ONLY use thumbnail - never use video URL as image source
-                            // For images, use the image URL
-                            let displayUrl = null;
-                            if (isVideo) {
-                              // Only use thumbnail for videos - if no thumbnail, skip this image
-                              if (thumbnailUrl) {
-                                displayUrl = thumbnailUrl;
-                              } else {
-                                // Skip videos without thumbnails
-                                return null;
-                              }
-                            } else {
-                              // For images, use the image URL
-                              displayUrl = fixedUrl;
-                            }
-
-                            if (!displayUrl) return null;
-                            return (
-                              <View key={imgIndex} style={styles.gridImageContainer}>
-                                <Image
-                                  source={{ uri: displayUrl }}
-                                  style={styles.gridImageSquare}
-                                  contentFit="cover"
-                                  placeholder={{ blurhash: BLUR_HASH }}
-                                  transition={300}
-                                  onError={(error) => {
-                                    console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
-                                  }}
-                                />
-                                {isVideo && (
-                                  <View style={styles.videoPlayIcon}>
-                                    <Ionicons name="play-circle" size={22} color="#fff" />
-                                  </View>
-                                )}
-                              
-                              </View>
-                            );
-                          })}
+                          {images.slice(0, 3).map((imageUrl, imgIndex) => 
+                            renderMediaItem(imageUrl, imgIndex, imagesData, thumbnails, locationKey)
+                          )}
                         </View>
 
-                        {/* Second Row - 2 images */}
+                        {/* Second Row - 2 images/videos */}
                         <View style={styles.imageRow}>
-                          {images[3] && (() => {
-                            const fixedUrl = fixUrl(images[3]);
-                            const imageData = imagesData[3] || {};
-                            // Get thumbnail from images_data first, then fallback to thumbnails array
-                            const thumbnailUrl = imageData.thumbnail_url
-                              ? fixUrl(imageData.thumbnail_url)
-                              : (thumbnails[3] ? fixUrl(thumbnails[3]) : null);
-                            const isVideo = isVideoFile(images[3]) || imageData.media_type === 'video';
-                            const userLevel = imageData.user_level || null;
+                          {images[3] && renderMediaItem(images[3], 3, imagesData, thumbnails, locationKey)}
 
-                            // For videos, ONLY use thumbnail - never use video URL as image source
-                            // For images, use the image URL
-                            let displayUrl = null;
-                            if (isVideo) {
-                              // Only use thumbnail for videos - if no thumbnail, skip this image
-                              if (thumbnailUrl) {
-                                displayUrl = thumbnailUrl;
-                              } else {
-                                // Skip videos without thumbnails
-                                return null;
-                              }
-                            } else {
-                              // For images, use the image URL
-                              displayUrl = fixedUrl;
-                            }
-
-                            if (!displayUrl) return null;
-                            return (
-                              <View style={styles.gridImageContainer}>
-                                <Image
-                                  source={{ uri: displayUrl }}
-                                  style={styles.gridImageSquare}
-                                  contentFit="cover"
-                                  placeholder={{ blurhash: BLUR_HASH }}
-                                  transition={300}
-                                  onError={(error) => {
-                                    console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
-                                  }}
-                                />
-                                {isVideo && (
-                                  <View style={styles.videoPlayIcon}>
-                                    <Ionicons name="play-circle" size={24} color="#fff" />
-                                  </View>
-                                )}
-                              </View>
-                            );
-                          })()}
-
-                          {images.length === 5 ? (() => {
-                            const fixedUrl = fixUrl(images[4]);
-                            const imageData = imagesData[4] || {};
-                            // Get thumbnail from images_data first, then fallback to thumbnails array
-                            const thumbnailUrl = imageData.thumbnail_url
-                              ? fixUrl(imageData.thumbnail_url)
-                              : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
-                            const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
-                            const userLevel = imageData.user_level || null;
-
-                            // For videos, ONLY use thumbnail - never use video URL as image source
-                            // For images, use the image URL
-                            let displayUrl = null;
-                            if (isVideo) {
-                              // Only use thumbnail for videos - if no thumbnail, skip this image
-                              if (thumbnailUrl) {
-                                displayUrl = thumbnailUrl;
-                              } else {
-                                // Skip videos without thumbnails
-                                return null;
-                              }
-                            } else {
-                              // For images, use the image URL
-                              displayUrl = fixedUrl;
-                            }
-
-                            if (!displayUrl) return null;
-                            return (
-                              <View style={styles.gridImageContainer}>
-                                <Image
-                                  source={{ uri: displayUrl }}
-                                  style={styles.gridImageSquare}
-                                  contentFit="cover"
-                                  placeholder={{ blurhash: BLUR_HASH }}
-                                  transition={300}
-                                  onError={(error) => {
-                                    console.error("❌ Image load error in HappeningPlaces:", displayUrl, error);
-                                  }}
-                                />
-                                {isVideo && (
-                                  <View style={styles.videoPlayIcon}>
-                                    <Ionicons name="play-circle" size={24} color="#fff" />
-                                  </View>
-                                )}
-                              </View>
-                            );
-                          })() : images.length > 5 ? (
+                          {images.length === 5 ? (
+                            renderMediaItem(images[4], 4, imagesData, thumbnails, locationKey)
+                          ) : images.length > 5 ? (
                             // More than 5 - show blurred with total count
                             <View style={styles.blurredImageWrapper}>
                               {(() => {
                                 const imageData = imagesData[4] || {};
                                 const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
 
-                                // For videos, ONLY use thumbnail - never use video URL
-                                // For images, use image URL
                                 let displayUrl = null;
                                 if (isVideo) {
-                                  // Get thumbnail from images_data first, then fallback to thumbnails array
                                   const thumbnailUrl = imageData.thumbnail_url
                                     ? fixUrl(imageData.thumbnail_url)
                                     : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
                                   if (thumbnailUrl) {
                                     displayUrl = thumbnailUrl;
                                   } else {
-                                    // If no thumbnail for video, use a placeholder or skip
-                                    displayUrl = fixUrl(images[4]); // Fallback to video URL but it won't work as image
+                                    displayUrl = fixUrl(images[4]);
                                   }
                                 } else {
                                   displayUrl = fixUrl(images[4]);
@@ -628,15 +739,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     marginBottom: 12,
     borderRadius: 15,
-    backgroundColor: '#fff',  // Add this - Android needs background for shadows
+    backgroundColor: '#fff',
   },
   card: {
+    backgroundColor: '#FFF',
     borderRadius: 15,
-    padding: 20,
-    paddingBottom: 24,
+    padding: 12,
+    marginHorizontal: 20,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: '#E8E8E8',
-    overflow: 'hidden',  // Move it here
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   titleBox: {
@@ -647,11 +764,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: 1,
     borderColor: 'rgba(200, 200, 200, 0.3)',
-  },
-  titleMain: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#000',
   },
 
   gridImageContainer: {
@@ -677,12 +789,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000',
-    fontStyle: 'lobster',
-  },
-  titleSub: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
   },
 
   subtitleRow: {
@@ -695,20 +801,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 6,
   },
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 15,
-    padding: 12,
-    marginHorizontal: 20,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -772,6 +865,64 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  // Skeleton styles
+skeletonContainer: {
+  paddingHorizontal: 20,
+},
+skeletonCard: {
+  backgroundColor: '#fff',
+  borderRadius: 15,
+  padding: 12,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: '#E8E8E8',
+},
+skeletonHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+skeletonRank: {
+  width: 26,
+  height: 26,
+  borderRadius: 13,
+  backgroundColor: '#E0E0E0',
+  marginRight: 10,
+},
+skeletonTitleContainer: {
+  flex: 1,
+},
+skeletonTitle: {
+  height: 16,
+  width: '60%',
+  backgroundColor: '#E0E0E0',
+  borderRadius: 4,
+  marginBottom: 6,
+},
+skeletonSubtitle: {
+  height: 12,
+  width: '30%',
+  backgroundColor: '#E0E0E0',
+  borderRadius: 4,
+},
+skeletonImageRow: {
+  flexDirection: 'row',
+  gap: 3,
+  marginBottom: 8,
+},
+skeletonImage: {
+  flex: 1,
+  height: 110,
+  backgroundColor: '#E0E0E0',
+  borderRadius: 10,
+},
+skeletonImageLarge: {
+  flex: 1,
+  height: 110,
+  backgroundColor: '#E0E0E0',
+  borderRadius: 10,
+},
+
   gridImageSquare: {
     flex: 1,
     height: 110,
@@ -807,7 +958,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
 
-
   countButton: {
     width: 65,
     height: 45,
@@ -836,7 +986,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-
 
   noImagePlaceholder: {
     width: '100%',
@@ -892,16 +1041,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 20,
   },
-  noImagePlaceholder: {
-    width: 70,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
+
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
