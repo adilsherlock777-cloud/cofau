@@ -116,18 +116,25 @@ export default function FeedScreen() {
 useEffect(() => {
   if (!hasInitiallyLoaded) {
     fetchFeed(true);
-    loadUnreadCount();
     setHasInitiallyLoaded(true);
   }
+  loadUnreadCount();
 }, []);
 
-// Replace your useFocusEffect with this SIMPLER version
+
 useFocusEffect(
   React.useCallback(() => {
-    // Only update notifications and story, DON'T call refreshUser or fetchFeed
+    // Always update notifications and user data
     loadUnreadCount();
+    refreshUser();
     fetchOwnStory();
-  }, [token])
+    
+    // Only fetch feed on first load
+    if (!hasInitiallyLoaded) {
+      fetchFeed(true);
+      setHasInitiallyLoaded(true);
+    }
+  }, [hasInitiallyLoaded])
 );
 
   const loadUnreadCount = async () => {

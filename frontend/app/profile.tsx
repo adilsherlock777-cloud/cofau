@@ -176,21 +176,27 @@ const ProfileSkeleton = () => {
         </View>
       </View>
 
-      {/* Stats Skeleton */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20, marginTop: 15, marginBottom: 15 }}>
-        <View style={{ alignItems: 'center' }}>
-          <SkeletonBox width={40} height={20} borderRadius={4} />
-          <SkeletonBox width={50} height={12} borderRadius={4} style={{ marginTop: 5 }} />
-        </View>
-        <View style={{ alignItems: 'center' }}>
-          <SkeletonBox width={40} height={20} borderRadius={4} />
-          <SkeletonBox width={50} height={12} borderRadius={4} style={{ marginTop: 5 }} />
-        </View>
-        <View style={{ alignItems: 'center' }}>
-          <SkeletonBox width={40} height={20} borderRadius={4} />
-          <SkeletonBox width={70} height={12} borderRadius={4} style={{ marginTop: 5 }} />
-        </View>
-      </View>
+     {/* Stats Section Skeleton */}
+<View style={styles.statsContainer}>
+  <View style={styles.statBox}>
+    <SkeletonBox width={40} height={20} borderRadius={4} />
+    <SkeletonBox width={50} height={12} borderRadius={4} style={{ marginTop: 5 }} />
+  </View>
+  
+  <View style={styles.statDivider} />
+  
+  <View style={styles.statBox}>
+    <SkeletonBox width={40} height={20} borderRadius={4} />
+    <SkeletonBox width={50} height={12} borderRadius={4} style={{ marginTop: 5 }} />
+  </View>
+  
+  <View style={styles.statDivider} />
+  
+  <View style={styles.statBox}>
+    <SkeletonBox width={40} height={20} borderRadius={4} />
+    <SkeletonBox width={70} height={12} borderRadius={4} style={{ marginTop: 5 }} />
+  </View>
+</View>
 
       {/* Action Buttons Skeleton */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 15 }}>
@@ -1522,37 +1528,43 @@ if (loading) {
   )}
 </View>
         </View>
-
         {/* Stats Section */}
-        <View style={styles.statsSection}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>
-              {userStats?.total_posts || 0}
-            </Text>
-            <Text style={styles.statLabel}>Posts</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.statBox}
-            onPress={() => {
-              if (userData?.id) {
-                setFollowersModalVisible(true);
-                fetchFollowers();
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.statValue}>
-              {userStats?.followers_count || 0}
-            </Text>
-            <Text style={styles.statLabel}>People</Text>
-          </TouchableOpacity>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>
-              {complimentsCount}
-            </Text>
-            <Text style={styles.statLabel}>Compliments</Text>
-          </View>
-        </View>
+<View style={styles.statsContainer}>
+  <View style={styles.statBox}>
+    <Text style={styles.statValue}>
+      {userStats?.total_posts || 0}
+    </Text>
+    <Text style={styles.statLabel}>Posts</Text>
+  </View>
+  
+  <View style={styles.statDivider} />
+  
+  <TouchableOpacity 
+    style={styles.statBox}
+    onPress={() => {
+      if (userData?.id) {
+        setFollowersModalVisible(true);
+        fetchFollowers();
+      }
+    }}
+    activeOpacity={0.7}
+  >
+    <Text style={styles.statValue}>
+      {userStats?.followers_count || 0}
+    </Text>
+    <Text style={styles.statLabel}>People</Text>
+  </TouchableOpacity>
+  
+  <View style={styles.statDivider} />
+  
+  <View style={styles.statBox}>
+    <Text style={styles.statValue}>
+      {complimentsCount}
+    </Text>
+    <Text style={styles.statLabel}>Compliments</Text>
+  </View>
+</View>
+        
 
         {/* Action Buttons with Gradient */}
         <View style={styles.actionButtonsContainer}>
@@ -2644,19 +2656,34 @@ profilePictureContainer: {
     marginTop: -10,
   },
 
-  statsSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    marginBottom: 8,
-    marginTop: 8
-  },
-  statBox: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    minWidth: 100,
-  },
+statsContainer: {
+  flexDirection: 'row',
+  backgroundColor: '#fff',
+  marginHorizontal: 16,
+  marginVertical: 16,
+  borderRadius: 16,
+  paddingVertical: 16,
+  paddingHorizontal: 8,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 4,
+  alignItems: 'center',
+  justifyContent: 'space-evenly',  
+},
+statBox: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 0, 
+},
+statDivider: {
+  width: 1,
+  height: 40,
+  backgroundColor: '#D0D0D0',  
+  alignSelf: 'center',
+},
   statValue: {
     fontSize: 16,
     fontWeight: '700',
