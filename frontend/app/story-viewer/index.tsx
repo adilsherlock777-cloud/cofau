@@ -183,41 +183,58 @@ const handleSendStoryReply = async () => {
   setSendingReply(true);
   
   try {
-    // Connect to WebSocket and send message with story data
-    const wsUrl = `${API_URL.replace('/api', '').replace('https', 'wss').replace('http', 'ws')}/api/chat/ws/${storyUser._id || storyUser.id}?token=${encodeURIComponent(token || '')}`;
+    const otherUserId = storyUser._id || storyUser.id;
+    const wsUrl = `${BACKEND_URL.replace('https', 'wss').replace('http', 'ws')}/api/chat/ws/${otherUserId}?token=${encodeURIComponent(token || '')}`;
     
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
+      console.log("✅ WebSocket connected for story reply");
       ws.send(JSON.stringify({
         message: replyText.trim(),
         story_id: currentStory.id,
         story_data: {
           media_url: currentStory.media_url,
           media_type: currentStory.media_type,
-          story_owner_id: storyUser._id || storyUser.id,
+          story_owner_id: otherUserId,
           story_owner_username: storyUser.username,
           story_owner_profile_picture: storyUser.profile_picture,
         }
       }));
-      
-      setTimeout(() => {
-        ws.close();
-        setShowReplyInput(false);
-        setReplyText("");
-        Alert.alert("Sent!", "Your reply has been sent");
-      }, 500);
+    };
+
+    ws.onmessage = (event) => {
+      console.log("📨 Message confirmation received");
+      // Message was saved and broadcast, now we can close
+      ws.close();
+      setShowReplyInput(false);
+      setReplyText("");
+      setSendingReply(false);
+      Alert.alert("Sent!", "Your reply has been sent");
     };
 
     ws.onerror = (error) => {
       console.error("❌ WebSocket error:", error);
+      setSendingReply(false);
       Alert.alert("Error", "Failed to send reply");
     };
+
+    ws.onclose = () => {
+      console.log("🔌 WebSocket closed");
+    };
+
+    // Timeout fallback in case no response
+    setTimeout(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+        setSendingReply(false);
+      }
+    }, 5000);
+
   } catch (error) {
     console.error("❌ Error sending story reply:", error);
-    Alert.alert("Error", "Failed to send reply");
-  } finally {
     setSendingReply(false);
+    Alert.alert("Error", "Failed to send reply");
   }
 };
 
@@ -846,7 +863,7 @@ const handleSendStoryReply = async () => {
             style={styles.interactionButton}
             onPress={handleShareStory}
           >
-            <Ionicons name="paper-plane-outline" size={26} color="#FFF" />
+            <Ionicons name="share-outline" size={26} color="#FFF" />
           </TouchableOpacity>
         </View>
       )}
@@ -879,35 +896,42 @@ const handleSendStoryReply = async () => {
                 data={viewers}
                 keyExtractor={(item, index) => `${item.user_id}-${index}`}
                 renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.viewerItem}
-                    onPress={() => {
-                      setShowViewersModal(false);
-                      router.push(`/profile?userId=${(item as any).user_id}`);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <UserAvatar
-                      profilePicture={normalizeProfilePicture(item.profile_picture)}
-                      username={item.username}
-                      size={50}
-                      level={1}
-                      showLevelBadge={false}
-                      style={{}}
-                    />
-                    <View style={styles.viewerInfo}>
-                      <Text style={styles.viewerUsername}>
-                        {(item as any).full_name || item.username}
-                      </Text>
-                      {(item as any).full_name && item.username && (item as any).full_name !== item.username && (
-                        <Text style={styles.viewerUsernameSecondary}>@{item.username}</Text>
-                      )}
-                      <Text style={styles.viewerTime}>
-                        {new Date(item.viewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
+  <TouchableOpacity
+    style={styles.viewerItem}
+    onPress={() => {
+      setShowViewersModal(false);
+      router.push(`/profile?userId=${(item as any).user_id}`);
+    }}
+    activeOpacity={0.7}
+  >
+    <UserAvatar
+      profilePicture={normalizeProfilePicture(item.profile_picture)}
+      username={item.username}
+      size={50}
+      level={1}
+      showLevelBadge={false}
+      style={{}}
+    />
+    <View style={styles.viewerInfo}>
+      <Text style={styles.viewerUsername}>
+        {(item as any).full_name || item.username}
+      </Text>
+      {(item as any).full_name && item.username && (item as any).full_name !== item.username && (
+        <Text style={styles.viewerUsernameSecondary}>@{item.username}</Text>
+      )}
+      <Text style={styles.viewerTime}>
+        {new Date(item.viewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </Text>
+    </View>
+    
+    {/* Show gradient heart if viewer liked the story */}
+    {(item as any).has_liked && (
+      <View style={styles.viewerLikedIcon}>
+        <GradientHeart size={22} />
+      </View>
+    )}
+  </TouchableOpacity>
+)}
                 ListEmptyComponent={
                   <View style={styles.emptyViewers}>
                     <Text style={styles.emptyViewersText}>No views yet</Text>
@@ -1056,7 +1080,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: "#4dd0e1",
+    backgroundColor: "#2A9D9D",
     borderRadius: 8,
   },
   retryButtonText: {
@@ -1127,6 +1151,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333',
   },
+
+  viewerLikedIcon: {
+  marginLeft: 'auto',
+  paddingLeft: 10,
+},
   viewerUsernameSecondary: {
     fontSize: 13,
     color: '#999',
@@ -1236,7 +1265,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#4DD0E1',
+    backgroundColor: '#2A9D9D',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,

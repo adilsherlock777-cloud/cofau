@@ -218,7 +218,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
       const skip = forceRefresh ? 0 : (page - 1) * POSTS_PER_PAGE;
       const ts = forceRefresh ? `&_t=${Date.now()}` : "";
       const res = await axios.get(
-        `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${ts}`
+        `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}&sort=chronological${ts}`
       );
 
       if (res.data.length === 0) {
