@@ -1,203 +1,267 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Modal,
-  FlatList,
+  Pressable,
+  ScrollView,
+  TextInput,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getComments, addComment } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
-import UserAvatar from './UserAvatar';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const normalizeDP = (input) => {
-  if (!input) return null;
-  if (typeof input === "object") {
-    input =
-      input.profile_picture ||
-      input.user_profile_picture ||
-      input.profile_pic ||
-      input.profile_picture_url ||
-      input.userProfilePicture ||
-      input.profilePicture ||
-      null;
-  }
-  if (!input) return null;
-  if (input.startsWith("http")) return input;
-  const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
-  if (!input.startsWith("/")) return `${BASE}/${input}`;
-  return `${BASE}${input}`;
-};
+// Updated compliment types matching your requirements
+const COMPLIMENT_TYPES = [
+  {
+    type: 'amazing_taste',
+    name: "You've got amazing taste!",
+    icon: '✨',
+    color: '#FF6B6B',
+  },
+  {
+    type: 'on_point',
+    name: 'Your food choices are always on point.',
+    icon: '🎯',
+    color: '#4ECDC4',
+  },
+  {
+    type: 'never_miss',
+    name: 'Your recommendations never miss!',
+    icon: '🔥',
+    color: '#FF9F43',
+  },
+  {
+    type: 'top_tier',
+    name: 'Top-tier food spotting!',
+    icon: '🏆',
+    color: '#F9CA24',
+  },
+  {
+    type: 'knows_good_food',
+    name: 'You really know good food.',
+    icon: '👨‍🍳',
+    color: '#6C5CE7',
+  },
+];
 
-export default function CommentsModal({ postId, isVisible, onClose }) {
-  const { token } = useAuth();
+const MAX_CUSTOM_LENGTH = 250;
 
-  // Safety check - don't render if no postId or not visible
-  if (!isVisible || !postId) {
-    return null;
-  }
-  const [comments, setComments] = useState([]);
-  const [commentText, setCommentText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+interface ComplimentModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSend: (complimentType: string, customMessage?: string) => Promise<void>;
+  loading?: boolean;
+}
 
-  useEffect(() => {
-    if (isVisible && postId) {
-      fetchComments();
-    }
-  }, [isVisible, postId]);
+export default function ComplimentModal({
+  visible,
+  onClose,
+  onSend,
+  loading = false,
+}: ComplimentModalProps) {
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [customMessage, setCustomMessage] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
 
-  const fetchComments = async () => {
-    if (!postId) return;
-    
-    try {
-      setLoading(true);
-      const data = await getComments(postId);
-      const fixed = data.map((c) => ({
-        ...c,
-        profile_pic: normalizeDP(
-          c.profile_pic ||
-          c.profile_picture ||
-          c.user_profile_picture ||
-          c.profile_picture_url ||
-          c.userProfilePicture
-        ),
-      }));
-      setComments(fixed);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleSendCompliment = async (type: string) => {
+    setSelectedType(type);
+    await onSend(type, undefined);
+    setSelectedType(null);
   };
 
-  const handleAddComment = async () => {
-    if (!commentText.trim()) return;
-    
-    setSubmitting(true);
-    try {
-      await addComment(postId, commentText, token);
-      setCommentText('');
-      await fetchComments();
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      Alert.alert('Error', 'Failed to add comment');
-    } finally {
-      setSubmitting(false);
-    }
+  const handleSendCustomCompliment = async () => {
+    if (!customMessage.trim()) return;
+    setSelectedType('custom');
+    await onSend('custom', customMessage.trim());
+    setSelectedType(null);
+    setCustomMessage('');
+    setShowCustomInput(false);
   };
 
-  const formatTimestamp = (timestamp) => {
-    const now = new Date();
-    const commentDate = new Date(timestamp);
-    const diff = Math.floor((now - commentDate) / 1000);
-
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return commentDate.toLocaleDateString();
+  const handleClose = () => {
+    setCustomMessage('');
+    setShowCustomInput(false);
+    setSelectedType(null);
+    onClose();
   };
 
-  const renderComment = ({ item }) => (
-    <View style={styles.commentCard}>
-      <View style={styles.commentHeader}>
-        <UserAvatar
-          profilePicture={item.profile_pic}
-          username={item.username}
-          size={36}
-          level={item.level}
-          showLevelBadge={true}
-        />
-        <View style={styles.commentInfo}>
-          <Text style={styles.username}>{item.username}</Text>
-          <Text style={styles.timestamp}>
-            {formatTimestamp(item.created_at)}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.commentText}>{item.comment_text}</Text>
-    </View>
-  );
+  const remainingChars = MAX_CUSTOM_LENGTH - customMessage.length;
 
   return (
     <Modal
-      visible={isVisible}
+      visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-          >
+      <Pressable style={styles.backdrop} onPress={handleClose}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoid}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.handleBar} />
-              <Text style={styles.headerTitle}>Comments</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.headerTitle}>Send a Compliment</Text>
+              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
 
-            {/* Comments List */}
-            <FlatList
-              data={comments}
-              renderItem={renderComment}
-              keyExtractor={(item) => item.id.toString()}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                loading ? (
-                  <ActivityIndicator size="large" color="#4dd0e1" style={{ marginTop: 40 }} />
-                ) : (
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
-                    <Text style={styles.emptyText}>No comments yet</Text>
-                    <Text style={styles.emptySubtext}>Be the first to comment!</Text>
-                  </View>
-                )
-              }
-            />
+            {/* Subtitle */}
+            <Text style={styles.subtitle}>
+              Choose a compliment or write your own!
+            </Text>
 
-            {/* Input */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Add a comment..."
-                placeholderTextColor="#999"
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-                maxLength={500}
-              />
-              <TouchableOpacity
-                style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
-                onPress={handleAddComment}
-                disabled={submitting || !commentText.trim()}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#4dd0e1" />
-                ) : (
-                  <Ionicons 
-                    name="send" 
-                    size={24} 
-                    color={commentText.trim() ? "#4dd0e1" : "#CCC"} 
+            {/* Compliment Options */}
+            <ScrollView
+              style={styles.optionsContainer}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {COMPLIMENT_TYPES.map((compliment) => {
+                const isSelected = selectedType === compliment.type;
+                const isDisabled = loading;
+
+                return (
+                  <TouchableOpacity
+                    key={compliment.type}
+                    style={[
+                      styles.complimentOption,
+                      isSelected && styles.complimentOptionSelected,
+                      isDisabled && styles.complimentOptionDisabled,
+                    ]}
+                    onPress={() => handleSendCompliment(compliment.type)}
+                    disabled={isDisabled}
+                    activeOpacity={0.7}
+                  >
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: compliment.color + '20' },
+                      ]}
+                    >
+                      <Text style={styles.iconEmoji}>{compliment.icon}</Text>
+                    </View>
+
+                    <View style={styles.complimentInfo}>
+                      <Text style={styles.complimentName}>{compliment.name}</Text>
+                    </View>
+
+                    {isSelected && loading ? (
+                      <ActivityIndicator size="small" color={compliment.color} />
+                    ) : (
+                      <View
+                        style={[
+                          styles.sendIndicator,
+                          { backgroundColor: compliment.color },
+                        ]}
+                      >
+                        <Ionicons name="send" size={14} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Custom Message Section */}
+              <View style={styles.customSection}>
+                <TouchableOpacity
+                  style={[
+                    styles.customToggle,
+                    showCustomInput && styles.customToggleActive,
+                  ]}
+                  onPress={() => setShowCustomInput(!showCustomInput)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.iconContainer, { backgroundColor: '#E91E6320' }]}>
+                    <Text style={styles.iconEmoji}>💬</Text>
+                  </View>
+                  <View style={styles.complimentInfo}>
+                    <Text style={styles.complimentName}>Write a custom message</Text>
+                    <Text style={styles.customSubtext}>Add your personal touch</Text>
+                  </View>
+                  <Ionicons
+                    name={showCustomInput ? 'chevron-up' : 'chevron-down'}
+                    size={20}
+                    color="#666"
                   />
+                </TouchableOpacity>
+
+                {showCustomInput && (
+                  <View style={styles.customInputContainer}>
+                    <TextInput
+                      style={styles.customInput}
+                      placeholder="Write something nice..."
+                      placeholderTextColor="#999"
+                      value={customMessage}
+                      onChangeText={(text) => {
+                        if (text.length <= MAX_CUSTOM_LENGTH) {
+                          setCustomMessage(text);
+                        }
+                      }}
+                      multiline
+                      maxLength={MAX_CUSTOM_LENGTH}
+                      autoFocus
+                    />
+                    <View style={styles.customInputFooter}>
+                      <Text
+                        style={[
+                          styles.charCount,
+                          remainingChars < 50 && styles.charCountWarning,
+                          remainingChars < 20 && styles.charCountDanger,
+                        ]}
+                      >
+                        {remainingChars} characters remaining
+                      </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.sendCustomButton,
+                          (!customMessage.trim() || loading) && styles.sendCustomButtonDisabled,
+                        ]}
+                        onPress={handleSendCustomCompliment}
+                        disabled={!customMessage.trim() || loading}
+                        activeOpacity={0.7}
+                      >
+                        {selectedType === 'custom' && loading ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <>
+                            <Ionicons name="send" size={16} color="#fff" />
+                            <Text style={styles.sendCustomButtonText}>Send</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
-              </TouchableOpacity>
+              </View>
+
+              {/* Bottom spacing */}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <LinearGradient
+                colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.footerGradient}
+              >
+                <Text style={styles.footerText}>
+                  💝 Spread kindness, one compliment at a time!
+                </Text>
+              </LinearGradient>
             </View>
-          </KeyboardAvoidingView>
-        </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );
@@ -209,19 +273,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoid: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   modalContent: {
     backgroundColor: '#FFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    height: '75%',
+    paddingBottom: 30,
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 5,
-  },
-  container: {
-    flex: 1,
   },
   header: {
     alignItems: 'center',
@@ -246,80 +312,152 @@ const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute',
     right: 16,
-    top: 8,
+    top: 20,
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  commentCard: {
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
-  commentHeader: {
+  optionsContainer: {
+    paddingHorizontal: 16,
+    maxHeight: 400,
+  },
+  complimentOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  commentInfo: {
-    marginLeft: 12,
+  complimentOptionSelected: {
+    borderColor: '#4dd0e1',
+    backgroundColor: '#E0F7FA',
+  },
+  complimentOptionDisabled: {
+    opacity: 0.6,
+  },
+  iconContainer: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  iconEmoji: {
+    fontSize: 24,
+  },
+  complimentInfo: {
     flex: 1,
   },
-  username: {
-    fontSize: 15,
-    fontWeight: 'bold',
+  complimentName: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
+    lineHeight: 20,
   },
-  timestamp: {
+  sendIndicator: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customSection: {
+    marginTop: 6,
+  },
+  customToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F8',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 2,
+    borderColor: '#E91E6330',
+  },
+  customToggleActive: {
+    borderColor: '#E91E63',
+    backgroundColor: '#FCE4EC',
+  },
+  customSubtext: {
     fontSize: 12,
     color: '#999',
     marginTop: 2,
   },
-  commentText: {
+  customInputContainer: {
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  customInput: {
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    padding: 14,
     fontSize: 15,
     color: '#333',
-    lineHeight: 20,
-    marginLeft: 48,
+    minHeight: 100,
+    maxHeight: 150,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  emptyContainer: {
+  customInputFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 60,
+    marginTop: 12,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
+  charCount: {
+    fontSize: 12,
     color: '#999',
-    marginTop: 8,
   },
-  inputContainer: {
+  charCountWarning: {
+    color: '#FFA500',
+  },
+  charCountDanger: {
+    color: '#FF5252',
+  },
+  sendCustomButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#E91E63',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    gap: 6,
+  },
+  sendCustomButtonDisabled: {
+    backgroundColor: '#CCC',
+  },
+  sendCustomButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  footer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    backgroundColor: '#FFF',
+    paddingTop: 16,
   },
-  input: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 24,
-    fontSize: 15,
-    maxHeight: 100,
+  footerGradient: {
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
   },
-  sendButton: {
-    marginLeft: 12,
-    padding: 8,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
+  footerText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

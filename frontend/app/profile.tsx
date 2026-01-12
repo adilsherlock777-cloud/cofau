@@ -1656,7 +1656,11 @@ if (loading) {
               {/* Compliment Button */}
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
-                onPress={() => setComplimentModalVisible(true)}
+                onPress={() => {
+  console.log('🎁 Compliment button pressed!');
+  console.log('Current complimentModalVisible:', complimentModalVisible);
+  setComplimentModalVisible(true);
+}}
                 disabled={hasComplimented}
               >
                 <LinearGradient
@@ -1958,30 +1962,30 @@ if (loading) {
       </Modal>
 
       <ComplimentModal
-        visible={complimentModalVisible}
-        onClose={() => setComplimentModalVisible(false)}
-        onSend={async (complimentType: string) => {
-          if (!userData?.id || !token) return;
+  visible={complimentModalVisible}
+  onClose={() => setComplimentModalVisible(false)}
+  onSend={async (complimentType: string, customMessage?: string) => {
+    if (!userData?.id || !token) return;
 
-          setSendingCompliment(true);
-          try {
-            await sendCompliment(userData.id, complimentType);
-            setHasComplimented(true);
-            fetchComplimentsCount();
-            Alert.alert('Success', 'Compliment sent successfully!');
-            setComplimentModalVisible(false);
-          } catch (error: any) {
-            console.error('❌ Error sending compliment:', error);
-            Alert.alert(
-              'Error',
-              error.response?.data?.detail || 'Failed to send compliment. Please try again.'
-            );
-          } finally {
-            setSendingCompliment(false);
-          }
-        }}
-        loading={sendingCompliment}
-      />
+    setSendingCompliment(true);
+    try {
+      await sendCompliment(userData.id, complimentType, customMessage);
+      setHasComplimented(true);
+      fetchComplimentsCount();
+      Alert.alert('Success', 'Compliment sent successfully!');
+      setComplimentModalVisible(false);
+    } catch (error: any) {
+      console.error('❌ Error sending compliment:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.detail || 'Failed to send compliment. Please try again.'
+      );
+    } finally {
+      setSendingCompliment(false);
+    }
+  }}
+  loading={sendingCompliment}
+/>
 
       <Modal
         animationType="slide"
