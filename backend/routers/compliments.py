@@ -10,36 +10,42 @@ router = APIRouter(prefix="/api/compliments", tags=["compliments"])
 
 
 class ComplimentRequest(BaseModel):
-    compliment_type: str  # "thank_you", "youre_cool", "hot_stuff", "youre_funny", "write_more"
+    compliment_type: str
     recipient_id: str
+    custom_message: str = None  # Add this line for custom messages
 
 
 # Compliment types with their display names and icons
 COMPLIMENT_TYPES = {
-    "thank_you": {
-        "name": "Thank You",
-        "icon": "🙏",
-        "color": "#FFA500"
+    "amazing_taste": {
+        "name": "You've got amazing taste!",
+        "icon": "✨",
+        "color": "#FF6B6B"
     },
-    "youre_cool": {
-        "name": "You're Cool",
-        "icon": "❄️",
-        "color": "#4FC3F7"
+    "on_point": {
+        "name": "Your food choices are always on point.",
+        "icon": "🎯",
+        "color": "#4ECDC4"
     },
-    "hot_stuff": {
-        "name": "Hot Stuff",
+    "never_miss": {
+        "name": "Your recommendations never miss!",
         "icon": "🔥",
-        "color": "#FF5252"
+        "color": "#FF9F43"
     },
-    "youre_funny": {
-        "name": "You're Funny",
-        "icon": "😄",
-        "color": "#66BB6A"
+    "top_tier": {
+        "name": "Top-tier food spotting!",
+        "icon": "🏆",
+        "color": "#F9CA24"
     },
-    "write_more": {
-        "name": "Write More",
-        "icon": "📖",
-        "color": "#8D6E63"
+    "knows_good_food": {
+        "name": "You really know good food.",
+        "icon": "👨‍🍳",
+        "color": "#6C5CE7"
+    },
+    "custom": {
+        "name": "Custom Message",
+        "icon": "💬",
+        "color": "#E91E63"
     }
 }
 
@@ -65,14 +71,12 @@ async def send_compliment(
     if not recipient:
         raise HTTPException(status_code=404, detail="Recipient not found")
     
-    # Check if already sent this compliment type today (optional - prevent spam)
-    # For now, we'll allow multiple compliments
-    
     # Store compliment in database
     compliment_doc = {
         "from_user_id": str(current_user["_id"]),
         "to_user_id": request.recipient_id,
         "compliment_type": request.compliment_type,
+        "custom_message": request.custom_message if request.compliment_type == "custom" else None,
         "created_at": datetime.utcnow()
     }
     
@@ -82,8 +86,11 @@ async def send_compliment(
     # Get compliment details
     compliment_info = COMPLIMENT_TYPES[request.compliment_type]
     
-    # Create notification
-    notification_message = f"{current_user['full_name']} sent you a {compliment_info['name']} compliment"
+    # Create notification message
+    if request.compliment_type == "custom" and request.custom_message:
+        notification_message = f"{current_user['full_name']} sent you a compliment: \"{request.custom_message[:50]}{'...' if len(request.custom_message) > 50 else ''}\""
+    else:
+        notification_message = f"{current_user['full_name']} says: {compliment_info['name']}"
     
     await create_notification(
         db=db,
