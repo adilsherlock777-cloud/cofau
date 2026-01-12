@@ -566,3 +566,17 @@ async def get_muted_users(current_user: dict = Depends(get_current_user)):
             })
     
     return muted_users
+
+@router.get("/unread-count")
+async def get_unread_messages_count(current_user: dict = Depends(get_current_user)):
+    """Get count of unread messages for current user"""
+    db = get_database()
+    user_id = str(current_user["_id"])
+    
+    # Count unread messages where current user is the recipient
+    count = await db.messages.count_documents({
+        "recipient_id": user_id,
+        "is_read": False
+    })
+    
+    return {"unreadCount": count}

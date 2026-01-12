@@ -51,19 +51,13 @@ const COMPLIMENT_TYPES = [
 
 const MAX_CUSTOM_LENGTH = 250;
 
-interface ComplimentModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSend: (complimentType: string, customMessage?: string) => Promise<void>;
-  loading?: boolean;
-}
 
-export default function ComplimentModal({
+ export default function ComplimentModal({
   visible,
   onClose,
   onSend,
   loading = false,
-}: ComplimentModalProps) {
+}) {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [customMessage, setCustomMessage] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -429,7 +423,7 @@ const styles = StyleSheet.create({
   sendCustomButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E91E63',
+    backgroundColor: '#1B7C82',
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 18,
