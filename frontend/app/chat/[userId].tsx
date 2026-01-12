@@ -476,10 +476,11 @@ const markMessagesAsRead = async () => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={90}
-    >
+  style={{ flex: 1 }}
+  behavior={Platform.OS === "ios" ? "padding" : "height"}
+  keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+>
+
       {/* Cofau Gradient Header */}
       <LinearGradient
         colors={["#E94A37", "#F2CF68", "#1B7C82"]}
