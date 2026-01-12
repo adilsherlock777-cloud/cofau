@@ -246,15 +246,25 @@ export const getFollowing = async (userId) => {
   }
 };
 
-/**
+/** 
  * Send a compliment to a user
+ * @param {string} recipientId - The user ID to send compliment to
+ * @param {string} complimentType - Type of compliment (amazing_taste, on_point, never_miss, top_tier, knows_good_food, custom)
+ * @param {string} customMessage - Optional custom message (required if complimentType is 'custom')
  */
-export const sendCompliment = async (recipientId, complimentType) => {
+export const sendCompliment = async (recipientId, complimentType, customMessage = null) => {
   try {
-    const response = await axios.post(`${API_URL}/compliments/send`, {
+    const payload = {
       recipient_id: recipientId,
       compliment_type: complimentType,
-    });
+    };
+    
+    // Add custom message if provided
+    if (customMessage) {
+      payload.custom_message = customMessage;
+    }
+    
+    const response = await axios.post(`${API_URL}/compliments/send`, payload);
     return response.data;
   } catch (error) {
     console.error('❌ Error sending compliment:', error.response?.data || error.message);
