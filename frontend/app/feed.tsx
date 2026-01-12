@@ -441,11 +441,12 @@ const renderPost = useCallback(
 >
   <Ionicons name="chatbox-ellipses" size={20} color="#fff" />
   {unreadMessagesCount > 0 && (
-    <View style={styles.badge}>
-      <Text style={styles.badgeText}>
-        {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
-      </Text>
-    </View>
+   <View style={styles.chatBadge}>
+  <Text style={styles.chatBadgeText}>
+    {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+  </Text>
+</View>
+
   )}
 </TouchableOpacity>
 
@@ -460,11 +461,12 @@ const renderPost = useCallback(
             >
               <Ionicons name="notifications" size={20} color="#fff" />
               {unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Text>
-                </View>
+                <View style={styles.notificationBadge}>
+  <Text style={styles.notificationBadgeText}>
+    {unreadCount > 99 ? "99+" : unreadCount}
+  </Text>
+</View>
+
               )}
             </TouchableOpacity>
           </View>
@@ -920,25 +922,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  badge: {
+ // 🔴 Chat badge
+chatBadge: {
   position: "absolute",
-  top: -4,
-  right: -6,
-  backgroundColor: "#FF3B30",
-  borderRadius: 10,
-  minWidth: 18,
+  top: 4,
+  right: -2,
+  backgroundColor: "#FF3B30",   // softer red
+  borderRadius: 12,
+  minWidth: 22,
   height: 18,
+  paddingHorizontal: 6,
   alignItems: "center",
   justifyContent: "center",
+  borderWidth: 2,
+  borderColor: "#fff",
+},
+
+chatBadgeText: {
+  color: "#fff",
+  fontSize: 10,
+  fontWeight: "800",
+},
+
+// 🔔 Notification badge
+notificationBadge: {
+  position: "absolute",
+  top: -2,
+  right: 11,
+  backgroundColor: "#FF3B30",   // stronger red
+  borderRadius: 10,
+  minWidth: 22,
+  height: 18,
   paddingHorizontal: 4,
+  alignItems: "center",
+  justifyContent: "center",
   borderWidth: 1.5,
   borderColor: "#fff",
 },
-badgeText: {
+
+notificationBadgeText: {
   color: "#fff",
-  fontSize: 10,
+  fontSize: 9,
   fontWeight: "700",
 },
+
   leftIcon: {
     width: 40,
     height: 40,
