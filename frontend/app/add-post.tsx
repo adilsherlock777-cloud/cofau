@@ -722,15 +722,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
 
   header: {
-    backgroundColor: '#FFF',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 16,
+  paddingTop: 50,      // ⬅️ ADD THIS (adjust value: 40-60 depending on your device)
+  paddingBottom: 12,   // ⬅️ CHANGE paddingVertical to paddingBottom
+  backgroundColor: '#FFF',
+  borderBottomWidth: 1,
+  borderBottomColor: '#E0E0E0',
+},
 
   backButton: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
