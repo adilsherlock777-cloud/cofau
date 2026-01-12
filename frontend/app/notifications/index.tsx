@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext'; // ⬅️ ADD THIS
 import UserAvatar from '../../components/UserAvatar';
 import {
   fetchNotifications,
@@ -23,6 +24,7 @@ import {
 export default function NotificationsScreen() {
   const router = useRouter();
   const { token } = useAuth();
+  const { refreshUnreadCount, setUnreadCount } = useNotifications(); // ⬅️ ADD THIS
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,6 +34,10 @@ export default function NotificationsScreen() {
       setLoading(true);
       const data = await fetchNotifications(token);
       setNotifications(data);
+      
+      // ⬅️ Update unread count based on fetched data
+      const unreadCount = data.filter((n: any) => !n.isRead).length;
+      setUnreadCount(unreadCount);
     } catch (error) {
       console.error('❌ Error loading notifications:', error);
     } finally {
@@ -45,15 +51,18 @@ export default function NotificationsScreen() {
     setRefreshing(false);
   };
 
-  const handleNotificationPress = async (notification) => {
+  const handleNotificationPress = async (notification: any) => {
     // Mark as read
     if (!notification.isRead) {
       try {
         await markNotificationAsRead(token, notification.id);
         // Update local state
         setNotifications((prev) =>
-          prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
-        );
+  prev.map((n: any) => (n.id === notification.id ? { ...n, isRead: true } : n))
+);
+setUnreadCount((prev: number) => Math.max(0, prev - 1)); 
+        // ⬅️ Decrement unread count
+        setUnreadCount((prev: number) => Math.max(0, prev - 1));
       } catch (error) {
         console.error('❌ Error marking notification as read:', error);
       }
@@ -73,7 +82,9 @@ export default function NotificationsScreen() {
     try {
       await markAllNotificationsAsRead(token);
       // Update local state
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setNotifications((prev) => prev.map((n: any) => ({ ...n, isRead: true })));
+      // ⬅️ Reset unread count to 0
+      setUnreadCount(0);
     } catch (error) {
       console.error('❌ Error marking all as read:', error);
     }
@@ -90,37 +101,52 @@ export default function NotificationsScreen() {
     }, [])
   );
 
-  const renderNotification = ({ item }) => {
-    const isUnread = !item.isRead;
+const renderNotification = ({ item }: { item: any }) => {
+  const isUnread = !item.isRead;
 
-    return (
-      <TouchableOpacity
-        style={[styles.notificationItem, isUnread && styles.unreadNotification]}
-        onPress={() => handleNotificationPress(item)}
-      >
-        <UserAvatar
-          profilePicture={item.fromUserProfilePicture}
-          username={item.fromUserName}
-          size={42}
-          level={item.fromUserLevel}
-          showLevelBadge={true}
-        />
-
-        <View style={styles.notificationContent}>
-          <Text style={[styles.notificationText, isUnread && styles.unreadText]}>
-            <Text style={styles.username}>{item.fromUserName}</Text> {item.message}
-          </Text>
-          <Text style={styles.timeAgo}>{formatTimeAgo(item.createdAt)}</Text>
-        </View>
-
-        {item.postThumbnail && (
-          <Image source={{ uri: item.postThumbnail }} style={styles.postThumbnail} />
-        )}
-
-        {isUnread && <View style={styles.unreadDot} />}
-      </TouchableOpacity>
-    );
+  // Get the action text without the username
+  const getActionText = () => {
+    if (!item.message) return '';
+    return item.message.replace(item.fromUserName, '').trim();
   };
+
+  return (
+    <TouchableOpacity
+      style={[styles.notificationItem, isUnread && styles.unreadNotification]}
+      onPress={() => handleNotificationPress(item)}
+    >
+      <UserAvatar
+        profilePicture={item.fromUserProfilePicture}
+        username={item.fromUserName}
+        size={42}
+        level={item.fromUserLevel}
+        showLevelBadge={true}
+      />
+
+      <View style={styles.notificationContent}>
+        <Text style={[styles.notificationText, isUnread && styles.unreadText]}>
+          <Text style={styles.username}>{item.fromUserName}</Text>
+          {` ${getActionText()}`}
+        </Text>
+        <Text style={styles.timeAgo}>{formatTimeAgo(item.createdAt)}</Text>
+      </View>
+
+      {/* Post thumbnail - only render if URL exists and is valid */}
+      {item.postThumbnail ? (
+        <Image 
+          source={{ uri: item.postThumbnail }} 
+          style={styles.postThumbnail}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      {/* Unread indicator - only show if no thumbnail */}
+      {isUnread && !item.postThumbnail ? (
+        <View style={styles.unreadDot} />
+      ) : null}
+    </TouchableOpacity>
+  );
+};
 
   if (loading) {
     return (
@@ -139,7 +165,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
         <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
-          <Ionicons name="checkmark-done" size={24} color="#4dd0e1" />
+          <Ionicons name="checkmark-done" size={24} color="#1B7C82" />
         </TouchableOpacity>
       </View>
 
@@ -147,10 +173,10 @@ export default function NotificationsScreen() {
       <FlatList
         data={notifications}
         renderItem={renderNotification}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: any) => item.id}
         contentContainerStyle={styles.listContainer}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#4dd0e1" />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#1B7C82" />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -175,15 +201,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 16,
+  paddingTop: 50,      // ⬅️ ADD THIS (adjust value: 40-60 depending on your device)
+  paddingBottom: 12,   // ⬅️ CHANGE paddingVertical to paddingBottom
+  backgroundColor: '#FFF',
+  borderBottomWidth: 1,
+  borderBottomColor: '#E0E0E0',
+},
   backButton: {
     padding: 8,
   },
@@ -241,7 +268,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4dd0e1',
+    backgroundColor: '#1B7C82',
     marginLeft: 8,
   },
   emptyContainer: {
@@ -250,6 +277,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 100,
   },
+
+  postThumbnail: {
+  width: 44,
+  height: 44,
+  borderRadius: 8,
+  marginLeft: 12,
+  backgroundColor: '#E0E0E0',  // Placeholder color while loading
+},
+unreadDot: {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: '#4dd0e1',
+  marginLeft: 8,
+},
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',

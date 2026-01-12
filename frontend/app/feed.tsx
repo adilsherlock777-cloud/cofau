@@ -35,6 +35,7 @@ import UserAvatar from "../components/UserAvatar";
 import StoriesBar from "../components/StoriesBar";
 import { BlurView } from 'expo-blur';
 import { fetchUnreadCount } from "../utils/notifications";
+import { useNotifications } from "../context/NotificationContext";
 import {
   normalizeMediaUrl,
   normalizeProfilePicture,
@@ -86,7 +87,7 @@ export default function FeedScreen() {
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount, refreshUnreadCount } = useNotifications();
   const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
   const [showFixedLine, setShowFixedLine] = useState(false);
   const [page, setPage] = useState(1);
@@ -118,14 +119,14 @@ useEffect(() => {
     fetchFeed(true);
     setHasInitiallyLoaded(true);
   }
-  loadUnreadCount();
+  refreshUnreadCount();  // ✅ NEW
 }, []);
 
 
 useFocusEffect(
   React.useCallback(() => {
     // Always update notifications and user data
-    loadUnreadCount();
+    refreshUnreadCount();
     refreshUser();
     fetchOwnStory();
     
@@ -137,13 +138,6 @@ useFocusEffect(
   }, [hasInitiallyLoaded])
 );
 
-  const loadUnreadCount = async () => {
-    if (!token) return;
-    try {
-      const count = await fetchUnreadCount(token);
-      setUnreadCount(count);
-    } catch {}
-  };
 
 
 // ADD this ref near your other refs

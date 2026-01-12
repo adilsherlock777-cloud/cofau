@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { StyleSheet, Platform } from "react-native";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { NotificationProvider } from "../context/NotificationContext"; 
 import { LevelProvider } from "../context/LevelContext";
 import LevelUpAnimation from "../components/LevelUpAnimation";
 import { useEffect } from "react";
@@ -86,7 +87,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <LevelProvider>
-        <RootLayoutNav />
+        <NotificationProvider>   {/* ⬅️ ADD THIS */}
+          <RootLayoutNav />
+        </NotificationProvider>   {/* ⬅️ ADD THIS */}
       </LevelProvider>
     </AuthProvider>
   );

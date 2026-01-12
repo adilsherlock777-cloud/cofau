@@ -1,14 +1,13 @@
 import axios from 'axios';
-import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com/api';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 
 /**
  * Fetch all notifications for the current user
  */
 export const fetchNotifications = async (token, limit = 50, skip = 0) => {
   try {
-    const response = await axios.get(`${API_URL}/notifications`, {
+    const response = await axios.get(`${BACKEND_URL}/api/notifications`, {
       headers: { Authorization: `Bearer ${token}` },
       params: { limit, skip },
     });
@@ -22,13 +21,12 @@ export const fetchNotifications = async (token, limit = 50, skip = 0) => {
 /**
  * Get unread notification count
  */
-// In your utils/notifications.js file
 export const fetchUnreadCount = async (token) => {
   try {
     const response = await axios.get(`${BACKEND_URL}/api/notifications/unread-count`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    return response.data.unread_count || 0;
+    return response.data.unreadCount || 0;  // ✅ Fixed: unreadCount not unread_count
   } catch (error) {
     console.error('Error fetching unread count:', error);
     return 0;
@@ -41,7 +39,7 @@ export const fetchUnreadCount = async (token) => {
 export const markNotificationAsRead = async (token, notificationId) => {
   try {
     const response = await axios.post(
-      `${API_URL}/notifications/${notificationId}/mark-read`,
+      `${BACKEND_URL}/api/notifications/${notificationId}/mark-read`,
       {},
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -60,7 +58,7 @@ export const markNotificationAsRead = async (token, notificationId) => {
 export const markAllNotificationsAsRead = async (token) => {
   try {
     const response = await axios.post(
-      `${API_URL}/notifications/mark-read`,
+      `${BACKEND_URL}/api/notifications/mark-read`,
       {},
       {
         headers: { Authorization: `Bearer ${token}` },
