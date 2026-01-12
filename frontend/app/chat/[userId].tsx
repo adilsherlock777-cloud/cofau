@@ -64,12 +64,26 @@ export default function ChatScreen() {
 
   const currentUserId = user?.id || user?._id;
   const otherUserId = userId as string;
+ // Check if user is blocked on mount and mark messages as read
+useEffect(() => {
+  checkBlockStatus();
+  checkMuteStatus();
+  markMessagesAsRead();
+}, []);
 
-  // Check if user is blocked on mount
-  useEffect(() => {
-    checkBlockStatus();
-    checkMuteStatus();
-  }, []);
+const markMessagesAsRead = async () => {
+  if (!token || !otherUserId) return;
+  try {
+    await axios.post(
+      `${API_URL}/chat/mark-read/${otherUserId}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    console.log('✅ Messages marked as read');
+  } catch (error) {
+    console.log('Error marking messages as read:', error);
+  }
+};
 
   const checkBlockStatus = async () => {
     try {
