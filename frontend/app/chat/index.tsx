@@ -45,25 +45,38 @@ export default function ChatListScreen() {
   const [filteredItems, setFilteredItems] = useState<ChatItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    if (!token) return;
+useEffect(() => {
+  if (!token) return;
 
-    axios
-      .get(`${API_URL}/chat/list`, {
+  const fetchChatList = async () => {
+    try {
+      // Fetch chat list
+      const listRes = await axios.get(`${API_URL}/chat/list`, {
         headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const mapped = (res.data || []).map((it: any) => ({
-          ...it,
-          other_user_profile_picture: fixUrl(it.other_user_profile_picture),
-        }));
-        setItems(mapped);
-        setFilteredItems(mapped);
-      })
-      .catch((err) =>
-        console.log("Chat list error", err?.response?.data || err?.message)
-      );
-  }, [token]);
+      });
+
+      // Fetch unread counts per user
+      const unreadRes = await axios.get(`${API_URL}/chat/unread-per-user`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const unreadCounts = unreadRes.data || {};
+
+      const mapped = (listRes.data || []).map((it: any) => ({
+        ...it,
+        other_user_profile_picture: fixUrl(it.other_user_profile_picture),
+        unread_count: unreadCounts[it.other_user_id] || 0,
+      }));
+
+      setItems(mapped);
+      setFilteredItems(mapped);
+    } catch (err: any) {
+      console.log("Chat list error", err?.response?.data || err?.message);
+    }
+  };
+
+  fetchChatList();
+}, [token]);
 
   // Filter chats based on search query
   useEffect(() => {

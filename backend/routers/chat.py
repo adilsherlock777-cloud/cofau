@@ -20,7 +20,6 @@ class ConnectionManager:
         self.active_connections: Dict[str, Set[WebSocket]] = {}
 
     async def connect(self, user_id: str, websocket: WebSocket):
-        # Note: websocket.accept() is called before this, so we just add to connections
         self.active_connections.setdefault(user_id, set()).add(websocket)
         print(f"📝 Added connection for user {user_id}, total connections: {len(self.active_connections.get(user_id, set()))}")
 
@@ -51,7 +50,6 @@ async def get_user_id_from_token(token: str) -> str:
         if not email:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token: no email in payload")
         
-        # Look up user by email to get user_id
         db = get_database()
         user = await db.users.find_one({"email": email})
         if not user:
@@ -67,7 +65,6 @@ async def get_user_id_from_token(token: str) -> str:
 async def chat_ws(websocket: WebSocket, other_user_id: str):
     print(f"🔗 WebSocket connection attempt for user_id: {other_user_id}")
     
-    # Accept connection first (required for WebSocket)
     try:
         await websocket.accept()
         print(f"✅ WebSocket connection accepted")
@@ -99,7 +96,6 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
         
         db = get_database()
 
-        # send last 50 messages (history)
         cursor = db.messages.find({
             "$or": [
                 {"from_user": current_user_id, "to_user": other_user_id},
@@ -126,16 +122,14 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
             ],
         })
 
-        # receive and broadcast new messages
         while True:
             try:
                 data = await websocket.receive_json()
                 text = (data.get("message") or "").strip()
-                post_id = data.get("post_id")  # Support post sharing via WebSocket
-                story_id = data.get("story_id")  # Support story replies via WebSocket
-                story_data = data.get("story_data")  # Story preview data
+                post_id = data.get("post_id")
+                story_id = data.get("story_id")
+                story_data = data.get("story_data")
                 
-                # Allow empty message if post_id is provided (for post sharing)
                 if not text and not post_id:
                     continue
 
@@ -145,13 +139,12 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                     "to_user": other_user_id,
                     "message": text or (f"📷 Shared a post" if post_id else (f"📷 Replied to story" if story_id else "")),
                     "created_at": now,
+                    "is_read": False,
                 }
 
-                # Add post_id if provided
                 if post_id:
                     msg_doc["post_id"] = post_id
 
-                # Add story_id and story_data if provided (story reply)
                 if story_id:
                     msg_doc["story_id"] = story_id
                 if story_data:
@@ -168,22 +161,18 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                     "created_at": now.isoformat() + "Z",
                 }
 
-                # Include post_id in payload if present
                 if post_id:
                     msg_payload["post_id"] = post_id
 
-                # Include story data in payload if present
                 if story_id:
                     msg_payload["story_id"] = story_id
                 if story_data:
                     msg_payload["story_data"] = story_data
                 
-                # Send to both users
                 await manager.send_personal_message(current_user_id, msg_payload)
                 await manager.send_personal_message(other_user_id, msg_payload)
                 print(f"📨 Message sent: {current_user_id} -> {other_user_id}")
                 
-                # Create notification and send push notification for the recipient
                 try:
                     await create_notification(
                         db=db,
@@ -191,7 +180,7 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                         from_user_id=current_user_id,
                         to_user_id=other_user_id,
                         post_id=None,
-                        message=None,  # Will use default message
+                        message=None,
                         send_push=True
                     )
                 except Exception as e:
@@ -201,7 +190,6 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                 raise
             except Exception as e:
                 print(f"❌ Error processing message: {str(e)}")
-                # Continue listening for more messages
                 continue
 
     except WebSocketDisconnect:
@@ -285,41 +273,35 @@ async def share_post_to_users(
     db = get_database()
     current_user_id = str(current_user["_id"])
     
-    # Verify post exists
     post = await db.posts.find_one({"_id": ObjectId(request.post_id)})
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
-    # Get post details for the message
     post_owner = await db.users.find_one({"_id": ObjectId(post["user_id"])})
     post_username = post_owner.get("username") if post_owner else "Unknown"
     
-    # Create messages for each user
     now = datetime.utcnow()
     shared_count = 0
     
     for user_id in request.user_ids:
-        # Skip if trying to share to self
         if user_id == current_user_id:
             continue
             
-        # Verify target user exists
         target_user = await db.users.find_one({"_id": ObjectId(user_id)})
         if not target_user:
             continue
         
-        # Create message with post_id
         msg_doc = {
             "from_user": current_user_id,
             "to_user": user_id,
             "message": f"📷 {post_username} shared a post",
             "post_id": request.post_id,
             "created_at": now,
+            "is_read": False,
         }
         
         await db.messages.insert_one(msg_doc)
         
-        # Send via WebSocket if user is online
         msg_payload = {
             "type": "message",
             "id": str(msg_doc.get("_id", "")),
@@ -332,7 +314,6 @@ async def share_post_to_users(
         
         await manager.send_personal_message(user_id, msg_payload)
         
-        # Create notification
         try:
             await create_notification(
                 db=db,
@@ -354,16 +335,12 @@ async def share_post_to_users(
     }
 
 
-# =============================================
-# CLEAR CHAT ENDPOINT
-# =============================================
 @router.delete("/clear/{other_user_id}")
 async def clear_chat(other_user_id: str, current_user: dict = Depends(get_current_user)):
     """Clear all messages between current user and other user"""
     db = get_database()
     current_user_id = str(current_user["_id"])
     
-    # Delete all messages between the two users
     result = await db.messages.delete_many({
         "$or": [
             {"from_user": current_user_id, "to_user": other_user_id},
@@ -377,21 +354,16 @@ async def clear_chat(other_user_id: str, current_user: dict = Depends(get_curren
     }
 
 
-# =============================================
-# BLOCK USER ENDPOINTS
-# =============================================
 @router.post("/block/{user_id}")
 async def block_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """Block a user"""
     db = get_database()
     current_user_id = str(current_user["_id"])
     
-    # Check if user exists
     target_user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Check if already blocked
     existing_block = await db.blocked_users.find_one({
         "blocker_id": current_user_id,
         "blocked_id": user_id
@@ -400,7 +372,6 @@ async def block_user(user_id: str, current_user: dict = Depends(get_current_user
     if existing_block:
         raise HTTPException(status_code=400, detail="User is already blocked")
     
-    # Add to blocked_users collection
     await db.blocked_users.insert_one({
         "blocker_id": current_user_id,
         "blocked_id": user_id,
@@ -433,13 +404,11 @@ async def check_if_blocked(user_id: str, current_user: dict = Depends(get_curren
     db = get_database()
     current_user_id = str(current_user["_id"])
     
-    # Check if current user blocked the other user
     i_blocked = await db.blocked_users.find_one({
         "blocker_id": current_user_id,
         "blocked_id": user_id
     })
     
-    # Check if other user blocked current user
     they_blocked = await db.blocked_users.find_one({
         "blocker_id": user_id,
         "blocked_id": current_user_id
@@ -477,21 +446,16 @@ async def get_blocked_users(current_user: dict = Depends(get_current_user)):
     return blocked_users
 
 
-# =============================================
-# MUTE USER ENDPOINTS
-# =============================================
 @router.post("/mute/{user_id}")
 async def mute_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """Mute notifications from a user"""
     db = get_database()
     current_user_id = str(current_user["_id"])
     
-    # Check if user exists
     target_user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Check if already muted
     existing_mute = await db.muted_users.find_one({
         "muter_id": current_user_id,
         "muted_id": user_id
@@ -500,7 +464,6 @@ async def mute_user(user_id: str, current_user: dict = Depends(get_current_user)
     if existing_mute:
         raise HTTPException(status_code=400, detail="User is already muted")
     
-    # Add to muted_users collection
     await db.muted_users.insert_one({
         "muter_id": current_user_id,
         "muted_id": user_id,
@@ -567,16 +530,63 @@ async def get_muted_users(current_user: dict = Depends(get_current_user)):
     
     return muted_users
 
+
 @router.get("/unread-count")
 async def get_unread_messages_count(current_user: dict = Depends(get_current_user)):
     """Get count of unread messages for current user"""
     db = get_database()
     user_id = str(current_user["_id"])
     
-    # Count unread messages where current user is the recipient
     count = await db.messages.count_documents({
-        "recipient_id": user_id,
+        "to_user": user_id,
         "is_read": False
     })
     
     return {"unreadCount": count}
+
+
+@router.post("/mark-read/{other_user_id}")
+async def mark_messages_as_read(other_user_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark all messages from a specific user as read"""
+    db = get_database()
+    current_user_id = str(current_user["_id"])
+    
+    result = await db.messages.update_many(
+        {
+            "from_user": other_user_id,
+            "to_user": current_user_id,
+            "is_read": False
+        },
+        {"$set": {"is_read": True}}
+    )
+    
+    return {"marked_count": result.modified_count}
+
+
+@router.get("/unread-per-user")
+async def get_unread_per_user(current_user: dict = Depends(get_current_user)):
+    """Get unread message count grouped by sender"""
+    db = get_database()
+    user_id = str(current_user["_id"])
+    
+    pipeline = [
+        {
+            "$match": {
+                "to_user": user_id,
+                "is_read": False
+            }
+        },
+        {
+            "$group": {
+                "_id": "$from_user",
+                "count": {"$sum": 1}
+            }
+        }
+    ]
+    
+    cursor = db.messages.aggregate(pipeline)
+    results = await cursor.to_list(None)
+    
+    unread_counts = {item["_id"]: item["count"] for item in results}
+    
+    return unread_counts
