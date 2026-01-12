@@ -1033,7 +1033,7 @@ async def get_feed(
         category_list = [cat.strip() for cat in categories.split(",") if cat.strip() and cat.strip().lower() != 'all']
         if category_list:
             # Match ANY of the selected categories (case-insensitive)
-            regex_patterns = [{"category": {"$regex": f"^{re.escape(cat)}$", "$options": "i"}} for cat in category_list]
+            regex_patterns = [{"category": {"$regex": re.escape(cat), "$options": "i"}} for cat in category_list]
             query["$or"] = regex_patterns
             print(f"🔍 Filtering posts by categories: {category_list}")
 
