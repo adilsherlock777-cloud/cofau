@@ -9,6 +9,19 @@ from utils.push_notifications import send_push_notification, get_user_device_tok
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
+# Base URL for constructing full image URLs
+# Change this to your actual backend URL
+BASE_URL = "https://api.cofau.com"
+
+
+def get_full_url(relative_url: str) -> str:
+    """Convert relative URL to full URL if needed"""
+    if not relative_url:
+        return None
+    if relative_url.startswith("http"):
+        return relative_url
+    return f"{BASE_URL}{relative_url}"
+
 
 async def create_notification(
     db,
@@ -32,6 +45,24 @@ async def create_notification(
     if not from_user:
         return None
     
+    # ============================================
+    # ✅ GET POST THUMBNAIL WHEN CREATING NOTIFICATION
+    # ============================================
+    post_thumbnail = None
+    if post_id:
+        try:
+            post = await db.posts.find_one({"_id": ObjectId(post_id)})
+            if post:
+                media_type = post.get("media_type", "image")
+                # For videos, prefer thumbnail_url; for images, use media_url
+                if media_type == "video":
+                    post_thumbnail = post.get("thumbnail_url") or post.get("media_url")
+                else:
+                    post_thumbnail = post.get("media_url") or post.get("image_url")
+                print(f"📷 Post thumbnail for notification: {post_thumbnail}")
+        except Exception as e:
+            print(f"⚠️ Error fetching post for thumbnail: {e}")
+    
     # Generate default message if not provided
     if not message:
         if notification_type == "like":
@@ -44,12 +75,20 @@ async def create_notification(
             message = f"{from_user['full_name']} uploaded a new post"
         elif notification_type == "message":
             message = f"{from_user['full_name']} sent you a message"
+        elif notification_type == "compliment":
+            message = f"{from_user['full_name']} sent you a compliment"
+        elif notification_type == "story_like":
+            message = f"{from_user['full_name']} liked your story"
     
     notification_doc = {
         "type": notification_type,
         "fromUserId": from_user_id,
+        "fromUserName": from_user.get("full_name", "Someone"),  # ✅ Save user name
+        "fromUserProfilePicture": from_user.get("profile_picture"),  # ✅ Save profile pic
+        "fromUserLevel": from_user.get("level", 1),  # ✅ Save user level
         "toUserId": to_user_id,
         "postId": post_id,
+        "postThumbnail": post_thumbnail,  # ✅ SAVE THUMBNAIL TO DATABASE
         "message": message,
         "isRead": False,
         "createdAt": datetime.utcnow(),
@@ -57,6 +96,11 @@ async def create_notification(
     
     result = await db.notifications.insert_one(notification_doc)
     notification_id = str(result.inserted_id)
+    
+    print(f"✅ Notification created: {notification_type}")
+    print(f"   From: {from_user['full_name']} ({from_user_id})")
+    print(f"   To: {to_user_id}")
+    print(f"   PostThumbnail: {post_thumbnail}")
     
     # Send push notification if enabled
     if send_push:
@@ -91,6 +135,8 @@ async def create_notification(
                     title = "New Post"
                 elif notification_type == "compliment":
                     title = "New Compliment"
+                elif notification_type == "story_like":
+                    title = "Story Like"
                 
                 await send_push_notification(
                     device_tokens=device_tokens,
@@ -129,24 +175,52 @@ async def get_notifications(
     # Enrich with user details and post thumbnail
     result = []
     for notif in notifications:
-        from_user = await db.users.find_one({"_id": ObjectId(notif["fromUserId"])})
+        # Check if we have cached user data in notification
+        from_user_name = notif.get("fromUserName")
+        from_user_profile_picture = notif.get("fromUserProfilePicture")
+        from_user_level = notif.get("fromUserLevel", 1)
         
-        # Get post thumbnail if notification is related to a post
-        post_thumbnail = None
-        if notif.get("postId"):
-            post = await db.posts.find_one({"_id": ObjectId(notif["postId"])})
-            if post:
-                post_thumbnail = post.get("media_url")
+        # If not cached, fetch from database (for old notifications)
+        if not from_user_name:
+            from_user = await db.users.find_one({"_id": ObjectId(notif["fromUserId"])})
+            if from_user:
+                from_user_name = from_user.get("full_name", "Unknown User")
+                from_user_profile_picture = from_user.get("profile_picture")
+                from_user_level = from_user.get("level", 1)
+            else:
+                from_user_name = "Unknown User"
+        
+        # Get post thumbnail - first check if saved in notification
+        post_thumbnail = notif.get("postThumbnail")
+        
+        # If not saved, fetch from post (for old notifications)
+        if not post_thumbnail and notif.get("postId"):
+            try:
+                post = await db.posts.find_one({"_id": ObjectId(notif["postId"])})
+                if post:
+                    media_type = post.get("media_type", "image")
+                    if media_type == "video":
+                        post_thumbnail = post.get("thumbnail_url") or post.get("media_url")
+                    else:
+                        post_thumbnail = post.get("media_url") or post.get("image_url")
+            except:
+                pass
+        
+        # ✅ Convert to full URL if it's a relative path
+        if post_thumbnail:
+            post_thumbnail = get_full_url(post_thumbnail)
+        if from_user_profile_picture:
+            from_user_profile_picture = get_full_url(from_user_profile_picture)
         
         notif_data = {
             "id": str(notif["_id"]),
             "type": notif["type"],
             "fromUserId": notif["fromUserId"],
-            "fromUserName": from_user["full_name"] if from_user else "Unknown User",
-            "fromUserProfilePicture": from_user.get("profile_picture") if from_user else None,
-            "fromUserLevel": from_user.get("level", 1) if from_user else 1,
+            "fromUserName": from_user_name,
+            "fromUserProfilePicture": from_user_profile_picture,
+            "fromUserLevel": from_user_level,
             "postId": notif.get("postId"),
-            "postThumbnail": post_thumbnail,
+            "postThumbnail": post_thumbnail,  # ✅ Now returns full URL
             "message": notif["message"],
             "isRead": notif["isRead"],
             "createdAt": notif["createdAt"],
@@ -246,3 +320,72 @@ async def register_device(
             status_code=500,
             detail="Failed to register device token. Please try again."
         )
+
+
+# ============================================
+# BACKFILL ENDPOINT - Run once to fix old notifications
+# ============================================
+@router.post("/backfill-thumbnails")
+async def backfill_notification_thumbnails(current_user: dict = Depends(get_current_user)):
+    """
+    One-time migration to add postThumbnail and user details to existing notifications.
+    Call this once after deploying to fix old notifications.
+    """
+    db = get_database()
+    
+    # Find notifications that need updating
+    notifications = await db.notifications.find({
+        "postId": {"$ne": None}
+    }).to_list(None)
+    
+    print(f"📷 Found {len(notifications)} notifications to check for backfill")
+    
+    updated = 0
+    for notif in notifications:
+        update_fields = {}
+        
+        # Check if postThumbnail needs updating
+        if not notif.get("postThumbnail"):
+            post_id = notif.get("postId")
+            if post_id:
+                try:
+                    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+                    if post:
+                        media_type = post.get("media_type", "image")
+                        if media_type == "video":
+                            thumbnail = post.get("thumbnail_url") or post.get("media_url")
+                        else:
+                            thumbnail = post.get("media_url") or post.get("image_url")
+                        
+                        if thumbnail:
+                            update_fields["postThumbnail"] = thumbnail
+                except Exception as e:
+                    print(f"⚠️ Error getting post thumbnail: {e}")
+        
+        # Check if user details need updating
+        if not notif.get("fromUserName"):
+            from_user_id = notif.get("fromUserId")
+            if from_user_id:
+                try:
+                    from_user = await db.users.find_one({"_id": ObjectId(from_user_id)})
+                    if from_user:
+                        update_fields["fromUserName"] = from_user.get("full_name", "Unknown")
+                        update_fields["fromUserProfilePicture"] = from_user.get("profile_picture")
+                        update_fields["fromUserLevel"] = from_user.get("level", 1)
+                except Exception as e:
+                    print(f"⚠️ Error getting user details: {e}")
+        
+        # Update if we have fields to update
+        if update_fields:
+            await db.notifications.update_one(
+                {"_id": notif["_id"]},
+                {"$set": update_fields}
+            )
+            updated += 1
+    
+    print(f"✅ Updated {updated} notifications")
+    return {
+        "message": f"Backfilled {updated} notifications",
+        "total_checked": len(notifications),
+        "updated": updated
+    }
