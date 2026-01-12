@@ -83,12 +83,12 @@ async def create_notification(
     notification_doc = {
         "type": notification_type,
         "fromUserId": from_user_id,
-        "fromUserName": from_user.get("full_name", "Someone"),  # ✅ Save user name
-        "fromUserProfilePicture": from_user.get("profile_picture"),  # ✅ Save profile pic
-        "fromUserLevel": from_user.get("level", 1),  # ✅ Save user level
+        "fromUserName": from_user.get("full_name", "Someone"),
+        "fromUserProfilePicture": from_user.get("profile_picture"),
+        "fromUserLevel": from_user.get("level", 1),
         "toUserId": to_user_id,
         "postId": post_id,
-        "postThumbnail": post_thumbnail,  # ✅ SAVE THUMBNAIL TO DATABASE
+        "postThumbnail": post_thumbnail,
         "message": message,
         "isRead": False,
         "createdAt": datetime.utcnow(),
@@ -165,10 +165,10 @@ async def get_notifications(
     db = get_database()
     user_id = str(current_user["_id"])
     
-  # Fetch notifications (exclude messages - they go to chat)
-cursor = db.notifications.find(
-    {"toUserId": user_id, "type": {"$ne": "message"}}
-).sort("createdAt", -1).skip(skip).limit(limit)
+    # Fetch notifications (exclude messages - they go to chat)
+    cursor = db.notifications.find(
+        {"toUserId": user_id, "type": {"$ne": "message"}}
+    ).sort("createdAt", -1).skip(skip).limit(limit)
     
     notifications = await cursor.to_list(length=limit)
     
@@ -206,7 +206,7 @@ cursor = db.notifications.find(
             except:
                 pass
         
-        # ✅ Convert to full URL if it's a relative path
+        # Convert to full URL if it's a relative path
         if post_thumbnail:
             post_thumbnail = get_full_url(post_thumbnail)
         if from_user_profile_picture:
@@ -220,7 +220,7 @@ cursor = db.notifications.find(
             "fromUserProfilePicture": from_user_profile_picture,
             "fromUserLevel": from_user_level,
             "postId": notif.get("postId"),
-            "postThumbnail": post_thumbnail,  # ✅ Now returns full URL
+            "postThumbnail": post_thumbnail,
             "message": notif["message"],
             "isRead": notif["isRead"],
             "createdAt": notif["createdAt"],
@@ -236,11 +236,11 @@ async def get_unread_count(current_user: dict = Depends(get_current_user)):
     db = get_database()
     user_id = str(current_user["_id"])
     
-   count = await db.notifications.count_documents({
-    "toUserId": user_id,
-    "isRead": False,
-    "type": {"$ne": "message"}
-})
+    count = await db.notifications.count_documents({
+        "toUserId": user_id,
+        "isRead": False,
+        "type": {"$ne": "message"}
+    })
     
     return {"unreadCount": count}
 
@@ -323,9 +323,6 @@ async def register_device(
         )
 
 
-# ============================================
-# BACKFILL ENDPOINT - Run once to fix old notifications
-# ============================================
 @router.post("/backfill-thumbnails")
 async def backfill_notification_thumbnails(current_user: dict = Depends(get_current_user)):
     """
