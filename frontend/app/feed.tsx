@@ -104,6 +104,7 @@ export default function FeedScreen() {
   const paginationTriggeredRef = useRef(false);
   const lastScrollYRef = useRef(0);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   const POSTS_PER_PAGE = 30;
   const VISIBILITY_THRESHOLD = 0.2;
@@ -119,14 +120,15 @@ useEffect(() => {
     fetchFeed(true);
     setHasInitiallyLoaded(true);
   }
-  refreshUnreadCount();  // ✅ NEW
+  refreshUnreadCount();
+  loadUnreadMessagesCount();  // ⬅️ ADD THIS
 }, []);
 
 
 useFocusEffect(
   React.useCallback(() => {
-    // Always update notifications and user data
     refreshUnreadCount();
+    loadUnreadMessagesCount();  // ⬅️ ADD THIS
     refreshUser();
     fetchOwnStory();
     
@@ -137,6 +139,18 @@ useFocusEffect(
     }
   }, [hasInitiallyLoaded])
 );
+
+const loadUnreadMessagesCount = async () => {
+  if (!token) return;
+  try {
+    const response = await axios.get(`${BACKEND}/api/chat/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setUnreadMessagesCount(response.data.unreadCount || 0);
+  } catch (error) {
+    console.log('Error fetching unread messages:', error);
+  }
+};
 
 
 
@@ -333,6 +347,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
   // Handle scroll
 const handleScroll = useCallback(
   (event: any) => {
+    
     const scrollY = event.nativeEvent.contentOffset.y;
     const viewportHeight = event.nativeEvent.layoutMeasurement.height;
     const contentHeight = event.nativeEvent.contentSize.height;
@@ -419,35 +434,41 @@ const renderPost = useCallback(
         >
           <View style={styles.headerRow}>
             <TouchableOpacity
-              style={styles.leftIcon}
-              onPress={() => router.push("/chat")}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="chatbox-ellipses" size={20} color="#fff" />
-            </TouchableOpacity>
+  style={styles.leftIcon}
+  onPress={() => router.push("/chat")}
+  activeOpacity={0.7}
+  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+>
+  <Ionicons name="chatbox-ellipses" size={20} color="#fff" />
+  {unreadMessagesCount > 0 && (
+    <View style={styles.badge}>
+      <Text style={styles.badgeText}>
+        {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+      </Text>
+    </View>
+  )}
+</TouchableOpacity>
 
             <Text style={styles.cofauTitle} pointerEvents="none">
               Cofau
             </Text>
 
-            <View style={styles.headerIcons}>
-              <TouchableOpacity
-                onPress={() => router.push("/notifications")}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="notifications" size={20} color="#fff" />
-                {unreadCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              onPress={() => router.push("/notifications")}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="notifications" size={20} color="#fff" />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
+
         </LinearGradient>
 
         {/* ===== LEVEL CARD ===== */}
@@ -718,7 +739,7 @@ const renderPost = useCallback(
         <FeedSkeleton showStories={false} />
       )}
     </>
-  ), [user, ownStoryData, unreadCount, refreshing, loading, feedPosts.length, router]);
+), [user, ownStoryData, unreadCount, unreadMessagesCount, refreshing, loading, feedPosts.length, router]);
 
   // List Footer Component
   const ListFooter = useCallback(() => (
@@ -899,6 +920,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  badge: {
+  position: "absolute",
+  top: -4,
+  right: -6,
+  backgroundColor: "#FF3B30",
+  borderRadius: 10,
+  minWidth: 18,
+  height: 18,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 4,
+  borderWidth: 1.5,
+  borderColor: "#fff",
+},
+badgeText: {
+  color: "#fff",
+  fontSize: 10,
+  fontWeight: "700",
+},
   leftIcon: {
     width: 40,
     height: 40,
@@ -925,23 +965,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 20,
     zIndex: 10,
-  },
-  badge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: "#FF4444",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700",
   },
   levelCardWrapper: {
     marginHorizontal: 20,
@@ -980,6 +1003,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -40 }],
     zIndex: 6,
   },
+ 
   dpAddButton: {
     position: "absolute",
     bottom: 0,

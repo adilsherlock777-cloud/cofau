@@ -165,10 +165,10 @@ async def get_notifications(
     db = get_database()
     user_id = str(current_user["_id"])
     
-    # Fetch notifications
-    cursor = db.notifications.find(
-        {"toUserId": user_id}
-    ).sort("createdAt", -1).skip(skip).limit(limit)
+  # Fetch notifications (exclude messages - they go to chat)
+cursor = db.notifications.find(
+    {"toUserId": user_id, "type": {"$ne": "message"}}
+).sort("createdAt", -1).skip(skip).limit(limit)
     
     notifications = await cursor.to_list(length=limit)
     
@@ -236,10 +236,11 @@ async def get_unread_count(current_user: dict = Depends(get_current_user)):
     db = get_database()
     user_id = str(current_user["_id"])
     
-    count = await db.notifications.count_documents({
-        "toUserId": user_id,
-        "isRead": False
-    })
+   count = await db.notifications.count_documents({
+    "toUserId": user_id,
+    "isRead": False,
+    "type": {"$ne": "message"}
+})
     
     return {"unreadCount": count}
 
