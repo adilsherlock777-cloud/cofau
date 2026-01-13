@@ -11,6 +11,7 @@ from database import get_database
 from routers.auth import get_current_user
 from config import settings
 from utils.moderation import check_image_moderation, save_moderation_result
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body, Query
 
 router = APIRouter(prefix="/api/stories", tags=["stories"])
 
@@ -29,8 +30,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload")
 async def upload_story(
     file: UploadFile = File(...),
-    location_name: Optional[str] = None,
-    map_link: Optional[str] = None,
+    location_name: Optional[str] = Query(None),
+    map_link: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user)
 ):
     """
