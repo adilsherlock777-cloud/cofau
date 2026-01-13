@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +47,10 @@ export default function StoryEditorScreen() {
 
   // Debounce ref for location search
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const uploadLockRef = useRef(false);
+
 
  
 
@@ -135,17 +140,19 @@ export default function StoryEditorScreen() {
   // ============================
   // UPLOAD STORY
   // ============================
-  const handlePostStory = async () => {
+const handlePostStory = async () => {
   if (!imageUri) {
     Alert.alert('Error', 'No image selected');
     return;
   }
 
-  // Prevent double submission
-  if (uploading) {
+  // 🔒 Hard lock (prevents all race conditions)
+  if (uploadLockRef.current) {
+    console.log("⚠️ Upload blocked (already in progress)");
     return;
   }
 
+  uploadLockRef.current = true;
   setUploading(true);
   try {
     const formData = new FormData();
@@ -193,12 +200,7 @@ export default function StoryEditorScreen() {
 
     console.log('✅ Story uploaded:', response.data);
 
-    Alert.alert('Success', 'Story posted!', [
-      {
-        text: 'OK',
-        onPress: () => router.replace('/feed'),
-      },
-    ]);
+    router.replace('/feed');
   } catch (error: any) {
     console.error('❌ Error uploading story:', error.response?.data || error.message);
     Alert.alert('Error', error.response?.data?.detail || 'Failed to upload story');
@@ -210,176 +212,182 @@ export default function StoryEditorScreen() {
   // ============================
   // UI
   // ============================
-  return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Story</Text>
-        <View style={styles.headerRight} />
-      </View>
+return (
+  <KeyboardAvoidingView 
+    style={styles.container}
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+  >
+    {/* Header */}
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={24} color="#333" />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>New Story</Text>
+      <View style={styles.headerRight} />
+    </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Image Preview */}
-        <View style={styles.imagePreviewContainer}>
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-          ) : (
-            <View style={styles.noImageContainer}>
-              <Ionicons name="image-outline" size={60} color="#CCC" />
-              <Text style={styles.noImageText}>No image selected</Text>
-            </View>
-          )}
-
-    
-        </View>
-
-        {/* Add Location Toggle */}
-        <TouchableOpacity
-          style={styles.addLocationToggle}
-          onPress={() => setShowLocationInput(!showLocationInput)}
-        >
-          <View style={styles.addLocationLeft}>
-            <Ionicons
-              name="location-outline"
-              size={22}
-              color={showLocationInput ? '#4ECDC4' : '#666'}
-            />
-            <Text
-              style={[
-                styles.addLocationText,
-                showLocationInput && styles.addLocationTextActive,
-              ]}
-            >
-              {locationName ? locationName : 'Add Location (Optional)'}
-            </Text>
-          </View>
-          <Ionicons
-            name={showLocationInput ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#666"
-          />
-        </TouchableOpacity>
-
-        {/* Location Input Section */}
-        {showLocationInput && (
-          <View style={styles.locationSection}>
-            {/* Location Name Input */}
-            <View style={styles.locationInputContainer}>
-              <TextInput
-                style={styles.locationInput}
-                placeholder="Type place name (e.g., Starbucks MG Road)"
-                placeholderTextColor="#999"
-                value={locationName}
-                onChangeText={handleLocationNameChange}
-                onFocus={() => {
-                  if (locationSuggestions.length > 0) {
-                    setShowSuggestions(true);
-                  }
-                }}
-              />
-
-              {loadingSuggestions && (
-                <ActivityIndicator
-                  size="small"
-                  color="#4ECDC4"
-                  style={styles.suggestionLoader}
-                />
-              )}
-
-              {/* Location Suggestions Dropdown */}
-              {showSuggestions && locationSuggestions.length > 0 && (
-                <View style={styles.suggestionsContainer}>
-                  <Text style={styles.suggestionsTitle}>Did you mean?</Text>
-                  {locationSuggestions.map((suggestion, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.suggestionItem}
-                      onPress={() => selectLocationSuggestion(suggestion)}
-                    >
-                      <View style={styles.suggestionContent}>
-                        <Ionicons name="location" size={18} color="#4ECDC4" />
-                        <View style={styles.suggestionTextContainer}>
-                          <Text style={styles.suggestionName}>
-                            {suggestion.location_name}
-                          </Text>
-                          <Text style={styles.suggestionMeta}>
-                            {suggestion.post_count} post
-                            {suggestion.post_count !== 1 ? 's' : ''} •{' '}
-                            {suggestion.similarity_score}% match
-                          </Text>
-                        </View>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#CCC" />
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    style={styles.suggestionItemNew}
-                    onPress={() => {
-                      setShowSuggestions(false);
-                      setLocationSuggestions([]);
-                    }}
-                  >
-                    <Ionicons name="add-circle-outline" size={18} color="#666" />
-                    <Text style={styles.suggestionNewText}>
-                      Add "{locationName}" as new location
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            {/* Generate Maps Link Button */}
-            <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
-              <Ionicons name="map" size={20} color="#4ECDC4" />
-              <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
-            </TouchableOpacity>
-
-            {/* Or Paste Link */}
-            <TextInput
-              style={styles.locationInput}
-              placeholder="Or paste existing Google Maps link"
-              placeholderTextColor="#999"
-              value={mapsLink}
-              onChangeText={setMapsLink}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            {/* Open in Maps */}
-            {mapsLink ? (
-              <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
-                <Ionicons name="open-outline" size={20} color="#4ECDC4" />
-                <Text style={styles.mapsButtonText}>Open in Google Maps</Text>
-              </TouchableOpacity>
-            ) : null}
+    <ScrollView 
+      style={styles.scrollView} 
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Image Preview */}
+      <View style={styles.imagePreviewContainer}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+        ) : (
+          <View style={styles.noImageContainer}>
+            <Ionicons name="image-outline" size={60} color="#CCC" />
+            <Text style={styles.noImageText}>No image selected</Text>
           </View>
         )}
+      </View>
 
-        {/* Post Button */}
-        <TouchableOpacity
-          style={styles.postButtonContainer}
-          onPress={handlePostStory}
-          disabled={uploading}
-        >
-          <LinearGradient
-            colors={['#E94A37', '#F2CF68', '#1B7C82']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.postButton}
+      {/* Add Location Toggle */}
+      <TouchableOpacity
+        style={styles.addLocationToggle}
+        onPress={() => setShowLocationInput(!showLocationInput)}
+      >
+        <View style={styles.addLocationLeft}>
+          <Ionicons
+            name="location-outline"
+            size={22}
+            color={showLocationInput ? '#4ECDC4' : '#666'}
+          />
+          <Text
+            style={[
+              styles.addLocationText,
+              showLocationInput && styles.addLocationTextActive,
+            ]}
           >
-            {uploading ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Text style={styles.postButtonText}>POST STORY</Text>
+            {locationName ? locationName : 'Add Location (Optional)'}
+          </Text>
+        </View>
+        <Ionicons
+          name={showLocationInput ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color="#666"
+        />
+      </TouchableOpacity>
+
+      {/* Location Input Section */}
+      {showLocationInput && (
+        <View style={styles.locationSection}>
+          {/* Location Name Input */}
+          <View style={styles.locationInputContainer}>
+            <TextInput
+              style={styles.locationInput}
+              placeholder="Type place name (e.g., Starbucks MG Road)"
+              placeholderTextColor="#999"
+              value={locationName}
+              onChangeText={handleLocationNameChange}
+              onFocus={() => {
+                if (locationSuggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
+            />
+
+            {loadingSuggestions && (
+              <ActivityIndicator
+                size="small"
+                color="#4ECDC4"
+                style={styles.suggestionLoader}
+              />
             )}
-          </LinearGradient>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
+
+            {/* Location Suggestions Dropdown */}
+            {showSuggestions && locationSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <Text style={styles.suggestionsTitle}>Did you mean?</Text>
+                {locationSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionItem}
+                    onPress={() => selectLocationSuggestion(suggestion)}
+                  >
+                    <View style={styles.suggestionContent}>
+                      <Ionicons name="location" size={18} color="#4ECDC4" />
+                      <View style={styles.suggestionTextContainer}>
+                        <Text style={styles.suggestionName}>
+                          {suggestion.location_name}
+                        </Text>
+                        <Text style={styles.suggestionMeta}>
+                          {suggestion.post_count} post
+                          {suggestion.post_count !== 1 ? 's' : ''} •{' '}
+                          {suggestion.similarity_score}% match
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#CCC" />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={styles.suggestionItemNew}
+                  onPress={() => {
+                    setShowSuggestions(false);
+                    setLocationSuggestions([]);
+                  }}
+                >
+                  <Ionicons name="add-circle-outline" size={18} color="#666" />
+                  <Text style={styles.suggestionNewText}>
+                    Add "{locationName}" as new location
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* Generate Maps Link Button */}
+          <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
+            <Ionicons name="map" size={20} color="#4ECDC4" />
+            <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
+          </TouchableOpacity>
+
+          {/* Or Paste Link */}
+          <TextInput
+            style={styles.locationInput}
+            placeholder="Or paste existing Google Maps link"
+            placeholderTextColor="#999"
+            value={mapsLink}
+            onChangeText={setMapsLink}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          {/* Open in Maps */}
+          {mapsLink ? (
+            <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
+              <Ionicons name="open-outline" size={20} color="#4ECDC4" />
+              <Text style={styles.mapsButtonText}>Open in Google Maps</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
+
+      {/* Post Button */}
+      <TouchableOpacity
+        style={styles.postButtonContainer}
+        onPress={handlePostStory}
+        disabled={uploading}
+      >
+        <LinearGradient
+          colors={['#E94A37', '#F2CF68', '#1B7C82']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.postButton}
+        >
+          {uploading ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Text style={styles.postButtonText}>POST STORY</Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+    </ScrollView>
+  </KeyboardAvoidingView>
+);
 }
 
 const styles = StyleSheet.create({

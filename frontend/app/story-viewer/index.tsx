@@ -969,27 +969,25 @@ const handlePrevious = () => {
           )
         )}
 
-        {/* Location Button */}
-        {locationName && mapLink && (
-          <TouchableOpacity
-            style={[
-              styles.locationButton,
-              contentLayout.height > 0 ? {
-                position: 'absolute',
-                bottom: undefined,
-                top: contentLayout.y + contentLayout.height - 80,
-                left: 16,
-              } : {}
-            ]}
-            onPress={handleOpenLocation}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="location" size={16} color="#333" />
-            <Text style={styles.locationButtonText} numberOfLines={1}>
-              {locationName}
-            </Text>
-          </TouchableOpacity>
-        )}
+        {/* Location Button - Dynamic Position */}
+{locationName && mapLink && (
+  <TouchableOpacity
+    style={[
+      styles.locationButton,
+      contentLayout.height > 0 && {
+        top: contentLayout.y + contentLayout.height - 50,
+        bottom: undefined,
+      }
+    ]}
+    onPress={handleOpenLocation}
+    activeOpacity={0.8}
+  >
+    <Ionicons name="location" size={16} color="#333" />
+    <Text style={styles.locationButtonText} numberOfLines={1}>
+      {locationName}
+    </Text>
+  </TouchableOpacity>
+)}
 
         {/* COFAU Watermark */}
         <Text style={[
@@ -1329,6 +1327,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
+  locationButton: {
+  position: 'absolute',
+  bottom: 120,
+  left: 16,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderRadius: 20,
+  gap: 6,
+  maxWidth: SCREEN_WIDTH * 0.7,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  elevation: 4,
+  zIndex: 100,
+},
   viewersModalTitle: {
     fontSize: 18,
     fontWeight: '600',
