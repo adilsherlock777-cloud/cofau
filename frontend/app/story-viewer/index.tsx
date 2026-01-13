@@ -89,6 +89,7 @@ export default function StoryViewerScreen() {
   const [sendingReply, setSendingReply] = useState(false);
   const [allUsersStories, setAllUsersStories] = useState<any[]>([]);
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
+  const [showTapHint, setShowTapHint] = useState(false);
 
   // Keyboard state for Android
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -392,6 +393,7 @@ useEffect(() => {
     setLocationName(stories[currentIndex].location_name || null);
     setMapLink(stories[currentIndex].map_link || null);
     loadStoryViews(stories[currentIndex].id);
+    setShowTapHint(false);
     
     // Check if story is liked (only for non-owners)
     const currentIsOwner = user && storyUser && 
@@ -989,92 +991,119 @@ const handlePrevious = () => {
   </TouchableOpacity>
 )}
 
-        {/* COFAU Watermark */}
-        <Text style={[
-          styles.watermark,
-          contentLayout.height > 0 ? {
-            position: 'absolute',
-            bottom: undefined,
-            top: contentLayout.y + contentLayout.height - 40,
-            right: 20,
-          } : {}
-        ]}>COFAU</Text>
+        {/* COFAU Watermark - Hide for post stories */}
+{!currentStory.from_post && (
+  <Text style={[
+    styles.watermark,
+    contentLayout.height > 0 ? {
+      position: 'absolute',
+      bottom: undefined,
+      top: contentLayout.y + contentLayout.height - 40,
+      right: 20,
+    } : {}
+  ]}>COFAU</Text>
+)}
 
         {/* Post Card Overlay - Only show if story was created from a post */}
 {currentStory.from_post && (
-  <TouchableOpacity
-    style={styles.postCardOverlay}
-    onPress={() => {
-      // Navigate to original post
-      router.push(`/post-details/${currentStory.from_post.post_id}`);
-    }}
-    activeOpacity={0.95}
-  >
-    <View style={styles.postCard}>
-      {/* Header */}
-      <View style={styles.postCardHeader}>
-        <UserAvatar
-          profilePicture={storyUser.profile_picture}
-          username={storyUser.username}
-          size={44}
-          level={storyUser.level || 1}
-          showLevelBadge
-          style={{}}
+  <>
+    {/* Blurred Background - Same image blurred */}
+    <Image
+      source={{ uri: currentStory.media_url }}
+      style={styles.blurredBackground}
+      blurRadius={25}
+    />
+    
+    <View style={styles.postCardOverlay}>
+      <TouchableOpacity
+        style={styles.postCard}
+        onPress={() => {
+          // Show hint on tap
+          setShowTapHint(true);
+          // Auto-hide hint after 3 seconds
+          setTimeout(() => setShowTapHint(false), 3000);
+        }}
+        activeOpacity={0.95}
+      >
+        {/* Header */}
+        <View style={styles.postCardHeader}>
+          <UserAvatar
+            profilePicture={storyUser.profile_picture}
+            username={storyUser.username}
+            size={44}
+            level={storyUser.level || 1}
+            showLevelBadge
+            style={{}}
+          />
+          <View style={styles.postCardHeaderText}>
+            <Text style={styles.postCardUsername}>{storyUser.username}</Text>
+            <Text style={styles.postCardTime}>1h</Text>
+          </View>
+        </View>
+
+        {/* Image */}
+        <Image
+          source={{ uri: currentStory.media_url }}
+          style={styles.postCardImage}
+          resizeMode="cover"
         />
-        <View style={styles.postCardHeaderText}>
-          <Text style={styles.postCardUsername}>{storyUser.username}</Text>
-          <Text style={styles.postCardTime}>1h</Text>
-        </View>
-      </View>
 
-      {/* Image */}
-      <Image
-        source={{ uri: currentStory.media_url }}
-        style={styles.postCardImage}
-        resizeMode="cover"
-      />
-
-      {/* Rating */}
-      {currentStory.from_post.rating > 0 && (
-        <View style={styles.postCardDetail}>
-          <Text style={styles.postCardLabel}>RATING</Text>
-          <View style={styles.postCardRow}>
-            <Ionicons name="star" size={19} color="#FFD700" />
-            <Text style={styles.postCardValue}>{currentStory.from_post.rating}/10</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Review */}
-      {currentStory.from_post.review && (
-        <View style={styles.postCardDetail}>
-          <Text style={styles.postCardLabel}>REVIEW</Text>
-          <View style={styles.postCardRow}>
-            <Ionicons name="create" size={19} color="#FFD700" />
-            <Text style={styles.postCardReview} numberOfLines={2}>
-              {currentStory.from_post.review}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Location */}
-      {currentStory.from_post.location && (
-        <View style={styles.postCardLocation}>
-          <Text style={styles.postCardLabel}>LOCATION</Text>
-          <View style={styles.postCardRow}>
-            <Ionicons name="location" size={18} color="#1B7C82" />
-            <Text style={styles.postCardLocationText} numberOfLines={1}>
-              {currentStory.from_post.location}
-            </Text>
-            <View style={styles.postCardArrow}>
-              <Ionicons name="chevron-forward" size={14} color="#fff" />
+        {/* Rating */}
+        {currentStory.from_post.rating > 0 && (
+          <View style={styles.postCardDetail}>
+            <Text style={styles.postCardLabel}>RATING</Text>
+            <View style={styles.postCardRow}>
+              <Ionicons name="star" size={19} color="#FFD700" />
+              <Text style={styles.postCardValue}>{currentStory.from_post.rating}/10</Text>
             </View>
           </View>
-        </View>
+        )}
+
+        {/* Review */}
+        {currentStory.from_post.review && (
+          <View style={styles.postCardDetail}>
+            <Text style={styles.postCardLabel}>REVIEW</Text>
+            <View style={styles.postCardRow}>
+              <Ionicons name="create" size={19} color="#FFD700" />
+              <Text style={styles.postCardReview} numberOfLines={2}>
+                {currentStory.from_post.review}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Location */}
+        {currentStory.from_post.location && (
+          <View style={styles.postCardLocation}>
+            <Text style={styles.postCardLabel}>LOCATION</Text>
+            <View style={styles.postCardRow}>
+              <Ionicons name="location" size={18} color="#1B7C82" />
+              <Text style={styles.postCardLocationText} numberOfLines={1}>
+                {currentStory.from_post.location}
+              </Text>
+              <View style={styles.postCardArrow}>
+                <Ionicons name="chevron-forward" size={14} color="#fff" />
+              </View>
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+      
+      {/* Tap to view post hint - ONLY this is clickable to navigate */}
+      {showTapHint && (
+        <TouchableOpacity 
+          style={styles.tapHintContainer}
+          onPress={() => {
+            router.push(`/post-details/${currentStory.from_post.post_id}`);
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="arrow-forward-circle" size={18} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={styles.tapHintText}>Tap to view post</Text>
+        </TouchableOpacity>
       )}
     </View>
-  </TouchableOpacity>
+  </>
 )}
 
         {/* Tap zones */}
@@ -1320,6 +1349,21 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
+  tapHintContainer: {
+  position: 'absolute',
+  bottom: 120,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  paddingHorizontal: 18,
+  paddingVertical: 12,
+  borderRadius: 25,
+},
+tapHintText: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '600',
+},
   watermark: {
     position: 'absolute',
     bottom: 100,
@@ -1441,6 +1485,7 @@ const styles = StyleSheet.create({
   bottom: 0,
   justifyContent: 'center',
   alignItems: 'center',
+  paddingBottom: 80,
   zIndex: 50,
 },
 postCard: {
@@ -1448,6 +1493,8 @@ postCard: {
   backgroundColor: '#fff',
   borderRadius: 20,
   overflow: 'hidden',
+  borderWidth: 2, 
+  borderColor: 'rgba(0,0,0,0)',
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 8 },
   shadowOpacity: 0.25,
@@ -1578,7 +1625,7 @@ postCardArrow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    zIndex: 10,
+    zIndex: 100,
   },
   eyeIconText: {
     color: '#FFF',
