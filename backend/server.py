@@ -1041,7 +1041,7 @@ async def get_feed(
         if category_list:
             # Match ANY of the selected categories (case-insensitive)
             regex_patterns = [{"category": {"$regex": re.escape(cat), "$options": "i"}} for cat in category_list]
-             if "user_id" in query:
+            if "user_id" in query:
                 query["$and"] = [{"user_id": query["user_id"]}, {"$or": regex_patterns}]
                 del query["user_id"]
             else:
