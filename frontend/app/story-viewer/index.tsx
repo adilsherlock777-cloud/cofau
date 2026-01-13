@@ -1000,6 +1000,83 @@ const handlePrevious = () => {
           } : {}
         ]}>COFAU</Text>
 
+        {/* Post Card Overlay - Only show if story was created from a post */}
+{currentStory.from_post && (
+  <TouchableOpacity
+    style={styles.postCardOverlay}
+    onPress={() => {
+      // Navigate to original post
+      router.push(`/post-details/${currentStory.from_post.post_id}`);
+    }}
+    activeOpacity={0.95}
+  >
+    <View style={styles.postCard}>
+      {/* Header */}
+      <View style={styles.postCardHeader}>
+        <UserAvatar
+          profilePicture={storyUser.profile_picture}
+          username={storyUser.username}
+          size={44}
+          level={storyUser.level || 1}
+          showLevelBadge
+          style={{}}
+        />
+        <View style={styles.postCardHeaderText}>
+          <Text style={styles.postCardUsername}>{storyUser.username}</Text>
+          <Text style={styles.postCardTime}>1h</Text>
+        </View>
+      </View>
+
+      {/* Image */}
+      <Image
+        source={{ uri: currentStory.media_url }}
+        style={styles.postCardImage}
+        resizeMode="cover"
+      />
+
+      {/* Rating */}
+      {currentStory.from_post.rating > 0 && (
+        <View style={styles.postCardDetail}>
+          <Text style={styles.postCardLabel}>RATING</Text>
+          <View style={styles.postCardRow}>
+            <Ionicons name="star" size={19} color="#FFD700" />
+            <Text style={styles.postCardValue}>{currentStory.from_post.rating}/10</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Review */}
+      {currentStory.from_post.review && (
+        <View style={styles.postCardDetail}>
+          <Text style={styles.postCardLabel}>REVIEW</Text>
+          <View style={styles.postCardRow}>
+            <Ionicons name="create" size={19} color="#FFD700" />
+            <Text style={styles.postCardReview} numberOfLines={2}>
+              {currentStory.from_post.review}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Location */}
+      {currentStory.from_post.location && (
+        <View style={styles.postCardLocation}>
+          <Text style={styles.postCardLabel}>LOCATION</Text>
+          <View style={styles.postCardRow}>
+            <Ionicons name="location" size={18} color="#1B7C82" />
+            <Text style={styles.postCardLocationText} numberOfLines={1}>
+              {currentStory.from_post.location}
+            </Text>
+            <View style={styles.postCardArrow}>
+              <Ionicons name="chevron-forward" size={14} color="#fff" />
+            </View>
+          </View>
+        </View>
+      )}
+    </View>
+  </TouchableOpacity>
+)}
+
         {/* Tap zones */}
         <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
         <TouchableOpacity style={styles.tapRight} onPress={handleNext} />
@@ -1356,6 +1433,98 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+  postCardOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 50,
+},
+postCard: {
+  width: SCREEN_WIDTH * 0.82,
+  backgroundColor: '#fff',
+  borderRadius: 20,
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.25,
+  shadowRadius: 12,
+  elevation: 12,
+},
+postCardHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 14,
+  gap: 12,
+},
+postCardHeaderText: {
+  flex: 1,
+},
+postCardUsername: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#333',
+},
+postCardTime: {
+  fontSize: 13,
+  color: '#999',
+  marginTop: 2,
+},
+postCardImage: {
+  width: '100%',
+  aspectRatio: 1,
+  backgroundColor: '#f5f5f5',
+},
+postCardDetail: {
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  borderTopWidth: 1,
+  borderTopColor: '#f0f0f0',
+},
+postCardLabel: {
+  fontSize: 11,
+  fontWeight: '600',
+  color: '#888',
+  letterSpacing: 0.5,
+  marginBottom: 6,
+},
+postCardRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+postCardValue: {
+  fontSize: 15,
+  fontWeight: '500',
+  color: '#333',
+},
+postCardReview: {
+  fontSize: 15,
+  color: '#333',
+  flex: 1,
+},
+postCardLocation: {
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  backgroundColor: 'rgba(27, 124, 130, 0.08)',
+},
+postCardLocationText: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#333',
+  flex: 1,
+},
+postCardArrow: {
+  width: 24,
+  height: 24,
+  borderRadius: 12,
+  backgroundColor: '#1B7C82',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
   viewerItem: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -267,6 +267,7 @@ async def get_stories_feed(
                         "story_length": story_length_seconds,
                         "location_name": s.get("location_name"),
                         "map_link": s.get("map_link"),
+                        "from_post": s.get("from_post"),
                     }
                     
                     # Include shared story information if it's a shared story
@@ -399,6 +400,7 @@ async def get_user_stories(
                 "story_length": story_length_seconds,
                 "location_name": s.get("location_name"),
                 "map_link": s.get("map_link"),
+                "from_post": s.get("from_post"),
             }
             
             # Include shared story information if it's a shared story
