@@ -29,6 +29,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload")
 async def upload_story(
     file: UploadFile = File(...),
+    location_name: Optional[str] = None,
+    map_link: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -150,6 +152,8 @@ async def upload_story(
             "media_type": media_type,
             "created_at": now,
             "expires_at": expires_at,
+            "location_name": location_name if location_name else None,
+            "map_link": map_link if map_link else None,
         }
         
         result = await db.stories.insert_one(story_doc)
@@ -173,6 +177,8 @@ async def upload_story(
                 "media_type": story_doc["media_type"],
                 "created_at": story_doc["created_at"].isoformat(),
                 "expires_at": story_doc["expires_at"].isoformat(),
+                "location_name": story_doc.get("location_name"),
+                "map_link": story_doc.get("map_link"),
             }
         }
     
@@ -256,7 +262,16 @@ async def get_stories_feed(
                         "view_count": view_count,
                         "year": created_year,
                         "story_length": story_length_seconds,
+                        "location_name": s.get("location_name"),
+                        "map_link": s.get("map_link"),
                     }
+                    
+                    # Include shared story information if it's a shared story
+                    if s.get("is_shared"):
+                        story_data["is_shared"] = True
+                        story_data["shared_from"] = s.get("shared_from")
+                    
+                    formatted_stories.append(story_data)
                     
                     # Include shared story information if it's a shared story
                     if s.get("is_shared"):
@@ -383,6 +398,8 @@ async def get_user_stories(
                 "view_count": view_count,
                 "year": created_year,
                 "story_length": story_length_seconds,
+                "location_name": s.get("location_name"),
+                "map_link": s.get("map_link"),
             }
             
             # Include shared story information if it's a shared story
