@@ -465,3 +465,18 @@ export const addPostToStory = async (postId, mediaUrl, review = "", rating = 0, 
 };
 
 export default api;
+
+export const blockUser = async (userId) => {
+  const response = await apiClient.post(`/users/${userId}/block`);
+  return response.data;
+};
+
+export const unblockUser = async (userId) => {
+  const response = await apiClient.delete(`/users/${userId}/block`);
+  return response.data;
+};
+
+export const getBlockedUsers = async () => {
+  const response = await apiClient.get('/users/blocked-list');
+  return response.data;
+};

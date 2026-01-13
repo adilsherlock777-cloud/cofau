@@ -395,6 +395,15 @@ useEffect(() => {
     loadStoryViews(stories[currentIndex].id);
     setShowTapHint(false);
     
+    // For from_post stories, manually trigger media loaded since we don't render main image/video
+    if (stories[currentIndex].from_post) {
+      // Small delay to allow background to render first
+      setTimeout(() => {
+        setMediaLoading(false);
+        setMediaError(false);
+      }, 100);
+    }
+    
     // Check if story is liked (only for non-owners)
     const currentIsOwner = user && storyUser && 
       String(user._id || user.id) === String(storyUser._id || storyUser.id);
@@ -807,16 +816,31 @@ const handlePrevious = () => {
       {/* Story Media with Blurred Background */}
       <View style={styles.contentContainer}>
         {/* Blurred Background */}
-        {!isVideoContent(currentStory) && (
-          <Image
-            source={{ uri: currentStory.media_url }}
-            style={styles.blurredBackground}
-            blurRadius={25}
-          />
-        )}
-        {isVideoContent(currentStory) && (
-          <View style={[styles.blurredBackground, { backgroundColor: '#000' }]} />
-        )}
+{!isVideoContent(currentStory) && (
+  <Image
+    source={{ uri: currentStory.media_url }}
+    style={styles.blurredBackground}
+    blurRadius={25}
+  />
+)}
+{isVideoContent(currentStory) && !currentStory.from_post && (
+  <View style={[styles.blurredBackground, { backgroundColor: '#000' }]} />
+)}
+{isVideoContent(currentStory) && currentStory.from_post && (
+  <View style={styles.blurredBackground}>
+    <Video
+      source={{ uri: currentStory.media_url }}
+      style={styles.backgroundVideo}
+      resizeMode={ResizeMode.COVER}
+      shouldPlay={!paused}
+      isLooping
+      isMuted={true}
+      volume={0}
+      useNativeControls={false}
+    />
+    <View style={styles.videoBlurOverlay} />
+  </View>
+)}
 
         {mediaError && (
           <View style={styles.errorContainer}>
@@ -835,7 +859,7 @@ const handlePrevious = () => {
           </View>
         )}
 
-        {!mediaError && isVideoContent(currentStory) ? (
+        {!mediaError && isVideoContent(currentStory) && !currentStory.from_post ? (
           <Video
             key={`video-${currentStory.id}-${currentIndex}`}
             source={{ 
@@ -909,7 +933,7 @@ const handlePrevious = () => {
             }}
           />
         ) : (
-          !mediaError && !isVideoContent(currentStory) && (
+          !mediaError && !isVideoContent(currentStory) && !currentStory.from_post && (
             <Image
               key={`image-${currentStory.id}-${currentIndex}`}
               source={{ uri: currentStory.media_url }}
@@ -1007,12 +1031,7 @@ const handlePrevious = () => {
         {/* Post Card Overlay - Only show if story was created from a post */}
 {currentStory.from_post && (
   <>
-    {/* Blurred Background - Same image blurred */}
-    <Image
-      source={{ uri: currentStory.media_url }}
-      style={styles.blurredBackground}
-      blurRadius={25}
-    />
+
     
     <View style={styles.postCardOverlay}>
       <TouchableOpacity
@@ -1041,12 +1060,25 @@ const handlePrevious = () => {
           </View>
         </View>
 
-        {/* Image */}
-        <Image
-          source={{ uri: currentStory.media_url }}
-          style={styles.postCardImage}
-          resizeMode="cover"
-        />
+        {/* Media (Image or Video inside card) */}
+{currentStory.media_type === 'video' || isVideoContent(currentStory) ? (
+  <Video
+    source={{ uri: currentStory.media_url }}
+    style={styles.postCardVideo}
+    resizeMode={ResizeMode.COVER}
+    shouldPlay={!paused}
+    isLooping
+    isMuted={false}
+    useNativeControls={false}
+  />
+) : (
+  <Image
+    source={{ uri: currentStory.media_url }}
+    style={styles.postCardImage}
+    resizeMode="cover"
+  />
+)}
+
 
         {/* Rating */}
         {currentStory.from_post.rating > 0 && (
@@ -1488,6 +1520,11 @@ tapHintText: {
   paddingBottom: 80,
   zIndex: 50,
 },
+postCardVideo: {
+  width: '100%',
+  aspectRatio: 1,
+  backgroundColor: '#000',
+},
 postCard: {
   width: SCREEN_WIDTH * 0.82,
   backgroundColor: '#fff',
@@ -1523,13 +1560,22 @@ postCardTime: {
 postCardImage: {
   width: '100%',
   aspectRatio: 1,
-  backgroundColor: '#f5f5f5',
+  backgroundColor: '#000',
 },
 postCardDetail: {
   paddingHorizontal: 14,
   paddingVertical: 12,
   borderTopWidth: 1,
   borderTopColor: '#f0f0f0',
+},
+backgroundVideo: {
+  width: '100%',
+  height: '100%',
+  opacity: 0.6,
+},
+videoBlurOverlay: {
+  ...StyleSheet.absoluteFillObject,
+  backgroundColor: 'rgba(0, 0, 0, 0.4)',
 },
 postCardLabel: {
   fontSize: 11,
