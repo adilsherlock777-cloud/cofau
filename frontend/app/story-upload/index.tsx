@@ -12,113 +12,78 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import axios from 'axios';
-import Constants from 'expo-constants';
 import { useAuth } from '../../context/AuthContext';
-
-import { BACKEND_URL } from '../../utils/imageUrlFix';
-
-const API_URL = `${BACKEND_URL}/api`;
 
 export default function StoryUploadScreen() {
   const router = useRouter();
   const { token } = useAuth();
-  const [uploading, setUploading] = useState(false);
 
   const handleTakePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images', 'videos'],
-        allowsEditing: true,
-        quality: 0.8,
-        videoMaxDuration: 30, // 30 seconds max
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await uploadStory(result.assets[0].uri, result.assets[0].type);
-      }
-    } catch (error) {
-      console.error('❌ Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo');
+  try {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+      return;
     }
-  };
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,  // We'll edit in our editor screen
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      // Navigate to editor screen with the image
+      router.push({
+        pathname: '/story-editor',
+        params: {
+          imageUri: result.assets[0].uri,
+          mediaType: 'image',
+        },
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error taking photo:', error);
+    Alert.alert('Error', 'Failed to take photo');
+  }
+};
 
   const handleChooseFromGallery = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Photo library permission is required.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'],
-        allowsEditing: true,
-        quality: 0.8,
-        videoMaxDuration: 30,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await uploadStory(result.assets[0].uri, result.assets[0].type);
-      }
-    } catch (error) {
-      console.error('❌ Error choosing from gallery:', error);
-      Alert.alert('Error', 'Failed to choose media');
+  try {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Photo library permission is required.');
+      return;
     }
-  };
 
-  const uploadStory = async (uri, mediaType) => {
-    setUploading(true);
-    try {
-      console.log('📤 Uploading story:', uri);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsEditing: true,  // We'll edit in our editor screen
+      quality: 0.8,
+      videoMaxDuration: 30,
+    });
 
-      const formData = new FormData();
-      
-      // Extract filename and create file object
-      const filename = uri.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = mediaType === 'video' 
-        ? 'video/mp4' 
-        : match ? `image/${match[1]}` : 'image/jpeg';
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const isVideo = asset.type === 'video' || 
+                      asset.uri.includes('.mp4') || 
+                      asset.uri.includes('.mov');
 
-      formData.append('file', {
-        uri,
-        name: filename || 'story.jpg',
-        type,
-      });
-
-      const response = await axios.post(
-        `${API_URL}/stories/upload`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
-
-      console.log('✅ Story uploaded:', response.data);
-      
-      Alert.alert('Success', 'Story added!', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
+      // Navigate to editor screen with the media
+      router.push({
+        pathname: '/story-editor',
+        params: {
+          imageUri: asset.uri,
+          mediaType: isVideo ? 'video' : 'image',
         },
-      ]);
-    } catch (error) {
-      console.error('❌ Error uploading story:', error.response?.data || error.message);
-      Alert.alert('Error', 'Failed to upload story. Please try again.');
-    } finally {
-      setUploading(false);
+      });
     }
-  };
+  } catch (error) {
+    console.error('❌ Error choosing from gallery:', error);
+    Alert.alert('Error', 'Failed to choose media');
+  }
+};
+
 
   return (
     <Modal
@@ -142,7 +107,6 @@ export default function StoryUploadScreen() {
             <TouchableOpacity
               style={styles.optionButton}
               onPress={handleTakePhoto}
-              disabled={uploading}
             >
               <View style={styles.optionIconContainer}>
                 <Ionicons name="camera" size={32} color="#4dd0e1" />
@@ -153,7 +117,6 @@ export default function StoryUploadScreen() {
             <TouchableOpacity
               style={styles.optionButton}
               onPress={handleChooseFromGallery}
-              disabled={uploading}
             >
               <View style={styles.optionIconContainer}>
                 <Ionicons name="images" size={32} color="#4dd0e1" />
@@ -162,13 +125,6 @@ export default function StoryUploadScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Loading Indicator */}
-          {uploading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4dd0e1" />
-              <Text style={styles.loadingText}>Uploading story...</Text>
-            </View>
-          )}
         </View>
       </View>
     </Modal>

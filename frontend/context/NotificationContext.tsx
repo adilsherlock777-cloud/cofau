@@ -55,10 +55,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
 
     return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
-      }
-    };
+  if (notificationListener.current && notificationListener.current.remove) {
+    notificationListener.current.remove();
+  }
+};
   }, [isAuthenticated, token, refreshUnreadCount]);
 
   // Refresh count periodically (every 30 seconds when app is active)

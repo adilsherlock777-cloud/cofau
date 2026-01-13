@@ -18,6 +18,7 @@ import {
   Share,
   KeyboardAvoidingView,
   Keyboard,
+  Linking,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -74,6 +75,8 @@ export default function StoryViewerScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState(false);
+  const [locationName, setLocationName] = useState<string | null>(null);
+  const [mapLink, setMapLink] = useState<string | null>(null);
 
   const progressAnims = useRef<any[]>([]);
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -297,6 +300,12 @@ const handleSendStoryReply = async () => {
     }
   };
 
+  const handleOpenLocation = () => {
+  if (mapLink) {
+    Linking.openURL(mapLink);
+  }
+};
+
   /* ----------------------------------------------------------
      LOAD STORIES FROM PARAMS
   -----------------------------------------------------------*/
@@ -380,6 +389,8 @@ useEffect(() => {
     setActualMediaType(stories[currentIndex].media_type);
     setMediaLoading(true);
     setMediaError(false);
+    setLocationName(stories[currentIndex].location_name || null);
+    setMapLink(stories[currentIndex].map_link || null);
     loadStoryViews(stories[currentIndex].id);
     
     // Check if story is liked (only for non-owners)
@@ -958,6 +969,28 @@ const handlePrevious = () => {
           )
         )}
 
+        {/* Location Button */}
+        {locationName && mapLink && (
+          <TouchableOpacity
+            style={[
+              styles.locationButton,
+              contentLayout.height > 0 ? {
+                position: 'absolute',
+                bottom: undefined,
+                top: contentLayout.y + contentLayout.height - 80,
+                left: 16,
+              } : {}
+            ]}
+            onPress={handleOpenLocation}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="location" size={16} color="#333" />
+            <Text style={styles.locationButtonText} numberOfLines={1}>
+              {locationName}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* COFAU Watermark */}
         <Text style={[
           styles.watermark,
@@ -1469,6 +1502,30 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginTop: 5,
+  },
+  locationButton: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 6,
+    maxWidth: SCREEN_WIDTH * 0.7,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
+  },
+  locationButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
   },
   cancelButtonText: {
     fontSize: 16,
