@@ -183,6 +183,8 @@ async def upload_story(
             }
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Error uploading story: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload story: {str(e)}")
@@ -273,14 +275,8 @@ async def get_stories_feed(
                         story_data["shared_from"] = s.get("shared_from")
                     
                     formatted_stories.append(story_data)
-                    
-                    # Include shared story information if it's a shared story
-                    if s.get("is_shared"):
-                        story_data["is_shared"] = True
-                        story_data["shared_from"] = s.get("shared_from")
-                    
-                    formatted_stories.append(story_data)
                 
+                # Add user and their stories to result
                 result.append({
                     "user": {
                         "id": str(user["_id"]),
@@ -303,6 +299,7 @@ async def get_stories_feed(
     except Exception as e:
         print(f"❌ Error fetching stories feed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch stories: {str(e)}")
+
 
 @router.post("/create-from-post")
 async def create_story_from_post(
@@ -356,6 +353,7 @@ async def create_story_from_post(
     except Exception as e:
         print("❌ Error creating story from post:", e)
         raise HTTPException(status_code=500, detail="Failed to create story")
+
 
 @router.get("/user/{user_id}")
 async def get_user_stories(
@@ -647,6 +645,7 @@ async def get_story_views(
         print(f"❌ Error getting story views: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get story views: {str(e)}")
 
+
 @router.post("/{story_id}/share")
 async def share_story(
     story_id: str,
@@ -725,6 +724,7 @@ async def share_story(
     except Exception as e:
         print(f"❌ Error sharing story: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to share story: {str(e)}")
+
 
 # ==================== STORY LIKE ENDPOINTS ====================
 
@@ -831,5 +831,3 @@ async def unlike_story(
     except Exception as e:
         print(f"❌ Error unliking story: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to unlike story: {str(e)}")
-
-
