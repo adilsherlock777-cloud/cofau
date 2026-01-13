@@ -1903,6 +1903,22 @@ if (loading) {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
+              {/* ✅ ADD THIS: Blocked Users */}
+        <TouchableOpacity
+          style={styles.sidebarMenuItem}
+          onPress={() => {
+            setSettingsModalVisible(false);
+            router.push('/blocked-users');
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={styles.sidebarMenuIconContainer}>
+            <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
+          </View>
+          <Text style={styles.sidebarMenuText}>Blocked Users</Text>
+          <Ionicons name="chevron-forward" size={20} color="#999" />
+        </TouchableOpacity>
+
               {/* Settings */}
               <TouchableOpacity
                 style={styles.sidebarMenuItem}

@@ -37,6 +37,7 @@ sharePostToUsers,
 addPostToStory,
 followUser,
 unfollowUser,
+blockUser,
 } from "../utils/api";
 import {
 normalizeMediaUrl,
@@ -91,6 +92,7 @@ const dimensionCache = useRef({});
 const [lastTap, setLastTap] = useState(0);
 const [showHeartAnimation, setShowHeartAnimation] = useState(false);
 const [showCommentsModal, setShowCommentsModal] = useState(false);
+const [isBlocked, setIsBlocked] = useState(post.is_blocked || false);
 
 // Update isFollowing state when post data changes
 useEffect(() => {
@@ -307,6 +309,73 @@ setFollowLoading(false);
 }
 };
 
+// Keep the simple block handler - no unblock in FeedCard
+const handleBlockUser = async () => {
+  if (!post.user_id || isOwnPost) return;
+
+  Alert.alert(
+    "Block User",
+    `Are you sure you want to block ${post.username || "this user"}? You won't see their posts anywhere in the app.`,
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Block",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await blockUser(post.user_id);
+            Alert.alert(
+              "Success", 
+              `${post.username || "User"} has been blocked. You can unblock them from Settings > Blocked Users.`
+            );
+            // Optionally: trigger a feed refresh or remove the post from view
+            // You could call a parent callback here to refresh the feed
+          } catch (error) {
+            console.error("Error blocking user:", error);
+            Alert.alert("Error", "Failed to block user. Please try again.");
+          }
+        },
+      },
+    ]
+  );
+};
+
+// Update options menu - only show Block option
+{showOptionsMenu && (
+  <View style={styles.optionsMenuOverlay}>
+    {/* Block User Option */}
+    {!isOwnPost && (
+      <TouchableOpacity
+        style={styles.optionsMenuItem}
+        onPress={() => {
+          setShowOptionsMenu(false);
+          handleBlockUser();
+        }}
+      >
+        <Ionicons name="ban-outline" size={20} color="#FF6B6B" />
+        <Text style={[styles.optionsMenuText, { color: '#FF6B6B' }]}>
+          Block User
+        </Text>
+      </TouchableOpacity>
+    )}
+    
+    {/* Report Post Option */}
+    <TouchableOpacity
+      style={styles.optionsMenuItem}
+      onPress={() => {
+        setShowOptionsMenu(false);
+        setShowReportModal(true);
+      }}
+    >
+      <Ionicons name="flag-outline" size={20} color="#E94A37" />
+      <Text style={styles.optionsMenuText}>Report Post</Text>
+    </TouchableOpacity>
+  </View>
+)}
+
 const handleDoubleTap = () => {
   const now = Date.now();
   const DOUBLE_TAP_DELAY = 300; // milliseconds
@@ -369,18 +438,35 @@ onPress={() => setShowOptionsMenu(!showOptionsMenu)}
 
 {/* Options Menu Modal */}
 {showOptionsMenu && (
-<View style={styles.optionsMenuOverlay}>
-<TouchableOpacity
-style={styles.optionsMenuItem}
-onPress={() => {
-setShowOptionsMenu(false);
-setShowReportModal(true);
-}}
->
-<Ionicons name="flag-outline" size={20} color="#E94A37" />
-<Text style={styles.optionsMenuText}>Report Post</Text>
-</TouchableOpacity>
-</View>
+  <View style={styles.optionsMenuOverlay}>
+    {/* Block User Option - Only show if not own post */}
+    {!isOwnPost && (
+      <TouchableOpacity
+        style={styles.optionsMenuItem}
+        onPress={() => {
+          setShowOptionsMenu(false);
+          handleBlockUser();
+        }}
+      >
+        <Ionicons name="ban-outline" size={20} color="#FF6B6B" />
+        <Text style={[styles.optionsMenuText, { color: '#FF6B6B' }]}>
+          Block User
+        </Text>
+      </TouchableOpacity>
+    )}
+    
+    {/* Report Post Option */}
+    <TouchableOpacity
+      style={styles.optionsMenuItem}
+      onPress={() => {
+        setShowOptionsMenu(false);
+        setShowReportModal(true);
+      }}
+    >
+      <Ionicons name="flag-outline" size={20} color="#E94A37" />
+      <Text style={styles.optionsMenuText}>Report Post</Text>
+    </TouchableOpacity>
+  </View>
 )}
 
 {/* Report Modal */}

@@ -1022,9 +1022,16 @@ async def get_feed(
     - "chronological": Sort by created_at (newest first) - traditional feed
     """
     db = get_database()
+
+    blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
     
     # Build query - filter by category/categories if provided
     query = {}
+
+       # ✅ ADD THIS: Exclude blocked users
+    if blocked_user_ids:
+        query["user_id"] = {"$nin": blocked_user_ids}
+
     import re
     import random
 
@@ -1034,8 +1041,12 @@ async def get_feed(
         if category_list:
             # Match ANY of the selected categories (case-insensitive)
             regex_patterns = [{"category": {"$regex": re.escape(cat), "$options": "i"}} for cat in category_list]
-            query["$or"] = regex_patterns
-            print(f"🔍 Filtering posts by categories: {category_list}")
+             if "user_id" in query:
+                query["$and"] = [{"user_id": query["user_id"]}, {"$or": regex_patterns}]
+                del query["user_id"]
+            else:
+                query["$or"] = regex_patterns
+                print(f"🔍 Filtering posts by categories: {category_list}")
 
     # Handle single category (backward compatibility)
     elif category and category.strip() and category.lower() != 'all':
@@ -1171,9 +1182,17 @@ async def get_feed(
 async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
     """Get posts from the last 3 days"""
     db = get_database()
+
+    blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
     
     # Calculate the date 3 days ago
     three_days_ago = datetime.utcnow() - timedelta(days=3)
+
+
+     # ✅ MODIFY THIS: Query posts created in the last 3 days, excluding blocked users
+    query = {"created_at": {"$gte": three_days_ago}}
+    if blocked_user_ids:
+        query["user_id"] = {"$nin": blocked_user_ids}
     
     # Query posts created in the last 3 days
     posts = await db.posts.find({
@@ -1641,10 +1660,18 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
     """
     db = get_database()
     current_time = datetime.utcnow()
+
+
+    blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
     
     # Fetch more posts than needed for better selection pool
     # Get posts from last 30 days for trending
     thirty_days_ago = current_time - timedelta(days=30)
+
+    # ✅ MODIFY THIS: Exclude blocked users
+    query = {"created_at": {"$gte": thirty_days_ago}}
+    if blocked_user_ids:
+        query["user_id"] = {"$nin": blocked_user_ids}
     
     all_posts = await db.posts.find({
         "created_at": {"$gte": thirty_days_ago}
@@ -1715,6 +1742,13 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
     """Get top-rated posts (rating >= 8) with freshness and randomness"""
     db = get_database()
     current_time = datetime.utcnow()
+
+    blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
+
+    # ✅ MODIFY THIS: Get high-rated posts excluding blocked users
+    query = {"rating": {"$gte": 8}}
+    if blocked_user_ids:
+        query["user_id"] = {"$nin": blocked_user_ids}
     
     # Get high-rated posts
     posts = await db.posts.find({"rating": {"$gte": 8}}).to_list(300)
@@ -1808,6 +1842,13 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
     """
     db = get_database()
     current_time = datetime.utcnow()
+
+    blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
+
+     # ✅ MODIFY THIS: Get all posts excluding blocked users
+    query = {}
+    if blocked_user_ids:
+        query["user_id"] = {"$nin": blocked_user_ids}
     
     # Get all posts (limit to reasonable pool for performance)
     all_posts = await db.posts.find().sort("created_at", -1).limit(1000).to_list(1000)
@@ -1871,6 +1912,18 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
     """Get posts filtered by category with diversity algorithm"""
     db = get_database()
     current_time = datetime.utcnow()
+
+    blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
+
+    # ✅ MODIFY THIS: Search in both category field and review_text, excluding blocked users
+    query = {
+        "$or": [
+            {"category": {"$regex": name, "$options": "i"}},
+            {"review_text": {"$regex": name, "$options": "i"}}
+        ]
+    }
+    if blocked_user_ids:
+        query["user_id"] = {"$nin": blocked_user_ids}
     
     # Search in both category field and review_text
     posts = await db.posts.find({
@@ -1982,13 +2035,6 @@ async def search_posts(
     """
     Search posts with intelligent ranking algorithm.
     Searches across: review_text, location_name, and username.
-    Ranking based on:
-    - Exact matches (highest priority)
-    - Partial matches in review_text
-    - Location matches
-    - Username matches
-    - Engagement score (likes + comments + rating)
-    - Recency (newer posts ranked higher)
     """
     if not q or not q.strip():
         return []
@@ -1996,16 +2042,24 @@ async def search_posts(
     db = get_database()
     query = q.strip().lower()
     
-    # Build MongoDB query to search across multiple fields
-    search_regex = {"$regex": query, "$options": "i"}
+    # ✅ ADD THIS: Get blocked user IDs
+    blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
     
-    # Get all posts that match the search query
-    all_posts = await db.posts.find({
+    # Build MongoDB query to search across multiple fields
+    search_regex = {"$regex": query, "$options": "i"}  # ✅ FIXED: Use 'query' instead of 'query_text'
+    
+    # ✅ MODIFY THIS: Exclude blocked users from search
+    search_query = {
         "$or": [
             {"review_text": search_regex},
             {"location_name": search_regex},
         ]
-    }).to_list(None)
+    }
+    if blocked_user_ids:
+        search_query["user_id"] = {"$nin": blocked_user_ids}
+    
+    # Get all posts that match the search query
+    all_posts = await db.posts.find(search_query).to_list(None)  # ✅ FIXED: Use search_query
     
     # Also search by username
     users_matching = await db.users.find({
@@ -2014,10 +2068,12 @@ async def search_posts(
     
     user_ids_matching = [str(u["_id"]) for u in users_matching]
     
-    # Get posts from matching users
-    posts_by_users = await db.posts.find({
-        "user_id": {"$in": user_ids_matching}
-    }).to_list(None)
+    # Get posts from matching users (excluding blocked users)
+    posts_by_users_query = {"user_id": {"$in": user_ids_matching}}
+    if blocked_user_ids:
+        posts_by_users_query["user_id"] = {"$in": [uid for uid in user_ids_matching if uid not in blocked_user_ids]}
+    
+    posts_by_users = await db.posts.find(posts_by_users_query).to_list(None)
     
     # Combine and deduplicate posts
     all_post_ids = set()
@@ -2868,3 +2924,81 @@ async def share_preview(post_id: str):
 # Debug endpoint for checking data
 from routers import check_data
 app.include_router(check_data.router)
+
+# ==================== BLOCK USER ENDPOINTS ====================
+
+@app.post("/api/users/{user_id}/block")
+async def block_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Block a user - they will be hidden from all feeds"""
+    db = get_database()
+    
+    if user_id == str(current_user["_id"]):
+        raise HTTPException(status_code=400, detail="Cannot block yourself")
+    
+    # Check if already blocked
+    existing_block = await db.blocks.find_one({
+        "blocker_id": str(current_user["_id"]),
+        "blocked_id": user_id
+    })
+    
+    if existing_block:
+        raise HTTPException(status_code=400, detail="User is already blocked")
+    
+    # Add block
+    await db.blocks.insert_one({
+        "blocker_id": str(current_user["_id"]),
+        "blocked_id": user_id,
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "User blocked successfully"}
+
+@app.delete("/api/users/{user_id}/block")
+async def unblock_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Unblock a user - they will appear in feeds again"""
+    db = get_database()
+    
+    result = await db.blocks.delete_one({
+        "blocker_id": str(current_user["_id"]),
+        "blocked_id": user_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="User is not blocked")
+    
+    return {"message": "User unblocked successfully"}
+
+@app.get("/api/users/blocked-list")
+async def get_blocked_users(current_user: dict = Depends(get_current_user)):
+    """Get list of blocked users"""
+    db = get_database()
+    
+    # Get all blocks for current user
+    blocks = await db.blocks.find({
+        "blocker_id": str(current_user["_id"])
+    }).to_list(None)
+    
+    result = []
+    for block in blocks:
+        user = await db.users.find_one({"_id": ObjectId(block["blocked_id"])})
+        if user:
+            result.append({
+                "id": str(user["_id"]),
+                "user_id": str(user["_id"]),
+                "full_name": user.get("full_name", "Unknown"),
+                "username": user.get("username") or user.get("full_name", "Unknown"),
+                "profile_picture": user.get("profile_picture"),
+                "level": user.get("level", 1),
+                "blocked_at": block["created_at"]
+            })
+    
+    return result
+
+# Helper function to get blocked user IDs (use in other endpoints)
+async def get_blocked_user_ids(current_user_id: str, db):
+    """Get list of user IDs that current user has blocked"""
+    blocks = await db.blocks.find({
+        "blocker_id": current_user_id
+    }).to_list(None)
+    
+    return [block["blocked_id"] for block in blocks]
