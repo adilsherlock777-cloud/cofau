@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  KeyboardAvoidingView,
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -401,18 +402,27 @@ const handleLocationNameChange = (text: string) => {
 
   // ------------------------------ UI ------------------------------
 
-  return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Post</Text>
-        <View style={styles.headerRight} />
-      </View>
+return (
+  <View style={styles.container}>
+    {/* Header */}
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={24} color="#333" />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Add Post</Text>
+      <View style={styles.headerRight} />
+    </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* Media Upload */}
         <View style={styles.section}>
@@ -529,90 +539,84 @@ const handleLocationNameChange = (text: string) => {
         </View>
 
         {/* FREE GOOGLE MAPS LOCATION */}
-<View style={styles.section}>
-  <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
 
-  <View style={styles.locationInputContainer}>
-    <TextInput
-      style={styles.linkInput}
-      placeholder="Type place name (e.g., Starbucks MG Road)"
-      placeholderTextColor="#999"
-      value={locationName}
-      onChangeText={handleLocationNameChange}
-      onFocus={() => {
-        if (locationSuggestions.length > 0) {
-          setShowSuggestions(true);
-        }
-      }}
-    />
-    
-    {loadingSuggestions && (
-      <ActivityIndicator 
-        size="small" 
-        color="#4ECDC4" 
-        style={styles.suggestionLoader} 
-      />
-    )}
+          <View style={styles.locationInputContainer}>
+            <TextInput
+              style={styles.linkInput}
+              placeholder="Type place name (e.g., Starbucks MG Road)"
+              placeholderTextColor="#999"
+              value={locationName}
+              onChangeText={handleLocationNameChange}
+              onFocus={() => {
+                if (locationSuggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
+            />
+            
+            {loadingSuggestions && (
+              <ActivityIndicator 
+                size="small" 
+                color="#4ECDC4" 
+                style={styles.suggestionLoader} 
+              />
+            )}
 
-    {/* Location Suggestions Dropdown */}
-    {showSuggestions && locationSuggestions.length > 0 && (
-      <View style={styles.suggestionsContainer}>
-        <Text style={styles.suggestionsTitle}>Did you mean?</Text>
-        {locationSuggestions.map((suggestion, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.suggestionItem}
-            onPress={() => selectLocationSuggestion(suggestion)}
-          >
-            <View style={styles.suggestionContent}>
-              <Ionicons name="location" size={18} color="#4ECDC4" />
-              <View style={styles.suggestionTextContainer}>
-                <Text style={styles.suggestionName}>{suggestion.location_name}</Text>
-                <Text style={styles.suggestionMeta}>
-                  {suggestion.post_count} post{suggestion.post_count !== 1 ? 's' : ''} • {suggestion.similarity_score}% match
-                </Text>
+            {/* Location Suggestions Dropdown */}
+            {showSuggestions && locationSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <Text style={styles.suggestionsTitle}>Did you mean?</Text>
+                {locationSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionItem}
+                    onPress={() => selectLocationSuggestion(suggestion)}
+                  >
+                    <View style={styles.suggestionContent}>
+                      <Ionicons name="location" size={18} color="#4ECDC4" />
+                      <View style={styles.suggestionTextContainer}>
+                        <Text style={styles.suggestionName}>{suggestion.location_name}</Text>
+                        <Text style={styles.suggestionMeta}>
+                          {suggestion.post_count} post{suggestion.post_count !== 1 ? 's' : ''} • {suggestion.similarity_score}% match
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#CCC" />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={styles.suggestionItemNew}
+                  onPress={() => {
+                    setShowSuggestions(false);
+                    setLocationSuggestions([]);
+                  }}
+                >
+                  <Ionicons name="add-circle-outline" size={18} color="#666" />
+                  <Text style={styles.suggestionNewText}>Add "{locationName}" as new location</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#CCC" />
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
+            <Ionicons name="map" size={20} color="#4ECDC4" />
+            <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
           </TouchableOpacity>
-        ))}
-        <TouchableOpacity
-          style={styles.suggestionItemNew}
-          onPress={() => {
-            setShowSuggestions(false);
-            setLocationSuggestions([]);
-          }}
-        >
-          <Ionicons name="add-circle-outline" size={18} color="#666" />
-          <Text style={styles.suggestionNewText}>Add "{locationName}" as new location</Text>
-        </TouchableOpacity>
-      </View>
-    )}
-  </View>
 
-  <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
-    <Ionicons name="map" size={20} color="#4ECDC4" />
-    <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
-  </TouchableOpacity>
-
-  <TextInput
-    style={styles.linkInput}
-    placeholder="Or paste existing Google Maps link"
-    placeholderTextColor="#999"
-    value={mapsLink}
-    onChangeText={(t) => {
-      setMapsLink(t);
-    }}
-    autoCapitalize="none"
-    autoCorrect={false}
-  />
-
-  <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
-    <Ionicons name="location" size={20} color="#4ECDC4" />
-    <Text style={styles.mapsButtonText}>Open Location in Maps</Text>
-    <Ionicons name="chevron-forward" size={20} color="#4ECDC4" />
-  </TouchableOpacity>
-</View>
+          <TouchableOpacity 
+            style={[styles.mapsButton, !mapsLink && styles.mapsButtonDisabled]} 
+            onPress={openMaps}
+            disabled={!mapsLink}
+          >
+            <Ionicons name="location" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+            <Text style={[styles.mapsButtonText, !mapsLink && styles.mapsButtonTextDisabled]}>
+              Verify Location
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+          </TouchableOpacity>
+        </View>
 
         {/* POST BUTTON */}
         <TouchableOpacity
@@ -637,85 +641,86 @@ const handleLocationNameChange = (text: string) => {
         <View style={{ height: 20 }} />
 
       </ScrollView>
+    </KeyboardAvoidingView>
 
-      {/* Points Earned Animation */}
-      <PointsEarnedAnimation
-        visible={showPointsAnimation}
-        pointsEarned={pointsEarned}
-        onClose={() => {
-          setShowPointsAnimation(false);
-          router.push('/feed');
-        }}
-      />
+    {/* Points Earned Animation */}
+    <PointsEarnedAnimation
+      visible={showPointsAnimation}
+      pointsEarned={pointsEarned}
+      onClose={() => {
+        setShowPointsAnimation(false);
+        router.push('/feed');
+      }}
+    />
 
-      {/* Category Selection Modal - MULTI-SELECT */}
-      <Modal
-        visible={showCategoryModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.categoryModal}>
-            <View style={styles.categoryModalHeader}>
-              <Text style={styles.categoryModalTitle}>Select Categories</Text>
-              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
+    {/* Category Selection Modal - MULTI-SELECT */}
+    <Modal
+      visible={showCategoryModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowCategoryModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.categoryModal}>
+          <View style={styles.categoryModalHeader}>
+            <Text style={styles.categoryModalTitle}>Select Categories</Text>
+            <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Selected Count */}
+          {categories.length > 0 && (
+            <View style={styles.selectedCountContainer}>
+              <Text style={styles.selectedCountText}>
+                {categories.length} selected
+              </Text>
             </View>
-            
-            {/* Selected Count */}
-            {categories.length > 0 && (
-              <View style={styles.selectedCountContainer}>
-                <Text style={styles.selectedCountText}>
-                  {categories.length} selected
-                </Text>
-              </View>
-            )}
-            
-            <FlatList
-              data={CATEGORIES}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.categoryItem,
-                    categories.includes(item) && styles.categoryItemSelected
-                  ]}
-                  onPress={() => toggleCategory(item)}
-                >
-                  <Text style={[
-                    styles.categoryItemText,
-                    categories.includes(item) && styles.categoryItemTextSelected
-                  ]}>
-                    {item}
-                  </Text>
-                  {categories.includes(item) ? (
-                    <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
-                  ) : (
-                    <Ionicons name="ellipse-outline" size={24} color="#CCC" />
-                  )}
-                </TouchableOpacity>
-              )}
-              contentContainerStyle={styles.categoryList}
-            />
-            
-            {/* Done Button */}
-            <View style={styles.modalFooter}>
-              <TouchableOpacity 
-                style={styles.doneButton}
-                onPress={() => setShowCategoryModal(false)}
+          )}
+          
+          <FlatList
+            data={CATEGORIES}
+            keyExtractor={(item) => item}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.categoryItem,
+                  categories.includes(item) && styles.categoryItemSelected
+                ]}
+                onPress={() => toggleCategory(item)}
               >
-                <Text style={styles.doneButtonText}>
-                  Done {categories.length > 0 ? `(${categories.length})` : ''}
+                <Text style={[
+                  styles.categoryItemText,
+                  categories.includes(item) && styles.categoryItemTextSelected
+                ]}>
+                  {item}
                 </Text>
+                {categories.includes(item) ? (
+                  <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+                ) : (
+                  <Ionicons name="ellipse-outline" size={24} color="#CCC" />
+                )}
               </TouchableOpacity>
-            </View>
+            )}
+            contentContainerStyle={styles.categoryList}
+          />
+          
+          {/* Done Button */}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity 
+              style={styles.doneButton}
+              onPress={() => setShowCategoryModal(false)}
+            >
+              <Text style={styles.doneButtonText}>
+                Done {categories.length > 0 ? `(${categories.length})` : ''}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    </View>
-  );
+      </View>
+    </Modal>
+  </View>
+);
 }
 
 const styles = StyleSheet.create({
@@ -1010,6 +1015,14 @@ suggestionNewText: {
     fontWeight: 'bold',
     color: '#333',
   },
+  mapsButtonDisabled: {
+  backgroundColor: '#F5F5F5',
+  borderColor: '#E0E0E0',
+},
+
+mapsButtonTextDisabled: {
+  color: '#CCC',
+},
   selectedCountContainer: {
     paddingHorizontal: 20,
     paddingVertical: 10,
