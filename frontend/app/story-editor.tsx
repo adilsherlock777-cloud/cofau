@@ -345,24 +345,19 @@ return (
             <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
           </TouchableOpacity>
 
-          {/* Or Paste Link */}
-          <TextInput
-            style={styles.locationInput}
-            placeholder="Or paste existing Google Maps link"
-            placeholderTextColor="#999"
-            value={mapsLink}
-            onChangeText={setMapsLink}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
 
-          {/* Open in Maps */}
-          {mapsLink ? (
-            <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
-              <Ionicons name="open-outline" size={20} color="#4ECDC4" />
-              <Text style={styles.mapsButtonText}>Open in Google Maps</Text>
-            </TouchableOpacity>
-          ) : null}
+          {/* Verify Location */}
+<TouchableOpacity 
+  style={[styles.mapsButton, !mapsLink && styles.mapsButtonDisabled]} 
+  onPress={openMaps}
+  disabled={!mapsLink}
+>
+  <Ionicons name="location" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+  <Text style={[styles.mapsButtonText, !mapsLink && styles.mapsButtonTextDisabled]}>
+    Verify Location
+  </Text>
+  <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+</TouchableOpacity>
         </View>
       )}
 
@@ -538,6 +533,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
+  mapsButtonDisabled: {
+  backgroundColor: '#F5F5F5',
+},
+mapsButtonTextDisabled: {
+  color: '#CCC',
+},
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
