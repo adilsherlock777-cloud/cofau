@@ -455,6 +455,7 @@ const renderPost = useCallback(
             </Text>
 
             <TouchableOpacity
+              style={styles.leftIcon} 
               onPress={() => router.push("/notifications")}
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
