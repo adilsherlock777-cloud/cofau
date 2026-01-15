@@ -16,9 +16,23 @@ Notifications.setNotificationHandler({
       shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowBanner: true,
+      priority: Notifications.AndroidNotificationPriority.MAX,
     };
   },
 });
+
+// Create notification channel for Android
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#E94A37',
+    sound: 'default',
+    enableVibrate: true,
+    showBadge: true,
+  });
+}
 
 /**
  * Register for push notifications and get the device token
