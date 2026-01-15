@@ -9,38 +9,42 @@ const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    // Show notification even when app is in foreground
     console.log('📬 Notification received in foreground:', notification);
     return {
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
-      shouldShowBanner: true,
       priority: Notifications.AndroidNotificationPriority.MAX,
     };
   },
 });
 
-// Create notification channel for Android
-if (Platform.OS === 'android') {
-  Notifications.setNotificationChannelAsync('default', {
-    name: 'Default',
-    importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#E94A37',
-    sound: 'default',
-    enableVibrate: true,
-    showBadge: true,
-  });
+// Ensure Android notification channel exists
+async function ensureNotificationChannel() {
+  if (Platform.OS === 'android') {
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Default Notifications',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#E94A37',
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+      });
+      console.log('✅ Android notification channel created');
+    } catch (error) {
+      console.error('❌ Failed to create notification channel:', error);
+    }
+  }
 }
 
-/**
- * Register for push notifications and get the device token
- * This works even when app is in background or closed
- */
+// Create channel immediately when module loads
+ensureNotificationChannel();
+
 export async function registerForPushNotificationsAsync(token, retryCount = 0) {
   const MAX_RETRIES = 3;
-  const RETRY_DELAY = 2000; // 2 seconds
+  const RETRY_DELAY = 2000;
 
   if (!Device.isDevice) {
     console.log('⚠️ Push notifications only work on physical devices');
@@ -53,6 +57,9 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
   }
 
   try {
+    // Ensure channel exists before registering
+    await ensureNotificationChannel();
+
     // Request permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
@@ -82,7 +89,7 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
 
     console.log('📱 Expo Push Token:', expoPushToken.data);
 
-    // Register token with backend with retry logic
+    // Register token with backend
     if (token && expoPushToken.data) {
       let registered = false;
       
@@ -96,7 +103,7 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
             },
             {
               headers: { Authorization: `Bearer ${token}` },
-              timeout: 10000, // 10 second timeout
+              timeout: 10000,
             }
           );
           
@@ -112,10 +119,10 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
           
           if (status === 401) {
             console.log('⚠️ Push notification registration failed - user not authenticated');
-            break; // Don't retry auth errors
+            break;
           } else if (status === 404) {
             console.log('⚠️ Push notification endpoint not found');
-            break; // Don't retry 404 errors
+            break;
           } else {
             if (isLastAttempt) {
               console.error('❌ Error registering device token after retries:', error.response?.data || error.message);
@@ -128,7 +135,6 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
       }
 
       if (!registered && retryCount < MAX_RETRIES) {
-        // If registration failed, try again after a delay (for app startup scenarios)
         console.log(`🔄 Retrying token registration in ${RETRY_DELAY * 2}ms...`);
         setTimeout(() => {
           registerForPushNotificationsAsync(token, retryCount + 1);
@@ -140,7 +146,6 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
   } catch (error) {
     console.error('❌ Error registering for push notifications:', error);
     
-    // Retry on unexpected errors
     if (retryCount < MAX_RETRIES) {
       console.log(`🔄 Retrying push notification registration in ${RETRY_DELAY * 2}ms...`);
       setTimeout(() => {
@@ -152,34 +157,22 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
   }
 }
 
-/**
- * Setup notification listeners
- * Handles notifications when app is in foreground, background, or completely closed
- */
 export function setupNotificationListeners(navigation) {
   console.log('🔔 Setting up notification listeners...');
 
-  // Handle notification received while app is in foreground
   const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
     console.log('📬 Notification received in foreground:', notification);
     const data = notification.request.content.data;
     console.log('   Type:', data?.type);
     console.log('   From:', data?.fromUserName || data?.fromUserId);
-    
-    // Badge count will be handled automatically by Expo
-    // The notification will be shown based on the handler configuration
   });
 
-  // Handle notification tapped/opened (works for foreground, background, and killed app)
   const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
     console.log('👆 Notification tapped:', response);
     const data = response.notification.request.content.data;
     
-    // Wait a bit for navigation to be ready
     setTimeout(() => {
       try {
-        // Navigate based on notification type
-        // Note: navigation is actually the router from expo-router
         if (data?.type === 'message' && data?.fromUserId) {
           console.log('   Navigating to chat with:', data.fromUserId);
           navigation?.push(`/chat/${data.fromUserId}`);
@@ -208,13 +201,11 @@ export function setupNotificationListeners(navigation) {
     }, 500);
   });
 
-  // Handle notifications when app is opened from a killed state
   Notifications.getLastNotificationResponseAsync().then((response) => {
     if (response) {
       console.log('📱 App opened from notification:', response);
       const data = response.notification.request.content.data;
       
-      // Navigate after app is fully loaded
       setTimeout(() => {
         if (data?.type === 'message' && data?.fromUserId) {
           navigation?.push(`/chat/${data.fromUserId}`);
@@ -235,7 +226,6 @@ export function setupNotificationListeners(navigation) {
 
   return () => {
     console.log('🔕 Cleaning up notification listeners...');
-    // The subscription objects have a remove() method
     if (notificationListener && notificationListener.remove) {
       notificationListener.remove();
     }
@@ -246,9 +236,6 @@ export function setupNotificationListeners(navigation) {
   };
 }
 
-/**
- * Send a local notification (for testing)
- */
 export async function sendLocalNotification(title, body, data = {}) {
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -257,7 +244,6 @@ export async function sendLocalNotification(title, body, data = {}) {
       data,
       sound: true,
     },
-    trigger: null, // Show immediately
+    trigger: null,
   });
 }
-
