@@ -45,24 +45,34 @@ async def send_push_notification(
             "data": data or {},
             "priority": "high",
             "channelId": "default",
-            # Ensure notification shows even when app is closed
-            "badge": 1,  # Set badge count (can be updated by app)
+            "badge": 1,
+            "_displayInForeground": True,
+            "mutableContent": True,
         }
-        
+
         # Additional configuration for Android
-        # These ensure notifications work when app is in background or closed
         message["android"] = {
             "priority": "high",
             "channelId": "default",
             "sound": "default",
+            "notification": {
+                "channelId": "default",
+                "priority": "max",
+                "sound": "default",
+                "vibrateTimingsMillis": [0, 250, 250, 250],
+                "defaultVibrateTimings": False,
+                "defaultSound": True,
+                "visibility": "public",
+                "notificationCount": 1,
+            }
         }
-        
+
         # Additional configuration for iOS
         message["ios"] = {
             "sound": "default",
             "badge": 1,
         }
-        
+
         messages.append(message)
     
     try:
@@ -198,4 +208,3 @@ async def register_device_token(user_id: str, device_token: str, platform: str =
         import traceback
         traceback.print_exc()
         return False
-
