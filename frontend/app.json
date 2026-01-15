@@ -26,22 +26,24 @@
       }
     },
     "android": {
-      "package": "com.cofau.app",
-      "versionCode": 2,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      },
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "INTERNET",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
-      ],
-      "allowBackup": false
-    },
+  "package": "com.cofau.app",
+  "versionCode": 2,
+  "googleServicesFile": "./google-services.json",
+  "useNextNotificationsApi": true,
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/images/adaptive-icon.png",
+    "backgroundColor": "#FFFFFF"
+  },
+  "permissions": [
+    "CAMERA",
+    "READ_EXTERNAL_STORAGE",
+    "WRITE_EXTERNAL_STORAGE",
+    "INTERNET",
+    "RECEIVE_BOOT_COMPLETED",
+    "VIBRATE"
+  ],
+  "allowBackup": false
+},
     "web": {
       "bundler": "metro",
       "output": "static",
