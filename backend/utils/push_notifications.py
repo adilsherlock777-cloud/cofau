@@ -152,7 +152,8 @@ async def get_user_device_tokens(user_id: str) -> List[str]:
 
 async def register_device_token(user_id: str, device_token: str, platform: str = "unknown"):
     """
-    Register a device token for a user
+    Register a device token for a user.
+    IMPORTANT: Removes token from other users first to prevent duplicate notifications.
     
     Args:
         user_id: User ID
@@ -160,7 +161,7 @@ async def register_device_token(user_id: str, device_token: str, platform: str =
         platform: Platform (ios, android, web)
         
     Returns:
-        bool: True if token was successfully registered (or already exists)
+        bool: True if token was successfully registered
     """
     if not device_token:
         print(f"⚠️ Empty device token provided for user {user_id}")
@@ -175,11 +176,20 @@ async def register_device_token(user_id: str, device_token: str, platform: str =
             print(f"❌ User {user_id} not found when registering device token")
             return False
         
-        # Check if token already exists
-        existing_tokens = user.get("device_tokens", [])
-        token_exists = device_token in existing_tokens
+        # ✅ IMPORTANT: Remove this token from ALL other users first
+        # This prevents the same device from receiving notifications for multiple accounts
+        remove_result = await db.users.update_many(
+            {
+                "_id": {"$ne": ObjectId(user_id)},  # All users EXCEPT current user
+                "device_tokens": device_token
+            },
+            {"$pull": {"device_tokens": device_token}}
+        )
         
-        # Add token to user's device_tokens array (avoid duplicates)
+        if remove_result.modified_count > 0:
+            print(f"🧹 Removed device token from {remove_result.modified_count} other user(s)")
+        
+        # Now add token to current user's device_tokens array (avoid duplicates)
         result = await db.users.update_one(
             {"_id": ObjectId(user_id)},
             {
@@ -188,16 +198,12 @@ async def register_device_token(user_id: str, device_token: str, platform: str =
             }
         )
         
-        # Verify the update succeeded by checking matched_count
         if result.matched_count > 0:
             if result.modified_count > 0:
                 print(f"✅ Device token registered for user {user_id} (platform: {platform})")
                 print(f"   Token: {device_token[:50]}...")
-            elif token_exists:
-                print(f"ℹ️ Device token already registered for user {user_id}")
             else:
-                # Token was already there (race condition or duplicate)
-                print(f"ℹ️ Device token verified for user {user_id}")
+                print(f"ℹ️ Device token already registered for user {user_id}")
             return True
         else:
             print(f"❌ Failed to register device token - user not found: {user_id}")
