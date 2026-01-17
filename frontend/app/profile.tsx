@@ -434,8 +434,19 @@ export default function ProfileScreen() {
       setEditedBio(user.bio || '');
       setEditedName(user.full_name || user.username || '');
 
-      const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
-      setUserStats(statsResponse.data);
+      // Fetch stats - wrap in try-catch for restaurant accounts
+try {
+  const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
+  setUserStats(statsResponse.data);
+} catch (statsError) {
+  console.log('⚠️ Stats fetch failed (might be restaurant account):', statsError);
+  // Set default stats for restaurants
+  setUserStats({
+    total_posts: 0,
+    followers_count: userData?.followers_count || 0,
+    following_count: userData?.following_count || 0,
+  });
+}
 
       setError(false);
     } catch (err: any) {
@@ -1127,36 +1138,31 @@ const renderRestaurantProfile = () => {
 
         {/* ================= BANNER IMAGE ================= */}
         <TouchableOpacity
-          style={restaurantStyles.bannerContainer}
-          onPress={() => {
-            if (isOwnProfile) {
-              // TODO: Handle banner upload
-              Alert.alert('Upload Banner', 'Banner upload coming soon!');
-            }
-          }}
-          activeOpacity={isOwnProfile ? 0.8 : 1}
-        >
-          {bannerImage || userData?.cover_image ? (
-            <Image
-              source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
-              style={restaurantStyles.bannerImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <LinearGradient
-              colors={['#E94A37', '#F2CF68', '#1B7C82']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={restaurantStyles.bannerPlaceholder}
-            >
-              {isOwnProfile && (
-                <View style={restaurantStyles.bannerEditIcon}>
-                  <Ionicons name="camera" size={24} color="#fff" />
-                  <Text style={restaurantStyles.bannerEditText}>Add Cover Photo</Text>
-                </View>
-              )}
-            </LinearGradient>
-          )}
+  style={restaurantStyles.bannerContainer}
+  onPress={() => {
+    if (isOwnProfile) {
+      Alert.alert('Upload Banner', 'Banner upload coming soon!');
+    }
+  }}
+  activeOpacity={isOwnProfile ? 0.8 : 1}
+>
+  {bannerImage || userData?.cover_image ? (
+    <Image
+      source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
+      style={restaurantStyles.bannerImage}
+      resizeMode="cover"
+    />
+  ) : (
+    // Change from LinearGradient to View with grey background
+    <View style={restaurantStyles.bannerPlaceholder}>
+      {isOwnProfile && (
+        <View style={restaurantStyles.bannerEditIcon}>
+          <Ionicons name="camera" size={24} color="#999" />
+          <Text style={restaurantStyles.bannerEditText}>Add Cover Photo</Text>
+        </View>
+      )}
+    </View>
+  )}
 
           {/* Edit icon overlay for banner */}
           {isOwnProfile && (bannerImage || userData?.cover_image) && (
@@ -2615,21 +2621,31 @@ if (accountType === 'restaurant') {
 
 /* ================= STYLES ================= */
 
-// Restaurant-specific styles
 const restaurantStyles = StyleSheet.create({
   bannerContainer: {
-    width: '100%',
-    height: 200,
+    marginHorizontal: 20,           // Add side margins
+    marginTop: -40,                 // Overlap with header
+    height: 160,                    // Slightly smaller height
+    borderRadius: 20,               // Rounded corners
+    backgroundColor: '#E0E0E0',     // Grey background (same as DP placeholder)
     position: 'relative',
-    marginTop: -30,
+    overflow: 'visible',            // Allow DP to overflow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   bannerImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 20,               // Match container radius
   },
   bannerPlaceholder: {
     width: '100%',
     height: '100%',
+    borderRadius: 20,
+    backgroundColor: '#E0E0E0',     // Grey color, NOT gradient
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2637,7 +2653,7 @@ const restaurantStyles = StyleSheet.create({
     alignItems: 'center',
   },
   bannerEditText: {
-    color: '#fff',
+    color: '#999',                  // Darker text for grey background
     fontSize: 14,
     marginTop: 8,
     fontWeight: '600',
@@ -2655,8 +2671,8 @@ const restaurantStyles = StyleSheet.create({
   },
   profileOnBanner: {
     position: 'absolute',
-    bottom: -50,
-    alignSelf: 'center',
+    bottom: -50,                    // Half outside the banner
+    left: 20,                       // Positioned on LEFT side
   },
   restaurantAvatar: {
     borderWidth: 4,
@@ -2676,9 +2692,10 @@ const restaurantStyles = StyleSheet.create({
     borderColor: '#fff',
   },
   restaurantInfoContainer: {
-    alignItems: 'center',
+    alignItems: 'flex-start',       // Align to left (next to DP)
     marginTop: 60,
     marginBottom: 10,
+    marginLeft: 140,                // Push to right of DP
   },
   restaurantName: {
     fontSize: 24,

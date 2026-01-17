@@ -1,0 +1,659 @@
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from datetime import datetime
+from bson import ObjectId
+from database import get_database
+from routers.restaurant_auth import get_current_restaurant
+from config import settings
+import os
+import shutil
+
+router = APIRouter(prefix="/api/restaurant/posts", tags=["Restaurant Posts"])
+
+# Restaurant uploads directory
+RESTAURANT_UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "restaurants")
+os.makedirs(RESTAURANT_UPLOAD_DIR, exist_ok=True)
+
+
+@router.post("/create")
+async def create_restaurant_post(
+    price: str = Form(...),
+    about: str = Form(...),
+    map_link: str = Form(None),
+    location_name: str = Form(None),
+    category: str = Form(None),
+    file: UploadFile = File(...),
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Create a new restaurant post (menu item, dish, etc.)"""
+    db = get_database()
+    
+    # Get file extension
+    file_ext = file.filename.split(".")[-1].lower()
+    
+    # Define allowed extensions
+    ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif"]
+    ALLOWED_VIDEO_EXTENSIONS = ["mp4", "mov", "m4v"]
+    ALL_ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS + ALLOWED_VIDEO_EXTENSIONS
+    
+    if file_ext not in ALL_ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type: {file_ext}. Allowed: {ALL_ALLOWED_EXTENSIONS}"
+        )
+    
+    # Generate unique filename
+    unique_id = str(ObjectId())
+    filename = f"{unique_id}_{file.filename}"
+    file_path = os.path.join(RESTAURANT_UPLOAD_DIR, filename)
+    
+    # Save the file
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Verify file was saved
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=500, detail="Failed to save file")
+        
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            os.remove(file_path)
+            raise HTTPException(status_code=500, detail="File was saved but is empty")
+        
+        print(f"✅ Restaurant file saved: {file_path} (size: {file_size} bytes)")
+    except Exception as e:
+        print(f"❌ Error saving restaurant file: {str(e)}")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # HEIC/HEIF conversion (for iOS photos)
+    if file_ext in ["heic", "heif"]:
+        print(f"📱 iOS HEIC/HEIF detected - converting to JPEG...")
+        try:
+            from PIL import Image
+            import pillow_heif
+            
+            pillow_heif.register_heif_opener()
+            img = Image.open(file_path)
+            
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            new_filename = f"{unique_id}_{os.path.splitext(file.filename)[0]}.jpg"
+            new_file_path = os.path.join(RESTAURANT_UPLOAD_DIR, new_filename)
+            
+            img.save(new_file_path, 'JPEG', quality=90, optimize=True)
+            img.close()
+            
+            os.remove(file_path)
+            
+            file_path = new_file_path
+            filename = new_filename
+            file_ext = "jpg"
+            
+            print(f"✅ Converted HEIC to JPEG: {new_filename}")
+        except ImportError:
+            print("❌ pillow-heif not installed")
+            os.remove(file_path)
+            raise HTTPException(
+                status_code=500,
+                detail="HEIC conversion not available. Please convert to JPEG before uploading."
+            )
+        except Exception as e:
+            print(f"❌ HEIC conversion failed: {str(e)}")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(status_code=500, detail=f"Failed to convert HEIC: {str(e)}")
+    
+    # Detect media type
+    media_type = "video" if file_ext in ["mp4", "mov", "m4v"] else "image"
+    
+    # Video optimization (if needed)
+    thumbnail_url = None
+    if media_type == "video":
+        try:
+            from utils.video_transcode import optimize_video_with_thumbnail
+            
+            video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
+            
+            file_path = video_path
+            filename = os.path.basename(video_path)
+            
+            thumbnail_filename = os.path.basename(thumbnail_path)
+            thumbnail_url = f"/api/static/uploads/restaurants/{thumbnail_filename}"
+            
+            print(f"✅ Restaurant video optimized: {filename}")
+        except Exception as e:
+            print(f"❌ Video optimization failed: {str(e)}")
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+            raise HTTPException(
+                status_code=500,
+                detail=f"Video processing failed: {str(e)}"
+            )
+    
+    # Clean map link
+    clean_map_link = None
+    if map_link:
+        map_link = map_link.strip()
+        if not map_link.startswith("http"):
+            map_link = "https://" + map_link
+        if "google.com/maps" in map_link or "goo.gl/maps" in map_link:
+            clean_map_link = map_link
+    
+    # Media URL for restaurant posts
+    media_url = f"/api/static/uploads/restaurants/{filename}"
+    
+    # Create restaurant post document
+    post_doc = {
+        "restaurant_id": str(current_restaurant["_id"]),
+        "restaurant_name": current_restaurant["restaurant_name"],
+        "media_url": media_url,
+        "image_url": media_url if media_type == "image" else None,
+        "thumbnail_url": thumbnail_url,
+        "media_type": media_type,
+        "price": price.strip(),
+        "about": about.strip(),
+        "map_link": clean_map_link,
+        "location_name": location_name.strip() if location_name else None,
+        "category": category.strip() if category else None,
+        "likes_count": 0,
+        "comments_count": 0,
+        "account_type": "restaurant",
+        "created_at": datetime.utcnow(),
+    }
+    
+    result = await db.restaurant_posts.insert_one(post_doc)
+    post_id = str(result.inserted_id)
+    
+    # Update restaurant's posts count
+    await db.restaurants.update_one(
+        {"_id": current_restaurant["_id"]},
+        {"$inc": {"posts_count": 1}}
+    )
+    
+    print(f"✅ Restaurant post created: {post_id}")
+    
+    return {
+        "message": "Post created successfully",
+        "post_id": post_id,
+    }
+
+
+@router.get("/feed")
+async def get_restaurant_posts_feed(
+    skip: int = 0,
+    limit: int = 30,
+    category: str = None,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Get restaurant posts feed (all restaurant posts)"""
+    db = get_database()
+    
+    query = {}
+    if category and category.strip() and category.lower() != 'all':
+        import re
+        query["category"] = {"$regex": re.escape(category.strip()), "$options": "i"}
+    
+    posts = await db.restaurant_posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        # Get restaurant info
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+        
+        # Check if current restaurant liked this post
+        is_liked = await db.restaurant_likes.find_one({
+            "post_id": str(post["_id"]),
+            "restaurant_id": str(current_restaurant["_id"])
+        }) is not None
+        
+        # Check if saved
+        is_saved = await db.restaurant_saved_posts.find_one({
+            "post_id": str(post["_id"]),
+            "restaurant_id": str(current_restaurant["_id"])
+        }) is not None
+        
+        result.append({
+            "id": str(post["_id"]),
+            "restaurant_id": post["restaurant_id"],
+            "restaurant_name": post.get("restaurant_name") or (restaurant["restaurant_name"] if restaurant else "Unknown"),
+            "restaurant_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "price": post.get("price", ""),
+            "about": post.get("about", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "is_liked_by_user": is_liked,
+            "is_saved_by_user": is_saved,
+            "account_type": "restaurant",
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+        })
+    
+    return result
+
+
+@router.get("/my-posts")
+async def get_my_restaurant_posts(
+    skip: int = 0,
+    limit: int = 50,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Get current restaurant's own posts"""
+    db = get_database()
+    
+    posts = await db.restaurant_posts.find({
+        "restaurant_id": str(current_restaurant["_id"])
+    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        result.append({
+            "id": str(post["_id"]),
+            "restaurant_id": post["restaurant_id"],
+            "restaurant_name": current_restaurant["restaurant_name"],
+            "restaurant_profile_picture": current_restaurant.get("profile_picture"),
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "price": post.get("price", ""),
+            "about": post.get("about", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "account_type": "restaurant",
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+        })
+    
+    return result
+
+
+@router.get("/{post_id}")
+async def get_restaurant_post(
+    post_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Get a single restaurant post by ID"""
+    db = get_database()
+    
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+    
+    is_liked = await db.restaurant_likes.find_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"])
+    }) is not None
+    
+    is_saved = await db.restaurant_saved_posts.find_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"])
+    }) is not None
+    
+    return {
+        "id": str(post["_id"]),
+        "restaurant_id": post["restaurant_id"],
+        "restaurant_name": post.get("restaurant_name") or (restaurant["restaurant_name"] if restaurant else "Unknown"),
+        "restaurant_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+        "media_url": post.get("media_url", ""),
+        "image_url": post.get("image_url"),
+        "thumbnail_url": post.get("thumbnail_url"),
+        "media_type": post.get("media_type", "image"),
+        "price": post.get("price", ""),
+        "about": post.get("about", ""),
+        "map_link": post.get("map_link"),
+        "location_name": post.get("location_name"),
+        "category": post.get("category"),
+        "likes_count": post.get("likes_count", 0),
+        "comments_count": post.get("comments_count", 0),
+        "is_liked_by_user": is_liked,
+        "is_saved_by_user": is_saved,
+        "account_type": "restaurant",
+        "created_at": post["created_at"],
+    }
+
+
+@router.delete("/{post_id}")
+async def delete_restaurant_post(
+    post_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Delete a restaurant post"""
+    db = get_database()
+    
+    # Find the post
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check ownership
+    if post["restaurant_id"] != str(current_restaurant["_id"]):
+        raise HTTPException(status_code=403, detail="You can only delete your own posts")
+    
+    # Get media URL to delete the file
+    media_url = post.get("media_url") or post.get("image_url")
+    
+    # Delete the media file
+    if media_url:
+        try:
+            if "/api/static/uploads/restaurants/" in media_url:
+                filename = media_url.split("/api/static/uploads/restaurants/")[-1]
+                file_path = os.path.join(RESTAURANT_UPLOAD_DIR, filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"✅ Deleted restaurant media file: {file_path}")
+        except Exception as e:
+            print(f"⚠️ Error deleting media file: {e}")
+    
+    # Delete thumbnail if exists
+    thumbnail_url = post.get("thumbnail_url")
+    if thumbnail_url:
+        try:
+            if "/api/static/uploads/restaurants/" in thumbnail_url:
+                thumbnail_filename = thumbnail_url.split("/api/static/uploads/restaurants/")[-1]
+                thumbnail_path = os.path.join(RESTAURANT_UPLOAD_DIR, thumbnail_filename)
+                if os.path.exists(thumbnail_path):
+                    os.remove(thumbnail_path)
+                    print(f"✅ Deleted thumbnail: {thumbnail_path}")
+        except Exception as e:
+            print(f"⚠️ Error deleting thumbnail: {e}")
+    
+    # Delete related data
+    await db.restaurant_likes.delete_many({"post_id": post_id})
+    await db.restaurant_comments.delete_many({"post_id": post_id})
+    await db.restaurant_saved_posts.delete_many({"post_id": post_id})
+    
+    # Delete the post
+    result = await db.restaurant_posts.delete_one({"_id": ObjectId(post_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to delete post")
+    
+    # Update restaurant's posts count
+    await db.restaurants.update_one(
+        {"_id": current_restaurant["_id"]},
+        {"$inc": {"posts_count": -1}}
+    )
+    
+    return {"message": "Post deleted successfully"}
+
+
+# ==================== LIKES ====================
+
+@router.post("/{post_id}/like")
+async def like_restaurant_post(
+    post_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Like a restaurant post"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if already liked
+    existing_like = await db.restaurant_likes.find_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"])
+    })
+    
+    if existing_like:
+        raise HTTPException(status_code=400, detail="Already liked this post")
+    
+    # Add like
+    await db.restaurant_likes.insert_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"]),
+        "created_at": datetime.utcnow()
+    })
+    
+    # Update post likes count
+    await db.restaurant_posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"likes_count": 1}}
+    )
+    
+    return {"message": "Post liked"}
+
+
+@router.delete("/{post_id}/like")
+async def unlike_restaurant_post(
+    post_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Unlike a restaurant post"""
+    db = get_database()
+    
+    result = await db.restaurant_likes.delete_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"])
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Like not found")
+    
+    # Update post likes count
+    await db.restaurant_posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"likes_count": -1}}
+    )
+    
+    return {"message": "Post unliked"}
+
+
+# ==================== SAVE POSTS ====================
+
+@router.post("/{post_id}/save")
+async def save_restaurant_post(
+    post_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Save a restaurant post"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if already saved
+    existing_save = await db.restaurant_saved_posts.find_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"])
+    })
+    
+    if existing_save:
+        raise HTTPException(status_code=400, detail="Post already saved")
+    
+    # Add save
+    await db.restaurant_saved_posts.insert_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"]),
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "Post saved"}
+
+
+@router.delete("/{post_id}/save")
+async def unsave_restaurant_post(
+    post_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Unsave a restaurant post"""
+    db = get_database()
+    
+    result = await db.restaurant_saved_posts.delete_one({
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"])
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Post not saved")
+    
+    return {"message": "Post unsaved"}
+
+
+# ==================== COMMENTS ====================
+
+@router.post("/{post_id}/comment")
+async def add_restaurant_comment(
+    post_id: str,
+    comment_text: str = Form(...),
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Add a comment to a restaurant post"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    comment_doc = {
+        "post_id": post_id,
+        "restaurant_id": str(current_restaurant["_id"]),
+        "restaurant_name": current_restaurant["restaurant_name"],
+        "profile_pic": current_restaurant.get("profile_picture"),
+        "comment_text": comment_text.strip(),
+        "created_at": datetime.utcnow()
+    }
+    
+    result = await db.restaurant_comments.insert_one(comment_doc)
+    
+    # Update post comments count
+    await db.restaurant_posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"comments_count": 1}}
+    )
+    
+    return {"message": "Comment added", "comment_id": str(result.inserted_id)}
+
+
+@router.get("/{post_id}/comments")
+async def get_restaurant_post_comments(post_id: str):
+    """Get all comments for a restaurant post"""
+    db = get_database()
+    
+    comments = await db.restaurant_comments.find({"post_id": post_id}).sort("created_at", -1).to_list(100)
+    
+    result = []
+    for comment in comments:
+        result.append({
+            "id": str(comment["_id"]),
+            "post_id": post_id,
+            "restaurant_id": comment["restaurant_id"],
+            "restaurant_name": comment["restaurant_name"],
+            "profile_pic": comment.get("profile_pic"),
+            "comment_text": comment["comment_text"],
+            "created_at": comment["created_at"]
+        })
+    
+    return result
+
+
+# ==================== PUBLIC ENDPOINTS (No Auth Required) ====================
+
+@router.get("/public/all")
+async def get_all_restaurant_posts_public(
+    skip: int = 0,
+    limit: int = 30,
+    category: str = None
+):
+    """Get all restaurant posts (public - no auth required)"""
+    db = get_database()
+    
+    query = {}
+    if category and category.strip() and category.lower() != 'all':
+        import re
+        query["category"] = {"$regex": re.escape(category.strip()), "$options": "i"}
+    
+    posts = await db.restaurant_posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+        
+        result.append({
+            "id": str(post["_id"]),
+            "restaurant_id": post["restaurant_id"],
+            "restaurant_name": post.get("restaurant_name") or (restaurant["restaurant_name"] if restaurant else "Unknown"),
+            "restaurant_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "price": post.get("price", ""),
+            "about": post.get("about", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "account_type": "restaurant",
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+        })
+    
+    return result
+
+
+@router.get("/public/restaurant/{restaurant_id}")
+async def get_restaurant_posts_by_id_public(
+    restaurant_id: str,
+    skip: int = 0,
+    limit: int = 50
+):
+    """Get posts by a specific restaurant (public - no auth required)"""
+    db = get_database()
+    
+    restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    posts = await db.restaurant_posts.find({
+        "restaurant_id": restaurant_id
+    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        result.append({
+            "id": str(post["_id"]),
+            "restaurant_id": post["restaurant_id"],
+            "restaurant_name": restaurant["restaurant_name"],
+            "restaurant_profile_picture": restaurant.get("profile_picture"),
+            "media_url": post.get("media_url", ""),
+            "image_url": post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "price": post.get("price", ""),
+            "about": post.get("about", ""),
+            "map_link": post.get("map_link"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "account_type": "restaurant",
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+        })
+    
+    return result

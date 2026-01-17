@@ -30,7 +30,8 @@ export default function AddPostScreen() {
   const router = useRouter();
   const { showLevelUpAnimation } = useLevelAnimation();
   const auth = useAuth() as any;
-  const { refreshUser } = auth;
+  const { refreshUser, accountType } = auth;
+  const [price, setPrice] = useState('');
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
@@ -226,118 +227,147 @@ export default function AddPostScreen() {
 
   // ------------------------------ POST SUBMISSION ------------------------------
 
-  const handlePost = async () => {
-    if (!mediaUri || !mediaType) {
-      Alert.alert('Media Required', 'Please add a photo or video.');
-      return;
-    }
+const handlePost = async () => {
+  if (!mediaUri || !mediaType) {
+    Alert.alert('Media Required', 'Please add a photo or video.');
+    return;
+  }
 
-    const numericRating = parseInt(rating, 10);
+  // Validation based on account type
+  let numericRating = 0;
+  
+  if (accountType !== 'restaurant') {
+    numericRating = parseInt(rating, 10);
     if (!numericRating || numericRating < 1 || numericRating > 10) {
       Alert.alert('Rating Required', 'Please add a rating between 1-10.');
       return;
     }
+  }
 
-    if (!review.trim()) {
-      Alert.alert('Review Required', 'Please write a review.');
+  if (accountType === 'restaurant') {
+    if (!price.trim()) {
+      Alert.alert('Price Required', 'Please enter a price.');
       return;
     }
+  }
 
-    if (!mapsLink.trim()) {
-      Alert.alert('Location Required', 'Please generate or paste a Google Maps link.');
-      return;
+  if (!review.trim()) {
+    Alert.alert('Review Required', 'Please write a review.');
+    return;
+  }
+
+  if (!mapsLink.trim()) {
+    Alert.alert('Location Required', 'Please generate or paste a Google Maps link.');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    let fileToUpload;
+
+    if (Platform.OS === 'web') {
+      const response = await fetch(mediaUri);
+      const blob = await response.blob();
+      const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+      const filename = `${mediaType}_${Date.now()}.${ext}`;
+      fileToUpload = new File([blob], filename, {
+        type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+      });
+    } else {
+      const name = mediaUri.split('/').pop() || `media_${Date.now()}`;
+      fileToUpload = {
+        uri: mediaUri,
+        name,
+        type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+      };
     }
 
-    setLoading(true);
+    let result;
 
-    try {
-      let fileToUpload;
+    if (accountType === 'restaurant') {
+      // Restaurant post
+      const postData = {
+        price: price.trim(),
+        about: review.trim(),
+        map_link: mapsLink.trim(),
+        location_name: locationName.trim(),
+        category: categories.length > 0 ? categories.join(', ') : undefined,
+        file: fileToUpload,
+        media_type: mediaType,
+      };
 
-      if (Platform.OS === 'web') {
-        const response = await fetch(mediaUri);
-        const blob = await response.blob();
-        const ext = mediaType === 'video' ? 'mp4' : 'jpg';
-        const filename = `${mediaType}_${Date.now()}.${ext}`;
+      console.log('📤 Sending restaurant post:', postData);
+      result = await createRestaurantPost(postData);
+      
+      // Restaurant doesn't have leveling, just redirect
+      setLoading(false);
+      Alert.alert('Success', 'Post created successfully!', [
+        { text: 'OK', onPress: () => router.replace('/feed') }
+      ]);
+      return;
 
-        fileToUpload = new File([blob], filename, {
-          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-        });
-      } else {
-        const name = mediaUri.split('/').pop() || `media_${Date.now()}`;
-        fileToUpload = {
-          uri: mediaUri,
-          name,
-          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-        };
-      }
-
+    } else {
+      // User post
       const postData = {
         rating: numericRating,
         review_text: review.trim(),
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
-        category: categories.length > 0 ? categories.join(', ') : undefined,  // Join array to string
+        category: categories.length > 0 ? categories.join(', ') : undefined,
         file: fileToUpload,
         media_type: mediaType,
       };
 
-      console.log('📤 Sending post with categories:', categories);
-      console.log('📤 Full post data:', postData);
-
-      const result = await createPost(postData);
-
-      setLoading(false);
-
-      await refreshUser();
-      
-      const oldLevel = auth?.user?.level || 1;
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const userResponse = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${auth?.token}` },
-      });
-      const updatedUser = userResponse.data;
-      const newLevel = updatedUser?.level || oldLevel;
-      
-      const currentLevel = oldLevel;
-      
-      let earnedPoints = 25;
-      if (currentLevel >= 5 && currentLevel <= 8) {
-        earnedPoints = 15;
-      } else if (currentLevel >= 9 && currentLevel <= 12) {
-        earnedPoints = 5;
-      }
-
-      const leveledUp = newLevel > oldLevel;
-
-      if (leveledUp) {
-        showLevelUpAnimation(newLevel);
-        setTimeout(() => {
-          router.replace('/feed');
-        }, 3000);
-        return;
-      }
-
-      if (earnedPoints > 0) {
-        setPointsEarned(earnedPoints);
-        setShowPointsAnimation(true);
-        setTimeout(() => {
-          setShowPointsAnimation(false);
-          router.replace('/feed');
-        }, 3000);
-      } else {
-        setTimeout(() => {
-          router.replace('/feed');
-        }, 500);
-      }
-
-    } catch (error: any) {
-      console.error('❌ Error creating post:', error);
-      setLoading(false);
-      Alert.alert('Error', error?.response?.data?.detail || 'Failed to create post.');
+      console.log('📤 Sending user post with categories:', categories);
+      result = await createPost(postData);
     }
-  };
+
+    setLoading(false);
+    await refreshUser();
+
+    const oldLevel = auth?.user?.level || 1;
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const userResponse = await axios.get(
+      `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/auth/me`,
+      { headers: { Authorization: `Bearer ${auth?.token}` } }
+    );
+    const updatedUser = userResponse.data;
+    const newLevel = updatedUser?.level || oldLevel;
+
+    let earnedPoints = 25;
+    if (oldLevel >= 5 && oldLevel <= 8) {
+      earnedPoints = 15;
+    } else if (oldLevel >= 9 && oldLevel <= 12) {
+      earnedPoints = 5;
+    }
+
+    const leveledUp = newLevel > oldLevel;
+
+    if (leveledUp) {
+      showLevelUpAnimation(newLevel);
+      setTimeout(() => router.replace('/feed'), 3000);
+      return;
+    }
+
+    if (earnedPoints > 0) {
+      setPointsEarned(earnedPoints);
+      setShowPointsAnimation(true);
+      setTimeout(() => {
+        setShowPointsAnimation(false);
+        router.replace('/feed');
+      }, 3000);
+    } else {
+      setTimeout(() => router.replace('/feed'), 500);
+    }
+
+  } catch (error: any) {
+    console.error('❌ Error creating post:', error);
+    setLoading(false);
+    Alert.alert('Error', error?.response?.data?.detail || 'Failed to create post.');
+  }
+};
 
   // ------------------------------ LOCATION SUGGESTIONS ------------------------------
 
@@ -460,31 +490,50 @@ return (
           </TouchableOpacity>
         </View>
 
-        {/* Rating */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Rating</Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.ratingNumber}>{rating || 0}/10</Text>
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                <TouchableOpacity key={n} onPress={() => setRating(n.toString())}>
-                  <Ionicons
-                    name="star"
-                    size={28}
-                    color={n <= Number(rating) ? '#FFD700' : '#E0E0E0'}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
+        {/* Rating - Only for Users */}
+{accountType !== 'restaurant' && (
+  <View style={styles.section}>
+    <Text style={styles.sectionLabel}>Rating</Text>
+    <View style={styles.ratingContainer}>
+      <Text style={styles.ratingNumber}>{rating || '0'} / 10</Text>
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+          <TouchableOpacity key={num} onPress={() => setRating(num.toString())}>
+            <Ionicons
+              name={parseInt(rating) >= num ? 'star' : 'star-outline'}
+              size={28}
+              color={parseInt(rating) >= num ? '#F2CF68' : '#CCC'}
+              style={{ marginRight: 4, marginBottom: 4 }}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  </View>
+)}
+
+{/* Price - Only for Restaurants */}
+{accountType === 'restaurant' && (
+  <View style={styles.section}>
+    <Text style={styles.sectionLabel}>Price</Text>
+    <TextInput
+      style={styles.linkInput}
+      placeholder="Enter price (e.g., ₹250, Free, $15-20)"
+      placeholderTextColor="#999"
+      value={price}
+      onChangeText={setPrice}
+    />
+  </View>
+)}
 
         {/* Review */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Review</Text>
+          <Text style={styles.sectionLabel}>
+  {accountType === 'restaurant' ? 'About' : 'Review'}
+</Text>
           <TextInput
             style={styles.reviewInput}
-            placeholder="Write your review..."
+            placeholder={accountType === 'restaurant' ? 'Write about this dish...' : 'Write your review...'}
             placeholderTextColor="#999"
             value={review}
             onChangeText={setReview}
