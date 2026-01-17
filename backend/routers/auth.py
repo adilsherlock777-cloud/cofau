@@ -29,17 +29,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     if user is None:
         user = await db.restaurants.find_one({"email": email})
         if user:
-            # Add account_type marker and map restaurant fields to user fields
+            # Map restaurant fields to user fields for compatibility
             user["account_type"] = "restaurant"
             user["full_name"] = user.get("restaurant_name", "Restaurant")
             user["username"] = user.get("restaurant_name", "Restaurant")
-            user["level"] = None  # Restaurants don't have levels
+            user["level"] = None
             user["points"] = None
     
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Ensure account_type is set for regular users too
+    # Set account_type for regular users
     if "account_type" not in user:
         user["account_type"] = "user"
     
@@ -158,9 +158,33 @@ async def verify_otp(email: str, otp: str):
     else:
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
-    """Get current user profile"""
+    """Get current user/restaurant profile"""
+    
+    # Check if it's a restaurant account
+    if current_user.get("account_type") == "restaurant":
+        return {
+            "id": str(current_user["_id"]),
+            "full_name": current_user.get("restaurant_name", "Restaurant"),
+            "username": current_user.get("restaurant_name", "Restaurant"),
+            "restaurant_name": current_user.get("restaurant_name"),
+            "email": current_user["email"],
+            "profile_picture": current_user.get("profile_picture"),
+            "bio": current_user.get("bio"),
+            "points": 0,
+            "level": None,
+            "currentPoints": 0,
+            "requiredPoints": 0,
+            "title": "Restaurant",
+            "badge": "verified" if current_user.get("is_verified", False) else None,
+            "followers_count": current_user.get("followers_count", 0),
+            "following_count": current_user.get("following_count", 0),
+            "account_type": "restaurant",
+            "created_at": current_user["created_at"]
+        }
+    
+    # Regular user response
     return {
         "id": str(current_user["_id"]),
         "full_name": current_user["full_name"],
@@ -176,6 +200,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "badge": current_user.get("badge"),
         "followers_count": current_user.get("followers_count", 0),
         "following_count": current_user.get("following_count", 0),
+        "account_type": "user",
         "created_at": current_user["created_at"]
     }
 
