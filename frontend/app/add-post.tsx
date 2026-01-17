@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { createPost } from '../utils/api';
+import { createPost, createRestaurantPost } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
