@@ -249,7 +249,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams();
   const auth = useAuth() as any;
-  const { token, logout, user: currentUser } = auth;
+  const { token, logout, user: currentUser, accountType } = auth;
 
   const [userData, setUserData] = useState<any>(null);
   const [userStats, setUserStats] = useState<any>(null);
@@ -279,6 +279,9 @@ export default function ProfileScreen() {
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [followingStatus, setFollowingStatus] = useState<{ [key: string]: boolean }>({});
   const sidebarAnimation = useRef(new Animated.Value(0)).current;
+  const [bannerImage, setBannerImage] = useState<string | null>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
 
   useEffect(() => {
     if (!token) {
@@ -986,6 +989,7 @@ export default function ProfileScreen() {
     );
   }
 
+
   return (
     <View style={styles.favouriteContainer}>
       {sortedLocations.map(([location, posts]) => {
@@ -1075,6 +1079,335 @@ export default function ProfileScreen() {
     </View>
   );
 };
+
+  // ================= RESTAURANT PROFILE UI =================
+const renderRestaurantProfile = () => {
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* ================= GRADIENT HEADER ================= */}
+        <View style={styles.headerContainer}>
+          <LinearGradient
+            colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientHeader}
+          >
+            <View style={styles.headerRow}>
+              {!isOwnProfile ? (
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => router.back()}
+                >
+                  <Ionicons name="arrow-back" size={24} color="#fff" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.leftSpacer}>
+                  <Ionicons name="menu-outline" size={24} color="#fff" />
+                </TouchableOpacity>
+              )}
+
+              <Text style={styles.cofauTitle}>Cofau</Text>
+
+              <View style={styles.headerIcons}>
+                {isOwnProfile && (
+                  <TouchableOpacity
+                    style={styles.headerIconButton}
+                    onPress={() => setSettingsModalVisible(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="settings-outline" size={24} color="#fff" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* ================= BANNER IMAGE ================= */}
+        <TouchableOpacity
+          style={restaurantStyles.bannerContainer}
+          onPress={() => {
+            if (isOwnProfile) {
+              // TODO: Handle banner upload
+              Alert.alert('Upload Banner', 'Banner upload coming soon!');
+            }
+          }}
+          activeOpacity={isOwnProfile ? 0.8 : 1}
+        >
+          {bannerImage || userData?.cover_image ? (
+            <Image
+              source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
+              style={restaurantStyles.bannerImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <LinearGradient
+              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={restaurantStyles.bannerPlaceholder}
+            >
+              {isOwnProfile && (
+                <View style={restaurantStyles.bannerEditIcon}>
+                  <Ionicons name="camera" size={24} color="#fff" />
+                  <Text style={restaurantStyles.bannerEditText}>Add Cover Photo</Text>
+                </View>
+              )}
+            </LinearGradient>
+          )}
+
+          {/* Edit icon overlay for banner */}
+          {isOwnProfile && (bannerImage || userData?.cover_image) && (
+            <View style={restaurantStyles.bannerEditOverlay}>
+              <Ionicons name="camera" size={20} color="#fff" />
+            </View>
+          )}
+
+          {/* Profile Picture on Banner */}
+          <View style={restaurantStyles.profileOnBanner}>
+            <TouchableOpacity
+              onPress={handleProfilePicturePress}
+              disabled={!isOwnProfile || uploadingImage}
+              activeOpacity={0.8}
+            >
+              <UserAvatar
+                profilePicture={userData?.profile_picture}
+                username={userData?.restaurant_name || userData?.full_name}
+                size={100}
+                showLevelBadge={false}
+                style={restaurantStyles.restaurantAvatar}
+              />
+              {isOwnProfile && (
+                <View style={restaurantStyles.dpCameraIcon}>
+                  {uploadingImage ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="camera" size={16} color="#fff" />
+                  )}
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+
+        {/* ================= RESTAURANT INFO ================= */}
+        <View style={restaurantStyles.restaurantInfoContainer}>
+          <Text style={restaurantStyles.restaurantName}>
+            {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
+          </Text>
+          <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
+        </View>
+
+        {/* ================= STATS SECTION ================= */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{userStats?.total_posts || 0}</Text>
+            <Text style={styles.statLabel}>Posts</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <TouchableOpacity
+            style={styles.statBox}
+            onPress={() => {
+              setFollowersModalVisible(true);
+              fetchFollowers();
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
+            <Text style={styles.statLabel}>People</Text>
+          </TouchableOpacity>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{userData?.reviews_count || 0}</Text>
+            <Text style={styles.statLabel}>Reviews</Text>
+          </View>
+        </View>
+
+        {/* ================= ACTION BUTTONS ================= */}
+        <View style={styles.actionButtonsContainer}>
+          {isOwnProfile ? (
+            <>
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => setEditModalVisible(true)}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="create" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Edit Profile</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => router.push('/chat')}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="chatbubble" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Messages</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={handleFollowToggle}
+                disabled={followLoading}
+              >
+                <LinearGradient
+                  colors={isFollowing ? ['#1B7C82', '#1B7C82'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name={isFollowing ? 'checkmark-circle' : 'person-add'} size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>{isFollowing ? 'Following' : 'Follow'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => router.push('/chat')}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="chatbubble" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Message</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* ================= BIO SECTION ================= */}
+        <View style={styles.bioSection}>
+          <Text style={styles.bioLabel}>Bio:</Text>
+          <Text style={styles.bioText}>
+            {userData?.bio || 'No bio yet. Add one by editing your profile!'}
+          </Text>
+        </View>
+
+        {/* ================= RESTAURANT TABS ================= */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tab, restaurantActiveTab === 'posts' && styles.activeTab]}
+            onPress={() => setRestaurantActiveTab('posts')}
+          >
+            <Text style={[styles.tabText, restaurantActiveTab === 'posts' && styles.activeTabText]}>
+              Posts
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, restaurantActiveTab === 'reviews' && styles.activeTab]}
+            onPress={() => setRestaurantActiveTab('reviews')}
+          >
+            <Text style={[styles.tabText, restaurantActiveTab === 'reviews' && styles.activeTabText]}>
+              Reviews
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, restaurantActiveTab === 'menu' && styles.activeTab]}
+            onPress={() => setRestaurantActiveTab('menu')}
+          >
+            <Text style={[styles.tabText, restaurantActiveTab === 'menu' && styles.activeTabText]}>
+              Menu
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ================= TAB CONTENT ================= */}
+        {restaurantActiveTab === 'posts' && (
+          <FlatList
+            data={userPosts}
+            renderItem={renderListItem}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="images-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>No posts yet</Text>
+              </View>
+            )}
+          />
+        )}
+
+        {restaurantActiveTab === 'reviews' && (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="star-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>No reviews yet</Text>
+            <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
+              Reviews from customers will appear here
+            </Text>
+          </View>
+        )}
+
+        {restaurantActiveTab === 'menu' && (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="restaurant-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>Menu coming soon</Text>
+            <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
+              You'll be able to add menu items here
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+
+      {/* Bottom Navigation */}
+      <View style={styles.navBar}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
+          <Ionicons name="home-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
+          <Ionicons name="compass-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Explore</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
+          <View style={styles.centerIconCircle}>
+            <Ionicons name="camera" size={22} color="#000" />
+          </View>
+          <Text style={styles.navLabel}>Top Posts</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
+          <Ionicons name="location-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Happening</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
+          <Ionicons name="person" size={20} color="#000" />
+          <Text style={styles.navLabel}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Reuse existing modals */}
+      {/* Edit Modal, Settings Modal, etc. - they will work for restaurants too */}
+    </View>
+  );
+};
+
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
     const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
@@ -1416,6 +1749,11 @@ if (loading) {
       </View>
     );
   }
+
+  // Check if restaurant account - show restaurant UI
+if (accountType === 'restaurant') {
+  return renderRestaurantProfile();
+}
 
   return (
     <View style={styles.container}>
@@ -2276,6 +2614,85 @@ if (loading) {
 }
 
 /* ================= STYLES ================= */
+
+// Restaurant-specific styles
+const restaurantStyles = StyleSheet.create({
+  bannerContainer: {
+    width: '100%',
+    height: 200,
+    position: 'relative',
+    marginTop: -30,
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bannerEditIcon: {
+    alignItems: 'center',
+  },
+  bannerEditText: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  bannerEditOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileOnBanner: {
+    position: 'absolute',
+    bottom: -50,
+    alignSelf: 'center',
+  },
+  restaurantAvatar: {
+    borderWidth: 4,
+    borderColor: '#fff',
+  },
+  dpCameraIcon: {
+    position: 'absolute',
+    right: 0,
+    bottom: 5,
+    backgroundColor: '#4dd0e1',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  restaurantInfoContainer: {
+    alignItems: 'center',
+    marginTop: 60,
+    marginBottom: 10,
+  },
+  restaurantName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  restaurantLabel: {
+    fontSize: 12,
+    color: '#E94A37',
+    fontWeight: '600',
+    marginTop: 4,
+    letterSpacing: 2,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
