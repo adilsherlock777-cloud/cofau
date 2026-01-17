@@ -1011,174 +1011,237 @@ def calculate_engagement_score(post, current_time):
 # ======================================================
 # FEED
 # ======================================================
+# ======================================================
+# FEED (MIXED - Users + Restaurants)
+# ======================================================
 @app.get("/api/feed")
 async def get_feed(
     skip: int = 0, 
     limit: int = None, 
     category: str = None, 
     categories: str = None,
-    sort: str = "engagement",  # "engagement" or "chronological"
+    sort: str = "engagement",
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get feed posts, optionally filtered by category.
-    
-    Sorting options:
-    - "engagement": Sort by engagement score (likes + comments + recency) - Instagram-like
-    - "chronological": Sort by created_at (newest first) - traditional feed
+    Get feed posts from both users and restaurants.
     """
     db = get_database()
-
     blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
     
-    # Build query - filter by category/categories if provided
-    query = {}
-
-       # ✅ ADD THIS: Exclude blocked users
+    # Build query for user posts
+    user_query = {}
     if blocked_user_ids:
-        query["user_id"] = {"$nin": blocked_user_ids}
+        user_query["user_id"] = {"$nin": blocked_user_ids}
 
     import re
-    import random
 
-    # Handle multiple categories (from new frontend)
+    # Handle category filtering
     if categories and categories.strip():
         category_list = [cat.strip() for cat in categories.split(",") if cat.strip() and cat.strip().lower() != 'all']
         if category_list:
-            # Match ANY of the selected categories (case-insensitive)
             regex_patterns = [{"category": {"$regex": re.escape(cat), "$options": "i"}} for cat in category_list]
-            if "user_id" in query:
-                query["$and"] = [{"user_id": query["user_id"]}, {"$or": regex_patterns}]
-                del query["user_id"]
+            if "user_id" in user_query:
+                user_query["$and"] = [{"user_id": user_query["user_id"]}, {"$or": regex_patterns}]
+                del user_query["user_id"]
             else:
-                query["$or"] = regex_patterns
-                print(f"🔍 Filtering posts by categories: {category_list}")
-
-    # Handle single category (backward compatibility)
+                user_query["$or"] = regex_patterns
     elif category and category.strip() and category.lower() != 'all':
         category_clean = category.strip()
         category_escaped = re.escape(category_clean)
-        query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
-        print(f"🔍 Filtering posts by category: '{category_clean}' (query: {query})")
+        user_query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
 
-    # Fetch posts based on sort mode
+    # Build query for restaurant posts (same category filter)
+    restaurant_query = {}
+    if categories and categories.strip():
+        category_list = [cat.strip() for cat in categories.split(",") if cat.strip() and cat.strip().lower() != 'all']
+        if category_list:
+            regex_patterns = [{"category": {"$regex": re.escape(cat), "$options": "i"}} for cat in category_list]
+            restaurant_query["$or"] = regex_patterns
+    elif category and category.strip() and category.lower() != 'all':
+        category_clean = category.strip()
+        category_escaped = re.escape(category_clean)
+        restaurant_query["category"] = {"$regex": f"^{category_escaped}$", "$options": "i"}
+
     current_time = datetime.utcnow()
     
+    # Fetch from both collections
     if sort == "engagement":
-        # For engagement-based sorting, fetch more posts than needed, calculate scores, then sort
-        # This allows old posts with high engagement to bubble up
-        # Fetch a reasonable pool size (3x the requested limit, or 300 posts max, or last 1000 posts)
-        if limit:
-            fetch_limit = min(limit * 3, 300)  # Fetch 3x requested, max 300
-        else:
-            fetch_limit = 300  # Default: fetch last 300 posts for engagement sorting
+        fetch_limit = min((limit or 30) * 3, 300)
         
-        raw_posts = await db.posts.find(query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
+        # Fetch user posts
+        user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
         
-        print(f"📊 Found {len(raw_posts)} posts for engagement sorting")
+        # Fetch restaurant posts
+        restaurant_posts_raw = await db.restaurant_posts.find(restaurant_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
         
-        # Calculate engagement scores (store with posts)
+        # Add source identifier
+        for post in user_posts_raw:
+            post["_source"] = "user"
+        for post in restaurant_posts_raw:
+            post["_source"] = "restaurant"
+        
+        # Combine all posts
+        all_posts = user_posts_raw + restaurant_posts_raw
+        
+        # Calculate engagement scores
         posts_with_scores = []
-        for post in raw_posts:
+        for post in all_posts:
             score = calculate_engagement_score(post, current_time)
             posts_with_scores.append((post, score))
         
-        # Sort by engagement score (descending - highest first)
+        # Sort by engagement score
         posts_with_scores.sort(key=lambda x: x[1], reverse=True)
         
-        # Add some randomness to prevent exact same order every time
-        # Shuffle posts within similar score ranges (posts with scores within 10% of each other)
+        # Shuffle similar scores for variety
         shuffled_posts_with_scores = []
         if len(posts_with_scores) > 1:
             i = 0
             while i < len(posts_with_scores):
                 current_post, current_score = posts_with_scores[i]
-                # Group posts with similar scores (within 10% range)
                 similar_group = [(current_post, current_score)]
                 j = i + 1
                 while j < len(posts_with_scores):
                     next_post, next_score = posts_with_scores[j]
-                    if abs(next_score - current_score) / max(current_score, 1) <= 0.1:  # Within 10%
+                    if abs(next_score - current_score) / max(current_score, 1) <= 0.1:
                         similar_group.append((next_post, next_score))
                         j += 1
                     else:
                         break
-                
-                # Shuffle the group to add randomness
                 random.shuffle(similar_group)
                 shuffled_posts_with_scores.extend(similar_group)
                 i = j
         else:
             shuffled_posts_with_scores = posts_with_scores
         
-        # Extract posts (without scores)
         posts = [p[0] for p in shuffled_posts_with_scores]
-        
-        # Apply skip and limit
         posts = posts[skip:]
         if limit:
             posts = posts[:limit]
-        
-        print(f"✅ Engagement-based sorting applied (showing {len(posts)} posts from {len(raw_posts)} pool)")
     else:
-        # Chronological sorting (default/traditional)
+        # Chronological sorting
         if limit is None:
-            posts = await db.posts.find(query).sort("created_at", -1).skip(skip).to_list(None)
+            user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).skip(skip).to_list(None)
+            restaurant_posts_raw = await db.restaurant_posts.find(restaurant_query).sort("created_at", -1).skip(skip).to_list(None)
         else:
-            posts = await db.posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-        print(f"📊 Found {len(posts)} posts (chronological sorting)")
+            user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+            restaurant_posts_raw = await db.restaurant_posts.find(restaurant_query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        
+        # Add source identifier
+        for post in user_posts_raw:
+            post["_source"] = "user"
+        for post in restaurant_posts_raw:
+            post["_source"] = "restaurant"
+        
+        # Combine and sort by created_at
+        all_posts = user_posts_raw + restaurant_posts_raw
+        all_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+        
+        # Apply limit after combining
+        if limit:
+            posts = all_posts[:limit]
+        else:
+            posts = all_posts
 
+    print(f"📊 Mixed feed: {len(posts)} posts (users + restaurants)")
+
+    # Build result
     result = []
     for post in posts:
         post_id = str(post["_id"])
-        user_id = post["user_id"]
-        user = await db.users.find_one({"_id": ObjectId(user_id)})
-
-        is_liked = await db.likes.find_one({
-            "post_id": post_id,
-            "user_id": str(current_user["_id"])
-        }) is not None
-
-        is_saved = await db.saved_posts.find_one({
-            "post_id": post_id,
-            "user_id": str(current_user["_id"])
-        }) is not None
-
-        # Check if current user is following the post author
-        is_following = await db.follows.find_one({
-            "followerId": str(current_user["_id"]),
-            "followingId": user_id
-        }) is not None
-
-        media_url = post.get("media_url", "")
-        media_type = post.get("media_type", "image")
+        is_restaurant_post = post.get("_source") == "restaurant"
         
-        # Only set image_url for images, not videos
-        image_url = post.get("image_url") if media_type == "image" else None
+        if is_restaurant_post:
+            # Restaurant post
+            restaurant_id = post.get("restaurant_id")
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)}) if restaurant_id else None
+            
+            is_liked = await db.restaurant_likes.find_one({
+                "post_id": post_id,
+                "restaurant_id": str(current_user["_id"])
+            }) is not None
+            
+            is_saved = await db.restaurant_saved_posts.find_one({
+                "post_id": post_id,
+                "restaurant_id": str(current_user["_id"])
+            }) is not None
+            
+            result.append({
+                "id": post_id,
+                "user_id": restaurant_id,
+                "username": post.get("restaurant_name") or (restaurant["restaurant_name"] if restaurant else "Unknown"),
+                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "user_level": None,  # Restaurants don't have levels
+                "media_url": post.get("media_url", ""),
+                "image_url": post.get("image_url"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": post.get("media_type", "image"),
+                "rating": None,  # Restaurants use price instead
+                "price": post.get("price", ""),
+                "review_text": post.get("about", ""),
+                "about": post.get("about", ""),
+                "description": post.get("about", ""),
+                "map_link": post.get("map_link"),
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "is_liked_by_user": is_liked,
+                "is_saved_by_user": is_saved,
+                "is_following": False,
+                "account_type": "restaurant",
+                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+            })
+        else:
+            # User post
+            user_id = post["user_id"]
+            user = await db.users.find_one({"_id": ObjectId(user_id)})
 
-        result.append({
-            "id": post_id,
-            "user_id": user_id,
-            "username": user["full_name"] if user else "Unknown",
-            "user_profile_picture": user.get("profile_picture") if user else None,
-            "user_badge": user.get("badge") if user else None,
-            "user_level": user.get("level", 1),
-            "media_url": media_url,
-            "image_url": image_url,
-            "thumbnail_url": post.get("thumbnail_url"),
-            "media_type": media_type,
-            "rating": post.get("rating", 0),
-            "review_text": post.get("review_text", ""),
-            "map_link": post.get("map_link"),
-            "location_name": post.get("location_name"),
-            "category": post.get("category"),
-            "likes_count": post.get("likes_count", 0),
-            "comments_count": post.get("comments_count", 0),
-            "is_liked_by_user": is_liked,
-            "is_saved_by_user": is_saved,
-            "is_following": is_following,
-            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
-        })
+            is_liked = await db.likes.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
+            is_saved = await db.saved_posts.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
+            is_following = await db.follows.find_one({
+                "followerId": str(current_user["_id"]),
+                "followingId": user_id
+            }) is not None
+
+            media_url = post.get("media_url", "")
+            media_type = post.get("media_type", "image")
+            image_url = post.get("image_url") if media_type == "image" else None
+
+            result.append({
+                "id": post_id,
+                "user_id": user_id,
+                "username": user["full_name"] if user else "Unknown",
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "user_badge": user.get("badge") if user else None,
+                "user_level": user.get("level", 1),
+                "media_url": media_url,
+                "image_url": image_url,
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": media_type,
+                "rating": post.get("rating", 0),
+                "price": None,  # Users use rating instead
+                "review_text": post.get("review_text", ""),
+                "description": post.get("review_text", ""),
+                "map_link": post.get("map_link"),
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "is_liked_by_user": is_liked,
+                "is_saved_by_user": is_saved,
+                "is_following": is_following,
+                "account_type": "user",
+                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+            })
 
     return result
 

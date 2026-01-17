@@ -467,49 +467,76 @@ export const addPostToStory = async (postId, mediaUrl, review = "", rating = 0, 
 export default api;
 
 export const blockUser = async (userId) => {
-  const response = await apiClient.post(`/users/${userId}/block`);
+  const response = await axios.post(`${API_URL}/users/${userId}/block`);
   return response.data;
 };
 
 export const unblockUser = async (userId) => {
-  const response = await apiClient.delete(`/users/${userId}/block`);
+  const response = await axios.delete(`${API_URL}/users/${userId}/block`);
   return response.data;
 };
 
 export const getBlockedUsers = async () => {
-  const response = await apiClient.get('/users/blocked-list');
+  const response = await axios.get(`${API_URL}/users/blocked-list`);
   return response.data;
 };
 
-export const createRestaurantPost = async (postData: any) => {
-  const formData = new FormData();
-  
-  formData.append('price', postData.price);
-  formData.append('about', postData.about);
-  formData.append('map_link', postData.map_link);
-  
-  if (postData.location_name) {
-    formData.append('location_name', postData.location_name);
-  }
-  if (postData.category) {
-    formData.append('category', postData.category);
-  }
-  
-  formData.append('file', postData.file);
-  formData.append('media_type', postData.media_type);
+export const createRestaurantPost = async (postData) => {
+  try {
+    const formData = new FormData();
 
-  const token = await AsyncStorage.getItem('restaurant_token'); // or however you store it
-  
-  const response = await axios.post(
-    `${API_URL}/api/restaurant/posts`,
-    formData,
-    {
+    // Append form fields
+    formData.append('price', postData.price);
+    formData.append('about', postData.about);
+    
+    if (postData.map_link) {
+      formData.append('map_link', postData.map_link);
+    }
+    if (postData.location_name) {
+      formData.append('location_name', postData.location_name);
+    }
+    if (postData.category) {
+      formData.append('category', postData.category);
+    }
+    if (postData.media_type) {
+      formData.append('media_type', postData.media_type);
+    }
+
+    // Append file - handle both web and native
+    if (postData.file) {
+      if (postData.file.uri) {
+        // React Native
+        formData.append('file', {
+          uri: postData.file.uri,
+          name: postData.file.name || postData.file.uri.split('/').pop(),
+          type: postData.file.type || 'image/jpeg',
+        });
+      } else {
+        // Web - File object
+        formData.append('file', postData.file);
+      }
+    }
+
+    console.log('📤 Creating restaurant post with data:', {
+      price: postData.price,
+      about: postData.about,
+      map_link: postData.map_link,
+      location_name: postData.location_name,
+      category: postData.category,
+      media_type: postData.media_type,
+    });
+
+    const response = await axios.post(`${API_URL}/restaurant/posts/create`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
-        Authorization: `Bearer ${token}`,
+        'Authorization': axios.defaults.headers.common['Authorization'],
       },
-    }
-  );
-  
-  return response.data;
+    });
+
+    console.log('✅ Restaurant post created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error creating restaurant post:', error.response?.data || error.message);
+    throw error;
+  }
 };

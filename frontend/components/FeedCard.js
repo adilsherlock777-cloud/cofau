@@ -699,30 +699,47 @@ postId={post.id}
   </Pressable>
 )}
 
-{/* DETAILS */}
-<View style={styles.detailsContainer}>
-{/* RATING */}
-{post.rating != null && (
-<View style={styles.detailBox}>
-<Text style={styles.detailLabel}>RATING</Text>
-<View style={styles.ratingRow}>
-<Ionicons name="star" size={19} color="#FFD700" />
-<Text style={styles.ratingText}>
-<Text style={styles.ratingNumber}>{post.rating}</Text>/10
-</Text>
-</View>
-</View>
+{/* RATING (Users) or PRICE (Restaurants) */}
+{post.rating != null && !post.price && (
+  <View style={styles.detailBox}>
+    <Text style={styles.detailLabel}>RATING</Text>
+    <View style={styles.ratingRow}>
+      <Ionicons name="star" size={19} color="#FFD700" />
+      <Text style={styles.ratingText}>
+        <Text style={styles.ratingNumber}>{post.rating}</Text>/10
+      </Text>
+    </View>
+  </View>
 )}
 
-{/* REVIEW */}
-{post.description && (
-<View style={styles.detailBox}>
-<Text style={styles.detailLabel}>REVIEW</Text>
-<View style={styles.reviewRow}>
-<Ionicons name="create" size={19} color="#FFD700" />
-<Text style={styles.reviewText}>{post.description}</Text>
-</View>
-</View>
+{/* PRICE (Restaurant posts only) */}
+{post.price && (
+  <View style={styles.detailBox}>
+    <Text style={styles.detailLabel}>PRICE</Text>
+    <View style={styles.ratingRow}>
+      <Ionicons name="pricetag" size={19} color="#4ECDC4" />
+      <Text style={styles.ratingText}>{post.price}</Text>
+    </View>
+  </View>
+)}
+
+{/* REVIEW (Users) or ABOUT (Restaurants) */}
+{(post.description || post.about) && (
+  <View style={styles.detailBox}>
+    <Text style={styles.detailLabel}>
+      {post.price ? 'ABOUT' : 'REVIEW'}
+    </Text>
+    <View style={styles.reviewRow}>
+      <Ionicons 
+        name={post.price ? "information-circle" : "create"} 
+        size={19} 
+        color={post.price ? "#4ECDC4" : "#FFD700"} 
+      />
+      <Text style={styles.reviewText}>
+        {post.about || post.description}
+      </Text>
+    </View>
+  </View>
 )}
 
 {/* LOCATION */}
