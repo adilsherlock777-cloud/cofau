@@ -82,7 +82,7 @@ const getPostDP = (post: any) =>
 
 export default function FeedScreen() {
   const router = useRouter();
-  const { user, token, refreshUser } = useAuth() as any;
+  const { user, token, refreshUser, accountType } = useAuth() as any;
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -475,8 +475,86 @@ const renderPost = useCallback(
         </LinearGradient>
 
         {/* ===== LEVEL CARD ===== */}
-        {user && (
-          <View style={styles.levelCardWrapper}>
+        {/* ===== RESTAURANT CARD (for restaurant accounts) ===== */}
+{user && accountType === 'restaurant' && (
+  <View style={styles.levelCardWrapper}>
+    <View style={[styles.levelCard, styles.levelCardAndroid]}>
+      {/* Restaurant DP Container - Same as User with Story Ring */}
+      <View style={styles.dpContainer}>
+        <TouchableOpacity
+          onPress={() => {
+            if (ownStoryData) {
+              router.push({
+                pathname: "/story-viewer",
+                params: {
+                  userId: user.id,
+                  stories: JSON.stringify(ownStoryData.stories),
+                  user: JSON.stringify(ownStoryData.user),
+                },
+              });
+            } else {
+              setShowAddMenu(true);
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          {ownStoryData ? (
+            <LinearGradient
+              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+              locations={[0, 0.35, 0.9]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.dpGradientRing}
+            >
+              <View style={styles.dpWhiteRing}>
+                <UserAvatar
+                  profilePicture={user.profile_picture}
+                  username={user.restaurant_name || user.username}
+                  size={66}
+                  showLevelBadge={false}
+                  style={{}}
+                />
+              </View>
+            </LinearGradient>
+          ) : (
+            <UserAvatar
+              profilePicture={user.profile_picture}
+              username={user.restaurant_name || user.username}
+              size={70}
+              showLevelBadge={false}
+              style={{}}
+            />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.dpAddButton}
+          onPress={() => setShowAddMenu(true)}
+        >
+          <Ionicons name="add" size={19} color="#0f0303ff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Total Reviews Content */}
+      <View style={styles.levelContent}>
+        <Text style={styles.levelLabel}>Total Reviews</Text>
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <LinearGradient
+              colors={['#4CAF50', '#8BC34A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.progressFill, { width: '0.4%' }]}
+            />
+          </View>
+          <Text style={styles.progressText}>0/25000</Text>
+        </View>
+      </View>
+    </View>
+  </View>
+)}
+        {user && accountType !== 'restaurant' && (
+           <View style={styles.levelCardWrapper}>
             {Platform.OS === "ios" ? (
               <BlurView intensity={60} tint="light" style={styles.levelCard}>
                 <View style={styles.dpContainer}>
@@ -974,6 +1052,21 @@ notificationBadgeText: {
     alignItems: "center",
     zIndex: 10,
   },
+  restaurantLogoContainer: {
+  width: 70,
+  height: 70,
+  borderRadius: 35,
+  backgroundColor: '#FFF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#E0E0E0',
+},
+restaurantLogo: {
+  width: 60,
+  height: 60,
+  borderRadius: 30,
+},
   cofauTitle: {
     position: "absolute",
     left: 0,
