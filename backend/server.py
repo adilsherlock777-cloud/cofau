@@ -24,6 +24,7 @@ from routers.chat import router as chat_router
 from routers.compliments import router as compliments_router
 from routers.moderation import router as moderation_router
 from routers.leaderboard import router as leaderboard_router
+from routers import restaurant_auth
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
@@ -333,6 +334,7 @@ app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Create uploads directory if missing
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+os.makedirs("static/uploads/restaurants", exist_ok=True)
 
 # ======================================================
 # OPEN GRAPH (WhatsApp Preview) CONFIGURATION
@@ -408,6 +410,7 @@ app.add_middleware(
 # Include Routers
 # ======================================================
 app.include_router(auth_router)
+app.include_router(restaurant_auth.router)
 app.include_router(notifications_router)
 app.include_router(follow_router)
 app.include_router(profile_picture_router)
@@ -417,6 +420,7 @@ app.include_router(chat_router)
 app.include_router(compliments_router)
 app.include_router(moderation_router)
 app.include_router(leaderboard_router)
+
 
 # ======================================================
 # OPEN GRAPH ROUTE (Non-API, for Social Media Scrapers)
