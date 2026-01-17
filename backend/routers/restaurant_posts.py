@@ -657,3 +657,229 @@ async def get_restaurant_posts_by_id_public(
         })
     
     return result
+
+# ==================== MENU ITEMS ====================
+
+@router.post("/menu/create")
+async def create_menu_item(
+    item_name: str = Form(...),
+    price: str = Form(...),
+    description: str = Form(None),
+    category: str = Form(None),
+    media_type: str = Form("image"),
+    file: UploadFile = File(...),
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Create a new menu item - Restaurant only"""
+    db = get_database()
+    
+    # Get file extension
+    file_ext = file.filename.split(".")[-1].lower()
+    
+    ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif"]
+    ALLOWED_VIDEO_EXTENSIONS = ["mp4", "mov", "m4v"]
+    ALL_ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS + ALLOWED_VIDEO_EXTENSIONS
+    
+    if file_ext not in ALL_ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type: {file_ext}. Allowed: {ALL_ALLOWED_EXTENSIONS}"
+        )
+    
+    # Generate unique filename
+    unique_id = str(ObjectId())
+    filename = f"menu_{unique_id}_{file.filename}"
+    file_path = os.path.join(RESTAURANT_UPLOAD_DIR, filename)
+    
+    # Save the file
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=500, detail="Failed to save file")
+        
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            os.remove(file_path)
+            raise HTTPException(status_code=500, detail="File was saved but is empty")
+        
+        print(f"✅ Menu item file saved: {file_path} (size: {file_size} bytes)")
+    except Exception as e:
+        print(f"❌ Error saving menu file: {str(e)}")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # HEIC/HEIF conversion
+    if file_ext in ["heic", "heif"]:
+        try:
+            from PIL import Image
+            import pillow_heif
+            
+            pillow_heif.register_heif_opener()
+            img = Image.open(file_path)
+            
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            new_filename = f"menu_{unique_id}_{os.path.splitext(file.filename)[0]}.jpg"
+            new_file_path = os.path.join(RESTAURANT_UPLOAD_DIR, new_filename)
+            
+            img.save(new_file_path, 'JPEG', quality=90, optimize=True)
+            img.close()
+            os.remove(file_path)
+            
+            file_path = new_file_path
+            filename = new_filename
+            file_ext = "jpg"
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(status_code=500, detail=f"Failed to convert HEIC: {str(e)}")
+    
+    # Detect media type
+    actual_media_type = "video" if file_ext in ["mp4", "mov", "m4v"] else "image"
+    
+    # Video optimization
+    thumbnail_url = None
+    if actual_media_type == "video":
+        try:
+            from utils.video_transcode import optimize_video_with_thumbnail
+            video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
+            file_path = video_path
+            filename = os.path.basename(video_path)
+            thumbnail_filename = os.path.basename(thumbnail_path)
+            thumbnail_url = f"/api/static/uploads/restaurants/{thumbnail_filename}"
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(status_code=500, detail=f"Video processing failed: {str(e)}")
+    
+    media_url = f"/api/static/uploads/restaurants/{filename}"
+    
+    # Create menu item document
+    menu_doc = {
+        "restaurant_id": str(current_restaurant["_id"]),
+        "restaurant_name": current_restaurant["restaurant_name"],
+        "item_name": item_name.strip(),
+        "price": price.strip(),
+        "description": description.strip() if description else "",
+        "category": category.strip() if category else "",
+        "media_url": media_url,
+        "thumbnail_url": thumbnail_url,
+        "media_type": actual_media_type,
+        "is_available": True,
+        "created_at": datetime.utcnow(),
+    }
+    
+    result = await db.menu_items.insert_one(menu_doc)
+    
+    # Update restaurant's menu count
+    await db.restaurants.update_one(
+        {"_id": current_restaurant["_id"]},
+        {"$inc": {"menu_count": 1}}
+    )
+    
+    print(f"✅ Menu item created: {result.inserted_id}")
+    
+    return {
+        "message": "Menu item created successfully",
+        "menu_item_id": str(result.inserted_id),
+    }
+
+@router.get("/menu/{restaurant_id}")
+async def get_restaurant_menu(
+    restaurant_id: str,
+    skip: int = 0,
+    limit: int = 100
+):
+    """Get all menu items for a restaurant (public)"""
+    db = get_database()
+    
+    menu_items = await db.menu_items.find({
+        "restaurant_id": restaurant_id,
+        "is_available": True
+    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for item in menu_items:
+        result.append({
+            "id": str(item["_id"]),
+            "restaurant_id": item["restaurant_id"],
+            "item_name": item.get("item_name", ""),
+            "price": item.get("price", ""),
+            "description": item.get("description", ""),
+            "category": item.get("category", ""),
+            "media_url": item.get("media_url", ""),
+            "thumbnail_url": item.get("thumbnail_url"),
+            "media_type": item.get("media_type", "image"),
+            "is_available": item.get("is_available", True),
+            "created_at": item["created_at"].isoformat() if isinstance(item.get("created_at"), datetime) else item.get("created_at", ""),
+        })
+    
+    return result
+
+@router.delete("/menu/{item_id}")
+async def delete_menu_item(
+    item_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Delete a menu item - Owner only"""
+    db = get_database()
+    
+    menu_item = await db.menu_items.find_one({"_id": ObjectId(item_id)})
+    
+    if not menu_item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+    
+    if menu_item["restaurant_id"] != str(current_restaurant["_id"]):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Delete media file
+    media_url = menu_item.get("media_url")
+    if media_url and "/api/static/uploads/restaurants/" in media_url:
+        try:
+            filename = media_url.split("/api/static/uploads/restaurants/")[-1]
+            file_path = os.path.join(RESTAURANT_UPLOAD_DIR, filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print(f"⚠️ Error deleting menu media: {e}")
+    
+    await db.menu_items.delete_one({"_id": ObjectId(item_id)})
+    
+    await db.restaurants.update_one(
+        {"_id": current_restaurant["_id"]},
+        {"$inc": {"menu_count": -1}}
+    )
+    
+    return {"message": "Menu item deleted"}
+
+@router.patch("/menu/{item_id}/toggle")
+async def toggle_menu_availability(
+    item_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Toggle menu item availability"""
+    db = get_database()
+    
+    menu_item = await db.menu_items.find_one({"_id": ObjectId(item_id)})
+    
+    if not menu_item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+    
+    if menu_item["restaurant_id"] != str(current_restaurant["_id"]):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    new_status = not menu_item.get("is_available", True)
+    
+    await db.menu_items.update_one(
+        {"_id": ObjectId(item_id)},
+        {"$set": {"is_available": new_status}}
+    )
+    
+    return {"success": True, "is_available": new_status}

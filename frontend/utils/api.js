@@ -540,3 +540,90 @@ export const createRestaurantPost = async (postData) => {
     throw error;
   }
 };
+
+// ==================== CREATE MENU ITEM ====================
+
+export const createMenuItem = async (data: {
+  item_name: string;
+  price: string;
+  description?: string;
+  category?: string;
+  media_type: string;
+  file: any;
+}): Promise<any> => {
+  const formData = new FormData();
+  
+  formData.append('item_name', data.item_name);
+  formData.append('price', data.price);
+  if (data.description) formData.append('description', data.description);
+  if (data.category) formData.append('category', data.category);
+  formData.append('media_type', data.media_type);
+  formData.append('file', data.file);
+
+  const token = await AsyncStorage.getItem('token');
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/restaurant/posts/menu/create`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to create menu item');
+  }
+
+  return response.json();
+};
+
+
+// ==================== GET RESTAURANT MENU ====================
+
+export const getRestaurantMenu = async (restaurantId: string): Promise<any[]> => {
+  const token = await AsyncStorage.getItem('token');
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/restaurant/posts/menu/${restaurantId}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch menu');
+  }
+
+  return response.json();
+};
+
+
+// ==================== DELETE MENU ITEM ====================
+
+export const deleteMenuItem = async (itemId: string): Promise<any> => {
+  const token = await AsyncStorage.getItem('token');
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/restaurant/posts/menu/${itemId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to delete menu item');
+  }
+
+  return response.json();
+};
+

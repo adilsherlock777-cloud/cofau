@@ -54,26 +54,6 @@ export default function LeaderboardScreen() {
         return;
       }
 
-  const fetchRestaurantLeaderboard = async () => {
-  try {
-    setError(null);
-    setLoading(true);
-
-    const response = await axios.get(`${BACKEND_URL}/api/leaderboard/restaurants/current`, {
-      headers: { Authorization: `Bearer ${token}` },
-      timeout: 10000,
-    });
-
-    setRestaurantData(response.data);
-  } catch (err: any) {
-    console.error("❌ Error fetching restaurant leaderboard:", err);
-    setError("Failed to load restaurant leaderboard");
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
-
       const response = await axios.get(`${BACKEND_URL}/api/leaderboard/current`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -134,6 +114,32 @@ export default function LeaderboardScreen() {
       setRefreshing(false);
     }
   };
+
+  const fetchRestaurantLeaderboard = async () => {
+  try {
+    setError(null);
+    setLoading(true);
+
+    if (!token) {
+      setError("Please log in to view the leaderboard");
+      setLoading(false);
+      return;
+    }
+
+    const response = await axios.get(`${BACKEND_URL}/api/leaderboard/restaurants/current`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000,
+    });
+
+    setRestaurantData(response.data);
+  } catch (err: any) {
+    console.error("❌ Error fetching restaurant leaderboard:", err);
+    setError("Failed to load restaurant leaderboard");
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -417,21 +423,30 @@ export default function LeaderboardScreen() {
                         </View>
 
                         <View style={styles.rankOneProfileSection}>
-                          <UserAvatar
-                            profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
-                            username={entry.username}
-                            size={60}
-                            showLevelBadge={true}
-                            level={entry.user_level || entry.level || 1}
-                            style={{}}
-                          />
-                          <View style={styles.rankOneInfo}>
+  <View style={{ position: 'relative' }}>
+    <UserAvatar
+      profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
+      username={entry.username}
+      size={60}
+      showLevelBadge={activeTab === 'users'}
+      level={entry.user_level || entry.level || 1}
+      style={{}}
+    />
+    {activeTab === 'restaurants' && (
+      <View style={styles.restaurantBadge}>
+        <Ionicons name="storefront" size={12} color="#fff" />
+      </View>
+    )}
+  </View>
+  <View style={styles.rankOneInfo}>
                             <Text style={styles.rankOneName} numberOfLines={1}>
                               {entry.full_name || entry.username || "Unknown User"}
                             </Text>
-                            <Text style={styles.levelText}>
-                              Level {entry.user_level || entry.level || 1}
-                            </Text>
+                            {activeTab === 'users' && (
+  <Text style={styles.levelText}>
+    Level {entry.user_level || entry.level || 1}
+  </Text>
+)}
                             <View style={styles.rankOneStats}>
                               <View style={styles.statItem}>
                                 <Ionicons name="people" size={18} color="#666" />
@@ -533,22 +548,31 @@ export default function LeaderboardScreen() {
   </View>
 )}
 
-                  <View style={styles.otherRanksContainer}>
-                    <UserAvatar
-                      profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
-                      username={entry.username}
-                      size={50}
-                      showLevelBadge={true}
-                      level={entry.user_level || entry.level || 1}
-                      style={{}}
-                    />
-                    <View style={styles.otherRanksInfo}>
+                   <View style={styles.otherRanksContainer}>
+  <View style={{ position: 'relative' }}>
+    <UserAvatar
+      profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
+      username={entry.username}
+      size={50}
+      showLevelBadge={activeTab === 'users'}
+      level={entry.user_level || entry.level || 1}
+      style={{}}
+    />
+    {activeTab === 'restaurants' && (
+      <View style={styles.restaurantBadgeSmall}>
+        <Ionicons name="storefront" size={10} color="#fff" />
+      </View>
+    )}
+  </View>
+  <View style={styles.otherRanksInfo}>
                       <Text style={styles.otherRanksName} numberOfLines={1}>
                         {entry.full_name || entry.username || "Unknown User"}
                       </Text>
-                      <Text style={styles.levelTextSmall}>
-                        Level {entry.user_level || entry.level || 1}
-                      </Text>
+                     {activeTab === 'users' && (
+  <Text style={styles.levelTextSmall}>
+    Level {entry.user_level || entry.level || 1}
+  </Text>
+)}
                     </View>
                   </View>
 
@@ -738,6 +762,32 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  restaurantBadge: {
+  position: 'absolute',
+  bottom: -2,
+  left: 40,
+  backgroundColor: '#1B7C82',
+  borderRadius: 10,
+  width: 20,
+  height: 20,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 2,
+  borderColor: '#fff',
+},
+restaurantBadgeSmall: {
+  position: 'absolute',
+  bottom: -2,
+  left: 34,
+  backgroundColor: '#1B7C82',
+  borderRadius: 8,
+  width: 16,
+  height: 16,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1.5,
+  borderColor: '#fff',
+},
   tabContainer: {
   flexDirection: 'row',
   backgroundColor: '#F5F5F5',

@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
-import { createPost, createRestaurantPost } from '../utils/api';
+import { createPost, createRestaurantPost, createMenuItem } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
@@ -31,6 +31,10 @@ export default function AddPostScreen() {
   const { showLevelUpAnimation } = useLevelAnimation();
   const auth = useAuth() as any;
   const { refreshUser, accountType } = auth;
+  
+  // Post mode (for restaurants only)
+  const [postMode, setPostMode] = useState<'post' | 'menu'>('post');
+  const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
@@ -40,7 +44,7 @@ export default function AddPostScreen() {
 
   const [locationName, setLocationName] = useState('');
   const [mapsLink, setMapsLink] = useState('');
-  const [categories, setCategories] = useState<string[]>([]); // CHANGED: Now an array
+  const [categories, setCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -51,6 +55,7 @@ export default function AddPostScreen() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
+
   // Categories list
   const CATEGORIES = [
     'Vegetarian/Vegan',
@@ -59,7 +64,7 @@ export default function AddPostScreen() {
     'Desserts',
     'SeaFood',
     'Chinese',
-    'Chats',
+    'Chaats',
     'Arabic',
     'BBQ/Tandoor',
     'Fast Food',
@@ -233,7 +238,66 @@ const handlePost = async () => {
     return;
   }
 
-  // Validation based on account type
+  // ========== MENU ITEM MODE ==========
+  if (accountType === 'restaurant' && postMode === 'menu') {
+    if (!itemName.trim()) {
+      Alert.alert('Item Name Required', 'Please enter the item name.');
+      return;
+    }
+    if (!price.trim()) {
+      Alert.alert('Price Required', 'Please enter a price.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let fileToUpload;
+
+      if (Platform.OS === 'web') {
+        const response = await fetch(mediaUri);
+        const blob = await response.blob();
+        const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+        const filename = `menu_${Date.now()}.${ext}`;
+        fileToUpload = new File([blob], filename, {
+          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+        });
+      } else {
+        const name = mediaUri.split('/').pop() || `menu_${Date.now()}`;
+        fileToUpload = {
+          uri: mediaUri,
+          name,
+          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+        };
+      }
+
+      const menuData = {
+        item_name: itemName.trim(),
+        price: price.trim(),
+        description: review.trim() || undefined,
+        category: categories.length > 0 ? categories.join(', ') : undefined,
+        media_type: mediaType,
+        file: fileToUpload,
+      };
+
+      console.log('📤 Creating menu item:', menuData);
+      await createMenuItem(menuData);
+
+      setLoading(false);
+      Alert.alert('Success', 'Menu item added successfully!', [
+        { text: 'OK', onPress: () => router.replace('/profile') }
+      ]);
+      return;
+
+    } catch (error: any) {
+      console.error('❌ Error creating menu item:', error);
+      setLoading(false);
+      Alert.alert('Error', error?.message || 'Failed to create menu item.');
+      return;
+    }
+  }
+
+  // ========== REGULAR POST MODE ==========
   let numericRating = 0;
   
   if (accountType !== 'restaurant') {
@@ -286,7 +350,6 @@ const handlePost = async () => {
     let result;
 
     if (accountType === 'restaurant') {
-      // Restaurant post
       const postData = {
         price: price.trim(),
         about: review.trim(),
@@ -300,7 +363,6 @@ const handlePost = async () => {
       console.log('📤 Sending restaurant post:', postData);
       result = await createRestaurantPost(postData);
       
-      // Restaurant doesn't have leveling, just redirect
       setLoading(false);
       Alert.alert('Success', 'Post created successfully!', [
         { text: 'OK', onPress: () => router.replace('/feed') }
@@ -308,7 +370,6 @@ const handlePost = async () => {
       return;
 
     } else {
-      // User post
       const postData = {
         rating: numericRating,
         review_text: review.trim(),
@@ -439,7 +500,9 @@ return (
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Add Post</Text>
+      <Text style={styles.headerTitle}>
+  {accountType === 'restaurant' && postMode === 'menu' ? 'Add Menu Item' : 'Add Post'}
+</Text>
       <View style={styles.headerRight} />
     </View>
 
@@ -448,6 +511,51 @@ return (
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
+
+      {/* Post Type Toggle - Only for Restaurants */}
+{accountType === 'restaurant' && (
+  <View style={styles.postTypeToggle}>
+    <TouchableOpacity
+      style={[
+        styles.postTypeButton,
+        postMode === 'post' && styles.postTypeButtonActive
+      ]}
+      onPress={() => setPostMode('post')}
+    >
+      <Ionicons 
+        name="image-outline" 
+        size={20} 
+        color={postMode === 'post' ? '#FFF' : '#666'} 
+      />
+      <Text style={[
+        styles.postTypeText,
+        postMode === 'post' && styles.postTypeTextActive
+      ]}>
+        Post
+      </Text>
+    </TouchableOpacity>
+    
+    <TouchableOpacity
+      style={[
+        styles.postTypeButton,
+        postMode === 'menu' && styles.postTypeButtonActive
+      ]}
+      onPress={() => setPostMode('menu')}
+    >
+      <Ionicons 
+        name="restaurant-outline" 
+        size={20} 
+        color={postMode === 'menu' ? '#FFF' : '#666'} 
+      />
+      <Text style={[
+        styles.postTypeText,
+        postMode === 'menu' && styles.postTypeTextActive
+      ]}>
+        Menu Item
+      </Text>
+    </TouchableOpacity>
+  </View>
+)}
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}
@@ -490,6 +598,21 @@ return (
           </TouchableOpacity>
         </View>
 
+
+        {/* Item Name - Only for Menu Mode */}
+{accountType === 'restaurant' && postMode === 'menu' && (
+  <View style={styles.section}>
+    <Text style={styles.sectionLabel}>Item Name *</Text>
+    <TextInput
+      style={styles.linkInput}
+      placeholder="e.g., Margherita Pizza, Chicken Biryani"
+      placeholderTextColor="#999"
+      value={itemName}
+      onChangeText={setItemName}
+    />
+  </View>
+)}
+
         {/* Rating - Only for Users */}
 {accountType !== 'restaurant' && (
   <View style={styles.section}>
@@ -529,11 +652,21 @@ return (
         {/* Review */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>
-  {accountType === 'restaurant' ? 'About' : 'Review'}
+  {accountType === 'restaurant' && postMode === 'menu' 
+    ? 'Description (Optional)' 
+    : accountType === 'restaurant' 
+      ? 'About' 
+      : 'Review'}
 </Text>
           <TextInput
             style={styles.reviewInput}
-            placeholder={accountType === 'restaurant' ? 'Write about this dish...' : 'Write your review...'}
+            placeholder={
+  accountType === 'restaurant' && postMode === 'menu'
+    ? 'Describe this dish (ingredients, taste, etc.)'
+    : accountType === 'restaurant' 
+      ? 'Write about this dish...' 
+      : 'Write your review...'
+}
             placeholderTextColor="#999"
             value={review}
             onChangeText={setReview}
@@ -588,6 +721,7 @@ return (
         </View>
 
         {/* FREE GOOGLE MAPS LOCATION */}
+        {!(accountType === 'restaurant' && postMode === 'menu') && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
 
@@ -666,6 +800,7 @@ return (
             <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
           </TouchableOpacity>
         </View>
+        )}
 
         {/* POST BUTTON */}
         <TouchableOpacity
@@ -855,6 +990,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
+
+  // Post Type Toggle Styles
+postTypeToggle: {
+  flexDirection: 'row',
+  backgroundColor: '#F0F0F0',
+  borderRadius: 12,
+  padding: 4,
+  marginHorizontal: 16,
+  marginTop: 12,
+  marginBottom: 8,
+},
+postTypeButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 12,
+  borderRadius: 10,
+  gap: 8,
+},
+postTypeButtonActive: {
+  backgroundColor: '#1B7C82',
+},
+postTypeText: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#666',
+},
+postTypeTextActive: {
+  color: '#FFF',
+},
 
   linkInput: {
     backgroundColor: '#FFF',

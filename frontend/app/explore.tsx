@@ -198,7 +198,7 @@ export default function ExploreScreen() {
   const [playingVideos, setPlayingVideos] = useState<string[]>([]);
 
   const POSTS_PER_PAGE = 30;
-  const CATEGORIES = ["All", "Vegetarian/Vegan", "Non vegetarian", "Biryani", "Desserts", "SeaFood", "Chinese", "Chats", "Arabic", "BBQ/Tandoor", "Fast Food", "Tea/Coffee", "Salad", "Karnataka Style", "Hyderabadi Style", "Kerala Style", "Andhra Style", "North Indian Style", "South Indian Style", "Punjabi Style", "Bengali Style", "Odia Style", "Gujurati Style", "Rajasthani Style", "Mangaluru Style", "Goan", "Kashmiri", "Continental", "Italian", "Japanese", "Korean", "Mexican", "Persian", "Drinks / sodas"];
+  const CATEGORIES = ["All", "Vegetarian/Vegan", "Non vegetarian", "Biryani", "Desserts", "SeaFood", "Chinese", "Chaats", "Arabic", "BBQ/Tandoor", "Fast Food", "Tea/Coffee", "Salad", "Karnataka Style", "Hyderabadi Style", "Kerala Style", "Andhra Style", "North Indian Style", "South Indian Style", "Punjabi Style", "Bengali Style", "Odia Style", "Gujurati Style", "Rajasthani Style", "Mangaluru Style", "Goan", "Kashmiri", "Continental", "Italian", "Japanese", "Korean", "Mexican", "Persian", "Drinks / sodas"];
 
   const handleVideoLayout = useCallback((videoId: string, event: LayoutChangeEvent) => {
     const { y, height } = event.nativeEvent.layout;
