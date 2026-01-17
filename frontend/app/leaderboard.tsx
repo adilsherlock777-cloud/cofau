@@ -26,6 +26,8 @@ export default function LeaderboardScreen() {
   const { token } = useAuth() as any;
 
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'users' | 'restaurants'>('users');
+  const [restaurantData, setRestaurantData] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +35,13 @@ export default function LeaderboardScreen() {
   const [followLoading, setFollowLoading] = useState<{ [key: string]: boolean }>({});
   const { user } = useAuth() as any;
 
-  useEffect(() => {
+ useEffect(() => {
+  if (activeTab === 'users') {
     fetchLeaderboard();
-  }, []);
+  } else {
+    fetchRestaurantLeaderboard();
+  }
+}, [activeTab]);
 
   const fetchLeaderboard = async () => {
     try {
@@ -47,6 +53,26 @@ export default function LeaderboardScreen() {
         setLoading(false);
         return;
       }
+
+  const fetchRestaurantLeaderboard = async () => {
+  try {
+    setError(null);
+    setLoading(true);
+
+    const response = await axios.get(`${BACKEND_URL}/api/leaderboard/restaurants/current`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000,
+    });
+
+    setRestaurantData(response.data);
+  } catch (err: any) {
+    console.error("❌ Error fetching restaurant leaderboard:", err);
+    setError("Failed to load restaurant leaderboard");
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
       const response = await axios.get(`${BACKEND_URL}/api/leaderboard/current`, {
         headers: {
@@ -163,7 +189,9 @@ export default function LeaderboardScreen() {
     );
   }
 
-  const entries = leaderboardData?.entries || [];
+  const entries = activeTab === 'users' 
+  ? (leaderboardData?.entries || [])
+  : (restaurantData?.entries || []);
 
   console.log("entries", entries);
 
@@ -260,6 +288,22 @@ export default function LeaderboardScreen() {
             </View>
           )}
         </View>
+
+        {/* Tab Toggle */}
+<View style={styles.tabContainer}>
+  <TouchableOpacity
+    style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+    onPress={() => setActiveTab('users')}
+  >
+    <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>Users</Text>
+  </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.tab, activeTab === 'restaurants' && styles.activeTab]}
+    onPress={() => setActiveTab('restaurants')}
+  >
+    <Text style={[styles.tabText, activeTab === 'restaurants' && styles.activeTabText]}>Restaurants</Text>
+  </TouchableOpacity>
+</View>
 
         {leaderboardData && leaderboardData.from_date && leaderboardData.to_date && (
           <View>
@@ -694,6 +738,32 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  tabContainer: {
+  flexDirection: 'row',
+  backgroundColor: '#F5F5F5',
+  borderRadius: 25,
+  padding: 4,
+  marginHorizontal: 20,
+  marginBottom: 16,
+},
+tab: {
+  flex: 1,
+  paddingVertical: 10,
+  alignItems: 'center',
+  borderRadius: 20,
+},
+activeTab: {
+  backgroundColor: '#F2CF68',
+},
+tabText: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#666',
+},
+activeTabText: {
+  color: '#000',
+  fontWeight: '600',
+},
   titleBox: {
     paddingVertical: 18,
     paddingHorizontal: 30,

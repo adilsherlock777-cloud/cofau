@@ -36,6 +36,7 @@ const SMALL_HEIGHT = COLUMN_WIDTH * 0.75;
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 const MAX_CONCURRENT_VIDEOS = 2;
 
+
 const fixUrl = (url: string | null) => {
   if (!url) return null;
   if (url.startsWith("http")) return url;
@@ -184,6 +185,7 @@ export default function ExploreScreen() {
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'restaurants'>('users');
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -245,7 +247,12 @@ export default function ExploreScreen() {
       else { if (!hasMore || loadingMore) return; setLoadingMore(true); }
       const categoriesToUse = categories ?? appliedCategories;
       const skip = refresh ? 0 : (page - 1) * POSTS_PER_PAGE;
-      let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
+      let feedUrl;
+if (activeTab === 'restaurants') {
+  feedUrl = `${API_URL}/restaurant/posts/public/all?skip=${skip}&limit=${POSTS_PER_PAGE}`;
+} else {
+  feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
+}
       if (categoriesToUse.length > 0) feedUrl += `&categories=${encodeURIComponent(categoriesToUse.join(","))}`;
       const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
       if (res.data.length === 0) { setHasMore(false); if (refresh) setPosts([]); return; }
@@ -293,6 +300,41 @@ export default function ExploreScreen() {
           </View>
         </View>
       </View>
+
+      {/* USERS | RESTAURANTS TABS */}
+<View style={styles.tabContainer}>
+  <TouchableOpacity 
+  style={[styles.tab, activeTab === 'restaurants' && styles.activeTab]}
+  onPress={() => {
+    if (activeTab !== 'restaurants') {
+      setActiveTab('restaurants');
+      setPosts([]);
+      setPage(1);
+      setHasMore(true);
+      setLoading(true);
+      fetchPosts(true);
+    }
+  }}
+>
+    <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>USERS</Text>
+  </TouchableOpacity>
+  <TouchableOpacity 
+  style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+  onPress={() => {
+    if (activeTab !== 'users') {
+      setActiveTab('users');
+      setPosts([]);
+      setPage(1);
+      setHasMore(true);
+      setLoading(true);
+      fetchPosts(true);
+    }
+  }}
+>
+  
+    <Text style={[styles.tabText, activeTab === 'restaurants' && styles.activeTabText]}>RESTAURANTS</Text>
+  </TouchableOpacity>
+</View>
 
       {appliedCategories.length > 0 && (
         <View style={styles.selectedTagsWrapper}>
@@ -366,6 +408,30 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
   headerContainer: { position: "relative", marginBottom: 30, zIndex: 10 },
+  tabContainer: {
+  flexDirection: 'row',
+  paddingHorizontal: 16,
+  marginTop: 10,
+  marginBottom: 10,
+},
+tab: {
+  flex: 1,
+  paddingVertical: 12,
+  alignItems: 'center',
+  borderBottomWidth: 2,
+  borderBottomColor: 'transparent',
+},
+activeTab: {
+  borderBottomColor: '#F2CF68', // Orange underline
+},
+tabText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#999',
+},
+activeTabText: {
+  color: '#000',
+},
   gradientHeader: { paddingTop: 65, paddingBottom: 55, alignItems: "center", justifyContent: "center", borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   headerTitle: { fontFamily: "Lobster", fontSize: 32, color: "#fff", textAlign: "center", letterSpacing: 1 },
   searchBoxWrapper: { position: "absolute", bottom: -25, left: 16, right: 16, zIndex: 10 },

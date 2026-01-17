@@ -392,6 +392,267 @@ async def generate_leaderboard_snapshot():
 
 
 # ======================================================
+# RESTAURANT LEADERBOARD GENERATION
+# ======================================================
+
+async def generate_restaurant_leaderboard_snapshot():
+    """Generate leaderboard for restaurant posts"""
+    db = get_database()
+
+    to_date = datetime.utcnow()
+    from_date = to_date - timedelta(days=LEADERBOARD_WINDOW_DAYS)
+
+    logger.info(
+        f"🏆 Generating RESTAURANT leaderboard for rolling 3-day window: "
+        f"{from_date.isoformat()} to {to_date.isoformat()}"
+    )
+
+    try:
+        all_posts = await db.restaurant_posts.find(
+            {"media_type": "image"}
+        ).to_list(None)
+
+        posts = []
+
+        for post in all_posts:
+            created_at_raw = post.get("created_at")
+            if not created_at_raw:
+                continue
+
+            created_at = parse_datetime_safe(created_at_raw)
+            created_at = (
+                created_at
+                .replace(tzinfo=IST)
+                .astimezone(UTC)
+                .replace(tzinfo=None)
+            )
+
+            if from_date <= created_at <= to_date:
+                posts.append(post)
+
+        logger.info(f"📊 Found {len(posts)} RESTAURANT PHOTOS in 3-day window")
+
+    except Exception as e:
+        logger.error(f"❌ Error fetching restaurant posts from database: {e}")
+        posts = []
+
+    if not posts:
+        logger.warning(
+            f"⚠️ No RESTAURANT PHOTOS found in 3-day window "
+            f"({from_date.strftime('%Y-%m-%d')} to {to_date.strftime('%Y-%m-%d')})"
+        )
+        return None
+
+    max_likes = max([post.get("likes_count", 0) for post in posts]) or 1
+
+    posts_with_scores = []
+
+    for post in posts:
+        try:
+            # For restaurants, use a default quality score or calculate differently
+            # Since restaurants might not have "rating", we can use likes more heavily
+            rating = post.get("rating", 5.0)
+            quality_score = normalize_rating_to_quality_score(rating)
+            likes_count = post.get("likes_count", 0)
+
+            engagement_score = calculate_engagement_score(likes_count, max_likes)
+            combined_score = calculate_combined_score(
+                quality_score, engagement_score
+            )
+
+            user = None
+            user_id = post.get("user_id")
+            followers_count = 0
+            following_count = 0
+            posts_count = 0
+
+            if user_id:
+                try:
+                    try:
+                        user = await db.users.find_one({"_id": ObjectId(user_id)})
+                    except:
+                        user = await db.users.find_one({"_id": str(user_id)})
+                except Exception as e:
+                    logger.error(f"❌ Error looking up restaurant user {user_id}: {e}")
+                    user = None
+
+                if user:
+                    followers_count = user.get("followers_count", 0)
+                    following_count = user.get("following_count", 0)
+
+                # Count restaurant posts for this user
+                if user_id:
+                    try:
+                        user_str_id = str(user_id)
+                        posts_count = await db.restaurant_posts.count_documents({"user_id": user_str_id})
+                    except Exception as e:
+                        logger.error(f"❌ Error counting restaurant posts for user {user_id}: {e}")
+                        posts_count = 0
+
+            # Get restaurant name and details
+            restaurant_name = None
+            if user:
+                restaurant_name = (
+                    user.get("restaurant_name") or
+                    user.get("full_name") or
+                    user.get("username") or
+                    "Unknown Restaurant"
+                )
+            else:
+                restaurant_name = post.get("restaurant_name") or "Unknown Restaurant"
+
+            created_at_value = post.get("created_at")
+            if isinstance(created_at_value, datetime):
+                created_at_str = created_at_value.isoformat()
+            elif created_at_value:
+                created_at_str = str(created_at_value)
+            else:
+                created_at_str = None
+
+            posts_with_scores.append({
+                "post_id": str(post["_id"]),
+                "user_id": str(user_id) if user_id else "",
+                "username": restaurant_name,
+                "full_name": restaurant_name,
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "user_level": user.get("level", 1) if user else 1,
+                "level": user.get("level", 1) if user else 1,
+                "followers_count": followers_count,
+                "following_count": following_count,
+                "posts_count": posts_count,
+                "media_url": post.get("media_url", ""),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": post.get("media_type", "image"),
+                "caption": post.get("about") or post.get("caption") or "",
+                "location_name": post.get("location_name"),
+                "price": post.get("price"),
+                "about": post.get("about"),
+                "rating": rating,
+                "quality_score": quality_score,
+                "likes_count": likes_count,
+                "engagement_score": engagement_score,
+                "combined_score": combined_score,
+                "created_at": created_at_str,
+                "account_type": "restaurant"
+            })
+
+        except Exception as e:
+            logger.error(f"❌ Error processing restaurant post {post.get('_id')}: {e}")
+
+    posts_with_scores.sort(key=lambda x: x["combined_score"], reverse=True)
+    top_posts = posts_with_scores[:LEADERBOARD_SIZE]
+
+    for idx, post in enumerate(top_posts, start=1):
+        post["rank"] = idx
+
+    snapshot = {
+        "from_date": from_date.isoformat(),
+        "to_date": to_date.isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
+        "window_days": LEADERBOARD_WINDOW_DAYS,
+        "total_posts_analyzed": len(posts),
+        "entries": top_posts,
+        "config": {
+            "quality_weight": QUALITY_WEIGHT,
+            "engagement_weight": ENGAGEMENT_WEIGHT,
+            "leaderboard_size": LEADERBOARD_SIZE
+        }
+    }
+
+    await db.restaurant_leaderboard_snapshots.insert_one(snapshot)
+    logger.info(f"✅ Restaurant leaderboard snapshot created with {len(top_posts)} entries")
+
+    return snapshot
+
+# ======================================================
+# RESTAURANT LEADERBOARD ENDPOINTS
+# ======================================================
+
+@router.get("/restaurants/current")
+async def get_current_restaurant_leaderboard(
+    force_refresh: bool = Query(False, description="Force regenerate leaderboard"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the current restaurant leaderboard snapshot."""
+    db = get_database()
+    
+    try:
+        latest_snapshot = await db.restaurant_leaderboard_snapshots.find_one(
+            sort=[("generated_at", -1)]
+        )
+        
+        should_regenerate = force_refresh
+        
+        if force_refresh:
+            logger.info("🔄 Force refresh requested, regenerating restaurant leaderboard...")
+            await db.restaurant_leaderboard_snapshots.delete_many({})
+        elif not latest_snapshot:
+            logger.info("📊 No restaurant leaderboard snapshot found, generating new one...")
+            should_regenerate = True
+        else:
+            generated_at_str = latest_snapshot.get("generated_at")
+            if generated_at_str:
+                generated_at = parse_datetime_safe(generated_at_str)
+                age_days = (datetime.utcnow() - generated_at).days
+                
+                if age_days >= LEADERBOARD_WINDOW_DAYS:
+                    should_regenerate = True
+        
+        if should_regenerate:
+            snapshot = await generate_restaurant_leaderboard_snapshot()
+            if not snapshot:
+                return {
+                    "from_date": (datetime.utcnow() - timedelta(days=LEADERBOARD_WINDOW_DAYS)).isoformat(),
+                    "to_date": datetime.utcnow().isoformat(),
+                    "generated_at": datetime.utcnow().isoformat(),
+                    "window_days": LEADERBOARD_WINDOW_DAYS,
+                    "total_posts_analyzed": 0,
+                    "entries": [],
+                    "config": {
+                        "quality_weight": QUALITY_WEIGHT,
+                        "engagement_weight": ENGAGEMENT_WEIGHT,
+                        "leaderboard_size": LEADERBOARD_SIZE
+                    }
+                }
+            return serialize_document(snapshot)
+        else:
+            serialized = serialize_document(latest_snapshot)
+            serialized.pop("_id", None)
+            return serialized
+            
+    except Exception as e:
+        logger.error(f"❌ Error getting restaurant leaderboard: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve restaurant leaderboard: {str(e)}")
+
+
+@router.post("/restaurants/refresh")
+async def refresh_restaurant_leaderboard(current_user: dict = Depends(get_current_user)):
+    """Force refresh the restaurant leaderboard."""
+    db = get_database()
+    
+    try:
+        result = await db.restaurant_leaderboard_snapshots.delete_many({})
+        logger.info(f"🗑️ Cleared {result.deleted_count} cached restaurant leaderboard snapshots")
+        
+        snapshot = await generate_restaurant_leaderboard_snapshot()
+        
+        if not snapshot:
+            return {
+                "message": "Restaurant leaderboard refreshed but no posts found",
+                "entries": []
+            }
+        
+        return {
+            "message": "Restaurant leaderboard refreshed successfully",
+            "entries_count": len(snapshot.get("entries", []))
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error refreshing restaurant leaderboard: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to refresh restaurant leaderboard: {str(e)}")
+
+
+# ======================================================
 # API ENDPOINTS
 # ======================================================
 
