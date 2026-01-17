@@ -57,7 +57,7 @@ style={{ width: size, height: size }}
 />
 </MaskedView>
 );
- function FeedCard({
+function FeedCard({
   post,
   onLikeUpdate,
   onStoryCreated,
@@ -67,9 +67,20 @@ style={{ width: size, height: size }}
   isMuted = true,
   onMuteToggle,
 }) {
-const router = useRouter();
-const { user } = useAuth();
-const videoRef = useRef(null);
+  // Add debug log HERE - inside the function
+  console.log('🔍 FeedCard post data:', {
+    id: post.id,
+    username: post.username,
+    price: post.price,
+    about: post.about,
+    rating: post.rating,
+    description: post.description,
+    account_type: post.account_type
+  });
+
+  const router = useRouter();
+  const { user } = useAuth();
+  const videoRef = useRef(null);
 
 console.log('Post user:', post.username, 'is_following:', post.is_following);
 
@@ -342,39 +353,6 @@ const handleBlockUser = async () => {
     ]
   );
 };
-
-// Update options menu - only show Block option
-{showOptionsMenu && (
-  <View style={styles.optionsMenuOverlay}>
-    {/* Block User Option */}
-    {!isOwnPost && (
-      <TouchableOpacity
-        style={styles.optionsMenuItem}
-        onPress={() => {
-          setShowOptionsMenu(false);
-          handleBlockUser();
-        }}
-      >
-        <Ionicons name="ban-outline" size={20} color="#FF6B6B" />
-        <Text style={[styles.optionsMenuText, { color: '#FF6B6B' }]}>
-          Block User
-        </Text>
-      </TouchableOpacity>
-    )}
-    
-    {/* Report Post Option */}
-    <TouchableOpacity
-      style={styles.optionsMenuItem}
-      onPress={() => {
-        setShowOptionsMenu(false);
-        setShowReportModal(true);
-      }}
-    >
-      <Ionicons name="flag-outline" size={20} color="#E94A37" />
-      <Text style={styles.optionsMenuText}>Report Post</Text>
-    </TouchableOpacity>
-  </View>
-)}
 
 const handleDoubleTap = () => {
   const now = Date.now();
@@ -773,7 +751,6 @@ postId={post.id}
     </LinearGradient>
   </Pressable>
 )}
-</View>
 
 {/* ACTIONS */}
 <View style={styles.actions}>

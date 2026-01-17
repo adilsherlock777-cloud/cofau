@@ -253,8 +253,11 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         user_id: post.user_id,
         username: post.username,
         user_profile_picture: getPostDP(post),
-        description: post.review_text || post.description,
+        description: post.review_text || post.description || post.about,
         rating: post.rating,
+        price: post.price, 
+        about: post.about,
+        account_type: post.account_type,
         media_url: normalizeMediaUrl(post.image_url || post.media_url),
         thumbnail_url: post.thumbnail_url
           ? normalizeMediaUrl(post.thumbnail_url)
