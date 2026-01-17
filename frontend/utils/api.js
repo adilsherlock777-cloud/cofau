@@ -480,3 +480,36 @@ export const getBlockedUsers = async () => {
   const response = await apiClient.get('/users/blocked-list');
   return response.data;
 };
+
+export const createRestaurantPost = async (postData: any) => {
+  const formData = new FormData();
+  
+  formData.append('price', postData.price);
+  formData.append('about', postData.about);
+  formData.append('map_link', postData.map_link);
+  
+  if (postData.location_name) {
+    formData.append('location_name', postData.location_name);
+  }
+  if (postData.category) {
+    formData.append('category', postData.category);
+  }
+  
+  formData.append('file', postData.file);
+  formData.append('media_type', postData.media_type);
+
+  const token = await AsyncStorage.getItem('restaurant_token'); // or however you store it
+  
+  const response = await axios.post(
+    `${API_URL}/api/restaurant/posts`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  
+  return response.data;
+};

@@ -25,6 +25,7 @@ from routers.compliments import router as compliments_router
 from routers.moderation import router as moderation_router
 from routers.leaderboard import router as leaderboard_router
 from routers import restaurant_auth
+from routers import restaurant_posts
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
@@ -420,6 +421,7 @@ app.include_router(chat_router)
 app.include_router(compliments_router)
 app.include_router(moderation_router)
 app.include_router(leaderboard_router)
+app.include_router(restaurant_posts.router)
 
 
 # ======================================================
