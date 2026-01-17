@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    """Get current authenticated user"""
+    """Get current authenticated user (works for both users and restaurants)"""
     email = verify_token(token)
     if email is None:
         raise HTTPException(
@@ -21,9 +21,27 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         )
     
     db = get_database()
+    
+    # First try users collection
     user = await db.users.find_one({"email": email})
+    
+    # If not found in users, try restaurants collection
+    if user is None:
+        user = await db.restaurants.find_one({"email": email})
+        if user:
+            # Add account_type marker and map restaurant fields to user fields
+            user["account_type"] = "restaurant"
+            user["full_name"] = user.get("restaurant_name", "Restaurant")
+            user["username"] = user.get("restaurant_name", "Restaurant")
+            user["level"] = None  # Restaurants don't have levels
+            user["points"] = None
+    
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Ensure account_type is set for regular users too
+    if "account_type" not in user:
+        user["account_type"] = "user"
     
     return user
 
