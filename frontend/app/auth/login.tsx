@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -24,13 +25,12 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  console.log('✅ LoginScreen hooks initialized, email:', email, 'password length:', password.length);
+  const [isRestaurant, setIsRestaurant] = useState(false); // Toggle for restaurant login
 
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
       window.alert(`${title}\n${message}`);
     } else {
-      // For native, you'd use Alert.alert (not imported for now)
       console.log(`Alert: ${title} - ${message}`);
     }
   };
@@ -39,6 +39,7 @@ export default function LoginScreen() {
     console.log('🚀 Login Screen: handleLogin called');
     console.log('📧 Email input:', email);
     console.log('🔒 Password length:', password.length);
+    console.log('🏪 Is Restaurant:', isRestaurant);
     
     // Basic validation
     if (!email || !password) {
@@ -58,18 +59,17 @@ export default function LoginScreen() {
 
     try {
       console.log('🔄 Calling login from AuthContext...');
-      // Call backend login API
-      const result = await login(email, password);
+      // Call backend login API with isRestaurant flag
+      const result = await login(email, password, isRestaurant);
       console.log('📥 Login result received:', result);
 
       if (result.success) {
         console.log('✅ Login successful! Auth state updated.');
-        console.log('   _layout will handle navigation automatically.');
-        // Show success message
-        showAlert('Login Successful! 🎉', 'Welcome back to Cofau');
-        // Don't manually navigate - let _layout handle it based on auth state
+        const welcomeMessage = isRestaurant 
+          ? 'Welcome back to Cofau Restaurant!' 
+          : 'Welcome back to Cofau';
+        showAlert('Login Successful! 🎉', welcomeMessage);
       } else {
-        // Show error from backend
         console.log('❌ Login failed:', result.error);
         showAlert('Login Failed', result.error || 'Please check your credentials');
       }
@@ -92,20 +92,33 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Logo */}
-        
         <View style={styles.logoContainer}>
-  <Image
-    source={require('../../assets/images/icon.png')}
-    style={styles.logoImage}
-  />
-</View>
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logoImage}
+          />
+        </View>
 
         {/* Title */}
         <Text style={styles.title}>Login</Text>
-        <Text style={styles.subtitle}>Welcome back to Cofau</Text>
+        <Text style={styles.subtitle}>
+          {isRestaurant ? 'Welcome back, Restaurant!' : 'Welcome back to Cofau'}
+        </Text>
 
         {/* Form */}
         <View style={styles.form}>
+          {/* Restaurant Toggle */}
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>Login as Restaurant</Text>
+            <Switch
+              value={isRestaurant}
+              onValueChange={setIsRestaurant}
+              trackColor={{ false: '#E0E0E0', true: '#1B7C82' }}
+              thumbColor={isRestaurant ? '#FFF' : '#FFF'}
+              ios_backgroundColor="#E0E0E0"
+            />
+          </View>
+
           {/* Email Input */}
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
@@ -164,15 +177,17 @@ export default function LoginScreen() {
             disabled={loading}
           >
             <LinearGradient
-  colors={['#E94A37', '#F2CF68', '#1B7C82']}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 0 }}
-  style={styles.button}
->
+              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.button}
+            >
               {loading ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <Text style={styles.buttonText}>Login</Text>
+                <Text style={styles.buttonText}>
+                  {isRestaurant ? 'Login as Restaurant' : 'Login'}
+                </Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -182,6 +197,14 @@ export default function LoginScreen() {
             <Text style={styles.signupText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/auth/signup')}>
               <Text style={styles.signupLink}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Restaurant Sign Up Link */}
+          <View style={styles.restaurantSignupContainer}>
+            <Text style={styles.restaurantSignupText}>Are you a Restaurant? </Text>
+            <TouchableOpacity onPress={() => router.push('/auth/restaurant-signup')}>
+              <Text style={styles.restaurantSignupLink}>Sign up here</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -205,22 +228,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  logoText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#FFF',
+  logoImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
   title: {
     fontSize: 32,
@@ -237,6 +248,23 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  toggleLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -283,12 +311,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-
-  logoImage: {
-  width: 120,
-  height: 120,
-  borderRadius: 60,
-},
   buttonText: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -299,12 +321,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
   },
   signupText: {
     fontSize: 14,
     color: '#999',
   },
   signupLink: {
+    fontSize: 14,
+    color: '#1B7C82',
+    fontWeight: '600',
+  },
+  restaurantSignupContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restaurantSignupText: {
+    fontSize: 14,
+    color: '#999',
+  },
+  restaurantSignupLink: {
     fontSize: 14,
     color: '#1B7C82',
     fontWeight: '600',
