@@ -1110,7 +1110,7 @@ async def unfollow_restaurant_public(
 @router.post("/public/{post_id}/like")
 async def like_restaurant_post_as_user(
     post_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_optional)
 ):
     """Like a restaurant post (for regular users)"""
     db = get_database()
