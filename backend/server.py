@@ -3242,6 +3242,31 @@ from routers import check_data
 app.include_router(check_data.router)
 
 # ==================== BLOCK USER ENDPOINTS ====================
+@app.get("/api/users/blocked-list")
+async def get_blocked_users(current_user: dict = Depends(get_current_user)):
+    """Get list of blocked users"""
+    db = get_database()
+    
+    # Get all blocks for current user
+    blocks = await db.blocks.find({
+        "blocker_id": str(current_user["_id"])
+    }).to_list(None)
+    
+    result = []
+    for block in blocks:
+        user = await db.users.find_one({"_id": ObjectId(block["blocked_id"])})
+        if user:
+            result.append({
+                "id": str(user["_id"]),
+                "user_id": str(user["_id"]),
+                "full_name": user.get("full_name", "Unknown"),
+                "username": user.get("username") or user.get("full_name", "Unknown"),
+                "profile_picture": user.get("profile_picture"),
+                "level": user.get("level", 1),
+                "blocked_at": block["created_at"]
+            })
+    
+    return result
 
 @app.post("/api/users/{user_id}/block")
 async def block_user(user_id: str, current_user: dict = Depends(get_current_user)):
@@ -3284,31 +3309,6 @@ async def unblock_user(user_id: str, current_user: dict = Depends(get_current_us
     
     return {"message": "User unblocked successfully"}
 
-@app.get("/api/users/blocked-list")
-async def get_blocked_users(current_user: dict = Depends(get_current_user)):
-    """Get list of blocked users"""
-    db = get_database()
-    
-    # Get all blocks for current user
-    blocks = await db.blocks.find({
-        "blocker_id": str(current_user["_id"])
-    }).to_list(None)
-    
-    result = []
-    for block in blocks:
-        user = await db.users.find_one({"_id": ObjectId(block["blocked_id"])})
-        if user:
-            result.append({
-                "id": str(user["_id"]),
-                "user_id": str(user["_id"]),
-                "full_name": user.get("full_name", "Unknown"),
-                "username": user.get("username") or user.get("full_name", "Unknown"),
-                "profile_picture": user.get("profile_picture"),
-                "level": user.get("level", 1),
-                "blocked_at": block["created_at"]
-            })
-    
-    return result
 
 # Helper function to get blocked user IDs (use in other endpoints)
 async def get_blocked_user_ids(current_user_id: str, db):
