@@ -598,6 +598,20 @@ try {
       setError(false);
     } catch (err: any) {
       console.error('❌ Profile fetch error:', err.response?.data || err.message);
+      // Check if user is blocked
+    if (err.response?.status === 403) {
+      Alert.alert(
+        'Blocked User',
+        'You have blocked this user. Unblock them from Settings > Blocked Users to view their profile.',
+        [
+          {
+            text: 'Go Back',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+      return;
+    }
       setError(true);
     } finally {
       setLoading(false);
@@ -3869,7 +3883,7 @@ bannerUploadingOverlay: {
   },
 profileOnBanner: {
   position: 'absolute',
-  bottom: 145,
+  top: 145,
   left: 20,
   elevation: 100,
   zIndex: 100, 

@@ -105,12 +105,13 @@ export default function FeedScreen() {
   const lastScrollYRef = useRef(0);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [restaurantReviewsCount, setRestaurantReviewsCount] = useState(0);
 
   const POSTS_PER_PAGE = 30;
   const VISIBILITY_THRESHOLD = 0.2;
 
   // Handle mute toggle
-  const handleMuteToggle = useCallback((newMuteState: boolean) => {
+const handleMuteToggle = useCallback((newMuteState: boolean) => {
     globalMuteState = newMuteState;
     setIsMuted(newMuteState);
   }, []);
@@ -121,8 +122,26 @@ useEffect(() => {
     setHasInitiallyLoaded(true);
   }
   refreshUnreadCount();
-  loadUnreadMessagesCount();  // ⬅️ ADD THIS
+  loadUnreadMessagesCount(); 
+  if (accountType === 'restaurant') {
+    fetchRestaurantReviewsCount();  // ⬅️ ADD THIS
+  } 
 }, []);
+
+const fetchRestaurantReviewsCount = async () => {
+  if (!token || !user?.id || accountType !== 'restaurant') return;
+  try {
+    const response = await axios.get(
+      `${BACKEND}/api/restaurants/${user.id}/reviews`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const reviews = response.data || [];
+    setRestaurantReviewsCount(reviews.length);
+  } catch (err) {
+    console.log('Error fetching restaurant reviews count:', err);
+    setRestaurantReviewsCount(0);
+  }
+};
 
 
 useFocusEffect(
@@ -131,13 +150,11 @@ useFocusEffect(
     loadUnreadMessagesCount();  // ⬅️ ADD THIS
     refreshUser();
     fetchOwnStory();
-    
-    // Only fetch feed on first load
-    if (!hasInitiallyLoaded) {
-      fetchFeed(true);
-      setHasInitiallyLoaded(true);
+    if (accountType === 'restaurant') {
+      fetchRestaurantReviewsCount();  // ⬅️ ADD THIS
     }
-  }, [hasInitiallyLoaded])
+    // ...rest of code
+  }, [hasInitiallyLoaded, accountType])
 );
 
 const loadUnreadMessagesCount = async () => {
@@ -151,6 +168,7 @@ const loadUnreadMessagesCount = async () => {
     console.log('Error fetching unread messages:', error);
   }
 };
+
 
 
 
@@ -539,20 +557,50 @@ const renderPost = useCallback(
       </View>
 
       {/* Total Reviews Content */}
-      <View style={styles.levelContent}>
-        <Text style={styles.levelLabel}>Total Reviews</Text>
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <LinearGradient
-              colors={['#4CAF50', '#8BC34A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.progressFill, { width: '0.4%' }]}
-            />
-          </View>
-          <Text style={styles.progressText}>0/25000</Text>
-        </View>
-      </View>
+<View style={styles.levelContent}>
+  <Text style={styles.levelLabel}>Total Reviews</Text>
+  <View style={styles.progressContainer}>
+    <View style={styles.progressBar}>
+      {(() => {
+        const reviewsCount = restaurantReviewsCount || 0;
+        const maxReviews = 25000;
+        const progressPercent = maxReviews > 0
+          ? Math.min((reviewsCount / maxReviews) * 100, 100)
+          : 0;
+
+        let gradientColors;
+        let gradientLocations;
+
+        if (progressPercent <= 33) {
+          gradientColors = ["#E94A37", "#E94A37"];
+          gradientLocations = [0, 1];
+        } else if (progressPercent <= 66) {
+          gradientColors = ["#E94A37", "#F2CF68"];
+          gradientLocations = [0, 1];
+        } else {
+          gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
+          gradientLocations = [0, 0.5, 1];
+        }
+
+        return (
+          <LinearGradient
+            colors={gradientColors}
+            locations={gradientLocations}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[
+              styles.progressFill,
+              { width: `${Math.max(progressPercent, 0.5)}%` },
+            ]}
+          />
+        );
+      })()}
+    </View>
+    <Text style={styles.progressText}>
+      {restaurantReviewsCount || 0}/25000
+    </Text>
+  </View>
+</View>
     </View>
   </View>
 )}

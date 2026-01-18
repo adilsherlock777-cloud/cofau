@@ -200,11 +200,16 @@ export const addComment = async (postId, commentText, token = null) => {
 };
 
 /**
- * Follow a user
+ * Follow a user or restaurant
  */
-export const followUser = async (userId) => {
+export const followUser = async (userId, accountType) => {
   try {
-    const response = await axios.post(`${API_URL}/users/${userId}/follow`);
+    // Use different endpoint for restaurant accounts
+    const endpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/posts/follow/${userId}`
+      : `${API_URL}/users/${userId}/follow`;
+    
+    const response = await axios.post(endpoint);
     return response.data;
   } catch (error) {
     console.error('❌ Error following user:', error.response?.data || error.message);
@@ -213,11 +218,16 @@ export const followUser = async (userId) => {
 };
 
 /**
- * Unfollow a user
+ * Unfollow a user or restaurant
  */
-export const unfollowUser = async (userId) => {
+export const unfollowUser = async (userId, accountType) => {
   try {
-    const response = await axios.delete(`${API_URL}/users/${userId}/follow`);
+    // Use different endpoint for restaurant accounts
+    const endpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/posts/follow/${userId}`
+      : `${API_URL}/users/${userId}/follow`;
+    
+    const response = await axios.delete(endpoint);
     return response.data;
   } catch (error) {
     console.error('❌ Error unfollowing user:', error.response?.data || error.message);

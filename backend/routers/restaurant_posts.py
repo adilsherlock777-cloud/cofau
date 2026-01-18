@@ -3,6 +3,7 @@ from datetime import datetime
 from bson import ObjectId
 from database import get_database
 from routers.restaurant_auth import get_current_restaurant
+from routers.auth import get_current_user as get_current_user_optional
 from config import settings
 import os
 import shutil
@@ -1016,3 +1017,90 @@ async def get_restaurant_reviews(
     )
     
     return result
+
+# ==================== FOLLOW/UNFOLLOW RESTAURANT ====================
+
+@router.post("/follow/{restaurant_id}")
+async def follow_restaurant_public(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user_optional)
+):
+    """Follow a restaurant (for regular users)"""
+    db = get_database()
+    
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Check if restaurant exists
+    try:
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid restaurant ID")
+    
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    # Check if already following
+    existing_follow = await db.follows.find_one({
+        "followerId": user_id,
+        "followingId": restaurant_id,
+        "followingType": "restaurant"
+    })
+    
+    if existing_follow:
+        raise HTTPException(status_code=400, detail="Already following this restaurant")
+    
+    # Create follow record
+    follow_doc = {
+        "followerId": user_id,
+        "followingId": restaurant_id,
+        "followingType": "restaurant",
+        "created_at": datetime.utcnow()
+    }
+    await db.follows.insert_one(follow_doc)
+    
+    # Update restaurant's followers count
+    await db.restaurants.update_one(
+        {"_id": ObjectId(restaurant_id)},
+        {"$inc": {"followers_count": 1}}
+    )
+    
+    print(f"✅ User {user_id} followed restaurant {restaurant_id}")
+    
+    return {"message": "Successfully followed restaurant"}
+
+
+@router.delete("/follow/{restaurant_id}")
+async def unfollow_restaurant_public(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user_optional)
+):
+    """Unfollow a restaurant (for regular users)"""
+    db = get_database()
+    
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    # Remove follow record
+    result = await db.follows.delete_one({
+        "followerId": user_id,
+        "followingId": restaurant_id,
+        "followingType": "restaurant"
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Not following this restaurant")
+    
+    # Update restaurant's followers count
+    await db.restaurants.update_one(
+        {"_id": ObjectId(restaurant_id)},
+        {"$inc": {"followers_count": -1}}
+    )
+    
+    print(f"✅ User {user_id} unfollowed restaurant {restaurant_id}")
+    
+    return {"message": "Successfully unfollowed restaurant"}

@@ -289,7 +289,7 @@ const previousFollowState = isFollowing;
 setIsFollowing(true);
 
 try {
-await followUser(post.user_id);
+await followUser(post.user_id, post.account_type);
 Alert.alert("Success", `You are now following ${post.username || "this user"}`);
 } catch (error) {
 console.error("Error following user:", error);
@@ -309,7 +309,7 @@ const previousFollowState = isFollowing;
 setIsFollowing(false);
 
 try {
-await unfollowUser(post.user_id);
+await unfollowUser(post.user_id, post.account_type);
 } catch (error) {
 console.error("Error unfollowing user:", error);
 setIsFollowing(previousFollowState);
@@ -695,7 +695,7 @@ postId={post.id}
   <View style={styles.detailBox}>
     <Text style={styles.detailLabel}>PRICE</Text>
     <View style={styles.ratingRow}>
-      <Ionicons name="pricetag" size={19} color="#4ECDC4" />
+      <Ionicons name="pricetag" size={19} color="#FFD700" />
       <Text style={styles.ratingText}>{post.price}</Text>
     </View>
   </View>
@@ -711,7 +711,7 @@ postId={post.id}
       <Ionicons 
         name={post.price ? "information-circle" : "create"} 
         size={19} 
-        color={post.price ? "#4ECDC4" : "#FFD700"} 
+        color={post.price ? "#FFD700" : "#FFD700"} 
       />
       <Text style={styles.reviewText}>
         {post.about || post.description}
