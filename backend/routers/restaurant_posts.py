@@ -1152,7 +1152,7 @@ async def like_restaurant_post_as_user(
 @router.delete("/public/{post_id}/like")
 async def unlike_restaurant_post_as_user(
     post_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_optional)
 ):
     """Unlike a restaurant post (for regular users)"""
     db = get_database()
@@ -1182,7 +1182,7 @@ async def unlike_restaurant_post_as_user(
 async def add_comment_to_restaurant_post_as_user(
     post_id: str,
     comment_text: str = Form(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_optional)
 ):
     """Add a comment to a restaurant post (for regular users)"""
     db = get_database()
@@ -1274,7 +1274,7 @@ async def get_restaurant_post_comments_public(post_id: str):
 async def delete_comment_from_restaurant_post_as_user(
     post_id: str,
     comment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_optional)
 ):
     """Delete a comment from a restaurant post (for regular users - only own comments)"""
     db = get_database()
