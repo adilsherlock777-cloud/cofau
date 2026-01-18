@@ -917,46 +917,65 @@ const renderPost = useCallback(
       </View>
 
       {/* Add Post/Story Modal */}
-      <Modal
-        visible={showAddMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddMenu(false)}
+<Modal
+  visible={showAddMenu}
+  transparent={true}
+  animationType="fade"
+  onRequestClose={() => setShowAddMenu(false)}
+>
+  <TouchableOpacity
+    style={styles.modalOverlay}
+    activeOpacity={1}
+    onPress={() => setShowAddMenu(false)}
+  >
+    <View style={styles.modalContent}>
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={() => {
+          setShowAddMenu(false);
+          router.push("/add-post");
+        }}
+        activeOpacity={0.7}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAddMenu(false)}
-        >
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push("/add-post");
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="image-outline" size={24} color="#333" />
-              <Text style={styles.menuItemText}>Add Post</Text>
-            </TouchableOpacity>
+        <Ionicons name="image-outline" size={24} color="#333" />
+        <Text style={styles.menuItemText}>Add Post</Text>
+      </TouchableOpacity>
 
-            <View style={styles.menuDivider} />
+      <View style={styles.menuDivider} />
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push("/story-upload");
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="camera-outline" size={24} color="#333" />
-              <Text style={styles.menuItemText}>Add Story</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {/* Add Menu - Only for Restaurant Users */}
+      {accountType === 'restaurant' && (
+        <>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              setShowAddMenu(false);
+              router.push({ pathname: "/add-post", params: { mode: 'menu' } });
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="list-outline" size={24} color="#333" />
+            <Text style={styles.menuItemText}>Add Menu </Text>
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+        </>
+      )}
+
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={() => {
+          setShowAddMenu(false);
+          router.push("/story-upload");
+        }}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="camera-outline" size={24} color="#333" />
+        <Text style={styles.menuItemText}>Add Story</Text>
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
+</Modal>
     </View>
   );
 }

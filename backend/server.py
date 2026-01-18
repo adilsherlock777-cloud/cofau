@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import OAuth2PasswordBearer
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from bson import ObjectId
@@ -2720,6 +2721,174 @@ async def update_profile_picture(
     )
     
     return {"message": "Profile picture updated", "profile_picture": profile_image_url}
+
+
+# ==================== BANNER IMAGE ENDPOINTS ====================
+
+@app.post("/api/users/upload-banner-image")
+async def upload_banner_image(
+    file: UploadFile = File(...),
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login"))
+):
+    """Upload banner/cover image - Works for both restaurant and regular users"""
+    from utils.jwt import verify_token
+    import jwt
+    
+    db = get_database()
+    
+    # Decode token to check account type
+    try:
+        # First verify the token is valid
+        email = verify_token(token)
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        # Decode to get account_type (without verification since we already verified)
+        payload = jwt.decode(token, options={"verify_signature": False})
+        account_type = payload.get("account_type", "user")
+    except Exception as e:
+        print(f"❌ Token decode error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Get the current account based on type
+    if account_type == "restaurant":
+        current_account = await db.restaurants.find_one({"email": email})
+        collection = db.restaurants
+        upload_dir = os.path.join(settings.UPLOAD_DIR, "restaurants")
+        url_prefix = "/api/static/uploads/restaurants"
+    else:
+        current_account = await db.users.find_one({"email": email})
+        collection = db.users
+        upload_dir = settings.UPLOAD_DIR
+        url_prefix = "/api/static/uploads"
+    
+    if not current_account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Ensure upload directory exists
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Validate file type
+    file_ext = file.filename.split(".")[-1].lower()
+    if file_ext not in ["jpg", "jpeg", "png", "gif", "webp"]:
+        raise HTTPException(
+            status_code=400, 
+            detail="Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed."
+        )
+    
+    # Generate unique filename
+    unique_id = str(ObjectId())
+    filename = f"banner_{str(current_account['_id'])}_{unique_id}.{file_ext}"
+    file_path = os.path.join(upload_dir, filename)
+    
+    # Delete old banner image if exists
+    old_banner = current_account.get("cover_image")
+    if old_banner:
+        old_filename = None
+        if f"{url_prefix}/" in old_banner:
+            old_filename = old_banner.split(f"{url_prefix}/")[-1]
+        
+        if old_filename:
+            old_path = os.path.join(upload_dir, old_filename)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                    print(f"🗑️ Deleted old banner image: {old_path}")
+                except Exception as e:
+                    print(f"⚠️ Failed to delete old banner image: {e}")
+    
+    # Save file
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        print(f"✅ Banner image saved: {file_path}")
+    except Exception as e:
+        print(f"❌ Error saving banner image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # Calculate URL
+    cover_image_url = f"{url_prefix}/{filename}"
+    
+    # Update account
+    await collection.update_one(
+        {"_id": current_account["_id"]},
+        {"$set": {"cover_image": cover_image_url}}
+    )
+    
+    print(f"✅ Banner image updated for {account_type} {current_account['_id']}: {cover_image_url}")
+    
+    return {
+        "message": "Banner image uploaded successfully",
+        "cover_image": cover_image_url,
+        "banner_image": cover_image_url,
+        "cover_image_url": cover_image_url
+    }
+
+
+@app.delete("/api/users/banner-image")
+async def delete_banner_image(
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login"))
+):
+    """Remove banner/cover image - Works for both restaurant and regular users"""
+    from utils.jwt import verify_token
+    import jwt
+    
+    db = get_database()
+    
+    # Decode token to check account type
+    try:
+        email = verify_token(token)
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        payload = jwt.decode(token, options={"verify_signature": False})
+        account_type = payload.get("account_type", "user")
+    except Exception as e:
+        print(f"❌ Token decode error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Get the current account based on type
+    if account_type == "restaurant":
+        current_account = await db.restaurants.find_one({"email": email})
+        collection = db.restaurants
+        upload_dir = os.path.join(settings.UPLOAD_DIR, "restaurants")
+        url_prefix = "/api/static/uploads/restaurants"
+    else:
+        current_account = await db.users.find_one({"email": email})
+        collection = db.users
+        upload_dir = settings.UPLOAD_DIR
+        url_prefix = "/api/static/uploads"
+    
+    if not current_account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Get current banner
+    old_banner = current_account.get("cover_image")
+    
+    # Delete file if exists
+    if old_banner:
+        old_filename = None
+        if f"{url_prefix}/" in old_banner:
+            old_filename = old_banner.split(f"{url_prefix}/")[-1]
+        
+        if old_filename:
+            old_path = os.path.join(upload_dir, old_filename)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                    print(f"🗑️ Deleted banner image: {old_path}")
+                except Exception as e:
+                    print(f"⚠️ Failed to delete banner image: {e}")
+    
+    # Clear cover_image in database
+    await collection.update_one(
+        {"_id": current_account["_id"]},
+        {"$set": {"cover_image": None}}
+    )
+    
+    print(f"✅ Banner image removed for {account_type} {current_account['_id']}")
+    
+    return {"message": "Banner image removed successfully"}
 
 
 # ==================== LOGOUT ENDPOINT ====================
