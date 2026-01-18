@@ -578,15 +578,22 @@ async def get_restaurant_post_comments(post_id: str):
 async def get_all_restaurant_posts_public(
     skip: int = 0,
     limit: int = 30,
-    categories: str = None
+    categories: str = None  # ← Parameter is "categories"
 ):
     """Get all restaurant posts (public - no auth required)"""
     db = get_database()
     
     query = {}
-    if category and category.strip() and category.lower() != 'all':
+    
+    # Handle multiple categories (comma-separated)
+    if categories and categories.strip():  # ← Use "categories" here, not "category"
         import re
-        query["category"] = {"$regex": re.escape(category.strip()), "$options": "i"}
+        category_list = [cat.strip() for cat in categories.split(",") if cat.strip().lower() != 'all']
+        if category_list:
+            query["category"] = {
+                "$regex": "|".join([re.escape(cat) for cat in category_list]),
+                "$options": "i"
+            }
     
     posts = await db.restaurant_posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
