@@ -54,6 +54,13 @@ export default function AddPostScreen() {
   const [showPointsAnimation, setShowPointsAnimation] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
 
+  // Tag Restaurant - Only for regular users
+  const [taggedRestaurant, setTaggedRestaurant] = useState<any>(null);
+  const [restaurantSearchQuery, setRestaurantSearchQuery] = useState('');
+  const [restaurantSuggestions, setRestaurantSuggestions] = useState<any[]>([]);
+  const [showRestaurantSuggestions, setShowRestaurantSuggestions] = useState(false);
+  const [loadingRestaurants, setLoadingRestaurants] = useState(false);
+
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -379,6 +386,7 @@ const handlePost = async () => {
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
         category: categories.length > 0 ? categories.join(', ') : undefined,
+        tagged_restaurant_id: taggedRestaurant?.id || undefined, 
         file: fileToUpload,
         media_type: mediaType,
       };
@@ -492,6 +500,66 @@ const handleLocationNameChange = (text: string) => {
   debounceTimeout.current = setTimeout(() => {
     fetchLocationSuggestions(text);
   }, 300); // 300ms debounce
+};
+
+// ------------------------------ RESTAURANT SEARCH ------------------------------
+
+const restaurantDebounceTimeout = React.useRef<NodeJS.Timeout | null>(null);
+
+const fetchRestaurantSuggestions = async (text: string) => {
+  if (!text || text.trim().length < 2) {
+    setRestaurantSuggestions([]);
+    setShowRestaurantSuggestions(false);
+    return;
+  }
+
+  setLoadingRestaurants(true);
+  try {
+    const response = await axios.get(
+      `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/restaurants/search`,
+      {
+        params: { q: text.trim(), limit: 5 },
+        headers: { Authorization: `Bearer ${auth?.token}` },
+      }
+    );
+
+    if (response.data && response.data.length > 0) {
+      setRestaurantSuggestions(response.data);
+      setShowRestaurantSuggestions(true);
+    } else {
+      setRestaurantSuggestions([]);
+      setShowRestaurantSuggestions(false);
+    }
+  } catch (error) {
+    console.log('Error fetching restaurant suggestions:', error);
+    setRestaurantSuggestions([]);
+    setShowRestaurantSuggestions(false);
+  } finally {
+    setLoadingRestaurants(false);
+  }
+};
+
+const handleRestaurantSearchChange = (text: string) => {
+  setRestaurantSearchQuery(text);
+
+  if (restaurantDebounceTimeout.current) {
+    clearTimeout(restaurantDebounceTimeout.current);
+  }
+
+  restaurantDebounceTimeout.current = setTimeout(() => {
+    fetchRestaurantSuggestions(text);
+  }, 300);
+};
+
+const selectRestaurant = (restaurant: any) => {
+  setTaggedRestaurant(restaurant);
+  setRestaurantSearchQuery('');
+  setShowRestaurantSuggestions(false);
+  setRestaurantSuggestions([]);
+};
+
+const removeTaggedRestaurant = () => {
+  setTaggedRestaurant(null);
 };
 
   // ------------------------------ UI ------------------------------
@@ -722,6 +790,72 @@ return (
             </TouchableOpacity>
           )}
         </View>
+
+        {/* TAG A RESTAURANT - Only for Regular Users */}
+{accountType !== 'restaurant' && (
+  <View style={styles.section}>
+    <Text style={styles.sectionLabel}>Tag a Restaurant (Optional)</Text>
+    
+    {taggedRestaurant ? (
+      <View style={styles.taggedRestaurantContainer}>
+        <View style={styles.taggedRestaurantInfo}>
+          <Ionicons name="restaurant" size={20} color="#1B7C82" />
+          <Text style={styles.taggedRestaurantName}>
+            {taggedRestaurant.restaurant_name}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={removeTaggedRestaurant}>
+          <Ionicons name="close-circle" size={24} color="#E94A37" />
+        </TouchableOpacity>
+      </View>
+    ) : (
+      <View style={styles.restaurantSearchContainer}>
+        <TextInput
+          style={styles.linkInput}
+          placeholder="Search restaurant to tag..."
+          placeholderTextColor="#999"
+          value={restaurantSearchQuery}
+          onChangeText={handleRestaurantSearchChange}
+        />
+        
+        {loadingRestaurants && (
+          <ActivityIndicator 
+            size="small" 
+            color="#4ECDC4" 
+            style={styles.restaurantLoader} 
+          />
+        )}
+
+        {showRestaurantSuggestions && restaurantSuggestions.length > 0 && (
+          <View style={styles.restaurantSuggestionsContainer}>
+            {restaurantSuggestions.map((restaurant, index) => (
+              <TouchableOpacity
+                key={restaurant.id || index}
+                style={styles.restaurantSuggestionItem}
+                onPress={() => selectRestaurant(restaurant)}
+              >
+                <View style={styles.restaurantSuggestionContent}>
+                  <Ionicons name="restaurant" size={18} color="#1B7C82" />
+                  <View style={styles.restaurantSuggestionTextContainer}>
+                    <Text style={styles.restaurantSuggestionName}>
+                      {restaurant.restaurant_name}
+                    </Text>
+                    {restaurant.bio && (
+                      <Text style={styles.restaurantSuggestionBio} numberOfLines={1}>
+                        {restaurant.bio}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <Ionicons name="add-circle" size={22} color="#4ECDC4" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+    )}
+  </View>
+)}
 
         {/* FREE GOOGLE MAPS LOCATION */}
         {!(accountType === 'restaurant' && postMode === 'menu') && (
@@ -1092,6 +1226,78 @@ postTypeTextActive: {
     marginTop: 12,
     gap: 8,
   },
+  // Tag Restaurant Styles
+taggedRestaurantContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  backgroundColor: '#F0F9F9',
+  borderRadius: 12,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#1B7C82',
+},
+taggedRestaurantInfo: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+  flex: 1,
+},
+taggedRestaurantName: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#1B7C82',
+},
+restaurantSearchContainer: {
+  position: 'relative',
+  zIndex: 999,
+},
+restaurantLoader: {
+  position: 'absolute',
+  right: 16,
+  top: 18,
+},
+restaurantSuggestionsContainer: {
+  backgroundColor: '#FFF',
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#E5E5E5',
+  marginTop: -8,
+  marginBottom: 12,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+restaurantSuggestionItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F0F0F0',
+},
+restaurantSuggestionContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+  gap: 12,
+},
+restaurantSuggestionTextContainer: {
+  flex: 1,
+},
+restaurantSuggestionName: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#333',
+},
+restaurantSuggestionBio: {
+  fontSize: 12,
+  color: '#999',
+  marginTop: 2,
+},
   selectedTag: {
     flexDirection: 'row',
     alignItems: 'center',
