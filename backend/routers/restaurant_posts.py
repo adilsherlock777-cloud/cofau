@@ -578,7 +578,7 @@ async def get_restaurant_post_comments(post_id: str):
 async def get_all_restaurant_posts_public(
     skip: int = 0,
     limit: int = 30,
-    category: str = None
+    categories: str = None
 ):
     """Get all restaurant posts (public - no auth required)"""
     db = get_database()

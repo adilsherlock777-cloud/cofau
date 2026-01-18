@@ -241,30 +241,63 @@ export default function ExploreScreen() {
     return () => setPlayingVideos([]);
   }, [user, token]));
 
-  const fetchPosts = async (refresh = false, categories?: string[]) => {
+const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' | 'restaurants') => {
     try {
       if (refresh) { setLoading(true); setPage(1); setHasMore(true); videoPositions.current.clear(); }
       else { if (!hasMore || loadingMore) return; setLoadingMore(true); }
       const categoriesToUse = categories ?? appliedCategories;
+      const currentTab = tab ?? activeTab;
       const skip = refresh ? 0 : (page - 1) * POSTS_PER_PAGE;
+      
       let feedUrl;
-if (activeTab === 'restaurants') {
-  feedUrl = `${API_URL}/restaurant/posts/public/all?skip=${skip}&limit=${POSTS_PER_PAGE}`;
-} else {
-  feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
-}
-      if (categoriesToUse.length > 0) feedUrl += `&categories=${encodeURIComponent(categoriesToUse.join(","))}`;
+      if (currentTab === 'restaurants') {
+        feedUrl = `${API_URL}/restaurant/posts/public/all?skip=${skip}&limit=${POSTS_PER_PAGE}`;
+      } else {
+        feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
+      }
+      
+      // Same category parameter for both endpoints
+      if (categoriesToUse.length > 0) {
+        feedUrl += `&categories=${encodeURIComponent(categoriesToUse.join(","))}`;
+      }
+      
       const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
-      if (res.data.length === 0) { setHasMore(false); if (refresh) setPosts([]); return; }
+      
+      if (res.data.length === 0) { 
+        setHasMore(false); 
+        if (refresh) setPosts([]); 
+        return; 
+      }
+      
       const newPosts = res.data.map((post: any) => {
         const fullUrl = fixUrl(post.media_url || post.image_url);
-        return { ...post, full_image_url: fullUrl, full_thumbnail_url: fixUrl(post.thumbnail_url), is_liked: post.is_liked_by_user || false, _isVideo: isVideoFile(fullUrl || "", post.media_type), category: post.category?.trim() || null, aspect_ratio: post.aspect_ratio || null };
+        return { 
+          ...post, 
+          full_image_url: fullUrl, 
+          full_thumbnail_url: fixUrl(post.thumbnail_url), 
+          is_liked: post.is_liked_by_user || false, 
+          _isVideo: isVideoFile(fullUrl || "", post.media_type), 
+          category: post.category?.trim() || null, 
+          aspect_ratio: post.aspect_ratio || null 
+        };
       });
-      if (refresh) { setPosts(newPosts); setPage(2); }
-      else { setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]); setPage((prev) => prev + 1); }
+      
+      if (refresh) { 
+        setPosts(newPosts); 
+        setPage(2); 
+      } else { 
+        setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]); 
+        setPage((prev) => prev + 1); 
+      }
+      
       if (res.data.length < POSTS_PER_PAGE) setHasMore(false);
-    } catch (err) { console.error("Fetch error:", err); }
-    finally { setLoading(false); setLoadingMore(false); setRefreshing(false); }
+    } catch (err) { 
+      console.error("Fetch error:", err); 
+    } finally { 
+      setLoading(false); 
+      setLoadingMore(false); 
+      setRefreshing(false); 
+    }
   };
 
   const fetchPostsWithCategories = (categories: string[]) => fetchPosts(true, categories);
@@ -304,34 +337,34 @@ if (activeTab === 'restaurants') {
       {/* USERS | RESTAURANTS TABS */}
 <View style={styles.tabContainer}>
   <TouchableOpacity 
-  style={[styles.tab, activeTab === 'restaurants' && styles.activeTab]}
-  onPress={() => {
-    if (activeTab !== 'restaurants') {
-      setActiveTab('restaurants');
-      setPosts([]);
-      setPage(1);
-      setHasMore(true);
-      setLoading(true);
-      fetchPosts(true);
-    }
-  }}
->
+    style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+    onPress={() => {
+      if (activeTab !== 'users') {
+        setActiveTab('users');
+        setPosts([]);
+        setPage(1);
+        setHasMore(true);
+        setLoading(true);
+        fetchPosts(true, [], 'users');  // ← Pass 'users'
+      }
+    }}
+  >
     <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>USERS</Text>
   </TouchableOpacity>
+
   <TouchableOpacity 
-  style={[styles.tab, activeTab === 'users' && styles.activeTab]}
-  onPress={() => {
-    if (activeTab !== 'users') {
-      setActiveTab('users');
-      setPosts([]);
-      setPage(1);
-      setHasMore(true);
-      setLoading(true);
-      fetchPosts(true);
-    }
-  }}
->
-  
+    style={[styles.tab, activeTab === 'restaurants' && styles.activeTab]}
+    onPress={() => {
+      if (activeTab !== 'restaurants') {
+        setActiveTab('restaurants');
+        setPosts([]);
+        setPage(1);
+        setHasMore(true);
+        setLoading(true);
+        fetchPosts(true, [], 'restaurants');  // ← Pass 'restaurants'
+      }
+    }}
+  >
     <Text style={[styles.tabText, activeTab === 'restaurants' && styles.activeTabText]}>RESTAURANTS</Text>
   </TouchableOpacity>
 </View>
@@ -358,7 +391,28 @@ if (activeTab === 'restaurants') {
           ))}
         </View>
         {loadingMore && <View style={styles.loadingMore}><ActivityIndicator size="small" color="#4dd0e1" /></View>}
-        {!loading && posts.length === 0 && <View style={styles.emptyState}><Ionicons name="restaurant-outline" size={64} color="#ccc" /><Text style={styles.emptyStateText}>No posts found</Text></View>}
+        {!loading && posts.length === 0 && (
+  <View style={styles.emptyState}>
+    <Ionicons name={activeTab === 'restaurants' ? "restaurant-outline" : "images-outline"} size={64} color="#ccc" />
+    <Text style={styles.emptyStateText}>
+      {appliedCategories.length > 0 
+        ? `No ${activeTab === 'restaurants' ? 'restaurant' : ''} posts found for selected ${appliedCategories.length === 1 ? 'category' : 'categories'}` 
+        : 'No posts found'}
+    </Text>
+    {appliedCategories.length > 0 && (
+      <TouchableOpacity 
+        style={{ marginTop: 12 }} 
+        onPress={() => { 
+          setSelectedCategories([]); 
+          setAppliedCategories([]); 
+          fetchPosts(true, [], activeTab); 
+        }}
+      >
+        <Text style={{ color: '#E94A37', fontWeight: '600' }}>Clear Filters</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+)}
         <View style={{ height: 120 }} />
       </ScrollView>
 

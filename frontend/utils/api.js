@@ -37,6 +37,9 @@ export const createPost = async (postData) => {
     if (postData.category) {
       formData.append('category', postData.category);  // ✅ Add category
     }
+    if (postData.tagged_restaurant_id) {                          // ← ADD THIS
+      formData.append('tagged_restaurant_id', postData.tagged_restaurant_id);  // ← ADD THIS
+    }        
     if (postData.media_type) {
       formData.append('media_type', postData.media_type);
     }
@@ -66,6 +69,7 @@ export const createPost = async (postData) => {
       map_link: postData.map_link,
       location_name: postData.location_name,
       category: postData.category,
+      tagged_restaurant_id: postData.tagged_restaurant_id,
       media_type: postData.media_type,
       file: postData.file?.name || postData.file?.uri || 'unknown'
     });

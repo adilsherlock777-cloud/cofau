@@ -300,9 +300,18 @@ export default function ProfileScreen() {
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
+  const [expandedMenuCategories, setExpandedMenuCategories] = useState<{ [key: string]: boolean }>({});
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
   const [isRestaurantProfile, setIsRestaurantProfile] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<string | null>(null);
+  const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false);
+  const [reviewFilterCounts, setReviewFilterCounts] = useState({
+    topRated: 0,
+    mostLoved: 0,
+    newest: 0,
+    disliked: 0,
+  });
 
   useEffect(() => {
     if (!token) {
@@ -386,20 +395,68 @@ export default function ProfileScreen() {
      }
    };
 
-   const fetchRestaurantReviews = async () => {
+const fetchRestaurantReviews = async () => {
   if (!userData?.id) return;
   setLoadingReviews(true);
   try {
-    const response = await axios.get(
-      `${API_URL}/restaurants/${userData.id}/reviews`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    setRestaurantReviews(response.data || []);
-  } catch (err) {
-    console.error('Error fetching restaurant reviews:', err);
+    const url = `${API_URL}/restaurants/${userData.id}/reviews`;
+    console.log('🔍 Fetching reviews from:', url);
+    
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    console.log('✅ Reviews response:', response.data);
+    const reviews = response.data || [];
+    setRestaurantReviews(reviews);
+    calculateReviewFilterCounts(reviews); // Add this line
+  } catch (err: any) {
+    console.error('❌ Error fetching restaurant reviews:', err.response?.data || err.message);
     setRestaurantReviews([]);
   } finally {
     setLoadingReviews(false);
+  }
+};
+
+const calculateReviewFilterCounts = (reviews: any[]) => {
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const counts = {
+    topRated: reviews.filter((r) => r.rating >= 9).length,
+    mostLoved: reviews.filter((r) => (r.likes_count || 0) > 0).length,
+    newest: reviews.filter((r) => new Date(r.created_at) >= oneWeekAgo).length,
+    disliked: reviews.filter((r) => r.rating < 6).length,
+  };
+
+  setReviewFilterCounts(counts);
+};
+
+const getFilteredReviews = () => {
+  if (!reviewFilter) return restaurantReviews;
+
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  switch (reviewFilter) {
+    case 'topRated':
+      return restaurantReviews
+        .filter((r) => r.rating >= 9)
+        .sort((a, b) => b.rating - a.rating);
+    case 'mostLoved':
+  return restaurantReviews
+    .filter((r) => (r.likes_count || 0) > 0)  // Only reviews with likes
+    .sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
+    case 'newest':
+      return restaurantReviews
+        .filter((r) => new Date(r.created_at) >= oneWeekAgo)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    case 'disliked':
+      return restaurantReviews
+        .filter((r) => r.rating < 6)
+        .sort((a, b) => a.rating - b.rating);
+    default:
+      return restaurantReviews;
   }
 };
 
@@ -1294,6 +1351,13 @@ const removeBannerImage = async () => {
   }));
 };
 
+ const toggleMenuCategory = (category: string) => {
+  setExpandedMenuCategories((prev) => ({
+    ...prev,
+    [category]: !prev[category],
+  }));
+};
+
   const renderFavouriteSection = () => {
   // Group posts by location
   const postsByLocation: { [key: string]: any[] } = {};
@@ -1411,6 +1475,167 @@ const removeBannerImage = async () => {
   );
 };
 
+const renderMenuByCategory = () => {
+  // Group menu items by category
+  const menuByCategory: { [key: string]: any[] } = {};
+  
+  menuItems.forEach((item) => {
+    const category = item.category || 'Other';
+    if (!menuByCategory[category]) {
+      menuByCategory[category] = [];
+    }
+    menuByCategory[category].push(item);
+  });
+
+  // Sort categories alphabetically
+  const sortedCategories = Object.entries(menuByCategory).sort(
+    ([catA], [catB]) => catA.localeCompare(catB)
+  );
+
+  if (sortedCategories.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="restaurant-outline" size={64} color="#ccc" />
+        <Text style={styles.emptyText}>No menu items yet</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.favouriteContainer}>
+      {sortedCategories.map(([category, items]) => {
+        const isExpanded = expandedMenuCategories[category] || false;
+        
+        return (
+          <View key={category} style={styles.locationSection}>
+            {/* Category Header */}
+            <TouchableOpacity
+              style={styles.locationHeader}
+              onPress={() => toggleMenuCategory(category)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.locationHeaderLeft}>
+                <Ionicons name="restaurant" size={20} color="#F2CF68" />
+                <Text style={styles.locationName}>{category}</Text>
+              </View>
+              <View style={styles.locationHeaderRight}>
+                <Text style={styles.locationCount}>({items.length})</Text>
+                <Ionicons 
+                  name={isExpanded ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#666" 
+                />
+              </View>
+            </TouchableOpacity>
+
+            {/* Menu Items Grid - Show when expanded */}
+            {isExpanded && (
+              <View style={styles.locationPostsGrid}>
+                {items.map((item) => {
+  const mediaUrl = fixUrl(item.media_url);
+
+  return (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.favouriteGridItem}
+      activeOpacity={0.8}
+    >
+      {mediaUrl ? (
+        <View style={styles.favouriteGridImageContainer}>
+          <Image 
+            source={{ uri: mediaUrl }} 
+            style={styles.favouriteGridImage} 
+            resizeMode="cover"
+          />
+          {/* Price Badge */}
+          {item.price && (
+            <View style={restaurantStyles.menuPriceBadge}>
+              <Text style={restaurantStyles.menuPriceText}>₹{item.price}</Text>
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={styles.gridPlaceholder}>
+          <Ionicons name="restaurant-outline" size={40} color="#ccc" />
+          {/* Price Badge on placeholder */}
+          {item.price && (
+            <View style={restaurantStyles.menuPriceBadge}>
+              <Text style={restaurantStyles.menuPriceText}>₹{item.price}</Text>
+            </View>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+})}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
+const renderGridWithLikes = ({ item }: { item: any }) => {
+  const mediaUrl = fixUrl(item.full_image_url || item.media_url);
+  const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
+  const isVideo =
+    item.media_type === 'video' ||
+    mediaUrl?.toLowerCase().endsWith('.mp4') ||
+    mediaUrl?.toLowerCase().endsWith('.mov') ||
+    mediaUrl?.toLowerCase().endsWith('.avi') ||
+    mediaUrl?.toLowerCase().endsWith('.webm');
+
+  const displayUrl = isVideo ? (thumbnailUrl || mediaUrl) : mediaUrl;
+
+  const handlePostPress = () => {
+    if (item.id) {
+      router.push(`/post-details/${item.id}`);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.gridItemWithBadge}
+      onPress={handlePostPress}
+      activeOpacity={0.8}
+    >
+      {displayUrl ? (
+        <>
+          <Image
+            source={{ uri: displayUrl }}
+            style={styles.gridImage}
+            resizeMode="cover"
+          />
+          {/* Video Play Icon */}
+          {isVideo && (
+            <View style={styles.videoOverlay}>
+              <Ionicons name="play-circle" size={40} color="#fff" />
+            </View>
+          )}
+        </>
+      ) : (
+        <View style={styles.gridPlaceholder}>
+          <Ionicons
+            name={isVideo ? 'videocam-outline' : 'image-outline'}
+            size={40}
+            color="#ccc"
+          />
+        </View>
+      )}
+
+      {/* Likes Badge - Top Right */}
+      <View style={styles.gridLikesBadge}>
+        <GradientHeart size={14} />
+        <Text style={styles.gridLikesText}>
+          {item.likes_count || item.likes || 0}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
   // ================= RESTAURANT PROFILE UI =================
 const renderRestaurantProfile = () => {
   return (
@@ -1498,15 +1723,22 @@ const renderRestaurantProfile = () => {
           </TouchableOpacity>
 
           {/* ================= WHITE INFO BOX ================= */}
-          <View style={restaurantStyles.whiteInfoBox}>
-            <View style={restaurantStyles.restaurantInfoContainer}>
-              <Text style={restaurantStyles.restaurantName}>
-                {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
-              </Text>
-              <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
-            </View>
+<View style={restaurantStyles.whiteInfoBox}>
+  {/* Row container for DP space + Name */}
+  <View style={restaurantStyles.nameRow}>
+    {/* Empty space for DP */}
+    <View style={restaurantStyles.dpPlaceholder} />
+    
+    {/* Restaurant Name & Label */}
+    <View style={restaurantStyles.restaurantInfoContainer}>
+      <Text style={restaurantStyles.restaurantName}>
+        {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
+      </Text>
+      <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
+    </View>
+  </View>
 
-            <View style={restaurantStyles.bioSection}>
+  <View style={restaurantStyles.bioSection}>
               <Text style={restaurantStyles.bioText}>
                 {userData?.bio || 'No bio yet. Add one by editing your profile!'}
               </Text>
@@ -1715,11 +1947,14 @@ const renderRestaurantProfile = () => {
 
         {/* ================= TAB CONTENT ================= */}
         {restaurantActiveTab === 'posts' && (
-          <FlatList
-            data={userPosts}
-            renderItem={renderListItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
+  <FlatList
+    key="restaurant-posts-grid-3col"
+    data={userPosts}
+    renderItem={renderGridWithLikes}
+    keyExtractor={(item) => item.id}
+    numColumns={3}
+    scrollEnabled={false}
+    columnWrapperStyle={{ gap: 1 }}
             ListEmptyComponent={() => (
               <View style={styles.emptyContainer}>
                 <Ionicons name="images-outline" size={64} color="#ccc" />
@@ -1730,118 +1965,161 @@ const renderRestaurantProfile = () => {
         )}
 
         {restaurantActiveTab === 'reviews' && (
-  loadingReviews ? (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" color="#4dd0e1" />
-    </View>
-  ) : restaurantReviews.length > 0 ? (
-    <FlatList
-      data={restaurantReviews}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={styles.reviewItem}
-          onPress={() => router.push(`/post-details/${item.id}`)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.reviewHeader}>
-            <UserAvatar
-              profilePicture={item.user_profile_picture}
-              username={item.username}
-              size={40}
-              level={item.user_level || 1}
-              showLevelBadge={false}
-            />
-            <View style={styles.reviewUserInfo}>
-              <Text style={styles.reviewUsername}>{item.username || 'User'}</Text>
-              <Text style={styles.reviewDate}>
-                {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
-              </Text>
-            </View>
-            <View style={styles.reviewRating}>
-              <Ionicons name="star" size={16} color="#F2CF68" />
-              <Text style={styles.reviewRatingText}>{item.rating}/10</Text>
-            </View>
-          </View>
-          
-          {item.media_url && (
-            <Image
-              source={{ uri: fixUrl(item.media_url) }}
-              style={styles.reviewImage}
-              resizeMode="cover"
-            />
-          )}
-          
-          {item.review_text && (
-            <Text style={styles.reviewText} numberOfLines={3}>
-              {item.review_text}
-            </Text>
-          )}
-        </TouchableOpacity>
-      )}
-      keyExtractor={(item) => item.id}
-      scrollEnabled={false}
-    />
-  ) : (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="star-outline" size={64} color="#ccc" />
-      <Text style={styles.emptyText}>No reviews yet</Text>
-      <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
-        Reviews from customers will appear here
+  <>
+    {/* Filter Button Row */}
+    <View style={restaurantStyles.reviewFilterContainer}>
+      <Text style={restaurantStyles.reviewFilterCount}>
+        {getFilteredReviews().length} {getFilteredReviews().length === 1 ? 'Review' : 'Reviews'}
       </Text>
+      <TouchableOpacity
+        style={[
+          restaurantStyles.reviewFilterButton,
+          reviewFilter && restaurantStyles.reviewFilterButtonActive,
+        ]}
+        onPress={() => setReviewFilterModalVisible(true)}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name="filter"
+          size={16}
+          color={reviewFilter ? '#fff' : '#666'}
+        />
+        <Text
+          style={[
+            restaurantStyles.reviewFilterButtonText,
+            reviewFilter && restaurantStyles.reviewFilterButtonTextActive,
+          ]}
+        >
+          {reviewFilter
+            ? reviewFilter === 'topRated'
+              ? 'Top Rated'
+              : reviewFilter === 'mostLoved'
+              ? 'Most Loved'
+              : reviewFilter === 'newest'
+              ? 'Newest'
+              : 'Disliked'
+            : 'Filter'}
+        </Text>
+        {reviewFilter && (
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              setReviewFilter(null);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close-circle" size={16} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
     </View>
-  )
+
+    {/* Reviews List */}
+    {loadingReviews ? (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4dd0e1" />
+      </View>
+    ) : getFilteredReviews().length > 0 ? (
+      <FlatList
+        data={getFilteredReviews()}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={restaurantStyles.reviewItem}
+            onPress={() => router.push(`/post-details/${item.id}`)}
+            activeOpacity={0.8}
+          >
+            {/* Left Side - Image */}
+            <View style={restaurantStyles.reviewImageContainer}>
+              {item.media_url ? (
+                <Image
+                  source={{ uri: fixUrl(item.media_url) }}
+                  style={restaurantStyles.reviewImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={restaurantStyles.reviewImagePlaceholder}>
+                  <Ionicons name="image-outline" size={40} color="#ccc" />
+                </View>
+              )}
+            </View>
+
+            {/* Right Side - Details */}
+            <View style={restaurantStyles.reviewDetails}>
+              {/* User Info */}
+              <View style={restaurantStyles.reviewUserRow}>
+                <UserAvatar
+                  profilePicture={item.user_profile_picture}
+                  username={item.username}
+                  size={40}
+                  level={item.user_level || 1}
+                  showLevelBadge={false}
+                />
+                <Text style={restaurantStyles.reviewUsername} numberOfLines={1}>
+                  {item.username || 'User'}
+                </Text>
+              </View>
+
+              {/* Rating */}
+              <View style={restaurantStyles.reviewDetailRow}>
+                <Ionicons name="star" size={18} color="#F2CF68" />
+                <Text style={restaurantStyles.reviewDetailText}>{item.rating}/10</Text>
+              </View>
+
+              {/* Review Text */}
+              {item.review_text && (
+                <View style={restaurantStyles.reviewDetailRow}>
+                  <Ionicons name="chatbubble" size={18} color="#F2CF68" />
+                  <Text style={restaurantStyles.reviewDetailText} numberOfLines={2}>
+                    {item.review_text}
+                  </Text>
+                </View>
+              )}
+
+              {/* Likes */}
+              <View style={restaurantStyles.reviewDetailRow}>
+                <GradientHeart size={18} />
+                <Text style={restaurantStyles.reviewDetailText}>
+                  {item.likes_count || 0}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+        keyExtractor={(item) => item.id}
+        scrollEnabled={false}
+      />
+    ) : (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="star-outline" size={64} color="#ccc" />
+        <Text style={styles.emptyText}>
+          {reviewFilter ? 'No reviews match this filter' : 'No reviews yet'}
+        </Text>
+        {reviewFilter && (
+          <TouchableOpacity
+            style={{ marginTop: 12 }}
+            onPress={() => setReviewFilter(null)}
+          >
+            <Text style={{ color: '#E94A37', fontWeight: '600' }}>Clear Filter</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )}
+  </>
 )}
 
         {restaurantActiveTab === 'menu' && (
   menuItems.length > 0 ? (
-    <FlatList
-      data={menuItems}
-      renderItem={({ item }) => (
-        <View style={styles.listItem}>
-          <View style={styles.listImageContainer}>
-            {item.media_url ? (
-              <Image
-                source={{ uri: fixUrl(item.media_url) }}
-                style={styles.listImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.listImagePlaceholder}>
-                <Ionicons name="restaurant-outline" size={40} color="#ccc" />
-              </View>
-            )}
-          </View>
-          <View style={styles.listDetails}>
-            <Text style={styles.listDetailText}>{item.item_name}</Text>
-            <Text style={styles.listDetailText}>₹{item.price}</Text>
-            {item.description && (
-              <Text style={[styles.listDetailText, { color: '#666' }]} numberOfLines={2}>
-                {item.description}
-              </Text>
-            )}
-            {item.category && (
-              <View style={styles.listDetailRow}>
-                <Ionicons name="pricetag" size={16} color="#F2CF68" />
-                <Text style={styles.listDetailText}>{item.category}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-      keyExtractor={(item) => item.id}
-      scrollEnabled={false}
-    />
+    renderMenuByCategory()
   ) : (
     <View style={styles.emptyContainer}>
       <Ionicons name="restaurant-outline" size={64} color="#ccc" />
       <Text style={styles.emptyText}>Menu coming soon</Text>
       <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
-        You'll be able to add menu items here
+        Menu items will appear here
       </Text>
     </View>
   )
 )}
-
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
@@ -2030,6 +2308,158 @@ const renderRestaurantProfile = () => {
       </TouchableOpacity>
     </View>
   </KeyboardAvoidingView>
+</Modal>
+{/* ================= REVIEW FILTER MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={reviewFilterModalVisible}
+  onRequestClose={() => setReviewFilterModalVisible(false)}
+>
+  <TouchableOpacity
+    style={restaurantStyles.filterModalOverlay}
+    activeOpacity={1}
+    onPress={() => setReviewFilterModalVisible(false)}
+  >
+    <View style={restaurantStyles.filterModalContent}>
+      <View style={restaurantStyles.filterModalHeader}>
+        <Text style={restaurantStyles.filterModalTitle}>Filter Reviews</Text>
+        <TouchableOpacity onPress={() => setReviewFilterModalVisible(false)}>
+          <Ionicons name="close" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Top Rated */}
+      <TouchableOpacity
+        style={[
+          restaurantStyles.filterOption,
+          reviewFilter === 'topRated' && restaurantStyles.filterOptionSelected,
+        ]}
+        onPress={() => {
+          setReviewFilter('topRated');
+          setReviewFilterModalVisible(false);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={restaurantStyles.filterOptionLeft}>
+          <View style={[restaurantStyles.filterOptionIcon, { backgroundColor: '#FFF9E6' }]}>
+            <Ionicons name="star" size={20} color="#F2CF68" />
+          </View>
+          <Text style={restaurantStyles.filterOptionText}>Top Rated</Text>
+          <Text style={{ fontSize: 12, color: '#999' }}>9+ stars</Text>
+        </View>
+        <Text
+          style={[
+            restaurantStyles.filterOptionCount,
+            reviewFilter === 'topRated' && restaurantStyles.filterOptionCountSelected,
+          ]}
+        >
+          {reviewFilterCounts.topRated}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Most Loved */}
+      <TouchableOpacity
+        style={[
+          restaurantStyles.filterOption,
+          reviewFilter === 'mostLoved' && restaurantStyles.filterOptionSelected,
+        ]}
+        onPress={() => {
+          setReviewFilter('mostLoved');
+          setReviewFilterModalVisible(false);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={restaurantStyles.filterOptionLeft}>
+          <View style={[restaurantStyles.filterOptionIcon, { backgroundColor: '#FFEEEE' }]}>
+            <Ionicons name="heart" size={20} color="#E94A37" />
+          </View>
+          <Text style={restaurantStyles.filterOptionText}>Most Loved</Text>
+          <Text style={{ fontSize: 12, color: '#999' }}>Highest likes</Text>
+        </View>
+        <Text
+          style={[
+            restaurantStyles.filterOptionCount,
+            reviewFilter === 'mostLoved' && restaurantStyles.filterOptionCountSelected,
+          ]}
+        >
+          {reviewFilterCounts.mostLoved}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Newest */}
+      <TouchableOpacity
+        style={[
+          restaurantStyles.filterOption,
+          reviewFilter === 'newest' && restaurantStyles.filterOptionSelected,
+        ]}
+        onPress={() => {
+          setReviewFilter('newest');
+          setReviewFilterModalVisible(false);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={restaurantStyles.filterOptionLeft}>
+          <View style={[restaurantStyles.filterOptionIcon, { backgroundColor: '#E8F5E9' }]}>
+            <Ionicons name="time" size={20} color="#4CAF50" />
+          </View>
+          <Text style={restaurantStyles.filterOptionText}>Newest</Text>
+          <Text style={{ fontSize: 12, color: '#999' }}>Last 7 days</Text>
+        </View>
+        <Text
+          style={[
+            restaurantStyles.filterOptionCount,
+            reviewFilter === 'newest' && restaurantStyles.filterOptionCountSelected,
+          ]}
+        >
+          {reviewFilterCounts.newest}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Disliked */}
+      <TouchableOpacity
+        style={[
+          restaurantStyles.filterOption,
+          reviewFilter === 'disliked' && restaurantStyles.filterOptionSelected,
+        ]}
+        onPress={() => {
+          setReviewFilter('disliked');
+          setReviewFilterModalVisible(false);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={restaurantStyles.filterOptionLeft}>
+          <View style={[restaurantStyles.filterOptionIcon, { backgroundColor: '#FFF3E0' }]}>
+            <Ionicons name="thumbs-down" size={20} color="#FF9800" />
+          </View>
+          <Text style={restaurantStyles.filterOptionText}>Disliked</Text>
+          <Text style={{ fontSize: 12, color: '#999' }}>Below 6 stars</Text>
+        </View>
+        <Text
+          style={[
+            restaurantStyles.filterOptionCount,
+            reviewFilter === 'disliked' && restaurantStyles.filterOptionCountSelected,
+          ]}
+        >
+          {reviewFilterCounts.disliked}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Clear Filter Button */}
+      {reviewFilter && (
+        <TouchableOpacity
+          style={restaurantStyles.clearFilterButton}
+          onPress={() => {
+            setReviewFilter(null);
+            setReviewFilterModalVisible(false);
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={restaurantStyles.clearFilterText}>Clear Filter</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </TouchableOpacity>
 </Modal>
     </View>
   );
@@ -2703,11 +3133,13 @@ if (isRestaurantProfile) {
 
         {activeTab === 'videos' ? (
   <FlatList
-    key="videos-list"
+    key="videos-grid-3col"
     data={userPosts.filter((post: any) => post.isVideo)}
-    renderItem={renderVideoListItem}
+    renderItem={renderGridWithLikes}
     keyExtractor={(item: any) => item.id}
+    numColumns={3}
     scrollEnabled={false}
+    columnWrapperStyle={{ gap: 1 }}
     ListEmptyComponent={() => (
       <View style={styles.emptyContainer}>
         <Ionicons name="videocam-outline" size={64} color="#ccc" />
@@ -2719,11 +3151,13 @@ if (isRestaurantProfile) {
   renderFavouriteSection()
 ) : (
   <FlatList
-    key="photos-list"
+    key="photos-grid-3col"
     data={userPosts.filter((post: any) => !post.isVideo)}
-    renderItem={renderListItem}
+    renderItem={renderGridWithLikes}
     keyExtractor={(item: any) => item.id}
+    numColumns={3}
     scrollEnabled={false}
+    columnWrapperStyle={{ gap: 1 }}
     ListEmptyComponent={() => (
       <View style={styles.emptyContainer}>
         <Ionicons name="images-outline" size={64} color="#ccc" />
@@ -3237,19 +3671,150 @@ const restaurantStyles = StyleSheet.create({
     position: 'relative',           // ✅ ADD THIS
     zIndex: 0,             // ✅ Changed from 20 to 0
   },
-  bannerContainer: {
-    height: 200,
-    borderTopLeftRadius: 20,      // ✅ Top corners rounded
-    borderTopRightRadius: 20,     // ✅ Top corners rounded
-    backgroundColor: '#E0E0E0',
-    position: 'relative',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
+ bannerContainer: {
+  height: 200,
+  borderRadius: 20,
+  backgroundColor: '#E0E0E0',
+  position: 'relative',
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  elevation: 6,
+  borderWidth: 4,
+  borderColor: '#fff',
+},
+menuPriceBadge: {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  backgroundColor: '#E94A37',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 12,
+  minWidth: 40,
+  alignItems: 'center',
+},
+menuPriceText: {
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: '700',
+},
+
+// Review Filter Styles
+reviewFilterContainer: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+reviewFilterButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#f5f5f5',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 20,
+  gap: 6,
+},
+reviewFilterButtonActive: {
+  backgroundColor: '#E94A37',
+},
+reviewFilterButtonText: {
+  fontSize: 13,
+  color: '#666',
+  fontWeight: '500',
+},
+reviewFilterButtonTextActive: {
+  color: '#fff',
+},
+reviewFilterCount: {
+  fontSize: 13,
+  color: '#999',
+},
+filterModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'flex-end',
+},
+filterModalContent: {
+  backgroundColor: '#fff',
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  paddingTop: 20,
+  paddingBottom: 40,
+},
+filterModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  marginBottom: 16,
+},
+filterModalTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#333',
+},
+filterOption: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingVertical: 16,
+  paddingHorizontal: 20,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+filterOptionLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 12,
+},
+filterOptionIcon: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+filterOptionText: {
+  fontSize: 16,
+  color: '#333',
+  fontWeight: '500',
+},
+filterOptionCount: {
+  fontSize: 14,
+  color: '#999',
+  backgroundColor: '#f5f5f5',
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 12,
+},
+filterOptionSelected: {
+  backgroundColor: '#FFF5F5',
+},
+filterOptionCountSelected: {
+  backgroundColor: '#E94A37',
+  color: '#fff',
+},
+clearFilterButton: {
+  marginTop: 16,
+  marginHorizontal: 20,
+  paddingVertical: 12,
+  borderRadius: 25,
+  borderWidth: 1,
+  borderColor: '#E94A37',
+  alignItems: 'center',
+},
+clearFilterText: {
+  color: '#E94A37',
+  fontSize: 14,
+  fontWeight: '600',
+},
   bannerImage: {
     width: '100%',
     height: '100%',
@@ -3304,24 +3869,70 @@ bannerUploadingOverlay: {
   },
 profileOnBanner: {
   position: 'absolute',
-  bottom: 180,
+  bottom: 145,
   left: 20,
-  elevation: 100,              // ✅ Very high elevation for Android
+  elevation: 100,
   zIndex: 100, 
-  backgroundColor: 'transparent',                // ✅ High z-index for iOS
+  backgroundColor: '#fff',
+  borderRadius: 55,
+  padding: 2,
+  borderWidth: 0.5,
+  borderColor: '#fff',
+},
+nameRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+dpPlaceholder: {
+  width: 100,
+  height: 50,
 },
   // Review Item Styles
 reviewItem: {
+  flexDirection: 'row',
   backgroundColor: '#fff',
   marginHorizontal: 16,
   marginBottom: 12,
   borderRadius: 12,
-  padding: 12,
+  overflow: 'visible',
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.08,
   shadowRadius: 4,
   elevation: 2,
+  minHeight: 150,
+},
+reviewDetails: {
+  flex: 1,
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+  paddingLeft: 16,
+  justifyContent: 'flex-start',
+  gap: 6,
+  marginLeft: 0,
+},
+reviewUsername: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#333',
+  flex: 1,
+},
+reviewDetailRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+reviewDetailText: {
+  fontSize: 14,
+  color: '#666',
+  flex: 1,
+},
+reviewUserRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 4,
 },
 reviewHeader: {
   flexDirection: 'row',
@@ -3344,9 +3955,9 @@ reviewDate: {
 },
 reviewRating: {
   flexDirection: 'row',
-  alignItems: 'center',
+  alignItems: 'right',
   backgroundColor: '#FFF9E6',
-  paddingHorizontal: 8,
+  paddingHorizontal: 5,
   paddingVertical: 4,
   borderRadius: 12,
   gap: 4,
@@ -3357,15 +3968,27 @@ reviewRatingText: {
   color: '#333',
 },
 reviewImage: {
-  width: '100%',
-  height: 180,
-  borderRadius: 8,
-  marginBottom: 10,
+  width: '140%',
+  height: '100%',
+},
+reviewImageContainer: {
+  width: 150,
+  height: 150,
+  borderRadius: 12,
+  overflow: 'hidden',
 },
 reviewText: {
   fontSize: 14,
   color: '#666',
   lineHeight: 20,
+},
+
+reviewImagePlaceholder: {
+  width: '100%',
+  height: '100%',
+  backgroundColor: '#f5f5f5',
+  justifyContent: 'center',
+  alignItems: 'center',
 },
   dpCameraIcon: {
     position: 'absolute',
@@ -3380,27 +4003,28 @@ reviewText: {
     borderWidth: 2,
     borderColor: '#fff',
   },
-  whiteInfoBox: {
-    backgroundColor: '#fff',
-    borderRadius: 10,              // ✅ ALL corners rounded
-    paddingTop: 60,                // ✅ More top padding for DP overlap
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    marginTop: -10,  
-    marginBottom: 16,               // ✅ Slight overlap with banner
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    zIndex: 1,
-  },
+whiteInfoBox: {
+  backgroundColor: '#fff',
+  borderRadius: 20,
+  paddingTop: 15,
+  paddingHorizontal: 20,
+  paddingBottom: 20,
+  marginTop: -25,  
+  marginBottom: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 4,
+  zIndex: 1,
+},
  restaurantInfoContainer: {
-  flexDirection: 'column',            // ✅ ADD THIS - horizontal layout
-  alignItems: 'center',            // ✅ ADD THIS
-  marginLeft: 120,    
-  marginTop: -5,             // ✅ ADD THIS - space for DP (100px DP + 20px gap)
-  marginBottom: 12,
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  flex: 1,
+  marginLeft: 10,    
+  marginTop: 0,
+  marginBottom: 0,
 },
   restaurantName: {
     fontSize: 24,
@@ -4300,6 +4924,33 @@ statDivider: {
     overflow: 'hidden',
     marginBottom: 5,
   },
+
+  // Grid with Likes Badge Styles
+gridItemWithBadge: {
+  width: (SCREEN_WIDTH - 4) / 3,
+  height: (SCREEN_WIDTH - 4) / 3,
+  margin: 0.5,
+  position: 'relative',
+  borderRadius: 8,
+  overflow: 'hidden',
+},
+gridLikesBadge: {
+  position: 'absolute',
+  top: 6,
+  right: 6,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  paddingHorizontal: 6,
+  paddingVertical: 3,
+  borderRadius: 10,
+  gap: 4,
+},
+gridLikesText: {
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: '600',
+},
   progressFill: {
     height: '100%',
     backgroundColor: '#4dd0e1',
