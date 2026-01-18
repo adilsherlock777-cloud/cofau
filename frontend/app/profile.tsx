@@ -300,6 +300,7 @@ export default function ProfileScreen() {
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
+  const [isRestaurantProfile, setIsRestaurantProfile] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -420,43 +421,71 @@ export default function ProfileScreen() {
           setIsOwnProfile(true);
         } else {
           try {
-            const userResponse = await axios.get(`${API_URL}/users/${userId}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            user = userResponse.data;
-            console.log('✅ Fetched user profile from /users endpoint:', user);
-          } catch (userError: any) {
-            console.log('⚠️ User endpoint failed, trying feed fallback:', userError.message);
-            const feedResponse = await axios.get(`${API_URL}/feed`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+  // First try regular users endpoint
+  const userResponse = await axios.get(`${API_URL}/users/${userId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  user = userResponse.data;
+  console.log('✅ Fetched user profile from /users endpoint:', user);
+  setIsRestaurantProfile(user.account_type === 'restaurant');
+  
+} catch (userError: any) {
+  console.log('⚠️ User endpoint failed, trying restaurant endpoint:', userError.message);
+  
+  // Try restaurant endpoint
+ try {
+    const restaurantResponse = await axios.get(
+      `${API_URL}/restaurant/posts/public/profile/${userId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    user = restaurantResponse.data;
+    console.log('✅ Fetched restaurant profile:', user);
+    setIsRestaurantProfile(true);
+    
+  } catch (restaurantError: any) {
+    console.log('⚠️ Restaurant endpoint also failed, trying feed fallback:', restaurantError.message);
+    
+    // Fallback to feed
+    const feedResponse = await axios.get(`${API_URL}/feed`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-            const userPost = feedResponse.data.find(
-              (post: any) => post.user_id === userId
-            );
-            if (userPost) {
-              user = {
-                id: userPost.user_id,
-                full_name: userPost.username,
-                profile_picture:
-                  userPost.user_profile_picture ||
-                  userPost.profile_picture ||
-                  userPost.profile_picture_url,
-                level: userPost.user_level,
-                title: userPost.user_title,
-              };
-            } else {
-              throw new Error('User not found');
-            }
-          }
-        }
+    const userPost = feedResponse.data.find(
+      (post: any) => post.user_id === userId
+    );
+    if (userPost) {
+      user = {
+        id: userPost.user_id,
+        full_name: userPost.username,
+        profile_picture:
+          userPost.user_profile_picture ||
+          userPost.profile_picture ||
+          userPost.profile_picture_url,
+        level: userPost.user_level,
+        title: userPost.user_title,
+        account_type: userPost.account_type,
+      };
+      setIsRestaurantProfile(userPost.account_type === 'restaurant');
+    } else {
+      throw new Error('User not found');
+    }
+  }
+}
       } else {
-        console.log('📡 Fetching own profile from:', `${API_URL}/auth/me`);
-        setIsOwnProfile(true);
-        const response = await axios.get(`${API_URL}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        console.log('📡 Fetching own profile, accountType:', accountType);
+setIsOwnProfile(true);
+
+// Use different endpoint based on account type
+const endpoint = accountType === 'restaurant' 
+  ? `${API_URL}/restaurant/auth/me` 
+  : `${API_URL}/auth/me`;
+
+console.log('📡 Fetching own profile from:', endpoint);
+const response = await axios.get(endpoint, {
+  headers: { Authorization: `Bearer ${token}` },
+});
         user = response.data.user || response.data;
+        setIsRestaurantProfile(accountType === 'restaurant');
       }
 
       const rawProfilePicture =
@@ -468,7 +497,11 @@ export default function ProfileScreen() {
 
       setUserData(user);
       setEditedBio(user.bio || '');
-      setEditedName(user.full_name || user.username || '');
+      setEditedName(
+  accountType === 'restaurant' 
+    ? (user.restaurant_name || user.full_name || '') 
+    : (user.full_name || user.username || '')
+);
 
 // Fetch stats - wrap in try-catch for restaurant accounts
 try {
@@ -742,10 +775,30 @@ try {
     }
   };
 
-  const handleUpdateProfile = async () => {
-    try {
-      console.log('📝 Updating profile with:', { name: editedName, bio: editedBio });
+ const handleUpdateProfile = async () => {
+  try {
+    console.log('📝 Updating profile with:', { name: editedName, bio: editedBio });
 
+    if (accountType === 'restaurant') {
+      // Restaurant: Send JSON body
+      const updateData: any = {};
+      if (editedName) updateData.restaurant_name = editedName;
+      if (editedBio !== null && editedBio !== undefined) updateData.bio = editedBio;
+
+      const response = await axios.put(
+        `${API_URL}/restaurant/auth/update`,
+        updateData,  // JSON body
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('✅ Restaurant profile update response:', response.data);
+    } else {
+      // Regular user: Send FormData
       const formData = new FormData();
       if (editedName) formData.append('full_name', editedName);
       if (editedBio !== null && editedBio !== undefined)
@@ -759,20 +812,22 @@ try {
       });
 
       console.log('✅ Profile update response:', response.data);
-      Alert.alert('Success', 'Profile updated successfully!');
-      setEditModalVisible(false);
-
-      setTimeout(() => {
-        fetchProfileData();
-      }, 500);
-    } catch (err: any) {
-      console.error(
-        '❌ Error updating profile:',
-        err.response?.data || err.message
-      );
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
     }
-  };
+
+    Alert.alert('Success', 'Profile updated successfully!');
+    setEditModalVisible(false);
+
+    setTimeout(() => {
+      fetchProfileData();
+    }, 500);
+  } catch (err: any) {
+    console.error(
+      '❌ Error updating profile:',
+      err.response?.data || err.message
+    );
+    Alert.alert('Error', 'Failed to update profile. Please try again.');
+  }
+};
 
   const handleLogout = async () => {
     try {
@@ -1358,21 +1413,20 @@ const renderRestaurantProfile = () => {
                   <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={styles.leftSpacer}>
-                  <Ionicons name="menu-outline" size={24} color="#fff" />
-                </TouchableOpacity>
+                <View style={styles.leftSpacer} />
               )}
 
               <Text style={styles.cofauTitle}>Cofau</Text>
 
-              <View style={styles.headerIcons}>
+              <View style={styles.headerIcons} pointerEvents="box-none">
                 {isOwnProfile && (
                   <TouchableOpacity
                     style={styles.headerIconButton}
                     onPress={() => setSettingsModalVisible(true)}
                     activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="settings-outline" size={24} color="#fff" />
+                    <Ionicons name="menu" size={24} color="#fff" />
                   </TouchableOpacity>
                 )}
               </View>
@@ -1380,131 +1434,127 @@ const renderRestaurantProfile = () => {
           </LinearGradient>
         </View>
 
-{/* ================= BANNER + WHITE BOX WRAPPER ================= */}
-<View style={restaurantStyles.bannerWrapper}>
-  {/* Banner Image */}
-  <TouchableOpacity
-    style={restaurantStyles.bannerContainer}
-    onPress={() => {
-      if (isOwnProfile) {
-        handleBannerPress();
-      }
-    }}
-    activeOpacity={isOwnProfile ? 0.8 : 1}
-  >
-    {bannerImage || userData?.cover_image ? (
-      <>
-        <Image
-          source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
-          style={restaurantStyles.bannerImage}
-          resizeMode="cover"
-        />
-        {/* Edit Pen Icon - Bottom Right */}
-        {isOwnProfile && !uploadingBanner && (
-          <View style={restaurantStyles.bannerEditPen}>
-            <Ionicons name="pencil" size={18} color="#fff" />
+        {/* ================= BANNER + WHITE BOX WRAPPER ================= */}
+        <View style={restaurantStyles.bannerWrapper}>
+          {/* Banner Image */}
+          <TouchableOpacity
+            style={restaurantStyles.bannerContainer}
+            onPress={() => {
+              if (isOwnProfile) {
+                handleBannerPress();
+              }
+            }}
+            activeOpacity={isOwnProfile ? 0.8 : 1}
+          >
+            {bannerImage || userData?.cover_image ? (
+              <>
+                <Image
+                  source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
+                  style={restaurantStyles.bannerImage}
+                  resizeMode="cover"
+                />
+                {isOwnProfile && !uploadingBanner && (
+                  <View style={restaurantStyles.bannerEditPen}>
+                    <Ionicons name="pencil" size={18} color="#fff" />
+                  </View>
+                )}
+                {uploadingBanner && (
+                  <View style={restaurantStyles.bannerUploadingOverlay}>
+                    <ActivityIndicator size="large" color="#fff" />
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={restaurantStyles.bannerPlaceholder}>
+                {isOwnProfile && (
+                  <View style={restaurantStyles.bannerEditIcon}>
+                    <Ionicons name="camera" size={24} color="#999" />
+                    <Text style={restaurantStyles.bannerEditText}>Add Cover Photo</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* ================= WHITE INFO BOX ================= */}
+          <View style={restaurantStyles.whiteInfoBox}>
+            <View style={restaurantStyles.restaurantInfoContainer}>
+              <Text style={restaurantStyles.restaurantName}>
+                {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
+              </Text>
+              <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
+            </View>
+
+            <View style={restaurantStyles.bioSection}>
+              <Text style={restaurantStyles.bioText}>
+                {userData?.bio || 'No bio yet. Add one by editing your profile!'}
+              </Text>
+            </View>
+
+            <View style={restaurantStyles.statsContainer}>
+              <View style={restaurantStyles.statBox}>
+                <Text style={restaurantStyles.statValue}>{userStats?.total_posts || 0}</Text>
+                <Text style={restaurantStyles.statLabel}>Posts</Text>
+              </View>
+
+              <View style={restaurantStyles.statDivider} />
+
+              <TouchableOpacity
+                style={restaurantStyles.statBox}
+                onPress={() => {
+                  setFollowersModalVisible(true);
+                  fetchFollowers();
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={restaurantStyles.statValue}>{userStats?.followers_count || 0}</Text>
+                <Text style={restaurantStyles.statLabel}>Followers</Text>
+              </TouchableOpacity>
+
+              <View style={restaurantStyles.statDivider} />
+
+              <View style={restaurantStyles.statBox}>
+                <Text style={restaurantStyles.statValue}>{userData?.reviews_count || 0}</Text>
+                <Text style={restaurantStyles.statLabel}>Reviews</Text>
+              </View>
+            </View>
           </View>
-        )}
-        {/* Loading Indicator */}
-        {uploadingBanner && (
-          <View style={restaurantStyles.bannerUploadingOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
+
+          {/* Profile Picture */}
+          <View style={restaurantStyles.profileOnBanner}>
+            <TouchableOpacity
+              onPress={handleProfilePicturePress}
+              disabled={!isOwnProfile || uploadingImage}
+              activeOpacity={0.8}
+            >
+              <UserAvatar
+                profilePicture={userData?.profile_picture}
+                username={userData?.restaurant_name || userData?.full_name}
+                size={100}
+                showLevelBadge={false}
+                style={{
+                  ...restaurantStyles.restaurantAvatar,
+                  backgroundColor: 'transparent',
+                }}
+              />
+              {isOwnProfile && (
+                <View style={restaurantStyles.dpCameraIcon}>
+                  {uploadingImage ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="camera" size={16} color="#fff" />
+                  )}
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-        )}
-      </>
-    ) : (
-      <View style={restaurantStyles.bannerPlaceholder}>
-        {isOwnProfile && (
-          <View style={restaurantStyles.bannerEditIcon}>
-            <Ionicons name="camera" size={24} color="#999" />
-            <Text style={restaurantStyles.bannerEditText}>Add Cover Photo</Text>
-          </View>
-        )}
-      </View>
-    )}
-  </TouchableOpacity>
-
-  {/* ================= WHITE INFO BOX ================= */}
-  <View style={restaurantStyles.whiteInfoBox}>
-    {/* Restaurant Name & Label */}
-    <View style={restaurantStyles.restaurantInfoContainer}>
-      <Text style={restaurantStyles.restaurantName}>
-        {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
-      </Text>
-      <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
-    </View>
-
-    {/* Bio Section */}
-    <View style={restaurantStyles.bioSection}>
-      <Text style={restaurantStyles.bioText}>
-        {userData?.bio || 'No bio yet. Add one by editing your profile!'}
-      </Text>
-    </View>
-
-    {/* Stats Section */}
-    <View style={restaurantStyles.statsContainer}>
-      <View style={restaurantStyles.statBox}>
-        <Text style={restaurantStyles.statValue}>{userStats?.total_posts || 0}</Text>
-        <Text style={restaurantStyles.statLabel}>Posts</Text>
-      </View>
-
-      <View style={restaurantStyles.statDivider} />
-
-      <TouchableOpacity
-        style={restaurantStyles.statBox}
-        onPress={() => {
-          setFollowersModalVisible(true);
-          fetchFollowers();
-        }}
-        activeOpacity={0.7}
-      >
-        <Text style={restaurantStyles.statValue}>{userStats?.followers_count || 0}</Text>
-        <Text style={restaurantStyles.statLabel}>Followers</Text>
-      </TouchableOpacity>
-
-      <View style={restaurantStyles.statDivider} />
-
-      <View style={restaurantStyles.statBox}>
-        <Text style={restaurantStyles.statValue}>{userData?.reviews_count || 0}</Text>
-        <Text style={restaurantStyles.statLabel}>Reviews</Text>
-      </View>
-    </View>
-  </View>
-
-  {/* Profile Picture - RENDERED LAST (on top of everything) */}
-  <View style={restaurantStyles.profileOnBanner}>
-    <TouchableOpacity
-      onPress={handleProfilePicturePress}
-      disabled={!isOwnProfile || uploadingImage}
-      activeOpacity={0.8}
-    >
-      <UserAvatar
-        profilePicture={userData?.profile_picture}
-        username={userData?.restaurant_name || userData?.full_name}
-        size={100}
-        showLevelBadge={false}
-        style={{
-          ...restaurantStyles.restaurantAvatar,
-          backgroundColor: 'transparent',
-        }}
-      />
-      {isOwnProfile && (
-        <View style={restaurantStyles.dpCameraIcon}>
-          {uploadingImage ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name="camera" size={16} color="#fff" />
-          )}
         </View>
-      )}
-    </TouchableOpacity>
-  </View>
-</View>
 
         {/* ================= ACTION BUTTONS ================= */}
         <View style={styles.actionButtonsContainer}>
           {isOwnProfile ? (
             <>
+              {/* Own Restaurant Profile - 2 Buttons */}
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
                 onPress={() => setEditModalVisible(true)}
@@ -1539,6 +1589,7 @@ const renderRestaurantProfile = () => {
             </>
           ) : (
             <>
+              {/* Visiting Other Restaurant - 3 Buttons */}
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
                 onPress={handleFollowToggle}
@@ -1548,10 +1599,23 @@ const renderRestaurantProfile = () => {
                   colors={isFollowing ? ['#1B7C82', '#1B7C82'] : ['#E94A37', '#F2CF68', '#1B7C82']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
                   style={styles.actionButton}
                 >
-                  <Ionicons name={isFollowing ? 'checkmark-circle' : 'person-add'} size={18} color="#fff" />
-                  <Text style={styles.actionButtonText}>{isFollowing ? 'Following' : 'Follow'}</Text>
+                  {followLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons 
+                        name={isFollowing ? 'checkmark-circle' : 'person-add'} 
+                        size={15} 
+                        color="#fff" 
+                      />
+                      <Text style={styles.actionButtonText}>
+                        {isFollowing ? 'Following' : 'Follow'}
+                      </Text>
+                    </>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -1563,16 +1627,42 @@ const renderRestaurantProfile = () => {
                   colors={['#E94A37', '#F2CF68', '#1B7C82']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
                   style={styles.actionButton}
                 >
-                  <Ionicons name="chatbubble" size={18} color="#fff" />
+                  <Ionicons name="chatbubble" size={15} color="#fff" />
                   <Text style={styles.actionButtonText}>Message</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionButtonWrapper}
+                onPress={() => {
+                  if (Platform.OS === 'web') {
+                    // Web share - copy link to clipboard
+                    const shareUrl = `${window.location.origin}/profile?userId=${userData?.id}`;
+                    navigator.clipboard.writeText(shareUrl);
+                    Alert.alert('Success', 'Profile link copied to clipboard!');
+                  } else {
+                    // Mobile share - you can integrate React Native Share here
+                    Alert.alert('Share Profile', 'Share functionality coming soon!');
+                  }
+                }}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.35, 0.9]}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="share-social" size={15} color="#fff" />
+                  <Text style={styles.actionButtonText}>Share</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </>
           )}
         </View>
-
 
         {/* ================= RESTAURANT TABS ================= */}
         <View style={styles.tabBar}>
@@ -1707,11 +1797,170 @@ const renderRestaurantProfile = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Reuse existing modals */}
-      {/* Edit Modal, Settings Modal, etc. - they will work for restaurants too */}
+      {/* ================= SIDEBAR MENU (at root level) ================= */}
+      <Modal
+        animationType="none"
+        transparent={true}
+        visible={settingsModalVisible}
+        onRequestClose={() => setSettingsModalVisible(false)}
+      >
+        <View style={styles.sidebarOverlay}>
+          <TouchableOpacity
+            style={styles.sidebarBackdrop}
+            activeOpacity={1}
+            onPress={() => setSettingsModalVisible(false)}
+          />
+          
+          <Animated.View
+            style={[
+              styles.sidebarContainer,
+              {
+                transform: [
+                  {
+                    translateX: sidebarAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [SCREEN_WIDTH, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Menu</Text>
+              <TouchableOpacity
+                onPress={() => setSettingsModalVisible(false)}
+                style={styles.sidebarCloseButton}
+              >
+                <Ionicons name="close" size={28} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.sidebarContent}>
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  router.push('/saved-posts');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="bookmark-outline" size={24} color="#333" />
+                </View>
+                <Text style={styles.sidebarMenuText}>Saved Posts</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  router.push('/blocked-users');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={styles.sidebarMenuText}>Blocked Users</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="settings-outline" size={24} color="#333" />
+                </View>
+                <Text style={styles.sidebarMenuText}>Settings</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
+              <View style={styles.sidebarDivider} />
+
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  if (Platform.OS === 'web') {
+                    const confirmed = window.confirm('Are you sure you want to logout?');
+                    if (confirmed) handleLogout();
+                  } else {
+                    Alert.alert('Logout', 'Are you sure you want to logout?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
+                    ]);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
+                  <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Logout</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+              </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
+
+
+      {/* ================= EDIT PROFILE MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={editModalVisible}
+  onRequestClose={() => setEditModalVisible(false)}
+>
+  <KeyboardAvoidingView 
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalContainer}
+  >
+    <View style={styles.modalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Edit Profile</Text>
+        <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+          <Ionicons name="close" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.inputLabel}>Restaurant Name</Text>
+      <TextInput
+        style={styles.input}
+        value={editedName}
+        onChangeText={setEditedName}
+        placeholder="Enter restaurant name"
+      />
+
+      <Text style={styles.inputLabel}>Bio</Text>
+      <TextInput
+        style={[styles.input, styles.bioInput]}
+        value={editedBio}
+        onChangeText={setEditedBio}
+        placeholder="Tell customers about your restaurant..."
+        multiline
+        numberOfLines={4}
+      />
+
+      <TouchableOpacity
+        style={styles.saveButton}
+        onPress={handleUpdateProfile}
+      >
+        <Text style={styles.saveButtonText}>Save Changes</Text>
+      </TouchableOpacity>
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
     </View>
   );
 };
+
 
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
@@ -2056,7 +2305,7 @@ if (loading) {
   }
 
   // Check if restaurant account - show restaurant UI
-if (accountType === 'restaurant') {
+if (isRestaurantProfile) {
   return renderRestaurantProfile();
 }
 
@@ -2439,54 +2688,8 @@ if (accountType === 'restaurant') {
         </TouchableOpacity>
       </View>
 
-      {/* Edit Profile Modal */}
-<Modal
-  animationType="slide"
-  transparent={true}
-  visible={editModalVisible}
-  onRequestClose={() => setEditModalVisible(false)}
->
-  <KeyboardAvoidingView 
-    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    style={styles.modalContainer}
-  >
-    <View style={styles.modalContent}>
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Edit Profile</Text>
-        <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-          <Ionicons name="close" size={28} color="#000" />
-        </TouchableOpacity>
-      </View>
 
-      <Text style={styles.inputLabel}>Name</Text>
-      <TextInput
-        style={styles.input}
-        value={editedName}
-        onChangeText={setEditedName}
-        placeholder="Enter your name"
-      />
-
-      <Text style={styles.inputLabel}>Bio</Text>
-      <TextInput
-        style={[styles.input, styles.bioInput]}
-        value={editedBio}
-        onChangeText={setEditedBio}
-        placeholder="Tell us about yourself..."
-        multiline
-        numberOfLines={4}
-      />
-
-      <TouchableOpacity
-        style={styles.saveButton}
-        onPress={handleUpdateProfile}
-      >
-        <Text style={styles.saveButtonText}>Save Changes</Text>
-      </TouchableOpacity>
-    </View>
-  </KeyboardAvoidingView>
-</Modal>
-
-      {/* Sidebar Menu */}
+      {/* ================= SIDEBAR MENU MODAL ================= */}
       <Modal
         animationType="none"
         transparent={true}
@@ -2494,14 +2697,12 @@ if (accountType === 'restaurant') {
         onRequestClose={() => setSettingsModalVisible(false)}
       >
         <View style={styles.sidebarOverlay}>
-          {/* Backdrop - Clickable to close */}
           <TouchableOpacity
             style={styles.sidebarBackdrop}
             activeOpacity={1}
             onPress={() => setSettingsModalVisible(false)}
           />
           
-          {/* Sidebar Content */}
           <Animated.View
             style={[
               styles.sidebarContainer,
@@ -2517,7 +2718,6 @@ if (accountType === 'restaurant') {
               },
             ]}
           >
-            {/* Header */}
             <View style={styles.sidebarHeader}>
               <Text style={styles.sidebarTitle}>Menu</Text>
               <TouchableOpacity
@@ -2528,9 +2728,7 @@ if (accountType === 'restaurant') {
               </TouchableOpacity>
             </View>
 
-            {/* Menu Options */}
             <ScrollView style={styles.sidebarContent}>
-              {/* Saved Posts */}
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
                 onPress={() => {
@@ -2546,23 +2744,21 @@ if (accountType === 'restaurant') {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
-              {/* ✅ ADD THIS: Blocked Users */}
-        <TouchableOpacity
-          style={styles.sidebarMenuItem}
-          onPress={() => {
-            setSettingsModalVisible(false);
-            router.push('/blocked-users');
-          }}
-          activeOpacity={0.7}
-        >
-          <View style={styles.sidebarMenuIconContainer}>
-            <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
-          </View>
-          <Text style={styles.sidebarMenuText}>Blocked Users</Text>
-          <Ionicons name="chevron-forward" size={20} color="#999" />
-        </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  router.push('/blocked-users');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={styles.sidebarMenuText}>Blocked Users</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
 
-              {/* Settings */}
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
                 onPress={() => {
@@ -2578,32 +2774,19 @@ if (accountType === 'restaurant') {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
-              {/* Divider */}
               <View style={styles.sidebarDivider} />
 
-              {/* Logout */}
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
                   if (Platform.OS === 'web') {
-                    const confirmed = window.confirm(
-                      'Are you sure you want to logout?'
-                    );
-                    if (confirmed) {
-                      handleLogout();
-                    }
+                    const confirmed = window.confirm('Are you sure you want to logout?');
+                    if (confirmed) handleLogout();
                   } else {
                     Alert.alert('Logout', 'Are you sure you want to logout?', [
-                      {
-                        text: 'Cancel',
-                        style: 'cancel',
-                      },
-                      {
-                        text: 'Logout',
-                        onPress: () => handleLogout(),
-                        style: 'destructive',
-                      },
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
                     ]);
                   }
                 }}
@@ -2620,32 +2803,81 @@ if (accountType === 'restaurant') {
         </View>
       </Modal>
 
+      {/* ================= EDIT PROFILE MODAL ================= */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={editModalVisible}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={editedName}
+              onChangeText={setEditedName}
+              placeholder="Enter your name"
+            />
+
+            <Text style={styles.inputLabel}>Bio</Text>
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              value={editedBio}
+              onChangeText={setEditedBio}
+              placeholder="Tell us about yourself..."
+              multiline
+              numberOfLines={4}
+            />
+
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleUpdateProfile}
+            >
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ================= COMPLIMENT MODAL ================= */}
       <ComplimentModal
-  visible={complimentModalVisible}
-  onClose={() => setComplimentModalVisible(false)}
-  onSend={async (complimentType: string, customMessage?: string) => {
-    if (!userData?.id || !token) return;
+        visible={complimentModalVisible}
+        onClose={() => setComplimentModalVisible(false)}
+        onSend={async (complimentType: string, customMessage?: string) => {
+          if (!userData?.id || !token) return;
 
-    setSendingCompliment(true);
-    try {
-      await sendCompliment(userData.id, complimentType, customMessage);
-      setHasComplimented(true);
-      fetchComplimentsCount();
-      Alert.alert('Success', 'Compliment sent successfully!');
-      setComplimentModalVisible(false);
-    } catch (error: any) {
-      console.error('❌ Error sending compliment:', error);
-      Alert.alert(
-        'Error',
-        error.response?.data?.detail || 'Failed to send compliment. Please try again.'
-      );
-    } finally {
-      setSendingCompliment(false);
-    }
-  }}
-  loading={sendingCompliment}
-/>
+          setSendingCompliment(true);
+          try {
+            await sendCompliment(userData.id, complimentType, customMessage);
+            setHasComplimented(true);
+            fetchComplimentsCount();
+            Alert.alert('Success', 'Compliment sent successfully!');
+            setComplimentModalVisible(false);
+          } catch (error: any) {
+            console.error('❌ Error sending compliment:', error);
+            Alert.alert(
+              'Error',
+              error.response?.data?.detail || 'Failed to send compliment. Please try again.'
+            );
+          } finally {
+            setSendingCompliment(false);
+          }
+        }}
+        loading={sendingCompliment}
+      />
 
+      {/* ================= DELETE POST MODAL ================= */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -2702,6 +2934,7 @@ if (accountType === 'restaurant') {
         </View>
       </Modal>
 
+      {/* ================= FOLLOWERS MODAL ================= */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -2789,6 +3022,7 @@ if (accountType === 'restaurant') {
         </View>
       </Modal>
 
+      {/* ================= LEVEL DETAILS MODAL ================= */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -2917,6 +3151,7 @@ if (accountType === 'restaurant') {
     </View>
   );
 }
+
 
 /* ================= STYLES ================= */
 
