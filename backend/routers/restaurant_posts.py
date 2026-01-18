@@ -921,3 +921,91 @@ async def toggle_menu_availability(
     )
     
     return {"success": True, "is_available": new_status}
+
+# ==================== SEARCH RESTAURANTS (For Tagging) ====================
+
+@router.get("/search/restaurants")
+async def search_restaurants_for_tagging(
+    q: str,
+    limit: int = 5
+):
+    """Search restaurants by name for tagging in user posts (public)"""
+    db = get_database()
+    
+    if not q or len(q.strip()) < 2:
+        return []
+    
+    import re
+    search_query = {
+        "restaurant_name": {"$regex": re.escape(q.strip()), "$options": "i"}
+    }
+    
+    restaurants = await db.restaurants.find(search_query).limit(limit).to_list(limit)
+    
+    result = []
+    for restaurant in restaurants:
+        result.append({
+            "id": str(restaurant["_id"]),
+            "restaurant_name": restaurant.get("restaurant_name", ""),
+            "profile_picture": restaurant.get("profile_picture"),
+            "bio": restaurant.get("bio", ""),
+            "is_verified": restaurant.get("is_verified", False),
+        })
+    
+    return result
+
+# ==================== RESTAURANT REVIEWS (Tagged Posts) ====================
+
+@router.get("/reviews/{restaurant_id}")
+async def get_restaurant_reviews(
+    restaurant_id: str,
+    skip: int = 0,
+    limit: int = 50
+):
+    """Get all user posts that tagged this restaurant (reviews)"""
+    db = get_database()
+    
+    # Verify restaurant exists
+    try:
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid restaurant ID")
+    
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    # Find all posts that tagged this restaurant
+    posts = await db.posts.find({
+        "tagged_restaurant_id": restaurant_id
+    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    result = []
+    for post in posts:
+        # Get user info
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        
+        result.append({
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user.get("full_name") or user.get("username") if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_level": user.get("level", 1) if user else 1,
+            "media_url": post.get("media_url") or post.get("image_url", ""),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "rating": post.get("rating"),
+            "review_text": post.get("review_text", ""),
+            "location_name": post.get("location_name"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+        })
+    
+    # Update reviews count on restaurant
+    reviews_count = await db.posts.count_documents({"tagged_restaurant_id": restaurant_id})
+    await db.restaurants.update_one(
+        {"_id": ObjectId(restaurant_id)},
+        {"$set": {"reviews_count": reviews_count}}
+    )
+    
+    return result

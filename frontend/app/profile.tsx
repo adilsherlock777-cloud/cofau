@@ -299,6 +299,8 @@ export default function ProfileScreen() {
   const sidebarAnimation = useRef(new Animated.Value(0)).current;
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
   const [isRestaurantProfile, setIsRestaurantProfile] = useState(false);
 
@@ -326,18 +328,19 @@ export default function ProfileScreen() {
     }
   }, [isOwnProfile, userData?.id, token]);
 
-  useEffect(() => {
+ useEffect(() => {
   if (userData) {
     fetchUserPosts();
     fetchComplimentsCount();
     checkIfComplimented();
     
-    // Fetch menu items if restaurant account
-    if (accountType === 'restaurant') {
+    // Fetch menu items and reviews if restaurant account
+    if (isRestaurantProfile || accountType === 'restaurant') {
       fetchMenuItems();
+      fetchRestaurantReviews();  // ← ADD THIS
     }
   }
-}, [userData, activeTab]);
+}, [userData, activeTab, isRestaurantProfile]);
 
   // Animate sidebar when modal visibility changes
   useEffect(() => {
@@ -382,6 +385,23 @@ export default function ProfileScreen() {
        setMenuItems([]);
      }
    };
+
+   const fetchRestaurantReviews = async () => {
+  if (!userData?.id) return;
+  setLoadingReviews(true);
+  try {
+    const response = await axios.get(
+      `${API_URL}/restaurants/${userData.id}/reviews`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setRestaurantReviews(response.data || []);
+  } catch (err) {
+    console.error('Error fetching restaurant reviews:', err);
+    setRestaurantReviews([]);
+  } finally {
+    setLoadingReviews(false);
+  }
+};
 
   const GradientHeart = ({ size = 24 }) => (
   <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
@@ -471,6 +491,7 @@ export default function ProfileScreen() {
     }
   }
 }
+        }
       } else {
         console.log('📡 Fetching own profile, accountType:', accountType);
 setIsOwnProfile(true);
@@ -532,8 +553,8 @@ try {
    try {
     let endpoint;
     
-    // Use different endpoint for restaurant accounts
-    if (accountType === 'restaurant') {
+    // Use different endpoint based on the PROFILE being viewed, not the visitor
+    if (isRestaurantProfile || userData?.account_type === 'restaurant') {
       endpoint = `${API_URL}/restaurant/posts/public/restaurant/${userData.id}`;
     } else {
       endpoint = `${API_URL}/users/${userData.id}/posts`;
@@ -591,13 +612,13 @@ try {
 
       setUserPosts(sorted);
       
-      // ✅ Update stats for restaurant accounts
-      if (accountType === 'restaurant') {
-        setUserStats((prev: any) => ({
-          ...prev,
-          total_posts: sorted.length,
-        }));
-      }
+      // ✅ Update stats for restaurant profiles
+if (isRestaurantProfile || userData?.account_type === 'restaurant') {
+  setUserStats((prev: any) => ({
+    ...prev,
+    total_posts: sorted.length,
+  }));
+}
       
     } catch (err) {
       console.error('❌ Error fetching user posts:', err);
@@ -1514,9 +1535,9 @@ const renderRestaurantProfile = () => {
               <View style={restaurantStyles.statDivider} />
 
               <View style={restaurantStyles.statBox}>
-                <Text style={restaurantStyles.statValue}>{userData?.reviews_count || 0}</Text>
-                <Text style={restaurantStyles.statLabel}>Reviews</Text>
-              </View>
+  <Text style={restaurantStyles.statValue}>{restaurantReviews.length || 0}</Text>
+  <Text style={restaurantStyles.statLabel}>Reviews</Text>
+</View>
             </View>
           </View>
 
@@ -1709,14 +1730,67 @@ const renderRestaurantProfile = () => {
         )}
 
         {restaurantActiveTab === 'reviews' && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="star-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No reviews yet</Text>
-            <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
-              Reviews from customers will appear here
-            </Text>
+  loadingReviews ? (
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color="#4dd0e1" />
+    </View>
+  ) : restaurantReviews.length > 0 ? (
+    <FlatList
+      data={restaurantReviews}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={styles.reviewItem}
+          onPress={() => router.push(`/post-details/${item.id}`)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.reviewHeader}>
+            <UserAvatar
+              profilePicture={item.user_profile_picture}
+              username={item.username}
+              size={40}
+              level={item.user_level || 1}
+              showLevelBadge={false}
+            />
+            <View style={styles.reviewUserInfo}>
+              <Text style={styles.reviewUsername}>{item.username || 'User'}</Text>
+              <Text style={styles.reviewDate}>
+                {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
+              </Text>
+            </View>
+            <View style={styles.reviewRating}>
+              <Ionicons name="star" size={16} color="#F2CF68" />
+              <Text style={styles.reviewRatingText}>{item.rating}/10</Text>
+            </View>
           </View>
-        )}
+          
+          {item.media_url && (
+            <Image
+              source={{ uri: fixUrl(item.media_url) }}
+              style={styles.reviewImage}
+              resizeMode="cover"
+            />
+          )}
+          
+          {item.review_text && (
+            <Text style={styles.reviewText} numberOfLines={3}>
+              {item.review_text}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+      keyExtractor={(item) => item.id}
+      scrollEnabled={false}
+    />
+  ) : (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="star-outline" size={64} color="#ccc" />
+      <Text style={styles.emptyText}>No reviews yet</Text>
+      <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
+        Reviews from customers will appear here
+      </Text>
+    </View>
+  )
+)}
 
         {restaurantActiveTab === 'menu' && (
   menuItems.length > 0 ? (
@@ -3236,7 +3310,63 @@ profileOnBanner: {
   zIndex: 100, 
   backgroundColor: 'transparent',                // ✅ High z-index for iOS
 },
-  
+  // Review Item Styles
+reviewItem: {
+  backgroundColor: '#fff',
+  marginHorizontal: 16,
+  marginBottom: 12,
+  borderRadius: 12,
+  padding: 12,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 4,
+  elevation: 2,
+},
+reviewHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 10,
+},
+reviewUserInfo: {
+  flex: 1,
+  marginLeft: 10,
+},
+reviewUsername: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#333',
+},
+reviewDate: {
+  fontSize: 11,
+  color: '#999',
+  marginTop: 2,
+},
+reviewRating: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FFF9E6',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 12,
+  gap: 4,
+},
+reviewRatingText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#333',
+},
+reviewImage: {
+  width: '100%',
+  height: 180,
+  borderRadius: 8,
+  marginBottom: 10,
+},
+reviewText: {
+  fontSize: 14,
+  color: '#666',
+  lineHeight: 20,
+},
   dpCameraIcon: {
     position: 'absolute',
     right: 0,
@@ -3252,7 +3382,7 @@ profileOnBanner: {
   },
   whiteInfoBox: {
     backgroundColor: '#fff',
-    borderRadius: 20,              // ✅ ALL corners rounded
+    borderRadius: 10,              // ✅ ALL corners rounded
     paddingTop: 60,                // ✅ More top padding for DP overlap
     paddingHorizontal: 20,
     paddingBottom: 20,
