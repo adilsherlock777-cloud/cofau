@@ -34,6 +34,7 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.co
 const API_URL = `${BACKEND_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+
 /* -------------------------
    Level System Helper
 ------------------------- */
@@ -99,6 +100,22 @@ const fixUrl = (url?: string | null) => {
   }
   return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
 };
+
+
+const fetchRestaurantPosts = async () => {
+     if (!userData?.id) return;
+     try {
+       const response = await axios.get(
+         `${API_URL}/restaurant/posts/public/restaurant/${userData.id}`,
+         { headers: { Authorization: `Bearer ${token}` } }
+       );
+       setUserPosts(response.data || []);
+     } catch (err) {
+       console.error('Error fetching restaurant posts:', err);
+       setUserPosts([]);
+     }
+   };
+
 
 const ProfileSkeleton = () => {
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -254,6 +271,7 @@ export default function ProfileScreen() {
   const [userData, setUserData] = useState<any>(null);
   const [userStats, setUserStats] = useState<any>(null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [menuItems, setMenuItems] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'favourite'>('posts');
@@ -308,12 +326,17 @@ export default function ProfileScreen() {
   }, [isOwnProfile, userData?.id, token]);
 
   useEffect(() => {
-    if (userData) {
-      fetchUserPosts();
-      fetchComplimentsCount();
-      checkIfComplimented();
+  if (userData) {
+    fetchUserPosts();
+    fetchComplimentsCount();
+    checkIfComplimented();
+    
+    // Fetch menu items if restaurant account
+    if (accountType === 'restaurant') {
+      fetchMenuItems();
     }
-  }, [userData, activeTab]);
+  }
+}, [userData, activeTab]);
 
   // Animate sidebar when modal visibility changes
   useEffect(() => {
@@ -345,6 +368,19 @@ export default function ProfileScreen() {
       userData: userData ? 'loaded' : 'not loaded',
     });
   }, [isOwnProfile, settingsModalVisible, userData]);
+
+  const fetchMenuItems = async () => {
+     if (!userData?.id) return;
+     try {
+       const response = await axios.get(
+         `${API_URL}/restaurant/posts/menu/${userData.id}`
+       );
+       setMenuItems(response.data || []);
+     } catch (err) {
+       console.error('Error fetching menu items:', err);
+       setMenuItems([]);
+     }
+   };
 
   const GradientHeart = ({ size = 24 }) => (
   <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
@@ -434,7 +470,7 @@ export default function ProfileScreen() {
       setEditedBio(user.bio || '');
       setEditedName(user.full_name || user.username || '');
 
-      // Fetch stats - wrap in try-catch for restaurant accounts
+// Fetch stats - wrap in try-catch for restaurant accounts
 try {
   const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
   setUserStats(statsResponse.data);
@@ -457,11 +493,18 @@ try {
     }
   };
 
-  const fetchUserPosts = async () => {
+ const fetchUserPosts = async () => {
     if (!userData) return;
 
-    try {
-      const endpoint = `${API_URL}/users/${userData.id}/posts`;
+   try {
+    let endpoint;
+    
+    // Use different endpoint for restaurant accounts
+    if (accountType === 'restaurant') {
+      endpoint = `${API_URL}/restaurant/posts/public/restaurant/${userData.id}`;
+    } else {
+      endpoint = `${API_URL}/users/${userData.id}/posts`;
+    }
 
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -514,11 +557,22 @@ try {
       });
 
       setUserPosts(sorted);
+      
+      // ✅ Update stats for restaurant accounts
+      if (accountType === 'restaurant') {
+        setUserStats((prev: any) => ({
+          ...prev,
+          total_posts: sorted.length,
+        }));
+      }
+      
     } catch (err) {
       console.error('❌ Error fetching user posts:', err);
       setUserPosts([]);
     }
   };
+
+
 
   const fetchComplimentsCount = async () => {
     if (!userData?.id) return;
@@ -767,6 +821,196 @@ try {
       Alert.alert('Profile Picture', 'Choose an option', options);
     }
   };
+
+  const handleBannerPress = () => {
+  if (!isOwnProfile) return;
+
+  const options: any[] = [
+    { text: 'Take Photo', onPress: () => handleTakeBannerPhoto() },
+    { text: 'Choose from Library', onPress: () => handleChooseBannerPhoto() },
+  ];
+
+  if (bannerImage || userData?.cover_image) {
+    options.push({
+      text: 'Remove Photo',
+      onPress: () => handleRemoveBanner(),
+      style: 'destructive',
+    });
+  }
+
+  options.push({ text: 'Cancel', style: 'cancel' });
+
+  if (Platform.OS === 'web') {
+    const action = window.confirm(
+      'Choose from library to upload a banner image?'
+    );
+    if (action) handleChooseBannerPhoto();
+  } else {
+    Alert.alert('Banner Image', 'Choose an option', options);
+  }
+};
+
+const handleTakeBannerPhoto = async () => {
+  try {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'Camera permission is required to take photos.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      await uploadBannerImage(result.assets[0].uri);
+    }
+  } catch (error) {
+    console.error('❌ Error taking banner photo:', error);
+    Alert.alert('Error', 'Failed to take photo');
+  }
+};
+
+const handleChooseBannerPhoto = async () => {
+  try {
+    const { status } =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'Photo library permission is required.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      await uploadBannerImage(result.assets[0].uri);
+    }
+  } catch (error) {
+    console.error('❌ Error choosing banner photo:', error);
+    Alert.alert('Error', 'Failed to choose photo');
+  }
+};
+
+const uploadBannerImage = async (uri: string) => {
+  setUploadingBanner(true);
+  try {
+    console.log('📤 Uploading banner image:', uri);
+
+    const formData = new FormData();
+    const filename = uri.split('/').pop() || 'banner.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+    formData.append('file', {
+      uri,
+      name: filename,
+      type,
+    } as any);
+
+    const response = await axios.post(
+      `${API_URL}/users/upload-banner-image`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    console.log('✅ Banner image uploaded:', response.data);
+
+    const apiBannerImage =
+      response.data.cover_image ||
+      response.data.banner_image ||
+      response.data.cover_image_url;
+
+    const normalizedBannerImage = fixUrl(apiBannerImage);
+
+    setBannerImage(normalizedBannerImage);
+    setUserData((prev: any) => ({
+      ...prev,
+      cover_image: normalizedBannerImage,
+    }));
+
+    Alert.alert('Success', 'Banner image updated successfully!');
+  } catch (error: any) {
+    console.error(
+      '❌ Error uploading banner image:',
+      error.response?.data || error.message
+    );
+    Alert.alert('Error', 'Failed to upload banner image. Please try again.');
+  } finally {
+    setUploadingBanner(false);
+  }
+};
+
+const handleRemoveBanner = async () => {
+  if (Platform.OS === 'web') {
+    const confirmRemove = window.confirm(
+      'Are you sure you want to remove your banner image?'
+    );
+    if (!confirmRemove) return;
+    await removeBannerImage();
+    return;
+  }
+
+  Alert.alert(
+    'Remove Banner Image',
+    'Are you sure you want to remove your banner image?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        onPress: () => removeBannerImage(),
+        style: 'destructive',
+      },
+    ]
+  );
+};
+
+const removeBannerImage = async () => {
+  setUploadingBanner(true);
+  try {
+    console.log('🗑️ Removing banner image');
+
+    await axios.delete(`${API_URL}/users/banner-image`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    console.log('✅ Banner image removed');
+
+    setBannerImage(null);
+    setUserData((prev: any) => ({
+      ...prev,
+      cover_image: null,
+    }));
+
+    Alert.alert('Success', 'Banner image removed successfully!');
+  } catch (error: any) {
+    console.error(
+      '❌ Error removing banner image:',
+      error.response?.data || error.message
+    );
+    Alert.alert('Error', 'Failed to remove banner image. Please try again.');
+  } finally {
+    setUploadingBanner(false);
+  }
+};
 
   const handleTakePhoto = async () => {
     try {
@@ -1136,104 +1380,126 @@ const renderRestaurantProfile = () => {
           </LinearGradient>
         </View>
 
-        {/* ================= BANNER IMAGE ================= */}
-        <TouchableOpacity
-  style={restaurantStyles.bannerContainer}
-  onPress={() => {
-    if (isOwnProfile) {
-      Alert.alert('Upload Banner', 'Banner upload coming soon!');
-    }
-  }}
-  activeOpacity={isOwnProfile ? 0.8 : 1}
->
-  {bannerImage || userData?.cover_image ? (
-    <Image
-      source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
-      style={restaurantStyles.bannerImage}
-      resizeMode="cover"
-    />
-  ) : (
-    // Change from LinearGradient to View with grey background
-    <View style={restaurantStyles.bannerPlaceholder}>
+{/* ================= BANNER + WHITE BOX WRAPPER ================= */}
+<View style={restaurantStyles.bannerWrapper}>
+  {/* Banner Image */}
+  <TouchableOpacity
+    style={restaurantStyles.bannerContainer}
+    onPress={() => {
+      if (isOwnProfile) {
+        handleBannerPress();
+      }
+    }}
+    activeOpacity={isOwnProfile ? 0.8 : 1}
+  >
+    {bannerImage || userData?.cover_image ? (
+      <>
+        <Image
+          source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
+          style={restaurantStyles.bannerImage}
+          resizeMode="cover"
+        />
+        {/* Edit Pen Icon - Bottom Right */}
+        {isOwnProfile && !uploadingBanner && (
+          <View style={restaurantStyles.bannerEditPen}>
+            <Ionicons name="pencil" size={18} color="#fff" />
+          </View>
+        )}
+        {/* Loading Indicator */}
+        {uploadingBanner && (
+          <View style={restaurantStyles.bannerUploadingOverlay}>
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
+        )}
+      </>
+    ) : (
+      <View style={restaurantStyles.bannerPlaceholder}>
+        {isOwnProfile && (
+          <View style={restaurantStyles.bannerEditIcon}>
+            <Ionicons name="camera" size={24} color="#999" />
+            <Text style={restaurantStyles.bannerEditText}>Add Cover Photo</Text>
+          </View>
+        )}
+      </View>
+    )}
+  </TouchableOpacity>
+
+  {/* ================= WHITE INFO BOX ================= */}
+  <View style={restaurantStyles.whiteInfoBox}>
+    {/* Restaurant Name & Label */}
+    <View style={restaurantStyles.restaurantInfoContainer}>
+      <Text style={restaurantStyles.restaurantName}>
+        {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
+      </Text>
+      <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
+    </View>
+
+    {/* Bio Section */}
+    <View style={restaurantStyles.bioSection}>
+      <Text style={restaurantStyles.bioText}>
+        {userData?.bio || 'No bio yet. Add one by editing your profile!'}
+      </Text>
+    </View>
+
+    {/* Stats Section */}
+    <View style={restaurantStyles.statsContainer}>
+      <View style={restaurantStyles.statBox}>
+        <Text style={restaurantStyles.statValue}>{userStats?.total_posts || 0}</Text>
+        <Text style={restaurantStyles.statLabel}>Posts</Text>
+      </View>
+
+      <View style={restaurantStyles.statDivider} />
+
+      <TouchableOpacity
+        style={restaurantStyles.statBox}
+        onPress={() => {
+          setFollowersModalVisible(true);
+          fetchFollowers();
+        }}
+        activeOpacity={0.7}
+      >
+        <Text style={restaurantStyles.statValue}>{userStats?.followers_count || 0}</Text>
+        <Text style={restaurantStyles.statLabel}>Followers</Text>
+      </TouchableOpacity>
+
+      <View style={restaurantStyles.statDivider} />
+
+      <View style={restaurantStyles.statBox}>
+        <Text style={restaurantStyles.statValue}>{userData?.reviews_count || 0}</Text>
+        <Text style={restaurantStyles.statLabel}>Reviews</Text>
+      </View>
+    </View>
+  </View>
+
+  {/* Profile Picture - RENDERED LAST (on top of everything) */}
+  <View style={restaurantStyles.profileOnBanner}>
+    <TouchableOpacity
+      onPress={handleProfilePicturePress}
+      disabled={!isOwnProfile || uploadingImage}
+      activeOpacity={0.8}
+    >
+      <UserAvatar
+        profilePicture={userData?.profile_picture}
+        username={userData?.restaurant_name || userData?.full_name}
+        size={100}
+        showLevelBadge={false}
+        style={{
+          ...restaurantStyles.restaurantAvatar,
+          backgroundColor: 'transparent',
+        }}
+      />
       {isOwnProfile && (
-        <View style={restaurantStyles.bannerEditIcon}>
-          <Ionicons name="camera" size={24} color="#999" />
-          <Text style={restaurantStyles.bannerEditText}>Add Cover Photo</Text>
+        <View style={restaurantStyles.dpCameraIcon}>
+          {uploadingImage ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="camera" size={16} color="#fff" />
+          )}
         </View>
       )}
-    </View>
-  )}
-
-          {/* Edit icon overlay for banner */}
-          {isOwnProfile && (bannerImage || userData?.cover_image) && (
-            <View style={restaurantStyles.bannerEditOverlay}>
-              <Ionicons name="camera" size={20} color="#fff" />
-            </View>
-          )}
-
-          {/* Profile Picture on Banner */}
-          <View style={restaurantStyles.profileOnBanner}>
-            <TouchableOpacity
-              onPress={handleProfilePicturePress}
-              disabled={!isOwnProfile || uploadingImage}
-              activeOpacity={0.8}
-            >
-              <UserAvatar
-                profilePicture={userData?.profile_picture}
-                username={userData?.restaurant_name || userData?.full_name}
-                size={100}
-                showLevelBadge={false}
-                style={restaurantStyles.restaurantAvatar}
-              />
-              {isOwnProfile && (
-                <View style={restaurantStyles.dpCameraIcon}>
-                  {uploadingImage ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="camera" size={16} color="#fff" />
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-
-        {/* ================= RESTAURANT INFO ================= */}
-        <View style={restaurantStyles.restaurantInfoContainer}>
-          <Text style={restaurantStyles.restaurantName}>
-            {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
-          </Text>
-          <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
-        </View>
-
-        {/* ================= STATS SECTION ================= */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{userStats?.total_posts || 0}</Text>
-            <Text style={styles.statLabel}>Posts</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <TouchableOpacity
-            style={styles.statBox}
-            onPress={() => {
-              setFollowersModalVisible(true);
-              fetchFollowers();
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
-            <Text style={styles.statLabel}>People</Text>
-          </TouchableOpacity>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{userData?.reviews_count || 0}</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
-          </View>
-        </View>
+    </TouchableOpacity>
+  </View>
+</View>
 
         {/* ================= ACTION BUTTONS ================= */}
         <View style={styles.actionButtonsContainer}>
@@ -1307,13 +1573,6 @@ const renderRestaurantProfile = () => {
           )}
         </View>
 
-        {/* ================= BIO SECTION ================= */}
-        <View style={styles.bioSection}>
-          <Text style={styles.bioLabel}>Bio:</Text>
-          <Text style={styles.bioText}>
-            {userData?.bio || 'No bio yet. Add one by editing your profile!'}
-          </Text>
-        </View>
 
         {/* ================= RESTAURANT TABS ================= */}
         <View style={styles.tabBar}>
@@ -1370,14 +1629,54 @@ const renderRestaurantProfile = () => {
         )}
 
         {restaurantActiveTab === 'menu' && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="restaurant-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>Menu coming soon</Text>
-            <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
-              You'll be able to add menu items here
-            </Text>
+  menuItems.length > 0 ? (
+    <FlatList
+      data={menuItems}
+      renderItem={({ item }) => (
+        <View style={styles.listItem}>
+          <View style={styles.listImageContainer}>
+            {item.media_url ? (
+              <Image
+                source={{ uri: fixUrl(item.media_url) }}
+                style={styles.listImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.listImagePlaceholder}>
+                <Ionicons name="restaurant-outline" size={40} color="#ccc" />
+              </View>
+            )}
           </View>
-        )}
+          <View style={styles.listDetails}>
+            <Text style={styles.listDetailText}>{item.item_name}</Text>
+            <Text style={styles.listDetailText}>₹{item.price}</Text>
+            {item.description && (
+              <Text style={[styles.listDetailText, { color: '#666' }]} numberOfLines={2}>
+                {item.description}
+              </Text>
+            )}
+            {item.category && (
+              <View style={styles.listDetailRow}>
+                <Ionicons name="pricetag" size={16} color="#F2CF68" />
+                <Text style={styles.listDetailText}>{item.category}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+      keyExtractor={(item) => item.id}
+      scrollEnabled={false}
+    />
+  ) : (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="restaurant-outline" size={64} color="#ccc" />
+      <Text style={styles.emptyText}>Menu coming soon</Text>
+      <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
+        You'll be able to add menu items here
+      </Text>
+    </View>
+  )
+)}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -2622,14 +2921,20 @@ if (accountType === 'restaurant') {
 /* ================= STYLES ================= */
 
 const restaurantStyles = StyleSheet.create({
+  bannerWrapper: {
+    marginHorizontal: 16,
+    marginTop: -50,
+    marginBottom: 0,    
+    position: 'relative',           // ✅ ADD THIS
+    zIndex: 0,             // ✅ Changed from 20 to 0
+  },
   bannerContainer: {
-    marginHorizontal: 20,           // Add side margins
-    marginTop: -40,                 // Overlap with header
-    height: 160,                    // Slightly smaller height
-    borderRadius: 20,               // Rounded corners
-    backgroundColor: '#E0E0E0',     // Grey background (same as DP placeholder)
+    height: 200,
+    borderTopLeftRadius: 20,      // ✅ Top corners rounded
+    borderTopRightRadius: 20,     // ✅ Top corners rounded
+    backgroundColor: '#E0E0E0',
     position: 'relative',
-    overflow: 'visible',            // Allow DP to overflow
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -2639,13 +2944,32 @@ const restaurantStyles = StyleSheet.create({
   bannerImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,               // Match container radius
   },
+  bannerEditPen: {
+  position: 'absolute',
+  bottom: 10,
+  right: 10,
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  borderRadius: 20,
+  width: 40,
+  height: 40,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+bannerUploadingOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
   bannerPlaceholder: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
-    backgroundColor: '#E0E0E0',     // Grey color, NOT gradient
+    backgroundColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2653,7 +2977,7 @@ const restaurantStyles = StyleSheet.create({
     alignItems: 'center',
   },
   bannerEditText: {
-    color: '#999',                  // Darker text for grey background
+    color: '#999',
     fontSize: 14,
     marginTop: 8,
     fontWeight: '600',
@@ -2669,15 +2993,15 @@ const restaurantStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  profileOnBanner: {
-    position: 'absolute',
-    bottom: -50,                    // Half outside the banner
-    left: 20,                       // Positioned on LEFT side
-  },
-  restaurantAvatar: {
-    borderWidth: 4,
-    borderColor: '#fff',
-  },
+profileOnBanner: {
+  position: 'absolute',
+  bottom: 180,
+  left: 20,
+  elevation: 100,              // ✅ Very high elevation for Android
+  zIndex: 100, 
+  backgroundColor: 'transparent',                // ✅ High z-index for iOS
+},
+  
   dpCameraIcon: {
     position: 'absolute',
     right: 0,
@@ -2691,14 +3015,31 @@ const restaurantStyles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  restaurantInfoContainer: {
-    alignItems: 'flex-start',       // Align to left (next to DP)
-    marginTop: 60,
-    marginBottom: 10,
-    marginLeft: 140,                // Push to right of DP
+  whiteInfoBox: {
+    backgroundColor: '#fff',
+    borderRadius: 20,              // ✅ ALL corners rounded
+    paddingTop: 60,                // ✅ More top padding for DP overlap
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    marginTop: -10,  
+    marginBottom: 16,               // ✅ Slight overlap with banner
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    zIndex: 1,
   },
+ restaurantInfoContainer: {
+  flexDirection: 'column',            // ✅ ADD THIS - horizontal layout
+  alignItems: 'center',            // ✅ ADD THIS
+  marginLeft: 120,    
+  marginTop: -5,             // ✅ ADD THIS - space for DP (100px DP + 20px gap)
+  marginBottom: 12,
+},
   restaurantName: {
     fontSize: 24,
+    marginTop: -25, 
     fontWeight: 'bold',
     color: '#333',
   },
@@ -2709,8 +3050,43 @@ const restaurantStyles = StyleSheet.create({
     marginTop: 4,
     letterSpacing: 2,
   },
+  bioSection: {
+    marginBottom: 16,
+  },
+  bioText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#D0D0D0',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
 });
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

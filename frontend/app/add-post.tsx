@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { createPost, createRestaurantPost, createMenuItem } from '../utils/api';
@@ -28,12 +28,15 @@ import axios from 'axios';
 
 export default function AddPostScreen() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams();  // Get mode from params
   const { showLevelUpAnimation } = useLevelAnimation();
   const auth = useAuth() as any;
   const { refreshUser, accountType } = auth;
   
   // Post mode (for restaurants only)
-  const [postMode, setPostMode] = useState<'post' | 'menu'>('post');
+  const [postMode, setPostMode] = useState<'post' | 'menu'>(
+    mode === 'menu' ? 'menu' : 'post'
+  );
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
 
