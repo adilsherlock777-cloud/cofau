@@ -658,6 +658,44 @@ async def get_restaurant_posts_by_id_public(
     
     return result
 
+
+@router.get("/public/profile/{restaurant_id}")
+async def get_restaurant_profile_public(restaurant_id: str):
+    """Get public restaurant profile by ID (no auth required)"""
+    db = get_database()
+    
+    try:
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid restaurant ID")
+    
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    # Get posts count
+    posts_count = await db.restaurant_posts.count_documents({"restaurant_id": restaurant_id})
+    
+    # Get followers count
+    followers_count = await db.follows.count_documents({"followingId": restaurant_id})
+    
+    return {
+        "id": str(restaurant["_id"]),
+        "restaurant_name": restaurant.get("restaurant_name"),
+        "full_name": restaurant.get("restaurant_name"),  # For compatibility
+        "profile_picture": restaurant.get("profile_picture"),
+        "cover_image": restaurant.get("cover_image"),
+        "bio": restaurant.get("bio"),
+        "phone": restaurant.get("phone"),
+        "address": restaurant.get("address"),
+        "cuisine_type": restaurant.get("cuisine_type"),
+        "posts_count": posts_count,
+        "reviews_count": restaurant.get("reviews_count", 0),
+        "followers_count": followers_count,
+        "is_verified": restaurant.get("is_verified", False),
+        "account_type": "restaurant",
+        "created_at": restaurant["created_at"].isoformat() if restaurant.get("created_at") else None
+    }
+
 # ==================== MENU ITEMS ====================
 
 @router.post("/menu/create")
