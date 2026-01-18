@@ -263,13 +263,22 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
       
       const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
       
-      if (res.data.length === 0) { 
+      let postsData = res.data;
+      
+      // Filter out restaurant posts when on USERS tab
+      if (currentTab === 'users') {
+        postsData = postsData.filter((post: any) => 
+          post.account_type !== 'restaurant' && !post.restaurant_id
+        );
+      }
+      
+      if (postsData.length === 0) { 
         setHasMore(false); 
         if (refresh) setPosts([]); 
         return; 
       }
       
-      const newPosts = res.data.map((post: any) => {
+      const newPosts = postsData.map((post: any) => {
         const fullUrl = fixUrl(post.media_url || post.image_url);
         return { 
           ...post, 
@@ -290,7 +299,7 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
         setPage((prev) => prev + 1); 
       }
       
-      if (res.data.length < POSTS_PER_PAGE) setHasMore(false);
+      if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
     } catch (err) { 
       console.error("Fetch error:", err); 
     } finally { 

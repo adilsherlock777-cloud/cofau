@@ -2697,6 +2697,15 @@ async def get_following(user_id: str):
 async def get_user_profile(user_id: str):
     """Get user profile by ID"""
     db = get_database()
+
+     # Check if this user is blocked
+    is_blocked = await db.blocks.find_one({
+        "blocker_id": str(current_user["_id"]),
+        "blocked_id": user_id
+    })
+    
+    if is_blocked:
+        raise HTTPException(status_code=403, detail="You have blocked this user")
     
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user:
@@ -2984,6 +2993,15 @@ async def logout(current_user: dict = Depends(get_current_user)):
 async def get_user_stats(user_id: str):
     """Get user statistics"""
     db = get_database()
+
+    # Check if this user is blocked
+    is_blocked = await db.blocks.find_one({
+        "blocker_id": str(current_user["_id"]),
+        "blocked_id": user_id
+    })
+    
+    if is_blocked:
+        raise HTTPException(status_code=403, detail="You have blocked this user")
     
     # Get user
     user = await db.users.find_one({"_id": ObjectId(user_id)})
@@ -3013,6 +3031,15 @@ async def get_user_stats(user_id: str):
 async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, limit: int = None):
     """Get user's posts, optionally filtered by media type. Returns all posts if limit is not specified."""
     db = get_database()
+
+    # Check if this user is blocked
+    is_blocked = await db.blocks.find_one({
+        "blocker_id": str(current_user["_id"]),
+        "blocked_id": user_id
+    })
+    
+    if is_blocked:
+        raise HTTPException(status_code=403, detail="You have blocked this user")
     
     # Build query
     query = {"user_id": user_id}
