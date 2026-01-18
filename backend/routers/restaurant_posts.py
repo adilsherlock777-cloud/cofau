@@ -1104,3 +1104,206 @@ async def unfollow_restaurant_public(
     print(f"✅ User {user_id} unfollowed restaurant {restaurant_id}")
     
     return {"message": "Successfully unfollowed restaurant"}
+
+# ==================== LIKES FOR REGULAR USERS ====================
+
+@router.post("/public/{post_id}/like")
+async def like_restaurant_post_as_user(
+    post_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Like a restaurant post (for regular users)"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    # Check if already liked
+    existing_like = await db.restaurant_likes.find_one({
+        "post_id": post_id,
+        "user_id": user_id,
+        "user_type": "user"
+    })
+    
+    if existing_like:
+        raise HTTPException(status_code=400, detail="Already liked this post")
+    
+    # Add like
+    await db.restaurant_likes.insert_one({
+        "post_id": post_id,
+        "user_id": user_id,
+        "user_type": "user",
+        "created_at": datetime.utcnow()
+    })
+    
+    # Update post likes count
+    await db.restaurant_posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"likes_count": 1}}
+    )
+    
+    return {"message": "Post liked"}
+
+
+@router.delete("/public/{post_id}/like")
+async def unlike_restaurant_post_as_user(
+    post_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Unlike a restaurant post (for regular users)"""
+    db = get_database()
+    
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    result = await db.restaurant_likes.delete_one({
+        "post_id": post_id,
+        "user_id": user_id,
+        "user_type": "user"
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Like not found")
+    
+    # Update post likes count
+    await db.restaurant_posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"likes_count": -1}}
+    )
+    
+    return {"message": "Post unliked"}
+
+# ==================== COMMENTS FOR REGULAR USERS ====================
+
+@router.post("/public/{post_id}/comment")
+async def add_comment_to_restaurant_post_as_user(
+    post_id: str,
+    comment_text: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a comment to a restaurant post (for regular users)"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    comment_doc = {
+        "post_id": post_id,
+        "user_id": user_id,
+        "user_type": "user",
+        "username": current_user.get("full_name") or current_user.get("username"),
+        "profile_pic": current_user.get("profile_picture"),
+        "level": current_user.get("level", 1),
+        "comment_text": comment_text.strip(),
+        "created_at": datetime.utcnow()
+    }
+    
+    result = await db.restaurant_comments.insert_one(comment_doc)
+    
+    # Update post comments count
+    await db.restaurant_posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"comments_count": 1}}
+    )
+    
+    print(f"✅ User {user_id} commented on restaurant post {post_id}")
+    
+    return {
+        "message": "Comment added",
+        "comment_id": str(result.inserted_id)
+    }
+
+
+@router.get("/public/{post_id}/comments")
+async def get_restaurant_post_comments_public(post_id: str):
+    """Get all comments for a restaurant post (public - no auth required)"""
+    db = get_database()
+    
+    # Check if post exists
+    post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    comments = await db.restaurant_comments.find({"post_id": post_id}).sort("created_at", -1).to_list(100)
+    
+    result = []
+    for comment in comments:
+        # Get user info based on user_type
+        user_type = comment.get("user_type", "restaurant")
+        
+        if user_type == "user":
+            # Regular user comment
+            user = await db.users.find_one({"_id": ObjectId(comment["user_id"])})
+            result.append({
+                "id": str(comment["_id"]),
+                "post_id": post_id,
+                "user_id": comment["user_id"],
+                "user_type": "user",
+                "username": user.get("full_name") if user else comment.get("username", "Unknown"),
+                "profile_pic": user.get("profile_picture") if user else comment.get("profile_pic"),
+                "level": user.get("level", 1) if user else comment.get("level", 1),
+                "comment_text": comment["comment_text"],
+                "created_at": comment["created_at"]
+            })
+        else:
+            # Restaurant comment
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(comment.get("restaurant_id", comment.get("user_id")))})
+            result.append({
+                "id": str(comment["_id"]),
+                "post_id": post_id,
+                "user_id": comment.get("restaurant_id", comment.get("user_id")),
+                "user_type": "restaurant",
+                "username": restaurant.get("restaurant_name") if restaurant else comment.get("restaurant_name", "Unknown"),
+                "profile_pic": restaurant.get("profile_picture") if restaurant else comment.get("profile_pic"),
+                "level": None,
+                "comment_text": comment["comment_text"],
+                "created_at": comment["created_at"]
+            })
+    
+    return result
+
+
+@router.delete("/public/{post_id}/comment/{comment_id}")
+async def delete_comment_from_restaurant_post_as_user(
+    post_id: str,
+    comment_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a comment from a restaurant post (for regular users - only own comments)"""
+    db = get_database()
+    
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+    
+    # Find and verify ownership
+    comment = await db.restaurant_comments.find_one({
+        "_id": ObjectId(comment_id),
+        "post_id": post_id
+    })
+    
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
+    # Check if user owns this comment
+    if comment.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="You can only delete your own comments")
+    
+    # Delete comment
+    result = await db.restaurant_comments.delete_one({"_id": ObjectId(comment_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to delete comment")
+    
+    # Update post comments count
+    await db.restaurant_posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"comments_count": -1}}
+    )
+    
+    return {"message": "Comment deleted"}
