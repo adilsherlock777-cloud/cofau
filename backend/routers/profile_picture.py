@@ -30,8 +30,15 @@ async def upload_profile_image(
     db = get_database()
     user_id = str(current_user["_id"])
 
-    # ✅ Fetch latest user data from database to get current profile_picture
+    # ✅ Check both users and restaurants collections
     user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    collection_name = "users"
+    
+    if not user_doc:
+        # Try restaurants collection
+        user_doc = await db.restaurants.find_one({"_id": ObjectId(user_id)})
+        collection_name = "restaurants"
+    
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -210,13 +217,14 @@ async def upload_profile_image(
     # -------------------------------------------------------------
     profile_image_url = f"/api/static/uploads/{filename}"
 
-    # DB update
-    await db.users.update_one(
+    # ✅ Update the correct collection (users OR restaurants)
+    collection = db.users if collection_name == "users" else db.restaurants
+    await collection.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {"profile_picture": profile_image_url}}
     )
 
-    print(f"📸 Updated profile picture for user {user_id}")
+    print(f"📸 Updated profile picture for {collection_name[:-1]} {user_id}")
 
     return {
         "message": "Profile picture uploaded successfully",
@@ -231,7 +239,18 @@ async def delete_profile_image(current_user: dict = Depends(get_current_user)):
     db = get_database()
     user_id = str(current_user["_id"])
 
-    old_profile_pic = current_user.get("profile_picture")
+    # ✅ Check both users and restaurants collections
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    collection_name = "users"
+    
+    if not user_doc:
+        user_doc = await db.restaurants.find_one({"_id": ObjectId(user_id)})
+        collection_name = "restaurants"
+    
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_profile_pic = user_doc.get("profile_picture")
 
     if old_profile_pic:
         # Handle various URL formats to extract the filename
@@ -271,8 +290,9 @@ async def delete_profile_image(current_user: dict = Depends(get_current_user)):
             else:
                 print(f"⚠️ Profile picture file not found: {old_path}")
 
-    # Remove from DB
-    await db.users.update_one(
+    # ✅ Update the correct collection
+    collection = db.users if collection_name == "users" else db.restaurants
+    await collection.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {"profile_picture": None}}
     )
