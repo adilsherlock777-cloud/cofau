@@ -2694,7 +2694,7 @@ async def get_following(user_id: str):
 # ==================== USER PROFILE ENDPOINTS ====================
 
 @app.get("/api/users/{user_id}")
-async def get_user_profile(user_id: str):
+async def get_user_profile(user_id: str, current_user: dict = Depends(get_current_user)):
     """Get user profile by ID"""
     db = get_database()
 
@@ -2990,7 +2990,7 @@ async def logout(current_user: dict = Depends(get_current_user)):
 # ==================== USER STATS ENDPOINTS ====================
 
 @app.get("/api/users/{user_id}/stats")
-async def get_user_stats(user_id: str):
+async def get_user_stats(user_id: str, current_user: dict = Depends(get_current_user)):
     """Get user statistics"""
     db = get_database()
 
@@ -3028,7 +3028,7 @@ async def get_user_stats(user_id: str):
     }
 
 @app.get("/api/users/{user_id}/posts")
-async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, limit: int = None):
+async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, limit: int = None, current_user: dict = Depends(get_current_user)):
     """Get user's posts, optionally filtered by media type. Returns all posts if limit is not specified."""
     db = get_database()
 
