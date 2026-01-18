@@ -14,11 +14,18 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getComments, addComment } from '../utils/api';
+import { addComment, getComments, deleteComment } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from './UserAvatar';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+interface CommentsModalProps {
+  postId: string;
+  isVisible: boolean;
+  onClose: () => void;
+  accountType?: string;  // ← Add this prop
+}
 
 const normalizeDP = (input) => {
   if (!input) return null;
@@ -39,7 +46,7 @@ const normalizeDP = (input) => {
   return `${BASE}${input}`;
 };
 
-export default function CommentsModal({ postId, isVisible, onClose }) {
+export default function CommentsModal({ postId, isVisible, onClose, accountType }) {
   const { token } = useAuth();
 
   const [comments, setComments] = useState([]);
@@ -58,7 +65,7 @@ export default function CommentsModal({ postId, isVisible, onClose }) {
     
     try {
       setLoading(true);
-      const data = await getComments(postId);
+      const data = await getComments(postId, accountType);
       const fixed = data.map((c) => ({
         ...c,
         profile_pic: normalizeDP(
@@ -82,7 +89,7 @@ export default function CommentsModal({ postId, isVisible, onClose }) {
     
     setSubmitting(true);
     try {
-      await addComment(postId, commentText, token);
+      await addComment(postId, commentText, token, accountType);
       setCommentText('');
       await fetchComments();
     } catch (error) {
@@ -90,6 +97,15 @@ export default function CommentsModal({ postId, isVisible, onClose }) {
       Alert.alert('Error', 'Failed to add comment');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await deleteComment(postId, commentId, accountType);  // ← Pass accountType
+      fetchComments(); // Refresh comments
+    } catch (error) {
+      console.error('Error deleting comment:', error);
     }
   };
 

@@ -234,15 +234,19 @@ useEffect(() => {
 }, [isMuted, shouldPlay, isVideo]);
 
 const handleLike = async () => {
-const prev = isLiked;
-setIsLiked(!prev);
-setLikes(prev ? likesCount - 1 : likesCount + 1);
-try {
-prev ? await unlikePost(post.id) : await likePost(post.id);
-} catch {
-setIsLiked(prev);
-setLikes(likesCount);
-}
+  const prev = isLiked;
+  setIsLiked(!prev);
+  setLikes(prev ? likesCount - 1 : likesCount + 1);
+  try {
+    if (prev) {
+      await unlikePost(post.id, post.account_type);  // ← Pass account_type
+    } else {
+      await likePost(post.id, post.account_type);    // ← Pass account_type
+    }
+  } catch {
+    setIsLiked(prev);
+    setLikes(likesCount);
+  }
 };
 
 const handleSave = async () => {
@@ -857,6 +861,7 @@ console.error("Error sharing post:", error);
   postId={post.id}
   isVisible={showCommentsModal}
   onClose={() => setShowCommentsModal(false)}
+  accountType={post.account_type} 
 />
 
 {/* Simple Share Modal (WhatsApp/Instagram) */}

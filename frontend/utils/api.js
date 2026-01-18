@@ -92,9 +92,14 @@ export const createPost = async (postData) => {
 /**
  * Like a post
  */
-export const likePost = async (postId) => {
+export const likePost = async (postId, accountType) => {
   try {
-    const response = await axios.post(`${API_URL}/posts/${postId}/like`);
+    // Use different endpoint for restaurant posts
+    const endpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/posts/public/${postId}/like`  // ← Note: /public/ path
+      : `${API_URL}/posts/${postId}/like`;
+    
+    const response = await axios.post(endpoint);
     return response.data;
   } catch (error) {
     console.error('❌ Error liking post:', error.response?.data || error.message);
@@ -105,9 +110,14 @@ export const likePost = async (postId) => {
 /**
  * Unlike a post
  */
-export const unlikePost = async (postId) => {
+export const unlikePost = async (postId, accountType) => {
   try {
-    const response = await axios.delete(`${API_URL}/posts/${postId}/like`);
+    // Use different endpoint for restaurant posts
+    const endpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/posts/public/${postId}/like`  // ← Note: /public/ path
+      : `${API_URL}/posts/${postId}/like`;
+    
+    const response = await axios.delete(endpoint);
     return response.data;
   } catch (error) {
     console.error('❌ Error unliking post:', error.response?.data || error.message);
@@ -116,19 +126,41 @@ export const unlikePost = async (postId) => {
 };
 
 /**
+ * Add a comment to a post
+ */
+export const addComment = async (postId, commentText, accountType) => {
+  try {
+    // Use different endpoint for restaurant posts
+    const endpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/posts/public/${postId}/comment`
+      : `${API_URL}/posts/${postId}/comment`;
+    
+    const formData = new FormData();
+    formData.append('comment_text', commentText);
+    
+    const response = await axios.post(endpoint, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error adding comment:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
  * Get comments for a post
  */
-export const getComments = async (postId) => {
+export const getComments = async (postId, accountType) => {
   try {
-    // Normalize postId
-    const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
-
-    if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
-      throw new Error('Invalid post ID');
-    }
-
-    console.log('📥 Fetching comments for postId:', normalizedPostId);
-    const response = await axios.get(`${API_URL}/posts/${normalizedPostId}/comments`);
+    // Use different endpoint for restaurant posts
+    const endpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/posts/public/${postId}/comments`
+      : `${API_URL}/posts/${postId}/comments`;
+    
+    const response = await axios.get(endpoint);
     return response.data;
   } catch (error) {
     console.error('❌ Error fetching comments:', error.response?.data || error.message);
@@ -137,68 +169,22 @@ export const getComments = async (postId) => {
 };
 
 /**
- * Add a comment to a post
- * @param {string} postId - The post ID
- * @param {string} commentText - The comment text
- * @param {string} token - Optional token (if not provided, uses axios defaults)
+ * Delete a comment
  */
-export const addComment = async (postId, commentText, token = null) => {
-  // Validate and normalize postId (outside try block so it's available in catch)
-  if (!postId) {
-    throw new Error('Post ID is required');
-  }
-
-  // Ensure postId is a string (handle array case from expo-router)
-  const normalizedPostId = Array.isArray(postId) ? postId[0] : String(postId);
-
-  if (!normalizedPostId || normalizedPostId === 'undefined' || normalizedPostId === 'null') {
-    throw new Error('Invalid post ID');
-  }
-
+export const deleteComment = async (postId, commentId, accountType) => {
   try {
-    const formData = new FormData();
-    formData.append('comment_text', commentText.trim());
-
-    // Get authorization token - prefer passed token, fallback to axios defaults
-    const authToken = token
-      ? `Bearer ${token}`
-      : axios.defaults.headers.common['Authorization'];
-
-    if (!authToken) {
-      throw new Error('No authorization token found. Please login again.');
-    }
-
-    console.log('📤 Adding comment:', {
-      postId: normalizedPostId,
-      originalPostId: postId,
-      commentText: commentText.substring(0, 50),
-      tokenSource: token ? 'passed' : 'axios defaults'
-    });
-    console.log('🔑 Auth token present:', !!authToken);
-    console.log('🌐 Platform:', Platform.OS);
-    console.log('🌐 API URL:', `${API_URL}/posts/${normalizedPostId}/comment`);
-
-    // Build headers - match post-details implementation exactly
-    const headers = {
-      'Authorization': authToken,
-      'Content-Type': 'multipart/form-data', // Always set like post-details does
-    };
-
-    const response = await axios.post(`${API_URL}/posts/${normalizedPostId}/comment`, formData, {
-      headers,
-    });
-
-    console.log('✅ Comment added successfully');
+    // Use different endpoint for restaurant posts
+    const endpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/posts/public/${postId}/comment/${commentId}`
+      : `${API_URL}/posts/${postId}/comment/${commentId}`;
+    
+    const response = await axios.delete(endpoint);
     return response.data;
   } catch (error) {
-    console.error('❌ Error adding comment:', error.response?.data || error.message);
-    console.error('❌ Error status:', error.response?.status);
-    console.error('❌ Error URL:', `${API_URL}/posts/${normalizedPostId}/comment`);
-    console.error('❌ Full error:', error);
+    console.error('❌ Error deleting comment:', error.response?.data || error.message);
     throw error;
   }
 };
-
 /**
  * Follow a user or restaurant
  */
