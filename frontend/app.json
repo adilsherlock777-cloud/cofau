@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cofau",
     "slug": "cofau-app",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "scheme": "cofau",
     "userInterfaceStyle": "automatic",
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.cofau.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "googleServicesFile": "./google-services.json",
       "useNextNotificationsApi": true,
       "adaptiveIcon": {
