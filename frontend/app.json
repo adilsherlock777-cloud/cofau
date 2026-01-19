@@ -14,6 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "1", 
       "bundleIdentifier": "com.cofau.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Allow Cofau to access your photo library for uploading posts.",
