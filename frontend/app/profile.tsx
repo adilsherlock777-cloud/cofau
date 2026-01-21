@@ -598,20 +598,7 @@ try {
       setError(false);
     } catch (err: any) {
       console.error('❌ Profile fetch error:', err.response?.data || err.message);
-      // Check if user is blocked
-    if (err.response?.status === 403) {
-      Alert.alert(
-        'Blocked User',
-        'You have blocked this user. Unblock them from Settings > Blocked Users to view their profile.',
-        [
-          {
-            text: 'Go Back',
-            onPress: () => router.back(),
-          },
-        ]
-      );
-      return;
-    }
+      
       setError(true);
     } finally {
       setLoading(false);
@@ -940,6 +927,33 @@ if (isRestaurantProfile || userData?.account_type === 'restaurant') {
       console.log('✅ Logout complete!');
     }
   };
+
+  const handleDeleteAccount = async () => {
+  try {
+    console.log('🗑️ Starting account deletion...');
+    
+    // This should match your API_URL pattern
+    const deleteEndpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/auth/delete`   // → /api/restaurant/auth/delete
+      : `${API_URL}/auth/delete`;              // → /api/auth/delete
+    
+    await axios.delete(deleteEndpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    console.log('✅ Account deleted successfully');
+    Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
+    
+    await logout();
+    router.push('/auth/login');
+  } catch (err: any) {
+    console.error('❌ Delete account error:', err.response?.data || err.message);
+    Alert.alert(
+      'Error',
+      err.response?.data?.detail || 'Failed to delete account. Please try again.'
+    );
+  }
+};
 
   const handleProfilePicturePress = () => {
     if (!isOwnProfile) return;
@@ -2249,22 +2263,71 @@ const renderRestaurantProfile = () => {
 
               <View style={styles.sidebarDivider} />
 
-              <TouchableOpacity
-                style={styles.sidebarMenuItem}
-                onPress={() => {
-                  setSettingsModalVisible(false);
-                  if (Platform.OS === 'web') {
-                    const confirmed = window.confirm('Are you sure you want to logout?');
-                    if (confirmed) handleLogout();
-                  } else {
-                    Alert.alert('Logout', 'Are you sure you want to logout?', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
-                    ]);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
+{/* DELETE ACCOUNT - Separate TouchableOpacity */}
+<TouchableOpacity
+  style={styles.sidebarMenuItem}
+  onPress={() => {
+    setSettingsModalVisible(false);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        'Are you sure you want to delete your account? This action is permanent and cannot be undone.'
+      );
+      if (confirmed) {
+        const doubleConfirm = window.confirm(
+          'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?'
+        );
+        if (doubleConfirm) handleDeleteAccount();
+      }
+    } else {
+      Alert.alert(
+        'Delete Account',
+        'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            onPress: () => {
+              Alert.alert(
+                'Final Confirmation',
+                'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete Forever', onPress: () => handleDeleteAccount(), style: 'destructive' },
+                ]
+              );
+            },
+            style: 'destructive',
+          },
+        ]
+      );
+    }
+  }}
+  activeOpacity={0.7}
+>
+  <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
+    <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
+  </View>
+  <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Delete Account</Text>
+  <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+</TouchableOpacity>
+
+{/* LOGOUT - Separate TouchableOpacity */}
+<TouchableOpacity
+  style={styles.sidebarMenuItem}
+  onPress={() => {
+    setSettingsModalVisible(false);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to logout?');
+      if (confirmed) handleLogout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
+      ]);
+    }
+  }}
+  activeOpacity={0.7}
+>
                 <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
                   <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
                 </View>
@@ -3298,22 +3361,71 @@ if (isRestaurantProfile) {
 
               <View style={styles.sidebarDivider} />
 
-              <TouchableOpacity
-                style={styles.sidebarMenuItem}
-                onPress={() => {
-                  setSettingsModalVisible(false);
-                  if (Platform.OS === 'web') {
-                    const confirmed = window.confirm('Are you sure you want to logout?');
-                    if (confirmed) handleLogout();
-                  } else {
-                    Alert.alert('Logout', 'Are you sure you want to logout?', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
-                    ]);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
+{/* DELETE ACCOUNT - Separate TouchableOpacity */}
+<TouchableOpacity
+  style={styles.sidebarMenuItem}
+  onPress={() => {
+    setSettingsModalVisible(false);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        'Are you sure you want to delete your account? This action is permanent and cannot be undone.'
+      );
+      if (confirmed) {
+        const doubleConfirm = window.confirm(
+          'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?'
+        );
+        if (doubleConfirm) handleDeleteAccount();
+      }
+    } else {
+      Alert.alert(
+        'Delete Account',
+        'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            onPress: () => {
+              Alert.alert(
+                'Final Confirmation',
+                'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete Forever', onPress: () => handleDeleteAccount(), style: 'destructive' },
+                ]
+              );
+            },
+            style: 'destructive',
+          },
+        ]
+      );
+    }
+  }}
+  activeOpacity={0.7}
+>
+  <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
+    <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
+  </View>
+  <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Delete Account</Text>
+  <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+</TouchableOpacity>
+
+{/* LOGOUT - Separate TouchableOpacity */}
+<TouchableOpacity
+  style={styles.sidebarMenuItem}
+  onPress={() => {
+    setSettingsModalVisible(false);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to logout?');
+      if (confirmed) handleLogout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
+      ]);
+    }
+  }}
+  activeOpacity={0.7}
+>
                 <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
                   <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
                 </View>

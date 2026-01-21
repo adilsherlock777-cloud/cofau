@@ -3345,3 +3345,305 @@ async def get_blocked_user_ids(current_user_id: str, db):
     }).to_list(None)
     
     return [block["blocked_id"] for block in blocks]
+
+# ==================== DELETE ACCOUNT ENDPOINT ====================
+
+@app.delete("/api/auth/delete")
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """
+    Permanently delete user account and all associated data.
+    This action cannot be undone.
+    """
+    db = get_database()
+    user_id = str(current_user["_id"])
+    
+    print(f"🗑️ Starting account deletion for user: {user_id}")
+    
+    try:
+        # 1. Delete all user's posts and their media files
+        user_posts = await db.posts.find({"user_id": user_id}).to_list(None)
+        deleted_posts_count = 0
+        
+        for post in user_posts:
+            # Delete media file from server
+            media_url = post.get("media_url") or post.get("image_url")
+            if media_url and "/api/static/uploads/" in media_url:
+                try:
+                    filename = media_url.split("/api/static/uploads/")[-1]
+                    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        print(f"✅ Deleted media file: {file_path}")
+                except Exception as e:
+                    print(f"⚠️ Error deleting media file: {e}")
+            
+            # Delete thumbnail if exists (for videos)
+            thumbnail_url = post.get("thumbnail_url")
+            if thumbnail_url and "/api/static/uploads/" in thumbnail_url:
+                try:
+                    thumb_filename = thumbnail_url.split("/api/static/uploads/")[-1]
+                    thumb_path = os.path.join(settings.UPLOAD_DIR, thumb_filename)
+                    if os.path.exists(thumb_path):
+                        os.remove(thumb_path)
+                        print(f"✅ Deleted thumbnail: {thumb_path}")
+                except Exception as e:
+                    print(f"⚠️ Error deleting thumbnail: {e}")
+            
+            # Delete likes on this post
+            await db.likes.delete_many({"post_id": str(post["_id"])})
+            
+            # Delete comments on this post
+            await db.comments.delete_many({"post_id": str(post["_id"])})
+            
+            # Delete saved_posts references to this post
+            await db.saved_posts.delete_many({"post_id": str(post["_id"])})
+            
+            deleted_posts_count += 1
+        
+        # Delete all posts
+        await db.posts.delete_many({"user_id": user_id})
+        print(f"✅ Deleted {deleted_posts_count} posts")
+        
+        # 2. Delete user's comments on other posts
+        deleted_comments = await db.comments.delete_many({"user_id": user_id})
+        print(f"✅ Deleted {deleted_comments.deleted_count} comments by user")
+        
+        # 3. Delete user's likes on other posts
+        deleted_likes = await db.likes.delete_many({"user_id": user_id})
+        print(f"✅ Deleted {deleted_likes.deleted_count} likes by user")
+        
+        # 4. Delete user's saved posts
+        deleted_saved = await db.saved_posts.delete_many({"user_id": user_id})
+        print(f"✅ Deleted {deleted_saved.deleted_count} saved posts")
+        
+        # 5. Delete follow relationships (both as follower and following)
+        deleted_following = await db.follows.delete_many({"followerId": user_id})
+        deleted_followers = await db.follows.delete_many({"followingId": user_id})
+        print(f"✅ Deleted {deleted_following.deleted_count} following relationships")
+        print(f"✅ Deleted {deleted_followers.deleted_count} follower relationships")
+        
+        # Update follower counts for users this person was following
+        # (This is optional but keeps counts accurate)
+        following_list = await db.follows.find({"followerId": user_id}).to_list(None)
+        for follow in following_list:
+            await db.users.update_one(
+                {"_id": ObjectId(follow["followingId"])},
+                {"$inc": {"followers_count": -1}}
+            )
+        
+        # 6. Delete notifications (both sent and received)
+        deleted_notif_to = await db.notifications.delete_many({"to_user_id": user_id})
+        deleted_notif_from = await db.notifications.delete_many({"from_user_id": user_id})
+        print(f"✅ Deleted {deleted_notif_to.deleted_count + deleted_notif_from.deleted_count} notifications")
+        
+        # 7. Delete compliments (both sent and received)
+        try:
+            deleted_comp_to = await db.compliments.delete_many({"to_user_id": user_id})
+            deleted_comp_from = await db.compliments.delete_many({"from_user_id": user_id})
+            print(f"✅ Deleted compliments")
+        except Exception as e:
+            print(f"⚠️ Error deleting compliments (collection may not exist): {e}")
+        
+        # 8. Delete blocks (both as blocker and blocked)
+        deleted_blocks_by = await db.blocks.delete_many({"blocker_id": user_id})
+        deleted_blocks_of = await db.blocks.delete_many({"blocked_id": user_id})
+        print(f"✅ Deleted {deleted_blocks_by.deleted_count + deleted_blocks_of.deleted_count} block records")
+        
+        # 9. Delete reports made by user
+        try:
+            deleted_reports = await db.reports.delete_many({"reporter_id": user_id})
+            print(f"✅ Deleted {deleted_reports.deleted_count} reports")
+        except Exception as e:
+            print(f"⚠️ Error deleting reports: {e}")
+        
+        # 10. Delete user's stories
+        try:
+            deleted_stories = await db.stories.delete_many({"user_id": user_id})
+            print(f"✅ Deleted {deleted_stories.deleted_count} stories")
+        except Exception as e:
+            print(f"⚠️ Error deleting stories: {e}")
+        
+        # 11. Delete chat messages (optional - you may want to keep for other users)
+        try:
+            deleted_messages = await db.messages.delete_many({
+                "$or": [
+                    {"sender_id": user_id},
+                    {"receiver_id": user_id}
+                ]
+            })
+            print(f"✅ Deleted {deleted_messages.deleted_count} chat messages")
+        except Exception as e:
+            print(f"⚠️ Error deleting messages: {e}")
+        
+        # 12. Delete profile picture from server
+        profile_picture = current_user.get("profile_picture")
+        if profile_picture and "/api/static/uploads/" in profile_picture:
+            try:
+                pp_filename = profile_picture.split("/api/static/uploads/")[-1]
+                pp_path = os.path.join(settings.UPLOAD_DIR, pp_filename)
+                if os.path.exists(pp_path):
+                    os.remove(pp_path)
+                    print(f"✅ Deleted profile picture: {pp_path}")
+            except Exception as e:
+                print(f"⚠️ Error deleting profile picture: {e}")
+        
+        # 13. Delete cover/banner image from server
+        cover_image = current_user.get("cover_image")
+        if cover_image and "/api/static/uploads/" in cover_image:
+            try:
+                cover_filename = cover_image.split("/api/static/uploads/")[-1]
+                cover_path = os.path.join(settings.UPLOAD_DIR, cover_filename)
+                if os.path.exists(cover_path):
+                    os.remove(cover_path)
+                    print(f"✅ Deleted cover image: {cover_path}")
+            except Exception as e:
+                print(f"⚠️ Error deleting cover image: {e}")
+        
+        # 14. Finally, delete the user account
+        result = await db.users.delete_one({"_id": current_user["_id"]})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=500, detail="Failed to delete user account")
+        
+        print(f"✅ Account deletion complete for user: {user_id}")
+        
+        return {
+            "message": "Account deleted successfully",
+            "deleted_data": {
+                "posts": deleted_posts_count,
+                "comments": deleted_comments.deleted_count,
+                "likes": deleted_likes.deleted_count,
+                "saved_posts": deleted_saved.deleted_count,
+                "follow_relationships": deleted_following.deleted_count + deleted_followers.deleted_count
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error during account deletion: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete account: {str(e)}"
+        )
+
+
+# ==================== DELETE RESTAURANT ACCOUNT ENDPOINT ====================
+
+@app.delete("/api/restaurant/auth/delete")
+async def delete_restaurant_account(
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/restaurant/auth/login"))
+):
+    """
+    Permanently delete restaurant account and all associated data.
+    This action cannot be undone.
+    """
+    from utils.jwt import verify_token
+    
+    db = get_database()
+    
+    # Verify token and get restaurant
+    email = verify_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    restaurant = await db.restaurants.find_one({"email": email})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    restaurant_id = str(restaurant["_id"])
+    print(f"🗑️ Starting account deletion for restaurant: {restaurant_id}")
+    
+    try:
+        # 1. Delete all restaurant's posts and their media files
+        restaurant_posts = await db.restaurant_posts.find({"restaurant_id": restaurant_id}).to_list(None)
+        deleted_posts_count = 0
+        
+        for post in restaurant_posts:
+            # Delete media file from server
+            media_url = post.get("media_url")
+            if media_url and "/api/static/uploads/" in media_url:
+                try:
+                    filename = media_url.split("/api/static/uploads/")[-1]
+                    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        print(f"✅ Deleted media file: {file_path}")
+                except Exception as e:
+                    print(f"⚠️ Error deleting media file: {e}")
+            
+            # Delete likes on this post
+            await db.restaurant_likes.delete_many({"post_id": str(post["_id"])})
+            
+            # Delete saved_posts references
+            await db.restaurant_saved_posts.delete_many({"post_id": str(post["_id"])})
+            
+            deleted_posts_count += 1
+        
+        # Delete all restaurant posts
+        await db.restaurant_posts.delete_many({"restaurant_id": restaurant_id})
+        print(f"✅ Deleted {deleted_posts_count} restaurant posts")
+        
+        # 2. Delete follow relationships
+        deleted_followers = await db.follows.delete_many({"followingId": restaurant_id})
+        print(f"✅ Deleted {deleted_followers.deleted_count} follower relationships")
+        
+        # 3. Delete notifications
+        try:
+            await db.notifications.delete_many({"to_user_id": restaurant_id})
+            await db.notifications.delete_many({"from_user_id": restaurant_id})
+            print(f"✅ Deleted notifications")
+        except Exception as e:
+            print(f"⚠️ Error deleting notifications: {e}")
+        
+        # 4. Delete profile picture from server
+        profile_picture = restaurant.get("profile_picture")
+        if profile_picture and "/api/static/uploads/" in profile_picture:
+            try:
+                pp_filename = profile_picture.split("/api/static/uploads/")[-1]
+                pp_path = os.path.join(settings.UPLOAD_DIR, pp_filename)
+                if os.path.exists(pp_path):
+                    os.remove(pp_path)
+                    print(f"✅ Deleted profile picture: {pp_path}")
+            except Exception as e:
+                print(f"⚠️ Error deleting profile picture: {e}")
+        
+        # 5. Delete cover image from server
+        cover_image = restaurant.get("cover_image")
+        if cover_image and "/api/static/uploads/" in cover_image:
+            try:
+                cover_filename = cover_image.split("/api/static/uploads/")[-1]
+                cover_path = os.path.join(settings.UPLOAD_DIR, cover_filename)
+                if os.path.exists(cover_path):
+                    os.remove(cover_path)
+                    print(f"✅ Deleted cover image: {cover_path}")
+            except Exception as e:
+                print(f"⚠️ Error deleting cover image: {e}")
+        
+        # 6. Finally, delete the restaurant account
+        result = await db.restaurants.delete_one({"_id": restaurant["_id"]})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=500, detail="Failed to delete restaurant account")
+        
+        print(f"✅ Restaurant account deletion complete: {restaurant_id}")
+        
+        return {
+            "message": "Restaurant account deleted successfully",
+            "deleted_data": {
+                "posts": deleted_posts_count
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error during restaurant account deletion: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete account: {str(e)}"
+        )
