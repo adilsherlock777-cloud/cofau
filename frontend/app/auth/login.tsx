@@ -26,6 +26,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isRestaurant, setIsRestaurant] = useState(false); // Toggle for restaurant login
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
@@ -35,22 +37,35 @@ export default function LoginScreen() {
     }
   };
 
-  const handleLogin = async () => {
+const handleLogin = async () => {
     console.log('🚀 Login Screen: handleLogin called');
     console.log('📧 Email input:', email);
     console.log('🔒 Password length:', password.length);
     console.log('🏪 Is Restaurant:', isRestaurant);
     
+    // Clear previous errors
+    setEmailError('');
+    setPasswordError('');
+    
     // Basic validation
     if (!email || !password) {
+      if (!email) setEmailError('Email is required');
+      if (!password) setPasswordError('Password is required');
       console.log('❌ Validation failed: Missing fields');
-      showAlert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address');
+      console.log('❌ Validation failed: Invalid email format');
       return;
     }
 
     if (password.length < 4) {
+      setPasswordError('Password must be at least 4 characters');
       console.log('❌ Validation failed: Password too short');
-      showAlert('Error', 'Password must be at least 4 characters');
       return;
     }
 
@@ -71,11 +86,34 @@ export default function LoginScreen() {
         showAlert('Login Successful! 🎉', welcomeMessage);
       } else {
         console.log('❌ Login failed:', result.error);
-        showAlert('Login Failed', result.error || 'Please check your credentials');
+        
+        // Parse error message to show specific field errors
+        const errorMessage = (result.error || '').toLowerCase();
+        
+        if (errorMessage.includes('email') && errorMessage.includes('not found')) {
+          setEmailError('No account found with this email');
+        } else if (errorMessage.includes('user not found') || errorMessage.includes('no user')) {
+          setEmailError('No account found with this email');
+        } else if (errorMessage.includes('password') || errorMessage.includes('incorrect') || errorMessage.includes('invalid credentials')) {
+          setPasswordError('Incorrect password. Please try again.');
+        } else if (errorMessage.includes('restaurant') && errorMessage.includes('not found')) {
+          setEmailError('No restaurant account found with this email');
+        } else {
+          // Generic error - show on password field
+          setPasswordError(result.error || 'Login failed. Please check your credentials.');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 Unexpected error in handleLogin:', error);
-      showAlert('Error', 'An unexpected error occurred. Please try again.');
+      const errorMessage = error?.response?.data?.detail || error?.message || '';
+      
+      if (errorMessage.toLowerCase().includes('email') || errorMessage.toLowerCase().includes('user not found')) {
+        setEmailError('No account found with this email');
+      } else if (errorMessage.toLowerCase().includes('password') || errorMessage.toLowerCase().includes('incorrect')) {
+        setPasswordError('Incorrect password. Please try again.');
+      } else {
+        setPasswordError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       console.log('🏁 Login process completed, clearing loading state');
       setLoading(false);
@@ -120,29 +158,62 @@ export default function LoginScreen() {
           </View>
 
           {/* Email Input */}
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+          <View style={[
+            styles.inputContainer,
+            emailError ? styles.inputError : null
+          ]}>
+            <Ionicons 
+              name="mail-outline" 
+              size={20} 
+              color={emailError ? '#F44336' : '#999'} 
+              style={styles.inputIcon} 
+            />
             <TextInput
               style={styles.input}
               placeholder="Email"
               placeholderTextColor="#999"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                setEmailError(''); // Clear error when user types
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {emailError ? (
+              <Ionicons name="alert-circle" size={20} color="#F44336" />
+            ) : null}
           </View>
+          
+          {/* Email Error Message */}
+          {emailError ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="warning-outline" size={14} color="#F44336" />
+              <Text style={styles.errorText}>{emailError}</Text>
+            </View>
+          ) : null}
 
           {/* Password Input */}
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+          <View style={[
+            styles.inputContainer,
+            passwordError ? styles.inputError : null
+          ]}>
+            <Ionicons 
+              name="lock-closed-outline" 
+              size={20} 
+              color={passwordError ? '#F44336' : '#999'} 
+              style={styles.inputIcon} 
+            />
             <TextInput
               style={styles.input}
               placeholder="Password"
               placeholderTextColor="#999"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                setPasswordError(''); // Clear error when user types
+              }}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
             />
@@ -153,10 +224,18 @@ export default function LoginScreen() {
               <Ionicons
                 name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                 size={20}
-                color="#999"
+                color={passwordError ? '#F44336' : '#999'}
               />
             </TouchableOpacity>
           </View>
+          
+          {/* Password Error Message */}
+          {passwordError ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="warning-outline" size={14} color="#F44336" />
+              <Text style={styles.errorText}>{passwordError}</Text>
+            </View>
+          ) : null}
 
           {/* Forgot Password */}
           <TouchableOpacity
@@ -291,6 +370,25 @@ const styles = StyleSheet.create({
   forgotContainer: {
     alignItems: 'flex-end',
     marginBottom: 24,
+  },
+  inputError: {
+    borderColor: '#F44336',
+    borderWidth: 1.5,
+    backgroundColor: '#FFF5F5',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
+    paddingHorizontal: 4,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#F44336',
+    marginLeft: 6,
+    fontWeight: '500',
   },
   forgotText: {
     fontSize: 14,

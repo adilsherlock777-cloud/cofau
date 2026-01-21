@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -37,6 +38,7 @@ export default function SignupScreen() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const usernameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Check username availability
@@ -125,6 +127,12 @@ export default function SignupScreen() {
   };
 
   const handleSignup = async () => {
+    // Check terms acceptance first
+    if (!termsAccepted) {
+      Alert.alert('Terms Required', 'Please agree to the Terms of Use and Privacy Policy to continue.');
+      return;
+    }
+
     // Basic validation
     if (!fullName || !username || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -380,15 +388,53 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Terms and Privacy Policy Checkbox */}
+          <View style={styles.termsContainer}>
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={() => setTermsAccepted(!termsAccepted)}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.checkboxBox,
+                termsAccepted && styles.checkboxChecked
+              ]}>
+                {termsAccepted && (
+                  <Ionicons name="checkmark" size={16} color="#fff" />
+                )}
+              </View>
+            </TouchableOpacity>
+            
+            <Text style={styles.termsText}>
+              I agree to the{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => Linking.openURL('https://adilsherlock777-cloud.github.io/cofau/terms-of-use.html')}
+              >
+                Terms of Use
+              </Text>
+              {' '}and{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => Linking.openURL('https://adilsherlock777-cloud.github.io/cofau/privacy-policy.html')}
+              >
+                Privacy Policy
+              </Text>
+            </Text>
+          </View>
+
           {/* Create Account Button */}
           <TouchableOpacity
-            style={styles.buttonContainer}
+            style={[
+              styles.buttonContainer,
+              !termsAccepted && styles.buttonDisabled
+            ]}
             onPress={handleSignup}
             activeOpacity={0.8}
-            disabled={loading}
+            disabled={loading || !termsAccepted}
           >
             <LinearGradient
-              colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
+              colors={!termsAccepted ? ['#ccc', '#ccc', '#ccc'] : ['#4dd0e1', '#ba68c8', '#ff80ab']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.button}
@@ -530,6 +576,45 @@ const styles = StyleSheet.create({
   },
   statusIcon: {
     marginLeft: 8,
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  checkboxBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#4dd0e1',
+    borderColor: '#4dd0e1',
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 22,
+  },
+  termsLink: {
+    color: '#4dd0e1',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   errorContainer: {
     marginTop: -12,
