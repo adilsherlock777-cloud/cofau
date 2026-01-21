@@ -17,8 +17,8 @@
       "buildNumber": "1", 
       "bundleIdentifier": "com.cofau.app",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow Cofau to access your photo library for uploading posts.",
-        "NSCameraUsageDescription": "Allow Cofau to access your camera for taking pictures.",
+        "NSPhotoLibraryUsageDescription": "Cofau needs photo library access to let you upload photos and videos of your food and dining experiences to share in your restaurant reviews.",
+        "NSCameraUsageDescription": "Cofau needs camera access to let you capture photos and videos of your food and dining experiences to share in your restaurant reviews.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
