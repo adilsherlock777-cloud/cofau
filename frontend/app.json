@@ -14,15 +14,21 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "3", 
+      "buildNumber": "3",
       "bundleIdentifier": "com.cofau.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
+      },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Cofau needs photo library access to let you upload photos and videos of your food and dining experiences to share in your restaurant reviews.",
         "NSCameraUsageDescription": "Cofau needs camera access to let you capture photos and videos of your food and dining experiences to share in your restaurant reviews.",
+        "NSLocationWhenInUseUsageDescription": "Cofau needs your location to show nearby restaurants and food posts on the map.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "UIBackgroundModes": ["remote-notification"],
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -35,13 +41,20 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
+        }
+      },
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "INTERNET",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ],
       "allowBackup": false
     },
@@ -67,6 +80,12 @@
           "color": "#4dd0e1",
           "sounds": [],
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Cofau to use your location to show nearby restaurants and posts."
         }
       ]
     ],

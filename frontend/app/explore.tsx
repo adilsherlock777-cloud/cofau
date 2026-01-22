@@ -12,6 +12,8 @@ import {
   FlatList,
   RefreshControl,
   LayoutChangeEvent,
+  Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -22,6 +24,8 @@ import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost } from "../utils/api";
+import MapView, { Marker, PROVIDER_GOOGLE, Callout } from "react-native-maps";
+import * as Location from "expo-location";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE_URL}/api`;
@@ -92,7 +96,6 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout }: any) =>
     if (!videoRef.current) return;
     try {
       if (shouldPlay) {
-        // iOS requires loading the video first
         const status = await videoRef.current.getStatusAsync();
         if (!status.isLoaded) {
           await videoRef.current.loadAsync(
@@ -175,17 +178,385 @@ const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos }: any) 
   return <ImageTile item={item} onPress={onPress} onLike={onLike} />;
 };
 
+// ======================================================
+// CUSTOM MAP MARKER COMPONENTS
+// ======================================================
+
+const RestaurantMarker = memo(({ restaurant, onPress }: any) => (
+  <Marker
+    coordinate={{
+      latitude: restaurant.latitude,
+      longitude: restaurant.longitude,
+    }}
+    onPress={() => onPress(restaurant)}
+  >
+    <View style={styles.restaurantMarkerContainer}>
+      <View style={styles.restaurantMarkerBubble}>
+        {restaurant.profile_picture ? (
+          <Image
+            source={{ uri: fixUrl(restaurant.profile_picture) }}
+            style={styles.restaurantMarkerImage}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={styles.restaurantMarkerPlaceholder}>
+            <Ionicons name="restaurant" size={16} color="#fff" />
+          </View>
+        )}
+        <View style={styles.reviewBadge}>
+          <Text style={styles.reviewBadgeText}>{restaurant.review_count}</Text>
+        </View>
+      </View>
+      <View style={styles.markerArrow} />
+    </View>
+  </Marker>
+));
+
+const PostMarker = memo(({ post, onPress }: any) => (
+  <Marker
+    coordinate={{
+      latitude: post.latitude,
+      longitude: post.longitude,
+    }}
+    onPress={() => onPress(post)}
+  >
+    <View style={styles.postMarkerContainer}>
+      <View style={styles.postMarkerBubble}>
+        {post.thumbnail_url || post.media_url ? (
+          <Image
+            source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+            style={styles.postMarkerImage}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={styles.postMarkerPlaceholder}>
+            <Ionicons name="image" size={14} color="#fff" />
+          </View>
+        )}
+        {post.rating && (
+          <View style={styles.ratingBadge}>
+            <Text style={styles.ratingBadgeText}>{post.rating}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.postMarkerArrow} />
+    </View>
+  </Marker>
+));
+
+// ======================================================
+// MAP VIEW COMPONENT
+// ======================================================
+
+const MapViewComponent = memo(({ 
+  userLocation, 
+  restaurants, 
+  posts, 
+  onRestaurantPress, 
+  onPostPress,
+  searchQuery,
+  onSearch,
+  isLoading,
+  mapRef,
+}: any) => {
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery || "");
+
+  const handleSearch = () => {
+    if (localSearchQuery.trim()) {
+      onSearch(localSearchQuery.trim());
+    }
+  };
+
+  const handleClearSearch = () => {
+    setLocalSearchQuery("");
+    onSearch("");
+  };
+
+  return (
+    <View style={styles.mapContainer}>
+      {/* Search Bar */}
+      <View style={styles.mapSearchContainer}>
+        <View style={styles.mapSearchBox}>
+          <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+          <TextInput
+            style={styles.mapSearchInput}
+            placeholder="Search biryani, pizza, etc..."
+            placeholderTextColor="#999"
+            value={localSearchQuery}
+            onChangeText={setLocalSearchQuery}
+            returnKeyType="search"
+            onSubmitEditing={handleSearch}
+          />
+          {localSearchQuery.length > 0 && (
+            <TouchableOpacity onPress={handleClearSearch} style={styles.clearSearchBtn}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleSearch} style={styles.mapSearchBtn}>
+            <LinearGradient
+              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.mapSearchBtnGradient}
+            >
+              <Text style={styles.mapSearchBtnText}>Search</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Map */}
+      {userLocation ? (
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          provider={PROVIDER_GOOGLE}
+          initialRegion={{
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+          showsUserLocation={true}
+          showsMyLocationButton={true}
+          showsCompass={true}
+        >
+          {/* Restaurant Markers */}
+          {restaurants.map((restaurant: any) => (
+            <RestaurantMarker
+              key={`restaurant-${restaurant.id}`}
+              restaurant={restaurant}
+              onPress={onRestaurantPress}
+            />
+          ))}
+
+          {/* Post Markers */}
+          {posts.map((post: any) => (
+            <PostMarker
+              key={`post-${post.id}`}
+              post={post}
+              onPress={onPostPress}
+            />
+          ))}
+        </MapView>
+      ) : (
+        <View style={styles.mapLoadingContainer}>
+          <ActivityIndicator size="large" color="#4dd0e1" />
+          <Text style={styles.mapLoadingText}>Getting your location...</Text>
+        </View>
+      )}
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.mapLoadingOverlay}>
+          <ActivityIndicator size="small" color="#4dd0e1" />
+        </View>
+      )}
+
+      {/* Results Count */}
+      {(restaurants.length > 0 || posts.length > 0) && (
+        <View style={styles.resultsCountContainer}>
+          <Text style={styles.resultsCountText}>
+            {restaurants.length} restaurants • {posts.length} posts nearby
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+});
+
+// ======================================================
+// RESTAURANT DETAIL MODAL
+// ======================================================
+
+const RestaurantDetailModal = memo(({ visible, restaurant, onClose, onViewProfile }: any) => {
+  if (!restaurant) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.detailModal}>
+          <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+
+          <View style={styles.restaurantDetailHeader}>
+            {restaurant.profile_picture ? (
+              <Image
+                source={{ uri: fixUrl(restaurant.profile_picture) }}
+                style={styles.restaurantDetailImage}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.restaurantDetailPlaceholder}>
+                <Ionicons name="restaurant" size={40} color="#fff" />
+              </View>
+            )}
+            <View style={styles.restaurantDetailInfo}>
+              <Text style={styles.restaurantDetailName}>{restaurant.name}</Text>
+              {restaurant.is_verified && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color="#4ECDC4" />
+                  <Text style={styles.verifiedText}>Verified</Text>
+                </View>
+              )}
+              <Text style={styles.restaurantDetailBio} numberOfLines={2}>
+                {restaurant.bio || "No description available"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.restaurantStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{restaurant.review_count}</Text>
+              <Text style={styles.statLabel}>Reviews</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{restaurant.average_rating || "N/A"}</Text>
+              <Text style={styles.statLabel}>Avg Rating</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{restaurant.distance_km} km</Text>
+              <Text style={styles.statLabel}>Away</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.viewProfileBtn} onPress={() => onViewProfile(restaurant)}>
+            <LinearGradient
+              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.viewProfileBtnGradient}
+            >
+              <Text style={styles.viewProfileBtnText}>View Restaurant Profile</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+// ======================================================
+// POST DETAIL MODAL
+// ======================================================
+
+const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
+  if (!post) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.detailModal}>
+          <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+
+          <View style={styles.postDetailContent}>
+            {post.media_url && (
+              <Image
+                source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+                style={styles.postDetailImage}
+                contentFit="cover"
+              />
+            )}
+            
+            <View style={styles.postDetailInfo}>
+              <View style={styles.postUserRow}>
+                {post.user_profile_picture ? (
+                  <Image
+                    source={{ uri: fixUrl(post.user_profile_picture) }}
+                    style={styles.postUserAvatar}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={styles.postUserAvatarPlaceholder}>
+                    <Ionicons name="person" size={16} color="#fff" />
+                  </View>
+                )}
+                <Text style={styles.postUsername}>{post.username}</Text>
+              </View>
+
+              {post.location_name && (
+                <View style={styles.postLocationRow}>
+                  <Ionicons name="location" size={14} color="#E94A37" />
+                  <Text style={styles.postLocationText}>{post.location_name}</Text>
+                </View>
+              )}
+
+              {post.category && (
+                <View style={styles.postCategoryBadge}>
+                  <Text style={styles.postCategoryText}>{post.category}</Text>
+                </View>
+              )}
+
+              <Text style={styles.postReviewText} numberOfLines={3}>
+                {post.review_text || "No review"}
+              </Text>
+
+              <View style={styles.postStats}>
+                {post.rating && (
+                  <View style={styles.postStatItem}>
+                    <Ionicons name="star" size={14} color="#F2CF68" />
+                    <Text style={styles.postStatText}>{post.rating}/10</Text>
+                  </View>
+                )}
+                <View style={styles.postStatItem}>
+                  <Ionicons name="heart" size={14} color="#E94A37" />
+                  <Text style={styles.postStatText}>{post.likes_count}</Text>
+                </View>
+                <View style={styles.postStatItem}>
+                  <Ionicons name="navigate" size={14} color="#1B7C82" />
+                  <Text style={styles.postStatText}>{post.distance_km} km</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.viewProfileBtn} onPress={() => onViewPost(post)}>
+            <LinearGradient
+              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.viewProfileBtnGradient}
+            >
+              <Text style={styles.viewProfileBtnText}>View Full Post</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+// ======================================================
+// MAIN EXPLORE SCREEN
+// ======================================================
+
 export default function ExploreScreen() {
   const router = useRouter();
   const auth = useAuth() as { user: any; token: string | null };
   const { user, token } = auth;
 
   const scrollViewRef = useRef<ScrollView>(null);
+  const mapRef = useRef<MapView>(null);
   const videoPositions = useRef<Map<string, { top: number; height: number }>>(new Map());
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'restaurants'>('users');
+  const [activeTab, setActiveTab] = useState<'map' | 'users'>('map');
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -197,8 +568,156 @@ export default function ExploreScreen() {
   const [scrollY, setScrollY] = useState(0);
   const [playingVideos, setPlayingVideos] = useState<string[]>([]);
 
+  // Map-specific state
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapRestaurants, setMapRestaurants] = useState<any[]>([]);
+  const [mapPosts, setMapPosts] = useState<any[]>([]);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null);
+  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [showRestaurantModal, setShowRestaurantModal] = useState(false);
+  const [showPostModal, setShowPostModal] = useState(false);
+
   const POSTS_PER_PAGE = 30;
   const CATEGORIES = ["All", "Vegetarian/Vegan", "Non vegetarian", "Biryani", "Desserts", "SeaFood", "Chinese", "Chaats", "Arabic", "BBQ/Tandoor", "Fast Food", "Tea/Coffee", "Salad", "Karnataka Style", "Hyderabadi Style", "Kerala Style", "Andhra Style", "North Indian Style", "South Indian Style", "Punjabi Style", "Bengali Style", "Odia Style", "Gujurati Style", "Rajasthani Style", "Mangaluru Style", "Goan", "Kashmiri", "Continental", "Italian", "Japanese", "Korean", "Mexican", "Persian", "Drinks / sodas"];
+
+  // ======================================================
+  // LOCATION PERMISSION & FETCH
+  // ======================================================
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Location Permission Required",
+          "Please enable location access to see nearby restaurants and posts on the map.",
+          [{ text: "OK" }]
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.log("Location permission error:", error);
+      return false;
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) return null;
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      setUserLocation(coords);
+      return coords;
+    } catch (error) {
+      console.log("Get location error:", error);
+      Alert.alert("Location Error", "Could not get your current location. Please try again.");
+      return null;
+    }
+  };
+
+  // ======================================================
+  // MAP DATA FETCHING
+  // ======================================================
+
+  const fetchMapPins = async (searchTerm?: string) => {
+    if (!userLocation) return;
+
+    setMapLoading(true);
+    try {
+      let url: string;
+      
+      if (searchTerm && searchTerm.trim()) {
+        // Search endpoint
+        url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+      } else {
+        // All pins endpoint
+        url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+      }
+
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token || ""}` },
+      });
+
+      if (searchTerm && searchTerm.trim()) {
+        // Search results only return posts
+        setMapPosts(response.data.results || []);
+        setMapRestaurants([]);
+      } else {
+        // All pins return both
+        setMapRestaurants(response.data.restaurants || []);
+        setMapPosts(response.data.posts || []);
+      }
+    } catch (error) {
+      console.log("Fetch map pins error:", error);
+    } finally {
+      setMapLoading(false);
+    }
+  };
+
+  const handleMapSearch = (query: string) => {
+    setMapSearchQuery(query);
+    if (query.trim()) {
+      fetchMapPins(query);
+    } else {
+      fetchMapPins();
+    }
+  };
+
+  const handleRestaurantPress = (restaurant: any) => {
+    setSelectedRestaurant(restaurant);
+    setShowRestaurantModal(true);
+  };
+
+  const handlePostPress = (post: any) => {
+    setSelectedPost(post);
+    setShowPostModal(true);
+  };
+
+  const handleViewRestaurantProfile = (restaurant: any) => {
+    setShowRestaurantModal(false);
+    router.push(`/restaurant/${restaurant.id}`);
+  };
+
+  const handleViewPost = (post: any) => {
+    setShowPostModal(false);
+    router.push(`/post-details/${post.id}`);
+  };
+
+  // ======================================================
+  // INITIALIZE MAP WHEN TAB CHANGES
+  // ======================================================
+
+  useEffect(() => {
+    if (activeTab === 'map' && !userLocation) {
+      getCurrentLocation().then((coords) => {
+        if (coords) {
+          fetchMapPins();
+        }
+      });
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (userLocation && activeTab === 'map') {
+      fetchMapPins();
+    }
+  }, [userLocation]);
+
+  // ======================================================
+  // EXISTING FEED LOGIC (for USERS tab)
+  // ======================================================
 
   const handleVideoLayout = useCallback((videoId: string, event: LayoutChangeEvent) => {
     const { y, height } = event.nativeEvent.layout;
@@ -237,11 +756,11 @@ export default function ExploreScreen() {
   }, [posts, calculateVisibleVideos, scrollY]);
 
   useFocusEffect(useCallback(() => {
-    if (user && token) fetchPosts(true);
+    if (user && token && activeTab === 'users') fetchPosts(true);
     return () => setPlayingVideos([]);
-  }, [user, token]));
+  }, [user, token, activeTab]));
 
-const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' | 'restaurants') => {
+  const fetchPosts = async (refresh = false, categories?: string[], tab?: 'map' | 'users') => {
     try {
       if (refresh) { setLoading(true); setPage(1); setHasMore(true); videoPositions.current.clear(); }
       else { if (!hasMore || loadingMore) return; setLoadingMore(true); }
@@ -249,14 +768,9 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
       const currentTab = tab ?? activeTab;
       const skip = refresh ? 0 : (page - 1) * POSTS_PER_PAGE;
       
-      let feedUrl;
-      if (currentTab === 'restaurants') {
-        feedUrl = `${API_URL}/restaurant/posts/public/all?skip=${skip}&limit=${POSTS_PER_PAGE}`;
-      } else {
-        feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
-      }
+      // For USERS tab, fetch user posts only
+      let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
       
-      // Same category parameter for both endpoints
       if (categoriesToUse.length > 0) {
         feedUrl += `&categories=${encodeURIComponent(categoriesToUse.join(","))}`;
       }
@@ -266,11 +780,9 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
       let postsData = res.data;
       
       // Filter out restaurant posts when on USERS tab
-      if (currentTab === 'users') {
-        postsData = postsData.filter((post: any) => 
-          post.account_type !== 'restaurant' && !post.restaurant_id
-        );
-      }
+      postsData = postsData.filter((post: any) => 
+        post.account_type !== 'restaurant' && !post.restaurant_id
+      );
       
       if (postsData.length === 0) { 
         setHasMore(false); 
@@ -314,10 +826,9 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
   const toggleCategory = (item: string) => { if (item === "All") setSelectedCategories([]); else setSelectedCategories((prev) => prev.includes(item) ? prev.filter((c) => c !== item) : [...prev, item]); };
   const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch (err) { console.log("Like error:", err); } };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
-  const handlePostPress = (postId: string) => { setPlayingVideos([]); router.push(`/post-details/${postId}`); };
+  const handlePostPressGrid = (postId: string) => { setPlayingVideos([]); router.push(`/post-details/${postId}`); };
 
   if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Authenticating…</Text></View>;
-  if (loading && posts.length === 0) return <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Loading explore…</Text></View>;
 
   const columns = distributePosts(posts);
 
@@ -327,58 +838,61 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
         <LinearGradient colors={["#E94A37", "#F2CF68", "#1B7C82"]} locations={[0, 0.5, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientHeader}>
           <Text style={styles.headerTitle}>Cofau</Text>
         </LinearGradient>
-        <View style={styles.searchBoxWrapper}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
-            <TextInput style={styles.searchInput} placeholder="Search" placeholderTextColor="#999" value={searchQuery} onChangeText={setSearchQuery} returnKeyType="search" onSubmitEditing={performSearch} />
-            <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
-              <LinearGradient colors={["#E94A37", "#F2CF68", "#1B7C82"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBorder}>
-                <View style={styles.inlineFilterButton}>
-                  <Ionicons name="options-outline" size={18} color="#FFF" />
-                  <Text style={styles.inlineFilterText}>{appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
+        
+        {/* Only show search box for USERS tab */}
+        {activeTab === 'users' && (
+          <View style={styles.searchBoxWrapper}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+              <TextInput style={styles.searchInput} placeholder="Search" placeholderTextColor="#999" value={searchQuery} onChangeText={setSearchQuery} returnKeyType="search" onSubmitEditing={performSearch} />
+              <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
+                <LinearGradient colors={["#E94A37", "#F2CF68", "#1B7C82"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBorder}>
+                  <View style={styles.inlineFilterButton}>
+                    <Ionicons name="options-outline" size={18} color="#FFF" />
+                    <Text style={styles.inlineFilterText}>{appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
-      {/* USERS | RESTAURANTS TABS */}
-<View style={styles.tabContainer}>
-  <TouchableOpacity 
-    style={[styles.tab, activeTab === 'users' && styles.activeTab]}
-    onPress={() => {
-      if (activeTab !== 'users') {
-        setActiveTab('users');
-        setPosts([]);
-        setPage(1);
-        setHasMore(true);
-        setLoading(true);
-        fetchPosts(true, [], 'users');  // ← Pass 'users'
-      }
-    }}
-  >
-    <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>USERS</Text>
-  </TouchableOpacity>
+      {/* MAP | USERS TABS */}
+      <View style={[styles.tabContainer, activeTab === 'map' && styles.tabContainerMap]}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'map' && styles.activeTab]}
+          onPress={() => {
+            if (activeTab !== 'map') {
+              setActiveTab('map');
+              setPlayingVideos([]);
+            }
+          }}
+        >
+          <Ionicons name="map" size={16} color={activeTab === 'map' ? '#000' : '#999'} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabText, activeTab === 'map' && styles.activeTabText]}>MAP</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity 
-    style={[styles.tab, activeTab === 'restaurants' && styles.activeTab]}
-    onPress={() => {
-      if (activeTab !== 'restaurants') {
-        setActiveTab('restaurants');
-        setPosts([]);
-        setPage(1);
-        setHasMore(true);
-        setLoading(true);
-        fetchPosts(true, [], 'restaurants');  // ← Pass 'restaurants'
-      }
-    }}
-  >
-    <Text style={[styles.tabText, activeTab === 'restaurants' && styles.activeTabText]}>RESTAURANTS</Text>
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+          onPress={() => {
+            if (activeTab !== 'users') {
+              setActiveTab('users');
+              setPosts([]);
+              setPage(1);
+              setHasMore(true);
+              setLoading(true);
+              fetchPosts(true, [], 'users');
+            }
+          }}
+        >
+          <Ionicons name="people" size={16} color={activeTab === 'users' ? '#000' : '#999'} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>USERS</Text>
+        </TouchableOpacity>
+      </View>
 
-      {appliedCategories.length > 0 && (
+      {/* USERS TAB: Category Tags */}
+      {activeTab === 'users' && appliedCategories.length > 0 && (
         <View style={styles.selectedTagsWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectedTagsContainer}>
             {appliedCategories.map((cat) => (
@@ -391,40 +905,64 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
         </View>
       )}
 
-      <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4dd0e1" />}>
-        <View style={styles.masonryContainer}>
-          {columns.map((column, columnIndex) => (
-            <View key={columnIndex} style={styles.column}>
-              {column.map((item) => <GridTile key={item.id} item={item} onPress={handlePostPress} onLike={handleLike} onVideoLayout={handleVideoLayout} playingVideos={playingVideos} />)}
-            </View>
-          ))}
-        </View>
-        {loadingMore && <View style={styles.loadingMore}><ActivityIndicator size="small" color="#4dd0e1" /></View>}
-        {!loading && posts.length === 0 && (
-  <View style={styles.emptyState}>
-    <Ionicons name={activeTab === 'restaurants' ? "restaurant-outline" : "images-outline"} size={64} color="#ccc" />
-    <Text style={styles.emptyStateText}>
-      {appliedCategories.length > 0 
-        ? `No ${activeTab === 'restaurants' ? 'restaurant' : ''} posts found for selected ${appliedCategories.length === 1 ? 'category' : 'categories'}` 
-        : 'No posts found'}
-    </Text>
-    {appliedCategories.length > 0 && (
-      <TouchableOpacity 
-        style={{ marginTop: 12 }} 
-        onPress={() => { 
-          setSelectedCategories([]); 
-          setAppliedCategories([]); 
-          fetchPosts(true, [], activeTab); 
-        }}
-      >
-        <Text style={{ color: '#E94A37', fontWeight: '600' }}>Clear Filters</Text>
-      </TouchableOpacity>
-    )}
-  </View>
-)}
-        <View style={{ height: 120 }} />
-      </ScrollView>
+      {/* CONTENT AREA */}
+      {activeTab === 'map' ? (
+        // MAP VIEW
+        <MapViewComponent
+          userLocation={userLocation}
+          restaurants={mapRestaurants}
+          posts={mapPosts}
+          onRestaurantPress={handleRestaurantPress}
+          onPostPress={handlePostPress}
+          searchQuery={mapSearchQuery}
+          onSearch={handleMapSearch}
+          isLoading={mapLoading}
+          mapRef={mapRef}
+        />
+      ) : (
+        // USERS GRID VIEW
+        <>
+          {loading && posts.length === 0 ? (
+            <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Loading posts…</Text></View>
+          ) : (
+            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4dd0e1" />}>
+              <View style={styles.masonryContainer}>
+                {columns.map((column, columnIndex) => (
+                  <View key={columnIndex} style={styles.column}>
+                    {column.map((item) => <GridTile key={item.id} item={item} onPress={handlePostPressGrid} onLike={handleLike} onVideoLayout={handleVideoLayout} playingVideos={playingVideos} />)}
+                  </View>
+                ))}
+              </View>
+              {loadingMore && <View style={styles.loadingMore}><ActivityIndicator size="small" color="#4dd0e1" /></View>}
+              {!loading && posts.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Ionicons name="images-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyStateText}>
+                    {appliedCategories.length > 0 
+                      ? `No posts found for selected ${appliedCategories.length === 1 ? 'category' : 'categories'}` 
+                      : 'No posts found'}
+                  </Text>
+                  {appliedCategories.length > 0 && (
+                    <TouchableOpacity 
+                      style={{ marginTop: 12 }} 
+                      onPress={() => { 
+                        setSelectedCategories([]); 
+                        setAppliedCategories([]); 
+                        fetchPosts(true, [], 'users'); 
+                      }}
+                    >
+                      <Text style={{ color: '#E94A37', fontWeight: '600' }}>Clear Filters</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+              <View style={{ height: 120 }} />
+            </ScrollView>
+          )}
+        </>
+      )}
 
+      {/* BOTTOM NAVIGATION */}
       <View style={styles.navBar}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}><Ionicons name="home-outline" size={20} color="#000" /><Text style={styles.navLabel}>Home</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}><Ionicons name="compass" size={20} color="#000" /><Text style={styles.navLabelActive}>Explore</Text></TouchableOpacity>
@@ -433,6 +971,7 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}><Ionicons name="person-outline" size={20} color="#000" /><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
       </View>
 
+      {/* CATEGORY MODAL */}
       <Modal visible={showCategoryModal} transparent animationType="slide" onRequestClose={() => { setSelectedCategories(appliedCategories); setShowCategoryModal(false); }}>
         <View style={styles.modalOverlay}>
           <View style={styles.categoryModal}>
@@ -458,6 +997,22 @@ const fetchPosts = async (refresh = false, categories?: string[], tab?: 'users' 
           </View>
         </View>
       </Modal>
+
+      {/* RESTAURANT DETAIL MODAL */}
+      <RestaurantDetailModal
+        visible={showRestaurantModal}
+        restaurant={selectedRestaurant}
+        onClose={() => setShowRestaurantModal(false)}
+        onViewProfile={handleViewRestaurantProfile}
+      />
+
+      {/* POST DETAIL MODAL */}
+      <PostDetailModal
+        visible={showPostModal}
+        post={selectedPost}
+        onClose={() => setShowPostModal(false)}
+        onViewPost={handleViewPost}
+      />
     </View>
   );
 }
@@ -472,29 +1027,34 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
   headerContainer: { position: "relative", marginBottom: 30, zIndex: 10 },
   tabContainer: {
-  flexDirection: 'row',
-  paddingHorizontal: 16,
-  marginTop: 10,
-  marginBottom: 10,
-},
-tab: {
-  flex: 1,
-  paddingVertical: 12,
-  alignItems: 'center',
-  borderBottomWidth: 2,
-  borderBottomColor: 'transparent',
-},
-activeTab: {
-  borderBottomColor: '#F2CF68', // Orange underline
-},
-tabText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#999',
-},
-activeTabText: {
-  color: '#000',
-},
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  tabContainerMap: {
+    marginTop: 20,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#F2CF68',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#999',
+  },
+  activeTabText: {
+    color: '#000',
+  },
   gradientHeader: { paddingTop: 65, paddingBottom: 55, alignItems: "center", justifyContent: "center", borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   headerTitle: { fontFamily: "Lobster", fontSize: 32, color: "#fff", textAlign: "center", letterSpacing: 1 },
   searchBoxWrapper: { position: "absolute", bottom: -25, left: 16, right: 16, zIndex: 10 },
@@ -548,4 +1108,415 @@ activeTabText: {
   modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: "#E5E5E5" },
   doneButton: { backgroundColor: "#4ECDC4", paddingVertical: 14, borderRadius: 12, alignItems: "center" },
   doneButtonText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
+
+  // ======================================================
+  // MAP STYLES
+  // ======================================================
+  mapContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  mapSearchContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 16,
+    right: 16,
+    zIndex: 100,
+  },
+  mapSearchBox: {
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  mapSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    paddingVertical: 4,
+  },
+  clearSearchBtn: {
+    padding: 4,
+    marginRight: 8,
+  },
+  mapSearchBtn: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  mapSearchBtnGradient: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+  },
+  mapSearchBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  mapLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  mapLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
+  },
+  mapLoadingOverlay: {
+    position: 'absolute',
+    top: 70,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 50,
+  },
+  resultsCountContainer: {
+    position: 'absolute',
+    bottom: 90,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  resultsCountText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  // ======================================================
+  // RESTAURANT MARKER STYLES
+  // ======================================================
+  restaurantMarkerContainer: {
+    alignItems: 'center',
+  },
+  restaurantMarkerBubble: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E94A37',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  restaurantMarkerImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+  },
+  restaurantMarkerPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E94A37',
+  },
+  reviewBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#1B7C82',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  reviewBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  markerArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#fff',
+    marginTop: -2,
+  },
+
+  // ======================================================
+  // POST MARKER STYLES
+  // ======================================================
+  postMarkerContainer: {
+    alignItems: 'center',
+  },
+  postMarkerBubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#F2CF68',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  postMarkerImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 6,
+  },
+  postMarkerPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F2CF68',
+  },
+  ratingBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#E94A37',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  ratingBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  postMarkerArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#fff',
+    marginTop: -1,
+  },
+
+  // ======================================================
+  // DETAIL MODAL STYLES
+  // ======================================================
+  detailModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    minHeight: 300,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    padding: 4,
+  },
+  restaurantDetailHeader: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
+  restaurantDetailImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f0f0f0',
+  },
+  restaurantDetailPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E94A37',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restaurantDetailInfo: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
+  },
+  restaurantDetailName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  verifiedText: {
+    fontSize: 12,
+    color: '#4ECDC4',
+    marginLeft: 4,
+  },
+  restaurantDetailBio: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 6,
+  },
+  restaurantStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: 24,
+    paddingVertical: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#e0e0e0',
+  },
+  viewProfileBtn: {
+    marginTop: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  viewProfileBtnGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  viewProfileBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  // ======================================================
+  // POST DETAIL MODAL STYLES
+  // ======================================================
+  postDetailContent: {
+    marginTop: 10,
+  },
+  postDetailImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  postDetailInfo: {
+    marginTop: 16,
+  },
+  postUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  postUserAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+  },
+  postUserAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1B7C82',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postUsername: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginLeft: 10,
+  },
+  postLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  postLocationText: {
+    fontSize: 13,
+    color: '#666',
+    marginLeft: 6,
+  },
+  postCategoryBadge: {
+    backgroundColor: '#FFF5E6',
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#F2CF68',
+  },
+  postCategoryText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '500',
+  },
+  postReviewText: {
+    fontSize: 14,
+    color: '#333',
+    marginTop: 12,
+    lineHeight: 20,
+  },
+  postStats: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 20,
+  },
+  postStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  postStatText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
 });

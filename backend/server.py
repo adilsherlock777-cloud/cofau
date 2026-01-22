@@ -27,6 +27,7 @@ from routers.moderation import router as moderation_router
 from routers.leaderboard import router as leaderboard_router
 from routers import restaurant_auth
 from routers import restaurant_posts
+from routers.map import router as map_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
@@ -423,6 +424,7 @@ app.include_router(compliments_router)
 app.include_router(moderation_router)
 app.include_router(leaderboard_router)
 app.include_router(restaurant_posts.router)
+app.include_router(map_router)
 
 
 # ======================================================
@@ -889,6 +891,8 @@ async def create_post(
         "rating": rating,
         "review_text": review_text,
         "map_link": clean_map_link,
+        "latitude": None,      # ← ADD THIS
+        "longitude": None,
         "location_name": final_location_name, 
         "normalized_location_name": normalized_location,
         "category": category.strip() if category else None,  # Add category
