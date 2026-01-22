@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/map", tags=["Map"])
 # ======================================================
 # CONFIGURATION - Add your Google API Key here
 # ======================================================
-GOOGLE_GEOCODING_API_KEY = AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE # Required for converting place names to coordinates
+GOOGLE_GEOCODING_API_KEY = "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
 
 # ======================================================
 # UTILITY FUNCTIONS
