@@ -390,7 +390,12 @@ size={36}
 level={post.user_level}
 showLevelBadge
 />
-<Text style={styles.username}>{post.username}</Text>
+<View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+  <Text style={styles.username}>{post.username}</Text>
+  {post.account_type === 'restaurant' && (
+    <Ionicons name="storefront" size={14} color="#1B7C82" />
+  )}
+</View>
 </TouchableOpacity>
 
 <View style={styles.headerRight}>
@@ -479,7 +484,13 @@ postId={post.id}
               level={post.user_level}
               showLevelBadge
             />
-            <Text style={styles.videoUsername}>{post.username}</Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+  <Text style={styles.videoUsername}>{post.username}</Text>
+  {post.account_type === 'restaurant' && (
+    <Ionicons name="storefront" size={14} color="#fff" />
+  )}
+</View>
 
             {!isOwnPost && !isFollowing && (
               <TouchableOpacity

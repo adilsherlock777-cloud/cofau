@@ -107,6 +107,7 @@ export default function FeedScreen() {
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [restaurantReviewsCount, setRestaurantReviewsCount] = useState(0);
+  const [suggestionsShown, setSuggestionsShown] = useState(false);
 
   const POSTS_PER_PAGE = 30;
   const VISIBILITY_THRESHOLD = 0.2;
@@ -414,32 +415,39 @@ const handleScroll = useCallback(
   };
 }, []);
 
-  // Render post item
+// Update your renderPost function
 const renderPost = useCallback(
-  ({ item: post }: { item: any }) => {
+  ({ item: post, index }) => {
     const isVideo =
       post.media_type === "video" ||
       post.media_url?.toLowerCase().endsWith(".mp4");
     const shouldPlay = isVideo && visibleVideoId === String(post.id);
 
+    // Show suggestions after every 5th post (index 4, 9, 14, etc.)
+    const showSuggestions = (index + 1) % 5 === 0;
+
     return (
-      <View style={styles.postContainer}>
-        <FeedCard
-          post={post}
-          onLikeUpdate={() => {
-            // Don't refresh entire feed on like
-            // Just update the specific post
-          }}
-          onStoryCreated={() => {}}
-          shouldPlay={shouldPlay}
-          shouldPreload={shouldPlay}
-          isMuted={isMuted}
-          onMuteToggle={handleMuteToggle}
-        />
+      <View>
+        <View style={styles.postContainer}>
+          <FeedCard
+            post={post}
+            onLikeUpdate={() => {}}
+            onStoryCreated={() => {}}
+            shouldPlay={shouldPlay}
+            shouldPreload={shouldPlay}
+            isMuted={isMuted}
+            onMuteToggle={handleMuteToggle}
+          />
+        </View>
+        
+        {/* Show suggestions after every 5 posts */}
+        {showSuggestions && (
+          <SuggestedUsersBar refreshTrigger={refreshing} />
+        )}
       </View>
     );
   },
-  [visibleVideoId, isMuted, handleMuteToggle]
+  [visibleVideoId, isMuted, handleMuteToggle, refreshing]
 );
 
   // List Header Component
@@ -867,8 +875,6 @@ const renderPost = useCallback(
       {/* ================= STORIES ================= */}
       <StoriesBar refreshTrigger={refreshing} />
 
-      {/* ================= SUGGESTED USERS (NEW) ================= */}
-    <SuggestedUsersBar refreshTrigger={refreshing} />
 
       {/* ⭐ SKELETON LOADING - Replace ActivityIndicator with FeedSkeleton */}
       {loading && feedPosts.length === 0 && (

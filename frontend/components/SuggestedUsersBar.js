@@ -59,7 +59,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
     
     try {
       if (followingIds.has(userId)) {
-        // Unfollow
         await axios.delete(`${BACKEND_URL}/api/users/${userId}/follow`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -69,7 +68,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
           return newSet;
         });
       } else {
-        // Follow
         await axios.post(`${BACKEND_URL}/api/users/${userId}/follow`, {}, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -82,12 +80,21 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
     }
   };
 
-  const handleUserPress = (userId) => {
-    router.push(`/user/${userId}`);
-  };
+  // Navigate to user profile
+const handleUserPress = (userId) => {
+  router.push(`/profile?userId=${userId}`);
+};
 
-  const handlePostPress = (postId) => {
-    router.push(`/post/${postId}`);
+// Navigate to user profile when tapping post image
+const handlePostPress = (userId) => {
+  router.push(`/profile?userId=${userId}`);
+};
+  // Get badge color based on level
+  const getLevelBadgeColor = (level) => {
+    if (level >= 10) return "#FFD700"; // Gold
+    if (level >= 7) return "#C0C0C0";  // Silver
+    if (level >= 4) return "#CD7F32";  // Bronze
+    return "#1B7C82";                   // Default teal
   };
 
   const renderUserCard = ({ item }) => {
@@ -95,13 +102,13 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
     const isLoadingThis = loadingFollow === item.id;
     const mediaUrl = normalizeMediaUrl(item.latest_post?.media_url);
     const profilePic = normalizeProfilePicture(item.profile_picture);
+    const userLevel = item.level || 1;
 
     return (
       <View style={styles.cardContainer}>
-        {/* Background Image (Latest Post) */}
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => handlePostPress(item.latest_post.id)}
+          onPress={() => router.push(`/profile?userId=${item.id}`)}
           style={styles.imageContainer}
         >
           {mediaUrl ? (
@@ -116,34 +123,45 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
             </View>
           )}
           
-          {/* Gradient Overlay */}
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.7)"]}
+            colors={["transparent", "rgba(0,0,0,0.8)"]}
             style={styles.gradientOverlay}
           />
 
-          {/* Video indicator */}
           {item.latest_post?.media_type === "video" && (
             <View style={styles.videoIndicator}>
               <Ionicons name="play" size={12} color="#fff" />
             </View>
           )}
 
-          {/* User Info Overlay */}
           <View style={styles.userInfoOverlay}>
             <TouchableOpacity
-              onPress={() => handleUserPress(item.id)}
+              onPress={() => router.push(`/profile?userId=${item.id}`)} 
               style={styles.userRow}
             >
-              {profilePic ? (
-                <Image source={{ uri: profilePic }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarText}>
-                    {item.username?.charAt(0)?.toUpperCase() || "?"}
-                  </Text>
+              {/* Avatar with Level Badge */}
+              <View style={styles.avatarContainer}>
+                {profilePic ? (
+                  <Image source={{ uri: profilePic }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarText}>
+                      {item.username?.charAt(0)?.toUpperCase() || "?"}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Level Badge */}
+                <View 
+                  style={[
+                    styles.levelBadge, 
+                    { backgroundColor: getLevelBadgeColor(userLevel) }
+                  ]}
+                >
+                  <Text style={styles.levelBadgeText}>{userLevel}</Text>
                 </View>
-              )}
+              </View>
+
               <View style={styles.usernameContainer}>
                 <Text style={styles.username} numberOfLines={1}>
                   {item.username}
@@ -154,7 +172,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
               </View>
             </TouchableOpacity>
 
-            {/* Follow Button */}
             <TouchableOpacity
               style={[
                 styles.followButton,
@@ -182,14 +199,12 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
     );
   };
 
-  // Don't render if no suggestions
   if (!loading && users.length === 0) {
     return null;
   }
 
   return (
     <View style={styles.container}>
-      {/* Section Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Suggested for you</Text>
         <TouchableOpacity onPress={fetchSuggestedUsers}>
@@ -197,7 +212,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
         </TouchableOpacity>
       </View>
 
-      {/* Loading State */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color="#E94A37" />
@@ -220,8 +234,12 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 12,
+    marginVertical: 8,
     backgroundColor: "#fff",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#f0f0f0",
   },
   header: {
     flexDirection: "row",
@@ -274,7 +292,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: "60%",
+    height: "65%",
   },
   videoIndicator: {
     position: "absolute",
@@ -299,10 +317,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
+  avatarContainer: {
+    position: "relative",
+  },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: "#fff",
   },
@@ -315,6 +336,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "700",
+  },
+  levelBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 15,
+    height: 15,
+    borderRadius: 7,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+  },
+  levelBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
   },
   usernameContainer: {
     flex: 1,
@@ -333,13 +371,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   followButton: {
-    backgroundColor: "#E94A37",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: "#1B7C82",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 4,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 34,
+    minHeight: 30,
   },
   followingButton: {
     backgroundColor: "#f0f0f0",

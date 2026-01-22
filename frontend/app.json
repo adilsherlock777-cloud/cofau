@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "2", 
+      "buildNumber": "3", 
       "bundleIdentifier": "com.cofau.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Cofau needs photo library access to let you upload photos and videos of your food and dining experiences to share in your restaurant reviews.",
@@ -22,7 +22,7 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "UIBackgroundModes": ["audio", "remote-notification"],
+        "UIBackgroundModes": ["remote-notification"],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
