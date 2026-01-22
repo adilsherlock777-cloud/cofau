@@ -36,6 +36,7 @@ import StoriesBar from "../components/StoriesBar";
 import { BlurView } from 'expo-blur';
 import { fetchUnreadCount } from "../utils/notifications";
 import { useNotifications } from "../context/NotificationContext";
+import SuggestedUsersBar from "../components/SuggestedUsersBar";
 import {
   normalizeMediaUrl,
   normalizeProfilePicture,
@@ -865,6 +866,9 @@ const renderPost = useCallback(
 
       {/* ================= STORIES ================= */}
       <StoriesBar refreshTrigger={refreshing} />
+
+      {/* ================= SUGGESTED USERS (NEW) ================= */}
+    <SuggestedUsersBar refreshTrigger={refreshing} />
 
       {/* ⭐ SKELETON LOADING - Replace ActivityIndicator with FeedSkeleton */}
       {loading && feedPosts.length === 0 && (

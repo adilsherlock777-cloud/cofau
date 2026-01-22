@@ -3647,3 +3647,94 @@ async def delete_restaurant_account(
             status_code=500,
             detail=f"Failed to delete account: {str(e)}"
         )
+
+# ==================== SUGGESTED USERS ENDPOINT ====================
+
+@app.get("/api/users/suggestions")
+async def get_suggested_users(
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get suggested users for the current user to follow.
+    Returns users that:
+    - Current user is NOT already following
+    - Have at least 1 post
+    - Are not blocked
+    - Include their latest post media
+    """
+    db = get_database()
+    current_user_id = str(current_user["_id"])
+    
+    # Get list of users current user is already following
+    following_docs = await db.follows.find({
+        "followerId": current_user_id
+    }).to_list(None)
+    following_ids = [f["followingId"] for f in following_docs]
+    
+    # Add current user to exclusion list
+    exclude_ids = following_ids + [current_user_id]
+    
+    # Get blocked users
+    blocked_user_ids = await get_blocked_user_ids(current_user_id, db)
+    exclude_ids.extend(blocked_user_ids)
+    
+    # Get users with at least 1 post, excluding already followed and blocked
+    pipeline = [
+        # Get all posts grouped by user
+        {"$group": {
+            "_id": "$user_id",
+            "post_count": {"$sum": 1},
+            "latest_post": {"$last": "$$ROOT"}
+        }},
+        # Filter users not in exclude list
+        {"$match": {
+            "_id": {"$nin": exclude_ids},
+            "post_count": {"$gte": 1}
+        }},
+        # Sort by post count (more active users first) with some randomness
+        {"$sample": {"size": limit * 3}},  # Get more than needed for variety
+        {"$limit": limit}
+    ]
+    
+    user_posts = await db.posts.aggregate(pipeline).to_list(limit)
+    
+    result = []
+    for item in user_posts:
+        user_id = item["_id"]
+        latest_post = item["latest_post"]
+        
+        # Get user details
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            continue
+        
+        # Determine media URL (use thumbnail for videos)
+        media_type = latest_post.get("media_type", "image")
+        if media_type == "video":
+            display_media = latest_post.get("thumbnail_url") or latest_post.get("media_url")
+        else:
+            display_media = latest_post.get("media_url") or latest_post.get("image_url")
+        
+        result.append({
+            "id": user_id,
+            "user_id": user_id,
+            "username": user.get("full_name") or user.get("username") or "Unknown",
+            "profile_picture": user.get("profile_picture"),
+            "level": user.get("level", 1),
+            "post_count": item["post_count"],
+            "latest_post": {
+                "id": str(latest_post["_id"]),
+                "media_url": display_media,
+                "media_type": media_type,
+                "thumbnail_url": latest_post.get("thumbnail_url"),
+                "rating": latest_post.get("rating"),
+                "location_name": latest_post.get("location_name"),
+            },
+            "is_following": False  # Always false since we filtered these out
+        })
+    
+    # Shuffle for variety on each request
+    random.shuffle(result)
+    
+    return result
