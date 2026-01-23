@@ -117,7 +117,7 @@ if not latitude or not longitude:
         except Exception as e:
             print(f"Error extracting coordinates: {e}")
 
-print(f"📍 Restaurant signup - Coordinates: {latitude}, {longitude}")
+    print(f"📍 Restaurant signup - Coordinates: {latitude}, {longitude}")
 
     restaurant_doc = {
         "restaurant_name": restaurant.restaurant_name.strip(),  # Store original casing
