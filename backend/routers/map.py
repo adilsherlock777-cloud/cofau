@@ -164,6 +164,21 @@ def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
 # ======================================================
 geocode_cache = {}
 
+# ======================================================
+# ADD THIS FUNCTION HERE (move from bottom of file)
+# ======================================================
+async def expand_short_url(short_url: str) -> str:
+    """Expand shortened Google Maps URLs (goo.gl, maps.app.goo.gl)"""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.get(short_url, timeout=10)
+            expanded_url = str(response.url)
+            print(f"📍 Expanded URL: {short_url} → {expanded_url}")
+            return expanded_url
+    except Exception as e:
+        print(f"❌ Error expanding URL {short_url}: {e}")
+        return short_url
+
 
 async def get_coordinates_for_map_link(map_link: str, db=None) -> dict:
     """
@@ -174,14 +189,18 @@ async def get_coordinates_for_map_link(map_link: str, db=None) -> dict:
     
     # Check cache first
     if map_link in geocode_cache:
+        print(f"📍 Cache hit for: {map_link}")
         return geocode_cache[map_link]
 
     # Expand short URLs first
+    original_link = map_link
     if 'goo.gl' in map_link or 'maps.app' in map_link:
         map_link = await expand_short_url(map_link)
+        print(f"📍 Expanded: {original_link} → {map_link}")
     
     # Extract/parse coordinates
     result = extract_coordinates_from_map_link(map_link)
+    print(f"📍 Extracted result: {result}")
     
     if not result:
         return None
@@ -667,13 +686,3 @@ async def batch_geocode_posts(
         "failed": failed,
         "message": f"Geocoded {success} out of {processed} posts"
     }
-
-async def expand_short_url(short_url: str) -> str:
-    """Expand shortened Google Maps URLs (goo.gl, maps.app.goo.gl)"""
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(short_url, timeout=10)
-            return str(response.url)
-    except Exception as e:
-        print(f"Error expanding URL {short_url}: {e}")
-        return short_url
