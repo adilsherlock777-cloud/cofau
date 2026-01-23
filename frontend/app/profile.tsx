@@ -27,7 +27,7 @@ import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
 import { sendCompliment, getFollowers } from '../utils/api';
-import auth from '@react-native-firebase/auth';
+//import auth from '@react-native-firebase/auth';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
 
@@ -308,10 +308,10 @@ export default function ProfileScreen() {
   const [reviewFilter, setReviewFilter] = useState<string | null>(null);
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  //const [otp, setOtp] = useState('');
+  //const [otpSent, setOtpSent] = useState(false);
+  //const [sendingOtp, setSendingOtp] = useState(false);
+  //const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [confirm, setConfirm] = useState<any>(null);
   const [updatingPhone, setUpdatingPhone] = useState(false);
@@ -1695,27 +1695,38 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
   return phone.startsWith('+') ? phone : `+${cleaned}`;
 };
 
-const handleSendPhoneOtp = async () => {
-  if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
-    Alert.alert('Error', 'Please enter a valid phone number');
-    return;
-  }
-  setSendingOtp(true);
-  try {
-    const formattedPhone = formatPhoneNumber(phoneNumber);
-    const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
-    setConfirm(confirmation);
-    setOtpSent(true);
-    setResendTimer(60);
-    Alert.alert('OTP Sent', `Code sent to ${formattedPhone}`);
-  } catch (error: any) {
-    console.error('Error sending OTP:', error);
-    Alert.alert('Error', error.code === 'auth/invalid-phone-number' 
-      ? 'Invalid phone number' 
-      : 'Failed to send OTP');
-  } finally {
-    setSendingOtp(false);
-  }
+// Send OTP
+const handleSendOtp = async () => {
+  // Firebase disabled - auto verify for now
+  Alert.alert('Info', 'Phone verification will be available soon');
+  setOtpSent(true);
+  setOtpVerified(true);
+
+  // if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+  //   Alert.alert('Error', 'Please enter a valid phone number');
+  //   return;
+  // }
+
+  // setSendingOtp(true);
+  // try {
+  //   const formattedPhone = formatPhoneNumber(phoneNumber);
+  //   const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+  //   setConfirm(confirmation);
+  //   setOtpSent(true);
+  //   setResendTimer(60);
+  //   Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
+  // } catch (error: any) {
+  //   console.error('Error sending OTP:', error);
+  //   let errorMessage = 'Failed to send OTP. Please try again.';
+  //   if (error.code === 'auth/invalid-phone-number') {
+  //     errorMessage = 'Invalid phone number format.';
+  //   } else if (error.code === 'auth/too-many-requests') {
+  //     errorMessage = 'Too many attempts. Please try again later.';
+  //   }
+  //   Alert.alert('Error', errorMessage);
+  // } finally {
+  //   setSendingOtp(false);
+  // }
 };
 
 const handleVerifyAndUpdatePhone = async () => {
@@ -1735,7 +1746,7 @@ const handleVerifyAndUpdatePhone = async () => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
     
-    await auth().signOut();
+    //await auth().signOut();
     Alert.alert('Success', 'Phone number updated!');
     setPhoneModalVisible(false);
     resetPhoneModal();

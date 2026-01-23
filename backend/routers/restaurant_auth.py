@@ -4,6 +4,7 @@ from datetime import datetime
 from database import get_database
 from models.restaurant import RestaurantCreate, RestaurantLogin, Token, RestaurantResponse, RestaurantUpdate
 from utils.hashing import hash_password, verify_password
+from routers.map import get_coordinates_for_map_link
 from utils.jwt import create_access_token, verify_token
 
 router = APIRouter(prefix="/api/restaurant/auth", tags=["Restaurant Authentication"])
@@ -75,8 +76,38 @@ async def restaurant_signup(restaurant: RestaurantCreate):
     
     # Hash password
     hashed_password = hash_password(restaurant.password)
+
+    # Extract coordinates from map_link if provided
+    latitude = None
+    longitude = None
+    map_link = None
+    
+    if hasattr(restaurant, 'map_link') and restaurant.map_link:
+        map_link = restaurant.map_link.strip()
+        try:
+            coords = await get_coordinates_for_map_link(map_link)
+            if coords:
+                latitude = coords.get("latitude")
+                longitude = coords.get("longitude")
+        except Exception as e:
+            print(f"Error extracting coordinates: {e}")
     
     # Create restaurant document (NO leveling system)
+    # Extract coordinates from map_link if provided
+    latitude = None
+    longitude = None
+    map_link = None
+    
+    if hasattr(restaurant, 'map_link') and restaurant.map_link:
+        map_link = restaurant.map_link.strip()
+        try:
+            coords = await get_coordinates_for_map_link(map_link)
+            if coords:
+                latitude = coords.get("latitude")
+                longitude = coords.get("longitude")
+        except Exception as e:
+            print(f"Error extracting coordinates: {e}")
+
     restaurant_doc = {
         "restaurant_name": restaurant.restaurant_name.strip(),  # Store original casing
         "restaurant_name_normalized": name_normalized,  # Store normalized for searches
@@ -90,6 +121,9 @@ async def restaurant_signup(restaurant: RestaurantCreate):
         "phone_verified": False,
         "address": None,
         "cuisine_type": None,
+        "map_link": map_link,        # <-- ADD THIS
+        "latitude": latitude,         # <-- ADD THIS
+        "longitude": longitude,
         "posts_count": 0,
         "reviews_count": 0,
         "followers_count": 0,

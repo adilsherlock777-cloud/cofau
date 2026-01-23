@@ -17,7 +17,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import auth from '@react-native-firebase/auth';
+//import auth from '@react-native-firebase/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${API_BASE_URL}/api`;
@@ -42,6 +42,7 @@ export default function RestaurantSignupScreen() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [mapLink, setMapLink] = useState('');
 
   // Firebase confirmation result
   const [confirm, setConfirm] = useState<any>(null);
@@ -165,70 +166,74 @@ export default function RestaurantSignupScreen() {
     
     return phone.startsWith('+') ? phone : `+${cleaned}`;
   };
+// Send OTP
+const handleSendOtp = async () => {
+  // Firebase disabled - auto verify for now
+  Alert.alert('Info', 'Phone verification will be available soon');
+  setOtpSent(true);
+  setOtpVerified(true);
 
-  // Send OTP
-  const handleSendOtp = async () => {
-    if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
-      showAlert('Error', 'Please enter a valid phone number');
-      return;
-    }
+  // if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+  //   Alert.alert('Error', 'Please enter a valid phone number');
+  //   return;
+  // }
 
-    setSendingOtp(true);
-    try {
-      const formattedPhone = formatPhoneNumber(phoneNumber);
-      const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
-      setConfirm(confirmation);
-      setOtpSent(true);
-      setResendTimer(60); // 60 seconds cooldown
-      showAlert('OTP Sent', `Verification code sent to ${formattedPhone}`);
-    } catch (error: any) {
-      console.error('Error sending OTP:', error);
-      
-      let errorMessage = 'Failed to send OTP. Please try again.';
-      if (error.code === 'auth/invalid-phone-number') {
-        errorMessage = 'Invalid phone number format. Please include country code.';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many attempts. Please try again later.';
-      }
-      
-      showAlert('Error', errorMessage);
-    } finally {
-      setSendingOtp(false);
-    }
-  };
+  // setSendingOtp(true);
+  // try {
+  //   const formattedPhone = formatPhoneNumber(phoneNumber);
+  //   const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+  //   setConfirm(confirmation);
+  //   setOtpSent(true);
+  //   setResendTimer(60);
+  //   Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
+  // } catch (error: any) {
+  //   console.error('Error sending OTP:', error);
+  //   let errorMessage = 'Failed to send OTP. Please try again.';
+  //   if (error.code === 'auth/invalid-phone-number') {
+  //     errorMessage = 'Invalid phone number format.';
+  //   } else if (error.code === 'auth/too-many-requests') {
+  //     errorMessage = 'Too many attempts. Please try again later.';
+  //   }
+  //   Alert.alert('Error', errorMessage);
+  // } finally {
+  //   setSendingOtp(false);
+  // }
+};
 
-  // Verify OTP
-  const handleVerifyOtp = async () => {
-    if (!otp || otp.length < 6) {
-      showAlert('Error', 'Please enter the 6-digit OTP');
-      return;
-    }
+// Verify OTP
+const handleVerifyOtp = async () => {
+  // Firebase disabled - auto verify for now
+  setOtpVerified(true);
+  Alert.alert('Verified! ✓', 'Phone number verified successfully');
+  
+  // if (!otp || otp.length < 6) {
+  //   Alert.alert('Error', 'Please enter the 6-digit OTP');
+  //   return;
+  // }
 
-    if (!confirm) {
-      showAlert('Error', 'Please request OTP first');
-      return;
-    }
+  // if (!confirm) {
+  //   Alert.alert('Error', 'Please request OTP first');
+  //   return;
+  // }
 
-    setVerifyingOtp(true);
-    try {
-      await confirm.confirm(otp);
-      setOtpVerified(true);
-      showAlert('Verified! ✓', 'Phone number verified successfully');
-    } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      
-      let errorMessage = 'Invalid OTP. Please try again.';
-      if (error.code === 'auth/invalid-verification-code') {
-        errorMessage = 'Incorrect verification code. Please check and try again.';
-      } else if (error.code === 'auth/code-expired') {
-        errorMessage = 'OTP has expired. Please request a new one.';
-      }
-      
-      showAlert('Error', errorMessage);
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
+  // setVerifyingOtp(true);
+  // try {
+  //   await confirm.confirm(otp);
+  //   setOtpVerified(true);
+  //   Alert.alert('Verified! ✓', 'Phone number verified successfully');
+  // } catch (error: any) {
+  //   console.error('Error verifying OTP:', error);
+  //   let errorMessage = 'Invalid OTP. Please try again.';
+  //   if (error.code === 'auth/invalid-verification-code') {
+  //     errorMessage = 'Incorrect verification code.';
+  //   } else if (error.code === 'auth/code-expired') {
+  //     errorMessage = 'OTP has expired. Please request a new one.';
+  //   }
+  //   Alert.alert('Error', errorMessage);
+  // } finally {
+  //   setVerifyingOtp(false);
+  // }
+};
 
   // Main signup handler
   const handleSignup = async () => {
@@ -285,6 +290,7 @@ export default function RestaurantSignupScreen() {
         confirm_password: confirmPassword,
         phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,  // Optional
         phone_verified: otpVerified,  // Will be false if not verified
+        map_link: mapLink.trim() || null,
       });
 
       if (response.data && response.data.access_token) {
@@ -292,7 +298,7 @@ export default function RestaurantSignupScreen() {
         await AsyncStorage.setItem('account_type', 'restaurant');
 
         // Sign out from Firebase (we only used it for OTP)
-        await auth().signOut();
+        //await auth().signOut();
 
         showAlert(
           'Account Created! 🎉',
@@ -409,6 +415,23 @@ export default function RestaurantSignupScreen() {
               autoCorrect={false}
             />
           </View>
+
+          {/* Google Maps Link Input */}
+<View style={styles.inputContainer}>
+  <Ionicons name="location-outline" size={20} color="#999" style={styles.inputIcon} />
+  <TextInput
+    style={styles.input}
+    placeholder="Google Maps Link"
+    placeholderTextColor="#999"
+    value={mapLink}
+    onChangeText={setMapLink}
+    autoCapitalize="none"
+    autoCorrect={false}
+  />
+</View>
+<Text style={styles.helperText}>
+  Open Google Maps → Find your restaurant → Share → Copy link
+</Text>
 
           {/* Phone Number Input with OTP */}
           <View style={styles.phoneContainer}>
@@ -637,6 +660,14 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: '#F44336',
   },
+  helperText: {
+  fontSize: 12,
+  color: '#999',
+  marginTop: -12,
+  marginBottom: 16,
+  marginLeft: 4,
+  fontStyle: 'italic',
+},
   eyeIcon: {
     padding: 4,
   },

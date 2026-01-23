@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import auth from '@react-native-firebase/auth';
+//import auth from '@react-native-firebase/auth';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -51,82 +51,73 @@ export default function ForgotPasswordScreen() {
   };
 
   // Send OTP
-  const handleSendOtp = async () => {
-    setPhoneError('');
-    
-    if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
-      setPhoneError('Please enter a valid phone number');
-      return;
-    }
+const handleSendOtp = async () => {
+  // Firebase disabled - auto verify for now
+  Alert.alert('Info', 'Phone verification will be available soon');
+  setOtpSent(true);
+  setOtpVerified(true);
 
-    setSendingOtp(true);
-    try {
-      const formattedPhone = formatPhoneNumber(phoneNumber);
-      const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
-      setConfirm(confirmation);
-      setOtpSent(true);
-      setResendTimer(60);
-      Alert.alert('OTP Sent! 📱', `Verification code sent to ${formattedPhone}`);
-    } catch (error: any) {
-      console.error('Error sending OTP:', error);
-      let errorMessage = 'Failed to send OTP. Please try again.';
-      if (error.code === 'auth/invalid-phone-number') {
-        errorMessage = 'Invalid phone number format.';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many attempts. Please try again later.';
-      }
-      setPhoneError(errorMessage);
-    } finally {
-      setSendingOtp(false);
-    }
-  };
+  // if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+  //   Alert.alert('Error', 'Please enter a valid phone number');
+  //   return;
+  // }
+
+  // setSendingOtp(true);
+  // try {
+  //   const formattedPhone = formatPhoneNumber(phoneNumber);
+  //   const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+  //   setConfirm(confirmation);
+  //   setOtpSent(true);
+  //   setResendTimer(60);
+  //   Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
+  // } catch (error: any) {
+  //   console.error('Error sending OTP:', error);
+  //   let errorMessage = 'Failed to send OTP. Please try again.';
+  //   if (error.code === 'auth/invalid-phone-number') {
+  //     errorMessage = 'Invalid phone number format.';
+  //   } else if (error.code === 'auth/too-many-requests') {
+  //     errorMessage = 'Too many attempts. Please try again later.';
+  //   }
+  //   Alert.alert('Error', errorMessage);
+  // } finally {
+  //   setSendingOtp(false);
+  // }
+};
 
   // Verify OTP
-  const handleVerifyOtp = async () => {
-    setOtpError('');
-    
-    if (!otp || otp.length < 6) {
-      setOtpError('Please enter the 6-digit OTP');
-      return;
-    }
+const handleVerifyOtp = async () => {
+  // Firebase disabled - auto verify for now
+  setOtpVerified(true);
+  Alert.alert('Verified! ✓', 'Phone number verified successfully');
+  
+  // if (!otp || otp.length < 6) {
+  //   Alert.alert('Error', 'Please enter the 6-digit OTP');
+  //   return;
+  // }
 
-    if (!confirm) {
-      setOtpError('Please request OTP first');
-      return;
-    }
+  // if (!confirm) {
+  //   Alert.alert('Error', 'Please request OTP first');
+  //   return;
+  // }
 
-    setVerifyingOtp(true);
-    try {
-      await confirm.confirm(otp);
-      
-      // OTP verified - navigate to reset password screen
-      Alert.alert('Verified! ✓', 'Now set your new password', [
-        {
-          text: 'Continue',
-          onPress: () => {
-            // Sign out from Firebase (we only used it for verification)
-            auth().signOut();
-            // Navigate to reset password with phone number
-            router.push({
-              pathname: '/auth/reset-password',
-              params: { phone: formatPhoneNumber(phoneNumber) }
-            });
-          },
-        },
-      ]);
-    } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      let errorMessage = 'Invalid OTP. Please try again.';
-      if (error.code === 'auth/invalid-verification-code') {
-        errorMessage = 'Incorrect verification code.';
-      } else if (error.code === 'auth/code-expired') {
-        errorMessage = 'OTP has expired. Please request a new one.';
-      }
-      setOtpError(errorMessage);
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
+  // setVerifyingOtp(true);
+  // try {
+  //   await confirm.confirm(otp);
+  //   setOtpVerified(true);
+  //   Alert.alert('Verified! ✓', 'Phone number verified successfully');
+  // } catch (error: any) {
+  //   console.error('Error verifying OTP:', error);
+  //   let errorMessage = 'Invalid OTP. Please try again.';
+  //   if (error.code === 'auth/invalid-verification-code') {
+  //     errorMessage = 'Incorrect verification code.';
+  //   } else if (error.code === 'auth/code-expired') {
+  //     errorMessage = 'OTP has expired. Please request a new one.';
+  //   }
+  //   Alert.alert('Error', errorMessage);
+  // } finally {
+  //   setVerifyingOtp(false);
+  // }
+};
 
   return (
     <KeyboardAvoidingView

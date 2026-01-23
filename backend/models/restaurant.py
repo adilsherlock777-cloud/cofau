@@ -9,6 +9,7 @@ class RestaurantCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
     confirm_password: str = Field(..., min_length=6)
+    map_link: Optional[str] = None 
     
     class Config:
         json_schema_extra = {
