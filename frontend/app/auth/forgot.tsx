@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,33 +9,123 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import auth from '@react-native-firebase/auth';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [confirm, setConfirm] = useState<any>(null);
+  const [phoneError, setPhoneError] = useState('');
+  const [otpError, setOtpError] = useState('');
 
-  const handleSendOTP = () => {
-    // Basic validation
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email');
+  // Resend timer countdown
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  // Format phone number for Firebase
+  const formatPhoneNumber = (phone: string): string => {
+    let cleaned = phone.replace(/\D/g, '');
+    if (!phone.startsWith('+')) {
+      if (cleaned.length === 10) {
+        return `+91${cleaned}`; // Default to India
+      }
+    }
+    return phone.startsWith('+') ? phone : `+${cleaned}`;
+  };
+
+  // Send OTP
+  const handleSendOtp = async () => {
+    setPhoneError('');
+    
+    if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+      setPhoneError('Please enter a valid phone number');
       return;
     }
 
-    // Dummy OTP send
-    Alert.alert(
-      'OTP Sent! 📧',
-      'Check your email for the verification code',
-      [
+    setSendingOtp(true);
+    try {
+      const formattedPhone = formatPhoneNumber(phoneNumber);
+      const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+      setConfirm(confirmation);
+      setOtpSent(true);
+      setResendTimer(60);
+      Alert.alert('OTP Sent! 📱', `Verification code sent to ${formattedPhone}`);
+    } catch (error: any) {
+      console.error('Error sending OTP:', error);
+      let errorMessage = 'Failed to send OTP. Please try again.';
+      if (error.code === 'auth/invalid-phone-number') {
+        errorMessage = 'Invalid phone number format.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many attempts. Please try again later.';
+      }
+      setPhoneError(errorMessage);
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  // Verify OTP
+  const handleVerifyOtp = async () => {
+    setOtpError('');
+    
+    if (!otp || otp.length < 6) {
+      setOtpError('Please enter the 6-digit OTP');
+      return;
+    }
+
+    if (!confirm) {
+      setOtpError('Please request OTP first');
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      await confirm.confirm(otp);
+      
+      // OTP verified - navigate to reset password screen
+      Alert.alert('Verified! ✓', 'Now set your new password', [
         {
-          text: 'OK',
-          onPress: () => router.push('/auth/verify'),
+          text: 'Continue',
+          onPress: () => {
+            // Sign out from Firebase (we only used it for verification)
+            auth().signOut();
+            // Navigate to reset password with phone number
+            router.push({
+              pathname: '/auth/reset-password',
+              params: { phone: formatPhoneNumber(phoneNumber) }
+            });
+          },
         },
-      ]
-    );
+      ]);
+    } catch (error: any) {
+      console.error('Error verifying OTP:', error);
+      let errorMessage = 'Invalid OTP. Please try again.';
+      if (error.code === 'auth/invalid-verification-code') {
+        errorMessage = 'Incorrect verification code.';
+      } else if (error.code === 'auth/code-expired') {
+        errorMessage = 'OTP has expired. Please request a new one.';
+      }
+      setOtpError(errorMessage);
+    } finally {
+      setVerifyingOtp(false);
+    }
   };
 
   return (
@@ -58,7 +148,7 @@ export default function ForgotPasswordScreen() {
         {/* Logo */}
         <View style={styles.logoContainer}>
           <LinearGradient
-            colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
+            colors={['#E94A37', '#F2CF68', '#1B7C82']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.logo}
@@ -70,41 +160,148 @@ export default function ForgotPasswordScreen() {
         {/* Title */}
         <Text style={styles.title}>Forgot Password</Text>
         <Text style={styles.subtitle}>
-          Enter your email to reset your password.
+          {otpSent 
+            ? 'Enter the verification code sent to your phone'
+            : 'Enter your phone number to reset your password'
+          }
         </Text>
 
         {/* Form */}
         <View style={styles.form}>
-          {/* Email Input */}
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+          {/* Phone Number Input */}
+          <View style={[
+            styles.inputContainer,
+            phoneError ? styles.inputError : null
+          ]}>
+            <Ionicons 
+              name="call-outline" 
+              size={20} 
+              color={phoneError ? '#F44336' : '#999'} 
+              style={styles.inputIcon} 
+            />
             <TextInput
               style={styles.input}
-              placeholder="Email"
+              placeholder="Phone Number (e.g., +91 9876543210)"
               placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
+              value={phoneNumber}
+              onChangeText={(text) => {
+                setPhoneNumber(text);
+                setPhoneError('');
+              }}
+              keyboardType="phone-pad"
+              editable={!otpSent}
             />
+            {otpSent && (
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+            )}
           </View>
+          
+          {/* Phone Error */}
+          {phoneError ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="warning-outline" size={14} color="#F44336" />
+              <Text style={styles.errorText}>{phoneError}</Text>
+            </View>
+          ) : null}
 
-          {/* Send OTP Button */}
-          <TouchableOpacity
-            style={styles.buttonContainer}
-            onPress={handleSendOTP}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.button}
+          {/* Send OTP Button (before OTP sent) */}
+          {!otpSent && (
+            <TouchableOpacity
+              style={[styles.buttonContainer, sendingOtp && styles.buttonDisabled]}
+              onPress={handleSendOtp}
+              activeOpacity={0.8}
+              disabled={sendingOtp}
             >
-              <Text style={styles.buttonText}>Send OTP</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.button}
+              >
+                {sendingOtp ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.buttonText}>Send OTP</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {/* OTP Section (after OTP sent) */}
+          {otpSent && (
+            <>
+              {/* OTP Input */}
+              <View style={[
+                styles.inputContainer,
+                otpError ? styles.inputError : null
+              ]}>
+                <Ionicons 
+                  name="key-outline" 
+                  size={20} 
+                  color={otpError ? '#F44336' : '#999'} 
+                  style={styles.inputIcon} 
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="#999"
+                  value={otp}
+                  onChangeText={(text) => {
+                    setOtp(text);
+                    setOtpError('');
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+              </View>
+              
+              {/* OTP Error */}
+              {otpError ? (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="warning-outline" size={14} color="#F44336" />
+                  <Text style={styles.errorText}>{otpError}</Text>
+                </View>
+              ) : null}
+
+              {/* Resend OTP */}
+              <TouchableOpacity
+                style={styles.resendContainer}
+                onPress={handleSendOtp}
+                disabled={resendTimer > 0 || sendingOtp}
+              >
+                <Text style={[
+                  styles.resendText,
+                  (resendTimer > 0 || sendingOtp) && styles.resendDisabled
+                ]}>
+                  {resendTimer > 0 
+                    ? `Resend OTP in ${resendTimer}s` 
+                    : 'Resend OTP'
+                  }
+                </Text>
+              </TouchableOpacity>
+
+              {/* Verify Button */}
+              <TouchableOpacity
+                style={[styles.buttonContainer, verifyingOtp && styles.buttonDisabled]}
+                onPress={handleVerifyOtp}
+                activeOpacity={0.8}
+                disabled={verifyingOtp}
+              >
+                <LinearGradient
+                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.button}
+                >
+                  {verifyingOtp ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.buttonText}>Verify & Continue</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
 
           {/* Back to Login */}
           <View style={styles.loginContainer}>
@@ -179,8 +376,13 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 16,
     height: 56,
+  },
+  inputError: {
+    borderColor: '#F44336',
+    borderWidth: 1.5,
+    backgroundColor: '#FFF5F5',
   },
   inputIcon: {
     marginRight: 12,
@@ -190,8 +392,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
+    paddingHorizontal: 4,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#F44336',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  resendContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  resendText: {
+    fontSize: 14,
+    color: '#1B7C82',
+    fontWeight: '600',
+  },
+  resendDisabled: {
+    color: '#999',
+  },
   buttonContainer: {
     marginBottom: 24,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   button: {
     height: 56,
@@ -221,7 +452,7 @@ const styles = StyleSheet.create({
   },
   loginLink: {
     fontSize: 14,
-    color: '#4dd0e1',
+    color: '#1B7C82',
     fontWeight: '600',
   },
 });

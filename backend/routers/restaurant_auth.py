@@ -86,6 +86,8 @@ async def restaurant_signup(restaurant: RestaurantCreate):
         "cover_image": None,
         "bio": None,
         "phone": None,
+        "phone_number": Optional[str] = None
+        "phone_verified": bool = False
         "address": None,
         "cuisine_type": None,
         "posts_count": 0,

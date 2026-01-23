@@ -17,19 +17,34 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import auth from '@react-native-firebase/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${API_BASE_URL}/api`;
 
 export default function RestaurantSignupScreen() {
   const router = useRouter();
+  
+  // Form states
   const [restaurantName, setRestaurantName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  
+  // UI states
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // Firebase confirmation result
+  const [confirm, setConfirm] = useState<any>(null);
 
   // Restaurant name validation states
   const [nameError, setNameError] = useState('');
@@ -37,6 +52,17 @@ export default function RestaurantSignupScreen() {
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [checkingName, setCheckingName] = useState(false);
   const nameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Resend timer countdown
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
 
   // Check restaurant name availability
   const checkNameAvailability = async (nameToCheck: string): Promise<boolean> => {
@@ -88,12 +114,10 @@ export default function RestaurantSignupScreen() {
     setNameError('');
     setNameSuggestions([]);
 
-    // Clear previous timeout
     if (nameCheckTimeout.current) {
       clearTimeout(nameCheckTimeout.current);
     }
 
-    // Debounce name check (wait 500ms after user stops typing)
     if (text.trim().length >= 3) {
       nameCheckTimeout.current = setTimeout(() => {
         checkNameAvailability(text);
@@ -116,7 +140,6 @@ export default function RestaurantSignupScreen() {
     setNameAvailable(true);
     setNameError('');
     setNameSuggestions([]);
-    // Verify the selected name is available
     checkNameAvailability(suggestedName);
   };
 
@@ -129,6 +152,85 @@ export default function RestaurantSignupScreen() {
     }
   };
 
+  // Format phone number for Firebase (needs country code)
+  const formatPhoneNumber = (phone: string): string => {
+    let cleaned = phone.replace(/\D/g, '');
+    
+    // If doesn't start with country code, assume India (+91)
+    if (!phone.startsWith('+')) {
+      if (cleaned.length === 10) {
+        return `+91${cleaned}`;
+      }
+    }
+    
+    return phone.startsWith('+') ? phone : `+${cleaned}`;
+  };
+
+  // Send OTP
+  const handleSendOtp = async () => {
+    if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+      showAlert('Error', 'Please enter a valid phone number');
+      return;
+    }
+
+    setSendingOtp(true);
+    try {
+      const formattedPhone = formatPhoneNumber(phoneNumber);
+      const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+      setConfirm(confirmation);
+      setOtpSent(true);
+      setResendTimer(60); // 60 seconds cooldown
+      showAlert('OTP Sent', `Verification code sent to ${formattedPhone}`);
+    } catch (error: any) {
+      console.error('Error sending OTP:', error);
+      
+      let errorMessage = 'Failed to send OTP. Please try again.';
+      if (error.code === 'auth/invalid-phone-number') {
+        errorMessage = 'Invalid phone number format. Please include country code.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many attempts. Please try again later.';
+      }
+      
+      showAlert('Error', errorMessage);
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  // Verify OTP
+  const handleVerifyOtp = async () => {
+    if (!otp || otp.length < 6) {
+      showAlert('Error', 'Please enter the 6-digit OTP');
+      return;
+    }
+
+    if (!confirm) {
+      showAlert('Error', 'Please request OTP first');
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      await confirm.confirm(otp);
+      setOtpVerified(true);
+      showAlert('Verified! ✓', 'Phone number verified successfully');
+    } catch (error: any) {
+      console.error('Error verifying OTP:', error);
+      
+      let errorMessage = 'Invalid OTP. Please try again.';
+      if (error.code === 'auth/invalid-verification-code') {
+        errorMessage = 'Incorrect verification code. Please check and try again.';
+      } else if (error.code === 'auth/code-expired') {
+        errorMessage = 'OTP has expired. Please request a new one.';
+      }
+      
+      showAlert('Error', errorMessage);
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  // Main signup handler
   const handleSignup = async () => {
     // Basic validation
     if (!restaurantName || !email || !password || !confirmPassword) {
@@ -141,13 +243,11 @@ export default function RestaurantSignupScreen() {
       return;
     }
 
-    // Check name availability before signup
     if (checkingName) {
       showAlert('Please Wait', 'Checking restaurant name availability...');
       return;
     }
 
-    // Always check name availability before signup
     const trimmedName = restaurantName.trim();
     if (trimmedName.length >= 3) {
       const isAvailable = await checkNameAvailability(trimmedName);
@@ -155,19 +255,13 @@ export default function RestaurantSignupScreen() {
         if (nameSuggestions.length > 0) {
           showAlert(
             'Name Taken',
-            `"${trimmedName}" is already taken. Please choose a different name or select one of the suggestions below.`
-          );
-        } else {
-          showAlert(
-            'Name Taken',
             `"${trimmedName}" is already taken. Please choose a different name.`
           );
+        } else {
+          showAlert('Name Taken', `"${trimmedName}" is already taken.`);
         }
         return;
       }
-    } else {
-      showAlert('Error', 'Restaurant name must be at least 3 characters');
-      return;
     }
 
     if (password.length < 6) {
@@ -183,36 +277,38 @@ export default function RestaurantSignupScreen() {
     setLoading(true);
 
     try {
-      // Call restaurant signup API
+      // CHANGE this in handleSignup:
       const response = await axios.post(`${API_URL}/restaurant/auth/signup`, {
         restaurant_name: trimmedName,
         email: email.trim(),
         password: password,
         confirm_password: confirmPassword,
+        phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,  // Optional
+        phone_verified: otpVerified,  // Will be false if not verified
       });
 
       if (response.data && response.data.access_token) {
-        // Store token and account type
         await AsyncStorage.setItem('token', response.data.access_token);
         await AsyncStorage.setItem('account_type', 'restaurant');
+
+        // Sign out from Firebase (we only used it for OTP)
+        await auth().signOut();
 
         showAlert(
           'Account Created! 🎉',
           'Welcome to Cofau! Your restaurant account has been created.',
           () => {
-            // Navigate to restaurant feed/home (you can change this route)
             router.replace('/feed');
           }
         );
       } else {
-        showAlert('Signup Failed', 'Unexpected response from server. Please try again.');
+        showAlert('Signup Failed', 'Unexpected response from server.');
       }
     } catch (error: any) {
       console.error('Restaurant signup error:', error);
       const errorMessage =
-        error.response?.data?.detail || error.message || 'An unexpected error occurred. Please try again.';
+        error.response?.data?.detail || error.message || 'An unexpected error occurred.';
 
-      // If name is taken, update UI state
       if (errorMessage.toLowerCase().includes('name') && errorMessage.toLowerCase().includes('taken')) {
         setNameAvailable(false);
         setNameError(`Restaurant name "${trimmedName}" is already taken`);
@@ -314,6 +410,82 @@ export default function RestaurantSignupScreen() {
             />
           </View>
 
+          {/* Phone Number Input with OTP */}
+          <View style={styles.phoneContainer}>
+            <View style={[styles.inputContainer, styles.phoneInput]}>
+              <Ionicons name="call-outline" size={20} color="#999" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number (e.g., +91XXXXXXXXXX)"
+                placeholderTextColor="#999"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+                editable={!otpVerified}
+              />
+              {otpVerified && (
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.statusIcon} />
+              )}
+            </View>
+            
+            {!otpVerified && (
+              <TouchableOpacity
+                style={[
+                  styles.otpButton,
+                  (sendingOtp || resendTimer > 0) && styles.otpButtonDisabled
+                ]}
+                onPress={handleSendOtp}
+                disabled={sendingOtp || resendTimer > 0}
+              >
+                {sendingOtp ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.otpButtonText}>
+                    {resendTimer > 0 ? `${resendTimer}s` : otpSent ? 'Resend' : 'Send OTP'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* OTP Input (shown after OTP is sent) */}
+          {otpSent && !otpVerified && (
+            <View style={styles.phoneContainer}>
+              <View style={[styles.inputContainer, styles.phoneInput]}>
+                <Ionicons name="key-outline" size={20} color="#999" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="#999"
+                  value={otp}
+                  onChangeText={setOtp}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+              </View>
+              
+              <TouchableOpacity
+                style={[styles.otpButton, styles.verifyButton, verifyingOtp && styles.otpButtonDisabled]}
+                onPress={handleVerifyOtp}
+                disabled={verifyingOtp}
+              >
+                {verifyingOtp ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.otpButtonText}>Verify</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Verified Badge */}
+          {otpVerified && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="shield-checkmark" size={16} color="#4CAF50" />
+              <Text style={styles.verifiedText}>Phone number verified</Text>
+            </View>
+          )}
+
           {/* Password Input */}
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
@@ -364,7 +536,7 @@ export default function RestaurantSignupScreen() {
 
           {/* Create Account Button */}
           <TouchableOpacity
-            style={styles.buttonContainer}
+            style={[styles.buttonContainer, !otpVerified && styles.buttonDisabled]}
             onPress={handleSignup}
             activeOpacity={0.8}
             disabled={loading}
@@ -513,9 +685,56 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
+  // Phone + OTP styles
+  phoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 10,
+  },
+  phoneInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  otpButton: {
+    backgroundColor: '#1B7C82',
+    paddingHorizontal: 16,
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  otpButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  otpButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  verifyButton: {
+    backgroundColor: '#4CAF50',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -8,
+    marginBottom: 16,
+    marginLeft: 4,
+  },
+  verifiedText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    marginLeft: 4,
+    fontWeight: '500',
+  },
   buttonContainer: {
     marginTop: 8,
     marginBottom: 24,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   button: {
     height: 56,

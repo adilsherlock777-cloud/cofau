@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import auth from '@react-native-firebase/auth';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
@@ -40,6 +41,14 @@ export default function SignupScreen() {
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const usernameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [confirm, setConfirm] = useState<any>(null);
 
   // Check username availability
   const checkUsernameAvailability = async (usernameToCheck: string): Promise<boolean> => {
@@ -116,6 +125,17 @@ export default function SignupScreen() {
     };
   }, []);
 
+  // Resend timer countdown
+useEffect(() => {
+  let interval: NodeJS.Timeout;
+  if (resendTimer > 0) {
+    interval = setInterval(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+  }
+  return () => clearInterval(interval);
+}, [resendTimer]);
+
   // Handle suggestion selection
   const handleSelectSuggestion = (suggestedUsername: string) => {
     setUsername(suggestedUsername);
@@ -125,6 +145,77 @@ export default function SignupScreen() {
     // Verify the selected username is available
     checkUsernameAvailability(suggestedUsername);
   };
+
+  // Format phone number for Firebase
+const formatPhoneNumber = (phone: string): string => {
+  let cleaned = phone.replace(/\D/g, '');
+  if (!phone.startsWith('+')) {
+    if (cleaned.length === 10) {
+      return `+91${cleaned}`;
+    }
+  }
+  return phone.startsWith('+') ? phone : `+${cleaned}`;
+};
+
+// Send OTP
+const handleSendOtp = async () => {
+  if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+    Alert.alert('Error', 'Please enter a valid phone number');
+    return;
+  }
+
+  setSendingOtp(true);
+  try {
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+    setConfirm(confirmation);
+    setOtpSent(true);
+    setResendTimer(60);
+    Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
+  } catch (error: any) {
+    console.error('Error sending OTP:', error);
+    let errorMessage = 'Failed to send OTP. Please try again.';
+    if (error.code === 'auth/invalid-phone-number') {
+      errorMessage = 'Invalid phone number format.';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMessage = 'Too many attempts. Please try again later.';
+    }
+    Alert.alert('Error', errorMessage);
+  } finally {
+    setSendingOtp(false);
+  }
+};
+
+// Verify OTP
+const handleVerifyOtp = async () => {
+  if (!otp || otp.length < 6) {
+    Alert.alert('Error', 'Please enter the 6-digit OTP');
+    return;
+  }
+
+  if (!confirm) {
+    Alert.alert('Error', 'Please request OTP first');
+    return;
+  }
+
+  setVerifyingOtp(true);
+  try {
+    await confirm.confirm(otp);
+    setOtpVerified(true);
+    Alert.alert('Verified! ✓', 'Phone number verified successfully');
+  } catch (error: any) {
+    console.error('Error verifying OTP:', error);
+    let errorMessage = 'Invalid OTP. Please try again.';
+    if (error.code === 'auth/invalid-verification-code') {
+      errorMessage = 'Incorrect verification code.';
+    } else if (error.code === 'auth/code-expired') {
+      errorMessage = 'OTP has expired. Please request a new one.';
+    }
+    Alert.alert('Error', errorMessage);
+  } finally {
+    setVerifyingOtp(false);
+  }
+};
 
   const handleSignup = async () => {
     // Check terms acceptance first
@@ -188,7 +279,19 @@ export default function SignupScreen() {
 
     try {
       // Call backend signup API
-      const result = await signup(fullName, username.trim(), email, password);
+      const result = await signup(
+  fullName, 
+  username.trim(), 
+  email, 
+  password,
+  phoneNumber ? formatPhoneNumber(phoneNumber) : null,
+  otpVerified
+);
+
+// Sign out from Firebase after signup
+if (result.success && otpVerified) {
+  await auth().signOut();
+}
 
       if (result.success) {
         // Success - AuthContext will handle redirect
@@ -339,6 +442,79 @@ export default function SignupScreen() {
               autoCorrect={false}
             />
           </View>
+
+          {/* Phone Number Input (Optional) */}
+<View style={styles.phoneContainer}>
+  <View style={[styles.inputContainer, styles.phoneInput]}>
+    <Ionicons name="call-outline" size={20} color="#999" style={styles.inputIcon} />
+    <TextInput
+      style={styles.input}
+      placeholder="Phone (Optional)"
+      placeholderTextColor="#999"
+      value={phoneNumber}
+      onChangeText={setPhoneNumber}
+      keyboardType="phone-pad"
+      editable={!otpVerified}
+    />
+    {otpVerified && (
+      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.statusIcon} />
+    )}
+  </View>
+  
+  {phoneNumber.length >= 10 && !otpVerified && (
+    <TouchableOpacity
+      style={[styles.otpButton, (sendingOtp || resendTimer > 0) && styles.otpButtonDisabled]}
+      onPress={handleSendOtp}
+      disabled={sendingOtp || resendTimer > 0}
+    >
+      {sendingOtp ? (
+        <ActivityIndicator size="small" color="#FFF" />
+      ) : (
+        <Text style={styles.otpButtonText}>
+          {resendTimer > 0 ? `${resendTimer}s` : otpSent ? 'Resend' : 'Verify'}
+        </Text>
+      )}
+    </TouchableOpacity>
+  )}
+</View>
+
+{/* OTP Input */}
+{otpSent && !otpVerified && (
+  <View style={styles.phoneContainer}>
+    <View style={[styles.inputContainer, styles.phoneInput]}>
+      <Ionicons name="key-outline" size={20} color="#999" style={styles.inputIcon} />
+      <TextInput
+        style={styles.input}
+        placeholder="Enter 6-digit OTP"
+        placeholderTextColor="#999"
+        value={otp}
+        onChangeText={setOtp}
+        keyboardType="number-pad"
+        maxLength={6}
+      />
+    </View>
+    
+    <TouchableOpacity
+      style={[styles.otpButton, styles.verifyButton, verifyingOtp && styles.otpButtonDisabled]}
+      onPress={handleVerifyOtp}
+      disabled={verifyingOtp}
+    >
+      {verifyingOtp ? (
+        <ActivityIndicator size="small" color="#FFF" />
+      ) : (
+        <Text style={styles.otpButtonText}>Verify</Text>
+      )}
+    </TouchableOpacity>
+  </View>
+)}
+
+{/* Verified Badge */}
+{otpVerified && (
+  <View style={styles.verifiedBadge}>
+    <Ionicons name="shield-checkmark" size={16} color="#4CAF50" />
+    <Text style={styles.verifiedText}>Phone number verified</Text>
+  </View>
+)}
 
           {/* Password Input */}
           <View style={styles.inputContainer}>
@@ -608,6 +784,49 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 22,
   },
+  phoneContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 16,
+  gap: 10,
+},
+phoneInput: {
+  flex: 1,
+  marginBottom: 0,
+},
+otpButton: {
+  backgroundColor: '#4dd0e1',
+  paddingHorizontal: 16,
+  height: 56,
+  borderRadius: 12,
+  justifyContent: 'center',
+  alignItems: 'center',
+  minWidth: 80,
+},
+otpButtonDisabled: {
+  backgroundColor: '#ccc',
+},
+otpButtonText: {
+  color: '#FFF',
+  fontSize: 14,
+  fontWeight: '600',
+},
+verifyButton: {
+  backgroundColor: '#4CAF50',
+},
+verifiedBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: -8,
+  marginBottom: 16,
+  marginLeft: 4,
+},
+verifiedText: {
+  fontSize: 12,
+  color: '#4CAF50',
+  marginLeft: 4,
+  fontWeight: '500',
+},
   termsLink: {
     color: '#4dd0e1',
     fontWeight: '600',

@@ -27,6 +27,7 @@ import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
 import { sendCompliment, getFollowers } from '../utils/api';
+import auth from '@react-native-firebase/auth';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
 
@@ -305,6 +306,15 @@ export default function ProfileScreen() {
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
   const [isRestaurantProfile, setIsRestaurantProfile] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<string | null>(null);
+  const [phoneModalVisible, setPhoneModalVisible] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [confirm, setConfirm] = useState<any>(null);
+  const [updatingPhone, setUpdatingPhone] = useState(false);
   const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false);
   const [reviewFilterCounts, setReviewFilterCounts] = useState({
     topRated: 0,
@@ -372,6 +382,16 @@ export default function ProfileScreen() {
       }).start();
     }
   }, [settingsModalVisible]);
+
+  useEffect(() => {
+  let interval: NodeJS.Timeout;
+  if (resendTimer > 0) {
+    interval = setInterval(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+  }
+  return () => clearInterval(interval);
+}, [resendTimer]);
 
   // Debug: Log when component renders (MUST be before any early returns)
   useEffect(() => {
@@ -1665,6 +1685,79 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
 };
 
   // ================= RESTAURANT PROFILE UI =================
+  const formatPhoneNumber = (phone: string): string => {
+  let cleaned = phone.replace(/\D/g, '');
+  if (!phone.startsWith('+')) {
+    if (cleaned.length === 10) {
+      return `+91${cleaned}`;
+    }
+  }
+  return phone.startsWith('+') ? phone : `+${cleaned}`;
+};
+
+const handleSendPhoneOtp = async () => {
+  if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+    Alert.alert('Error', 'Please enter a valid phone number');
+    return;
+  }
+  setSendingOtp(true);
+  try {
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+    setConfirm(confirmation);
+    setOtpSent(true);
+    setResendTimer(60);
+    Alert.alert('OTP Sent', `Code sent to ${formattedPhone}`);
+  } catch (error: any) {
+    console.error('Error sending OTP:', error);
+    Alert.alert('Error', error.code === 'auth/invalid-phone-number' 
+      ? 'Invalid phone number' 
+      : 'Failed to send OTP');
+  } finally {
+    setSendingOtp(false);
+  }
+};
+
+const handleVerifyAndUpdatePhone = async () => {
+  if (!otp || otp.length < 6) {
+    Alert.alert('Error', 'Please enter 6-digit OTP');
+    return;
+  }
+  setVerifyingOtp(true);
+  try {
+    await confirm.confirm(otp);
+    
+    // Update phone in backend
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    await axios.put(
+      `${API_URL}/users/update-phone`,
+      { phone_number: formattedPhone, phone_verified: true },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    await auth().signOut();
+    Alert.alert('Success', 'Phone number updated!');
+    setPhoneModalVisible(false);
+    resetPhoneModal();
+    fetchProfileData();
+  } catch (error: any) {
+    console.error('Error:', error);
+    Alert.alert('Error', error.code === 'auth/invalid-verification-code' 
+      ? 'Invalid OTP' 
+      : 'Failed to update phone');
+  } finally {
+    setVerifyingOtp(false);
+  }
+};
+
+const resetPhoneModal = () => {
+  setPhoneNumber('');
+  setOtp('');
+  setOtpSent(false);
+  setConfirm(null);
+  setResendTimer(0);
+};
+
 const renderRestaurantProfile = () => {
   return (
     <View style={styles.container}>
@@ -2261,6 +2354,24 @@ const renderRestaurantProfile = () => {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
+              <TouchableOpacity
+  style={styles.sidebarMenuItem}
+  onPress={() => {
+    setSettingsModalVisible(false);
+    setPhoneNumber(userData?.phone_number || '');
+    setPhoneModalVisible(true);
+  }}
+  activeOpacity={0.7}
+>
+  <View style={styles.sidebarMenuIconContainer}>
+    <Ionicons name="call-outline" size={24} color="#333" />
+  </View>
+  <Text style={styles.sidebarMenuText}>
+    {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
+  </Text>
+  <Ionicons name="chevron-forward" size={20} color="#999" />
+</TouchableOpacity>
+
               <View style={styles.sidebarDivider} />
 
 {/* DELETE ACCOUNT - Separate TouchableOpacity */}
@@ -2537,6 +2648,118 @@ const renderRestaurantProfile = () => {
       )}
     </View>
   </TouchableOpacity>
+</Modal>
+{/* ================= PHONE NUMBER MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={phoneModalVisible}
+  onRequestClose={() => {
+    setPhoneModalVisible(false);
+    resetPhoneModal();
+  }}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalContainer}
+  >
+    <View style={styles.modalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>
+          {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
+        </Text>
+        <TouchableOpacity onPress={() => {
+          setPhoneModalVisible(false);
+          resetPhoneModal();
+        }}>
+          <Ionicons name="close" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Current Phone */}
+      {userData?.phone_number && (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.inputLabel}>Current Phone</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, color: '#666' }}>{userData.phone_number}</Text>
+            {userData?.phone_verified && (
+              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={{ marginLeft: 8 }} />
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* New Phone Input */}
+      <Text style={styles.inputLabel}>
+        {userData?.phone_number ? 'New Phone Number' : 'Phone Number'}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <TextInput
+          style={[styles.input, { flex: 1 }]}
+          placeholder="+91 9876543210"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
+          editable={!otpSent}
+        />
+        {!otpSent && (
+          <TouchableOpacity
+            style={{
+              backgroundColor: sendingOtp ? '#ccc' : '#4dd0e1',
+              paddingHorizontal: 16,
+              borderRadius: 10,
+              justifyContent: 'center',
+            }}
+            onPress={handleSendPhoneOtp}
+            disabled={sendingOtp}
+          >
+            {sendingOtp ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Send OTP</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* OTP Input */}
+      {otpSent && (
+        <>
+          <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="6-digit OTP"
+            value={otp}
+            onChangeText={setOtp}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          
+          <TouchableOpacity
+            onPress={handleSendPhoneOtp}
+            disabled={resendTimer > 0}
+            style={{ alignSelf: 'center', marginTop: 12 }}
+          >
+            <Text style={{ color: resendTimer > 0 ? '#999' : '#4dd0e1', fontWeight: '600' }}>
+              {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+            onPress={handleVerifyAndUpdatePhone}
+            disabled={verifyingOtp}
+          >
+            {verifyingOtp ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Verify & Update</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  </KeyboardAvoidingView>
 </Modal>
     </View>
   );
@@ -3782,6 +4005,118 @@ if (isRestaurantProfile) {
           </View>
         </View>
       </Modal>
+      {/* ================= PHONE NUMBER MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={phoneModalVisible}
+  onRequestClose={() => {
+    setPhoneModalVisible(false);
+    resetPhoneModal();
+  }}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalContainer}
+  >
+    <View style={styles.modalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>
+          {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
+        </Text>
+        <TouchableOpacity onPress={() => {
+          setPhoneModalVisible(false);
+          resetPhoneModal();
+        }}>
+          <Ionicons name="close" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Current Phone */}
+      {userData?.phone_number && (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.inputLabel}>Current Phone</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, color: '#666' }}>{userData.phone_number}</Text>
+            {userData?.phone_verified && (
+              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={{ marginLeft: 8 }} />
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* New Phone Input */}
+      <Text style={styles.inputLabel}>
+        {userData?.phone_number ? 'New Phone Number' : 'Phone Number'}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <TextInput
+          style={[styles.input, { flex: 1 }]}
+          placeholder="+91 9876543210"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
+          editable={!otpSent}
+        />
+        {!otpSent && (
+          <TouchableOpacity
+            style={{
+              backgroundColor: sendingOtp ? '#ccc' : '#4dd0e1',
+              paddingHorizontal: 16,
+              borderRadius: 10,
+              justifyContent: 'center',
+            }}
+            onPress={handleSendPhoneOtp}
+            disabled={sendingOtp}
+          >
+            {sendingOtp ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Send OTP</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* OTP Input */}
+      {otpSent && (
+        <>
+          <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="6-digit OTP"
+            value={otp}
+            onChangeText={setOtp}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          
+          <TouchableOpacity
+            onPress={handleSendPhoneOtp}
+            disabled={resendTimer > 0}
+            style={{ alignSelf: 'center', marginTop: 12 }}
+          >
+            <Text style={{ color: resendTimer > 0 ? '#999' : '#4dd0e1', fontWeight: '600' }}>
+              {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+            onPress={handleVerifyAndUpdatePhone}
+            disabled={verifyingOtp}
+          >
+            {verifyingOtp ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Verify & Update</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
     </View>
   );
 }

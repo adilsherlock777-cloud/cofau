@@ -166,7 +166,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signup = async (fullName, username, email, password) => {
+  const signup = async (fullName, username, email, password, phoneNumber = null, phoneVerified = false) => {
     try {
       const response = await axios.post(`${API_URL}/api/auth/signup`, {
         full_name: fullName,

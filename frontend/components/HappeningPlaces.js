@@ -575,9 +575,9 @@ export default function HappeningPlaces() {
                         {location.location || location.location_name}
                       </Text>
                       <Text style={styles.uploadCount}>
-                        ({formatUploadCount(location.uploads)} uploaded)
-                        {location.distance_km !== undefined && ` • ${location.distance_km} km away`}
-                      </Text>
+  ({formatUploadCount(location.uploads)} uploaded)
+  {location.distance_km !== undefined && location.distance_km !== 49 && ` • ${location.distance_km} km away`}
+</Text>
                     </View>
                   </View>
 

@@ -23,6 +23,8 @@ class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=30, description="Unique username (3-30 characters)")
     email: EmailStr
     password: str
+    phone_number: Optional[str] = None      # ADD
+    phone_verified: bool = False  
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -43,6 +45,8 @@ class UserResponse(BaseModel):
     badge: Optional[str] = None
     followers_count: int = 0
     following_count: int = 0
+    phone_number: Optional[str] = None      # ADD
+    phone_verified: bool = False  
     created_at: datetime
 
 class UserUpdate(BaseModel):

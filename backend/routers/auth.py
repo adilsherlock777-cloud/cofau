@@ -5,6 +5,7 @@ from database import get_database
 from models.user import UserCreate, UserLogin, Token, UserResponse
 from utils.hashing import hash_password, verify_password
 from utils.jwt import create_access_token, verify_token
+from pydantic import BaseModel
 from utils.level_system import calculate_level
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -90,6 +91,8 @@ async def signup(user: UserCreate):
         "password_hash": hashed_password,
         "profile_picture": None,
         "bio": None,
+        "phone_number": user.phone_number,      # ADD
+        "phone_verified": user.phone_verified,  # ADD
         "total_points": 0,  # Total accumulated points
         "points": 0,  # For backward compatibility
         "level": 1,
@@ -180,6 +183,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
             "badge": "verified" if current_user.get("is_verified", False) else None,
             "followers_count": current_user.get("followers_count", 0),
             "following_count": current_user.get("following_count", 0),
+            "phone_number": user.phone_number,      # ADD
+            "phone_verified": user.phone_verified,  # ADD
             "account_type": "restaurant",
             "created_at": current_user["created_at"]
         }
@@ -275,3 +280,62 @@ async def suggest_usernames(base_username: str, limit: int = 5):
                     break
     
     return suggestions
+
+class ResetPasswordRequest(BaseModel):
+    phone_number: str
+    new_password: str
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password using verified phone number"""
+    db = get_database()
+    
+    # Find user by phone number
+    user = await db.users.find_one({"phone_number": request.phone_number})
+    
+    if not user:
+        # Also check restaurants
+        user = await db.restaurants.find_one({"phone_number": request.phone_number})
+        if not user:
+            raise HTTPException(status_code=404, detail="No account found with this phone number")
+        
+        # Update restaurant password
+        hashed_password = hash_password(request.new_password)
+        await db.restaurants.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"password_hash": hashed_password}}
+        )
+        return {"message": "Password reset successfully"}
+    
+    # Update user password
+    hashed_password = hash_password(request.new_password)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password_hash": hashed_password}}
+    )
+    
+    return {"message": "Password reset successfully"}
+
+class UpdatePhoneRequest(BaseModel):
+    phone_number: str
+    phone_verified: bool = False
+
+@router.put("/users/update-phone")
+async def update_phone(
+    request: UpdatePhoneRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user phone number"""
+    db = get_database()
+    
+    await db.users.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {
+            "phone_number": request.phone_number,
+            "phone_verified": request.phone_verified
+        }}
+    )
+    
+    return {"message": "Phone number updated successfully"}
+
+
