@@ -44,8 +44,7 @@ async def restaurant_signup(restaurant: RestaurantCreate):
     # Normalize restaurant name (lowercase, remove extra spaces)
     name_normalized = restaurant.restaurant_name.strip().lower().replace("  ", " ")
     
-    # Validate restaurant name format (allow letters, numbers, spaces, and common punctuation)
-    # More lenient than username since restaurant names can have spaces and special chars
+    # Validate restaurant name format
     if len(name_normalized) < 3:
         raise HTTPException(
             status_code=400,
@@ -64,7 +63,6 @@ async def restaurant_signup(restaurant: RestaurantCreate):
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Check if restaurant name already exists (case-insensitive)
-    # Only checking in restaurants collection as per requirement
     existing_name = await db.restaurants.find_one({
         "restaurant_name_normalized": name_normalized
     })
@@ -77,51 +75,35 @@ async def restaurant_signup(restaurant: RestaurantCreate):
     # Hash password
     hashed_password = hash_password(restaurant.password)
 
-    # Extract coordinates from map_link if provided
+    # Get coordinates - Priority: direct coordinates > map_link extraction
     latitude = None
     longitude = None
     map_link = None
-    
-    if hasattr(restaurant, 'map_link') and restaurant.map_link:
-        map_link = restaurant.map_link.strip()
-        try:
-            coords = await get_coordinates_for_map_link(map_link)
-            if coords:
-                latitude = coords.get("latitude")
-                longitude = coords.get("longitude")
-        except Exception as e:
-            print(f"Error extracting coordinates: {e}")
-    
-    # Create restaurant document (NO leveling system)
- # Get coordinates - Priority: direct coordinates > map_link extraction
-latitude = None
-longitude = None
-map_link = None
 
-# First, check if coordinates are provided directly (from map picker)
-if hasattr(restaurant, 'latitude') and restaurant.latitude:
-    latitude = restaurant.latitude
-if hasattr(restaurant, 'longitude') and restaurant.longitude:
-    longitude = restaurant.longitude
+    # First, check if coordinates are provided directly (from map picker)
+    if hasattr(restaurant, 'latitude') and restaurant.latitude:
+        latitude = restaurant.latitude
+    if hasattr(restaurant, 'longitude') and restaurant.longitude:
+        longitude = restaurant.longitude
 
-# If no direct coordinates, try to extract from map_link
-if not latitude or not longitude:
-    if hasattr(restaurant, 'map_link') and restaurant.map_link:
-        map_link = restaurant.map_link.strip()
-        try:
-            from routers.map import get_coordinates_for_map_link
-            coords = await get_coordinates_for_map_link(map_link)
-            if coords:
-                latitude = coords.get("latitude")
-                longitude = coords.get("longitude")
-        except Exception as e:
-            print(f"Error extracting coordinates: {e}")
+    # If no direct coordinates, try to extract from map_link
+    if not latitude or not longitude:
+        if hasattr(restaurant, 'map_link') and restaurant.map_link:
+            map_link = restaurant.map_link.strip()
+            try:
+                coords = await get_coordinates_for_map_link(map_link)
+                if coords:
+                    latitude = coords.get("latitude")
+                    longitude = coords.get("longitude")
+            except Exception as e:
+                print(f"Error extracting coordinates: {e}")
 
     print(f"📍 Restaurant signup - Coordinates: {latitude}, {longitude}")
 
+    # Create restaurant document
     restaurant_doc = {
-        "restaurant_name": restaurant.restaurant_name.strip(),  # Store original casing
-        "restaurant_name_normalized": name_normalized,  # Store normalized for searches
+        "restaurant_name": restaurant.restaurant_name.strip(),
+        "restaurant_name_normalized": name_normalized,
         "email": restaurant.email,
         "password_hash": hashed_password,
         "profile_picture": None,
@@ -132,15 +114,15 @@ if not latitude or not longitude:
         "phone_verified": False,
         "address": None,
         "cuisine_type": None,
-        "map_link": map_link,        # <-- ADD THIS
-        "latitude": latitude,         # <-- ADD THIS
+        "map_link": map_link,
+        "latitude": latitude,
         "longitude": longitude,
         "posts_count": 0,
         "reviews_count": 0,
         "followers_count": 0,
         "following_count": 0,
         "is_verified": False,
-        "account_type": "restaurant",  # Important: identifies this as restaurant account
+        "account_type": "restaurant",
         "created_at": datetime.utcnow()
     }
     
@@ -195,10 +177,7 @@ async def restaurant_login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @router.get("/check-name")
 async def check_restaurant_name(name: str):
-    """
-    Check if restaurant name is available
-    Returns: {"available": bool, "suggestions": []}
-    """
+    """Check if restaurant name is available"""
     db = get_database()
     
     if not name or len(name.strip()) < 3:
@@ -206,20 +185,15 @@ async def check_restaurant_name(name: str):
     
     name_normalized = name.strip().lower().replace("  ", " ")
     
-    # Check if restaurant name exists (case-insensitive)
     existing_restaurant = await db.restaurants.find_one({
         "restaurant_name_normalized": name_normalized
     })
     
     if existing_restaurant:
-        # Generate suggestions
         suggestions = []
         base_name = name.strip()
-        
-        # Try adding location-based suffixes or numbers
         suffixes = ["Cafe", "Kitchen", "Bistro", "House", "Place", "Spot"]
         
-        # First try with common restaurant suffixes
         for suffix in suffixes:
             suggested = f"{base_name} {suffix}"
             suggested_normalized = suggested.lower().replace("  ", " ")
@@ -231,7 +205,6 @@ async def check_restaurant_name(name: str):
                 if len(suggestions) >= 3:
                     break
         
-        # If still need more, try with numbers
         if len(suggestions) < 5:
             for i in range(1, 100):
                 suggested = f"{base_name} {i}"
@@ -284,11 +257,9 @@ async def update_restaurant_profile(
     
     update_dict = {}
     
-    # Handle restaurant name update (check uniqueness)
     if update_data.restaurant_name:
         name_normalized = update_data.restaurant_name.strip().lower().replace("  ", " ")
         
-        # Check if new name is taken by another restaurant
         existing = await db.restaurants.find_one({
             "restaurant_name_normalized": name_normalized,
             "_id": {"$ne": current_restaurant["_id"]}
@@ -302,7 +273,6 @@ async def update_restaurant_profile(
         update_dict["restaurant_name"] = update_data.restaurant_name.strip()
         update_dict["restaurant_name_normalized"] = name_normalized
     
-    # Handle other fields
     if update_data.bio is not None:
         update_dict["bio"] = update_data.bio
     if update_data.phone is not None:
@@ -319,7 +289,6 @@ async def update_restaurant_profile(
             {"$set": update_dict}
         )
     
-    # Fetch updated document
     updated_restaurant = await db.restaurants.find_one({"_id": current_restaurant["_id"]})
     
     return {
@@ -338,7 +307,3 @@ async def update_restaurant_profile(
         "is_verified": updated_restaurant.get("is_verified", False),
         "created_at": updated_restaurant["created_at"]
     }
-
-
-# NOTE: OTP/Forgot password functionality can be added later if needed
-# For now, restaurants use simple email + password authentication

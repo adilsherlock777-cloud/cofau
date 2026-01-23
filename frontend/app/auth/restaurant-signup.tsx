@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LocationPicker from '../components/LocationPicker';
+import LocationPicker from '../../components/LocationPicker';
 import axios from 'axios';
 //import auth from '@react-native-firebase/auth';
 
