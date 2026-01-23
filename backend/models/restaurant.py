@@ -10,6 +10,8 @@ class RestaurantCreate(BaseModel):
     password: str = Field(..., min_length=6)
     confirm_password: str = Field(..., min_length=6)
     map_link: Optional[str] = None 
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     
     class Config:
         json_schema_extra = {

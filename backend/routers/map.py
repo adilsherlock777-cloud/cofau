@@ -286,56 +286,30 @@ async def get_map_pins(
                     "is_verified": restaurant.get("is_verified", False)
                 })
     
-    # ==================== POSTS ====================
-    # FIRST: Get posts that ALREADY have coordinates (fast)
-    posts_with_coords = await db.posts.find({
-        "latitude": {"$exists": True, "$ne": None},
-        "longitude": {"$exists": True, "$ne": None}
+  # ==================== POSTS ====================
+    posts = await db.posts.find({
+        "map_link": {"$exists": True, "$ne": None, "$ne": ""}
     }).to_list(None)
     
-    for post in posts_with_coords:
-        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
-        if distance <= radius_km:
-            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-            posts_pins.append({
-                "id": str(post["_id"]),
-                "type": "post",
-                "user_id": post["user_id"],
-                "username": user.get("full_name", "Unknown") if user else "Unknown",
-                "user_profile_picture": user.get("profile_picture") if user else None,
+    for post in posts:
+        # Use stored coordinates first, otherwise geocode
+        if post.get("latitude") and post.get("longitude"):
+            coords = {
                 "latitude": post["latitude"],
-                "longitude": post["longitude"],
-                "distance_km": round(distance, 2),
-                "media_url": post.get("media_url") or post.get("image_url"),
-                "thumbnail_url": post.get("thumbnail_url"),
-                "media_type": post.get("media_type", "image"),
-                "rating": post.get("rating"),
-                "location_name": post.get("location_name"),
-                "category": post.get("category"),
-                "review_text": post.get("review_text", "")[:100],
-                "likes_count": post.get("likes_count", 0),
-                "map_link": post.get("map_link")
-            })
-    
-    # SECOND: Get posts WITHOUT coordinates (limited, for lazy geocoding)
-    posts_without_coords = await db.posts.find({
-        "map_link": {"$exists": True, "$ne": None, "$ne": ""},
-        "$or": [
-            {"latitude": {"$exists": False}},
-            {"latitude": None}
-        ]
-    }).limit(20).to_list(None)
-    
-    for post in posts_without_coords:
-        coords = await get_coordinates_for_map_link(post.get("map_link"))
-        if coords and coords.get("latitude") and coords.get("longitude"):
+                "longitude": post["longitude"]
+            }
+        else:
+            coords = await get_coordinates_for_map_link(post.get("map_link"))
             # Store coordinates for next time
-            await db.posts.update_one(
-                {"_id": post["_id"]},
-                {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
-            )
-            
+            if coords and coords.get("latitude"):
+                await db.posts.update_one(
+                    {"_id": post["_id"]},
+                    {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
+                )
+        
+        if coords and coords.get("latitude") and coords.get("longitude"):
             distance = calculate_distance_km(lat, lng, coords["latitude"], coords["longitude"])
+            
             if distance <= radius_km:
                 user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
                 posts_pins.append({
@@ -357,19 +331,6 @@ async def get_map_pins(
                     "likes_count": post.get("likes_count", 0),
                     "map_link": post.get("map_link")
                 })
-    
-    # Sort by distance
-    restaurants_pins.sort(key=lambda x: x["distance_km"])
-    posts_pins.sort(key=lambda x: x["distance_km"])
-    
-    return {
-        "user_location": {"latitude": lat, "longitude": lng},
-        "radius_km": radius_km,
-        "restaurants": restaurants_pins,
-        "posts": posts_pins,
-        "total_restaurants": len(restaurants_pins),
-        "total_posts": len(posts_pins)
-    }
 
 
 @router.get("/search")

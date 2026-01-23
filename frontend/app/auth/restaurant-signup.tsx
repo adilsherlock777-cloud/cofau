@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LocationPicker from '../components/LocationPicker';
 import axios from 'axios';
 //import auth from '@react-native-firebase/auth';
 
@@ -43,6 +44,8 @@ export default function RestaurantSignupScreen() {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [mapLink, setMapLink] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   // Firebase confirmation result
   const [confirm, setConfirm] = useState<any>(null);
@@ -284,14 +287,16 @@ const handleVerifyOtp = async () => {
     try {
       // CHANGE this in handleSignup:
       const response = await axios.post(`${API_URL}/restaurant/auth/signup`, {
-        restaurant_name: trimmedName,
-        email: email.trim(),
-        password: password,
-        confirm_password: confirmPassword,
-        phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,  // Optional
-        phone_verified: otpVerified,  // Will be false if not verified
-        map_link: mapLink.trim() || null,
-      });
+  restaurant_name: trimmedName,
+  email: email.trim(),
+  password: password,
+  confirm_password: confirmPassword,
+  phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,
+  phone_verified: otpVerified,
+  map_link: mapLink.trim() || null,
+  latitude: latitude,
+  longitude: longitude,
+});
 
       if (response.data && response.data.access_token) {
         await AsyncStorage.setItem('token', response.data.access_token);
@@ -416,12 +421,36 @@ const handleVerifyOtp = async () => {
             />
           </View>
 
-          {/* Google Maps Link Input */}
+          {/* Location Picker */}
+<View style={styles.locationSection}>
+  <Text style={styles.locationLabel}>
+    <Ionicons name="location-outline" size={16} color="#1B7C82" /> Restaurant Location
+  </Text>
+  <Text style={styles.locationHelper}>
+    Tap on the map to set your restaurant's exact location
+  </Text>
+  <LocationPicker
+    onLocationSelect={(lat: number, lng: number) => {
+      setLatitude(lat);
+      setLongitude(lng);
+    }}
+  />
+  {latitude && longitude && (
+    <View style={styles.coordsConfirm}>
+      <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+      <Text style={styles.coordsText}>
+        Location set: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+      </Text>
+    </View>
+  )}
+</View>
+
+{/* Optional: Keep Google Maps Link as backup */}
 <View style={styles.inputContainer}>
-  <Ionicons name="location-outline" size={20} color="#999" style={styles.inputIcon} />
+  <Ionicons name="link-outline" size={20} color="#999" style={styles.inputIcon} />
   <TextInput
     style={styles.input}
-    placeholder="Google Maps Link"
+    placeholder="Or paste Google Maps Link (optional)"
     placeholderTextColor="#999"
     value={mapLink}
     onChangeText={setMapLink}
@@ -429,9 +458,6 @@ const handleVerifyOtp = async () => {
     autoCorrect={false}
   />
 </View>
-<Text style={styles.helperText}>
-  Open Google Maps → Find your restaurant → Share → Copy link
-</Text>
 
           {/* Phone Number Input with OTP */}
           <View style={styles.phoneContainer}>
@@ -790,6 +816,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  // Add these new styles
+locationSection: {
+  marginBottom: 20,
+},
+locationLabel: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+  marginBottom: 4,
+},
+locationHelper: {
+  fontSize: 12,
+  color: '#999',
+  marginBottom: 12,
+  fontStyle: 'italic',
+},
+coordsConfirm: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 8,
+  paddingVertical: 8,
+  paddingHorizontal: 12,
+  backgroundColor: '#E8F5E9',
+  borderRadius: 8,
+},
+coordsText: {
+  fontSize: 12,
+  color: '#4CAF50',
+  marginLeft: 6,
+  fontWeight: '500',
+},
   loginText: {
     fontSize: 14,
     color: '#999',

@@ -93,20 +93,31 @@ async def restaurant_signup(restaurant: RestaurantCreate):
             print(f"Error extracting coordinates: {e}")
     
     # Create restaurant document (NO leveling system)
-    # Extract coordinates from map_link if provided
-    latitude = None
-    longitude = None
-    map_link = None
-    
+ # Get coordinates - Priority: direct coordinates > map_link extraction
+latitude = None
+longitude = None
+map_link = None
+
+# First, check if coordinates are provided directly (from map picker)
+if hasattr(restaurant, 'latitude') and restaurant.latitude:
+    latitude = restaurant.latitude
+if hasattr(restaurant, 'longitude') and restaurant.longitude:
+    longitude = restaurant.longitude
+
+# If no direct coordinates, try to extract from map_link
+if not latitude or not longitude:
     if hasattr(restaurant, 'map_link') and restaurant.map_link:
         map_link = restaurant.map_link.strip()
         try:
+            from routers.map import get_coordinates_for_map_link
             coords = await get_coordinates_for_map_link(map_link)
             if coords:
                 latitude = coords.get("latitude")
                 longitude = coords.get("longitude")
         except Exception as e:
             print(f"Error extracting coordinates: {e}")
+
+print(f"📍 Restaurant signup - Coordinates: {latitude}, {longitude}")
 
     restaurant_doc = {
         "restaurant_name": restaurant.restaurant_name.strip(),  # Store original casing
