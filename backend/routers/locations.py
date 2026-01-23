@@ -6,6 +6,7 @@ from datetime import datetime
 from bson import ObjectId
 
 from database import get_database
+from math import radians, cos, sin, asin, sqrt
 from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/locations", tags=["locations"])
@@ -233,3 +234,128 @@ async def get_location_details(
             "uploads": 0,
             "posts": []
         }
+
+def haversine(lat1, lon1, lat2, lon2):
+    """Calculate distance between two points in km"""
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+        return float('inf')
+    
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    km = 6371 * c
+    return km
+
+
+@router.get("/nearby")
+async def get_nearby_locations(
+    lat: float,
+    lng: float,
+    radius_km: float = 50,  # Large radius for now since you have less data
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get top locations near user's position.
+    Groups posts by location_name, counts uploads, sorts by count (highest first).
+    Returns locations with preview images.
+    """
+    db = get_database()
+    
+    # Get all posts with location_name
+    all_posts = await db.posts.find({
+        "location_name": {"$exists": True, "$ne": None, "$ne": ""}
+    }).to_list(None)
+    
+    # Group posts by location_name and calculate distance
+    location_map = {}
+    
+    for post in all_posts:
+        location_name = post.get("location_name")
+        if not location_name:
+            continue
+        
+        # Calculate distance if post has coordinates
+        post_lat = post.get("latitude")
+        post_lng = post.get("longitude")
+        
+        if post_lat and post_lng:
+            distance = haversine(lat, lng, post_lat, post_lng)
+        else:
+            # If no coordinates, include but with large distance
+            # This ensures posts without coordinates still show up
+            distance = radius_km - 1  # Just inside radius
+        
+        # Skip if outside radius
+        if distance > radius_km:
+            continue
+        
+        # Initialize location entry if not exists
+        if location_name not in location_map:
+            location_map[location_name] = {
+                "location": location_name,
+                "location_name": location_name,
+                "uploads": 0,
+                "images": [],
+                "thumbnails": [],
+                "images_data": [],
+                "map_link": None,
+                "min_distance": distance,
+                "avg_rating": [],
+            }
+        
+        # Update location data
+        loc_data = location_map[location_name]
+        loc_data["uploads"] += 1
+        
+        # Update min distance
+        if distance < loc_data["min_distance"]:
+            loc_data["min_distance"] = distance
+        
+        # Collect images (limit to 20 per location)
+        if len(loc_data["images"]) < 20:
+            media_url = post.get("media_url") or post.get("image_url")
+            if media_url:
+                loc_data["images"].append(media_url)
+                loc_data["thumbnails"].append(post.get("thumbnail_url"))
+                loc_data["images_data"].append({
+                    "media_url": media_url,
+                    "thumbnail_url": post.get("thumbnail_url"),
+                    "media_type": post.get("media_type", "image"),
+                    "post_id": str(post["_id"])
+                })
+        
+        # Collect map_link if not set
+        if not loc_data["map_link"] and post.get("map_link"):
+            loc_data["map_link"] = post.get("map_link")
+        
+        # Collect rating for average
+        if post.get("rating"):
+            loc_data["avg_rating"].append(post.get("rating"))
+    
+    # Convert to list and calculate average ratings
+    locations_list = []
+    for loc_name, loc_data in location_map.items():
+        # Calculate average rating
+        ratings = loc_data["avg_rating"]
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0
+        
+        locations_list.append({
+            "location": loc_data["location"],
+            "location_name": loc_data["location_name"],
+            "uploads": loc_data["uploads"],
+            "images": loc_data["images"],
+            "thumbnails": loc_data["thumbnails"],
+            "images_data": loc_data["images_data"],
+            "map_link": loc_data["map_link"],
+            "distance_km": round(loc_data["min_distance"], 2),
+            "average_rating": round(avg_rating, 1),
+        })
+    
+    # Sort by uploads (highest first)
+    locations_list.sort(key=lambda x: x["uploads"], reverse=True)
+    
+    # Limit results
+    return locations_list[:limit]

@@ -16,6 +16,7 @@ import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { BlurView } from 'expo-blur';
+import * as Location from 'expo-location';
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 
 export const options = {
@@ -28,7 +29,8 @@ const API_URL = `${API_BASE_URL}/api`;
 
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 const SCREEN_HEIGHT = Dimensions.get("window").height;
-const MAX_CONCURRENT_VIDEOS = 2;
+const MAX_CONCURRENT_VIDEOS = 3;
+
 
 // Check if URL is a video file
 const isVideoFile = (url) => {
@@ -144,43 +146,132 @@ const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayo
 export default function HappeningPlaces() {
   const router = useRouter();
   const { token } = useAuth();
+  
+  // ============================================
+  // STATE DECLARATIONS
+  // ============================================
   const [topLocations, setTopLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFixedLine, setShowFixedLine] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
   
   // Video autoplay state
   const videoPositions = useRef(new Map());
   const [scrollY, setScrollY] = useState(0);
   const [playingVideos, setPlayingVideos] = useState([]);
 
-  useEffect(() => {
-    if (token) {
-      fetchTopLocations();
+  // ============================================
+  // HELPER FUNCTIONS
+  // ============================================
+
+  const fixUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `${API_BASE_URL}${cleanUrl}`;
+  };
+
+  const formatUploadCount = (count) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K`;
     }
-  }, [token]);
+    return count.toString();
+  };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (token) {
-        console.log(
-          '🔄 HappeningPlaces screen focused - refreshing locations'
-        );
-        fetchTopLocations();
+  // ============================================
+  // LOCATION FUNCTIONS
+  // ============================================
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setLocationError("Location permission required to see nearby places");
+        return false;
       }
-      // Pause videos when leaving screen
-      return () => {
-        setPlayingVideos([]);
-      };
-    }, [token])
-  );
+      return true;
+    } catch (error) {
+      console.log("Location permission error:", error);
+      setLocationError("Could not get location permission");
+      return false;
+    }
+  };
 
-  // Track video positions
+  const getCurrentLocation = async () => {
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) return null;
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      setUserLocation(coords);
+      setLocationError(null);
+      return coords;
+    } catch (error) {
+      console.log("Get location error:", error);
+      setLocationError("Could not get your location");
+      return null;
+    }
+  };
+
+  // ============================================
+  // DATA FETCHING
+  // ============================================
+
+  const fetchTopLocations = async (coords) => {
+  if (!token) {
+    console.warn('⚠️ No token available for fetching locations');
+    setLoading(false);
+    return;
+  }
+
+  try {
+    setLoading(true);
+    videoPositions.current.clear();
+    
+    let endpoint;
+    
+    if (coords || userLocation) {
+      const location = coords || userLocation;
+      endpoint = `${API_URL}/locations/nearby?lat=${location.latitude}&lng=${location.longitude}&radius_km=50&limit=20`;
+      console.log('🔍 Fetching nearby locations from:', endpoint);
+    } else {
+      endpoint = `${API_URL}/locations/top`;
+      console.log('🔍 Fetching top locations (no location) from:', endpoint);
+    }
+
+    const response = await axios.get(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const locations = Array.isArray(response.data) ? response.data : [];
+    setTopLocations(locations);
+    console.log(`✅ Loaded ${locations.length} locations`);
+  } catch (error) {
+    console.error('❌ Error fetching locations:', error.response?.data || error.message);
+    setTopLocations([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // ============================================
+  // VIDEO FUNCTIONS
+  // ============================================
+
   const handleVideoLayout = useCallback((videoId, event) => {
     const { y, height } = event.nativeEvent.layout;
     videoPositions.current.set(videoId, { top: y, height });
   }, []);
 
-  // Calculate visible videos
   const calculateVisibleVideos = useCallback((currentScrollY) => {
     const visibleTop = currentScrollY;
     const visibleBottom = currentScrollY + SCREEN_HEIGHT;
@@ -195,74 +286,6 @@ export default function HappeningPlaces() {
     setPlayingVideos(visible.slice(0, MAX_CONCURRENT_VIDEOS));
   }, []);
 
-  // Effect to calculate visible videos when scroll or locations change
-  useEffect(() => {
-    if (topLocations.length > 0) {
-      const timer = setTimeout(() => calculateVisibleVideos(scrollY), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [scrollY, topLocations, calculateVisibleVideos]);
-
-  const fetchTopLocations = async () => {
-    if (!token) {
-      console.warn('⚠️ No token available for fetching locations');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      videoPositions.current.clear(); // Clear video positions on refresh
-      const endpoint = `${API_URL}/locations/top`;
-      console.log('🔍 Fetching top locations from:', endpoint);
-
-      const response = await axios.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { limit: 10 },
-      });
-
-      const locations = Array.isArray(response.data)
-        ? response.data
-        : [];
-      setTopLocations(locations);
-    } catch (error) {
-      console.error(
-        '❌ Error fetching top locations:',
-        error.response?.data || error.message
-      );
-      setTopLocations([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatUploadCount = (count) => {
-    if (count >= 1000) {
-      return `${(count / 1000).toFixed(1)}K`;
-    }
-    return count.toString();
-  };
-
-  const handleLocationPress = (location) => {
-    setPlayingVideos([]); // Pause videos when navigating
-    const locationName =
-      location.location || location.location_name;
-    if (locationName) {
-      router.push({
-        pathname: '/location-details',
-        params: { locationName: encodeURIComponent(locationName) },
-      });
-    }
-  };
-
-  const fixUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
-    return `${API_BASE_URL}${cleanUrl}`;
-  };
-
-  // Handle scroll to show/hide fixed line and track scroll position
   const handleScroll = useCallback((event) => {
     const currentScrollY = event.nativeEvent.contentOffset.y;
     setScrollY(currentScrollY);
@@ -275,7 +298,21 @@ export default function HappeningPlaces() {
     }
   }, [calculateVisibleVideos]);
 
-  // Helper function to render image or video
+  const handleLocationPress = (location) => {
+    setPlayingVideos([]);
+    const locationName = location.location || location.location_name;
+    if (locationName) {
+      router.push({
+        pathname: '/location-details',
+        params: { locationName: encodeURIComponent(locationName) },
+      });
+    }
+  };
+
+  // ============================================
+  // RENDER MEDIA HELPER
+  // ============================================
+
   const renderMediaItem = (imageUrl, imgIndex, imagesData, thumbnails, locationKey) => {
     const fixedUrl = fixUrl(imageUrl);
     const imageData = imagesData[imgIndex] || {};
@@ -287,25 +324,23 @@ export default function HappeningPlaces() {
     const videoId = `${locationKey}-${imgIndex}`;
 
     if (isVideo) {
-      // For videos - use VideoThumbnail component
       if (!fixedUrl) return null;
       return (
-  <VideoThumbnail
-    key={imgIndex}
-    videoId={videoId}
-    videoUrl={fixedUrl}
-    thumbnailUrl={thumbnailUrl}
-    style={styles.gridImageContainer}
-    shouldPlay={playingVideos.includes(videoId)}
-    onLayout={(id, e) => {
-      e.target.measureInWindow((x, y, width, height) => {
-        videoPositions.current.set(id, { top: y, height });
-      });
-    }}
-  />
-);
+        <VideoThumbnail
+          key={imgIndex}
+          videoId={videoId}
+          videoUrl={fixedUrl}
+          thumbnailUrl={thumbnailUrl}
+          style={styles.gridImageContainer}
+          shouldPlay={playingVideos.includes(videoId)}
+          onLayout={(id, e) => {
+            e.target.measureInWindow((x, y, width, height) => {
+              videoPositions.current.set(id, { top: y, height });
+            });
+          }}
+        />
+      );
     } else {
-      // For images - use Image component
       if (!fixedUrl) return null;
       return (
         <View key={imgIndex} style={styles.gridImageContainer}>
@@ -324,69 +359,123 @@ export default function HappeningPlaces() {
     }
   };
 
-  if (loading) {
-  return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.container}>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Header */}
-          <View style={styles.headerContainer}>
-            <LinearGradient
-              colors={['#E94A37', '#F2CF68', '#1B7C82']}
-              locations={[0, 0.5, 1]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientHeader}
-            >
-              <Text style={styles.headerTitle}>Cofau</Text>
-            </LinearGradient>
-          </View>
-          
-          {/* Title Box */}
-          <View style={styles.titleBoxWrapper}>
-            <BlurView intensity={60} tint="light" style={styles.titleBox}>
-              <Text style={styles.titleMain}>Happening places</Text>
-              <View style={styles.subtitleRow}>
-                <Ionicons name="location" size={16} color="#E94A37" />
-                <Text style={styles.titleSub}>Most Visited Places Around you</Text>
-              </View>
-            </BlurView>
-          </View>
-          
-          {/* Skeleton Cards */}
-          <SkeletonLoader />
-        </ScrollView>
+  // ============================================
+  // EFFECTS
+  // ============================================
+
+  useEffect(() => {
+    if (token) {
+      getCurrentLocation().then((coords) => {
+        if (coords) {
+          fetchTopLocations(coords);
+        } else {
+          fetchTopLocations();
+        }
+      });
+    }
+  }, [token]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (token) {
+        console.log('🔄 HappeningPlaces screen focused - refreshing locations');
         
-        {/* Bottom Navigation */}
-        <View style={styles.navBar}>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-            <Ionicons name="home-outline" size={20} color="#000" />
-            <Text style={styles.navLabel}>Home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-            <Ionicons name="compass-outline" size={20} color="#000" />
-            <Text style={styles.navLabel}>Explore</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
-            <View style={styles.centerIconCircle}>
-              <Ionicons name="camera" size={22} color="#000" />
-            </View>
-            <Text style={styles.navLabel}>Top Posts</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-            <Ionicons name="location" size={20} color="#000" />
-            <Text style={styles.navLabelActive}>Happening</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-            <Ionicons name="person-outline" size={20} color="#000" />
-            <Text style={styles.navLabel}>Profile</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </>
+        if (userLocation) {
+          fetchTopLocations(userLocation);
+        } else {
+          getCurrentLocation().then((coords) => {
+            if (coords) {
+              fetchTopLocations(coords);
+            } else {
+              fetchTopLocations();
+            }
+          });
+        }
+      }
+      return () => {
+        setPlayingVideos([]);
+      };
+    }, [token, userLocation])
   );
-}
+
+  useEffect(() => {
+    if (topLocations.length > 0) {
+      const timer = setTimeout(() => calculateVisibleVideos(scrollY), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollY, topLocations, calculateVisibleVideos]);
+
+  // ============================================
+  // LOADING STATE
+  // ============================================
+
+  if (loading) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.container}>
+          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            {/* Header */}
+            <View style={styles.headerContainer}>
+              <LinearGradient
+                colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                locations={[0, 0.5, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientHeader}
+              >
+                <Text style={styles.headerTitle}>Cofau</Text>
+              </LinearGradient>
+            </View>
+            
+            {/* Title Box */}
+            <View style={styles.titleBoxWrapper}>
+              <BlurView intensity={60} tint="light" style={styles.titleBox}>
+                <Text style={styles.titleMain}>Happening places</Text>
+                <View style={styles.subtitleRow}>
+                  <Ionicons name="location" size={16} color="#E94A37" />
+                  <Text style={styles.titleSub}>Most Visited Places Around you</Text>
+                </View>
+              </BlurView>
+            </View>
+            
+            {/* Skeleton Cards */}
+            <SkeletonLoader />
+          </ScrollView>
+          
+          {/* Bottom Navigation */}
+          <View style={styles.navBar}>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
+              <Ionicons name="home-outline" size={20} color="#000" />
+              <Text style={styles.navLabel}>Home</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
+              <Ionicons name="compass-outline" size={20} color="#000" />
+              <Text style={styles.navLabel}>Explore</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
+              <View style={styles.centerIconCircle}>
+                <Ionicons name="camera" size={22} color="#000" />
+              </View>
+              <Text style={styles.navLabel}>Top Posts</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
+              <Ionicons name="location" size={20} color="#000" />
+              <Text style={styles.navLabelActive}>Happening</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
+              <Ionicons name="person-outline" size={20} color="#000" />
+              <Text style={styles.navLabel}>Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  // ============================================
+  // MAIN RENDER
+  // ============================================
 
   return (
     <>
@@ -430,6 +519,7 @@ export default function HappeningPlaces() {
               </View>
             </BlurView>
           </View>
+
           {/* Empty State */}
           {topLocations.length === 0 && (
             <View style={styles.emptyState}>
@@ -486,6 +576,7 @@ export default function HappeningPlaces() {
                       </Text>
                       <Text style={styles.uploadCount}>
                         ({formatUploadCount(location.uploads)} uploaded)
+                        {location.distance_km !== undefined && ` • ${location.distance_km} km away`}
                       </Text>
                     </View>
                   </View>
@@ -571,87 +662,55 @@ export default function HappeningPlaces() {
           })}
         </ScrollView>
 
-        {/* Bottom Navigation - Same as Explore */}
+        {/* Bottom Navigation */}
         <View style={styles.navBar}>
-          {/* Home */}
           <TouchableOpacity
             style={styles.navItem}
             onPress={() => router.push('/feed')}
           >
-            <Ionicons
-              name="home-outline"
-              size={20}
-              color="#000"
-            />
+            <Ionicons name="home-outline" size={20} color="#000" />
             <Text style={styles.navLabel}>Home</Text>
           </TouchableOpacity>
 
-          {/* Explore */}
           <TouchableOpacity
             style={styles.navItem}
             onPress={() => router.push('/explore')}
           >
-            <Ionicons
-              name="compass-outline"
-              size={20}
-              color="#000"
-            />
-            <Text style={styles.navLabel}>
-              Explore
-            </Text>
+            <Ionicons name="compass-outline" size={20} color="#000" />
+            <Text style={styles.navLabel}>Explore</Text>
           </TouchableOpacity>
 
-          {/* Center - Top Posts with Camera Icon */}
           <TouchableOpacity
             style={styles.centerNavItem}
             onPress={() => router.push('/leaderboard')}
           >
             <View style={styles.centerIconCircle}>
-              <Ionicons
-                name="camera"
-                size={22}
-                color="#000"
-              />
+              <Ionicons name="camera" size={22} color="#000" />
             </View>
-            <Text style={styles.navLabel}>
-              Top Posts
-            </Text>
+            <Text style={styles.navLabel}>Top Posts</Text>
           </TouchableOpacity>
 
-          {/* Happening */}
           <TouchableOpacity
             style={styles.navItem}
             onPress={() => router.push('/happening')}
           >
-            <Ionicons
-              name="location"
-              size={20}
-              color="#000"
-            />
-            <Text style={styles.navLabelActive}>
-              Happening
-            </Text>
+            <Ionicons name="location" size={20} color="#000" />
+            <Text style={styles.navLabelActive}>Happening</Text>
           </TouchableOpacity>
 
-          {/* Profile */}
           <TouchableOpacity
             style={styles.navItem}
             onPress={() => router.push('/profile')}
           >
-            <Ionicons
-              name="person-outline"
-              size={20}
-              color="#000"
-            />
-            <Text style={styles.navLabel}>
-              Profile
-            </Text>
+            <Ionicons name="person-outline" size={20} color="#000" />
+            <Text style={styles.navLabel}>Profile</Text>
           </TouchableOpacity>
         </View>
       </View>
     </>
   );
 }
+
 
 /* ================= STYLES ================= */
 

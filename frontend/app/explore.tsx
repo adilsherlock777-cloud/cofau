@@ -179,70 +179,84 @@ const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos }: any) 
 };
 
 // ======================================================
-// CUSTOM MAP MARKER COMPONENTS
+// CORRECTED MAP MARKERS - Copy these to your ExploreScreen.tsx
 // ======================================================
 
-const RestaurantMarker = memo(({ restaurant, onPress }: any) => (
-  <Marker
-    coordinate={{
-      latitude: restaurant.latitude,
-      longitude: restaurant.longitude,
-    }}
-    onPress={() => onPress(restaurant)}
-  >
-    <View style={styles.restaurantMarkerContainer}>
-      <View style={styles.restaurantMarkerBubble}>
-        {restaurant.profile_picture ? (
-          <Image
-            source={{ uri: fixUrl(restaurant.profile_picture) }}
-            style={styles.restaurantMarkerImage}
-            contentFit="cover"
-          />
-        ) : (
-          <View style={styles.restaurantMarkerPlaceholder}>
-            <Ionicons name="restaurant" size={16} color="#fff" />
+const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  return (
+    <Marker
+      coordinate={{
+        latitude: restaurant.latitude,
+        longitude: restaurant.longitude,
+      }}
+      onPress={() => onPress(restaurant)}
+      tracksViewChanges={!imageLoaded}
+    >
+      <View style={styles.restaurantMarkerContainer}>
+        <View style={styles.restaurantMarkerBubble}>
+          {restaurant.profile_picture ? (
+            <Image
+              source={{ uri: fixUrl(restaurant.profile_picture) }}
+              style={styles.restaurantMarkerImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              onLoad={() => setImageLoaded(true)}
+            />
+          ) : (
+            <View style={styles.restaurantMarkerPlaceholder}>
+              <Ionicons name="restaurant" size={16} color="#fff" />
+            </View>
+          )}
+          <View style={styles.reviewBadge}>
+            <Text style={styles.reviewBadgeText}>{restaurant.review_count}</Text>
           </View>
-        )}
-        <View style={styles.reviewBadge}>
-          <Text style={styles.reviewBadgeText}>{restaurant.review_count}</Text>
         </View>
+        <View style={styles.markerArrow} />
       </View>
-      <View style={styles.markerArrow} />
-    </View>
-  </Marker>
-));
+    </Marker>
+  );
+});
 
-const PostMarker = memo(({ post, onPress }: any) => (
-  <Marker
-    coordinate={{
-      latitude: post.latitude,
-      longitude: post.longitude,
-    }}
-    onPress={() => onPress(post)}
-  >
-    <View style={styles.postMarkerContainer}>
-      <View style={styles.postMarkerBubble}>
-        {post.thumbnail_url || post.media_url ? (
-          <Image
-            source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
-            style={styles.postMarkerImage}
-            contentFit="cover"
-          />
-        ) : (
-          <View style={styles.postMarkerPlaceholder}>
-            <Ionicons name="image" size={14} color="#fff" />
-          </View>
-        )}
-        {post.rating && (
-          <View style={styles.ratingBadge}>
-            <Text style={styles.ratingBadgeText}>{post.rating}</Text>
-          </View>
-        )}
+const PostMarker = memo(({ post, onPress }: any) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  return (
+    <Marker
+      coordinate={{
+        latitude: post.latitude,
+        longitude: post.longitude,
+      }}
+      onPress={() => onPress(post)}
+      tracksViewChanges={!imageLoaded}
+    >
+      <View style={styles.postMarkerContainer}>
+        <View style={styles.postMarkerBubble}>
+          {post.thumbnail_url || post.media_url ? (
+            <Image
+              source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+              style={styles.postMarkerImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              onLoad={() => setImageLoaded(true)}
+            />
+          ) : (
+            <View style={styles.postMarkerPlaceholder}>
+              <Ionicons name="image" size={20} color="#fff" />
+            </View>
+          )}
+          {post.rating && (
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingBadgeText}>{post.rating}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.postMarkerArrow} />
       </View>
-      <View style={styles.postMarkerArrow} />
-    </View>
-  </Marker>
-));
+    </Marker>
+  );
+});
 
 // ======================================================
 // MAP VIEW COMPONENT
@@ -276,33 +290,6 @@ const MapViewComponent = memo(({
     <View style={styles.mapContainer}>
       {/* Search Bar */}
       <View style={styles.mapSearchContainer}>
-        <View style={styles.mapSearchBox}>
-          <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.mapSearchInput}
-            placeholder="Search biryani, pizza, etc..."
-            placeholderTextColor="#999"
-            value={localSearchQuery}
-            onChangeText={setLocalSearchQuery}
-            returnKeyType="search"
-            onSubmitEditing={handleSearch}
-          />
-          {localSearchQuery.length > 0 && (
-            <TouchableOpacity onPress={handleClearSearch} style={styles.clearSearchBtn}>
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handleSearch} style={styles.mapSearchBtn}>
-            <LinearGradient
-              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.mapSearchBtnGradient}
-            >
-              <Text style={styles.mapSearchBtnText}>Search</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Map */}
@@ -578,10 +565,26 @@ export default function ExploreScreen() {
   const [selectedPost, setSelectedPost] = useState<any>(null);
   const [showRestaurantModal, setShowRestaurantModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [selectedQuickCategory, setSelectedQuickCategory] = useState<string | null>(null);
 
   const POSTS_PER_PAGE = 30;
   const CATEGORIES = ["All", "Vegetarian/Vegan", "Non vegetarian", "Biryani", "Desserts", "SeaFood", "Chinese", "Chaats", "Arabic", "BBQ/Tandoor", "Fast Food", "Tea/Coffee", "Salad", "Karnataka Style", "Hyderabadi Style", "Kerala Style", "Andhra Style", "North Indian Style", "South Indian Style", "Punjabi Style", "Bengali Style", "Odia Style", "Gujurati Style", "Rajasthani Style", "Mangaluru Style", "Goan", "Kashmiri", "Continental", "Italian", "Japanese", "Korean", "Mexican", "Persian", "Drinks / sodas"];
-
+  const QUICK_CATEGORIES = [
+  { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'pizza', name: 'Pizza', emoji: '🍕' },
+  { id: 'dosa', name: 'Dosa', emoji: '🥘' },
+  { id: 'cafe', name: 'Cafe', emoji: '☕' },
+  { id: 'chinese', name: 'Chinese', emoji: '🍜' },
+  { id: 'desserts', name: 'Desserts', emoji: '🍰' },
+  { id: 'fast-food', name: 'Fast Food', emoji: '🍔' },
+  { id: 'bbq', name: 'BBQ', emoji: '🍗' },
+  { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
+  { id: 'salad', name: 'Salad', emoji: '🥗' },
+  { id: 'drinks', name: 'Drinks', emoji: '🍹' },
+  { id: 'japanese', name: 'Japanese', emoji: '🍣' },
+  { id: 'italian', name: 'Italian', emoji: '🍝' },
+  { id: 'mexican', name: 'Mexican', emoji: '🌮' },
+];
   // ======================================================
   // LOCATION PERMISSION & FETCH
   // ======================================================
@@ -675,6 +678,30 @@ export default function ExploreScreen() {
     }
   };
 
+  const handleQuickCategoryPress = (category: any) => {
+  if (selectedQuickCategory === category.id) {
+    // Deselect if already selected
+    setSelectedQuickCategory(null);
+    if (activeTab === 'map') {
+      fetchMapPins(); // Fetch all pins
+    } else {
+      setAppliedCategories([]);
+      setSelectedCategories([]);
+      fetchPosts(true, []);
+    }
+  } else {
+    // Select and search
+    setSelectedQuickCategory(category.id);
+    if (activeTab === 'map') {
+      fetchMapPins(category.name); // Search by category name
+    } else {
+      setAppliedCategories([category.name]);
+      setSelectedCategories([category.name]);
+      fetchPosts(true, [category.name]);
+    }
+  }
+};
+
   const handleRestaurantPress = (restaurant: any) => {
     setSelectedRestaurant(restaurant);
     setShowRestaurantModal(true);
@@ -756,9 +783,19 @@ export default function ExploreScreen() {
   }, [posts, calculateVisibleVideos, scrollY]);
 
   useFocusEffect(useCallback(() => {
-    if (user && token && activeTab === 'users') fetchPosts(true);
-    return () => setPlayingVideos([]);
-  }, [user, token, activeTab]));
+  // Only fetch if no posts AND on users tab
+  if (user && token && activeTab === 'users' && posts.length === 0) {
+    fetchPosts(true);
+  }
+  return () => setPlayingVideos([]);
+}, [user, token, activeTab]));
+
+// Initial load - fetch posts once when component mounts
+useEffect(() => {
+  if (user && token && posts.length === 0) {
+    fetchPosts(true);
+  }
+}, [user, token]);
 
   const fetchPosts = async (refresh = false, categories?: string[], tab?: 'map' | 'users') => {
     try {
@@ -778,11 +815,6 @@ export default function ExploreScreen() {
       const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
       
       let postsData = res.data;
-      
-      // Filter out restaurant posts when on USERS tab
-      postsData = postsData.filter((post: any) => 
-        post.account_type !== 'restaurant' && !post.restaurant_id
-      );
       
       if (postsData.length === 0) { 
         setHasMore(false); 
@@ -840,56 +872,110 @@ export default function ExploreScreen() {
         </LinearGradient>
         
         {/* Only show search box for USERS tab */}
-        {activeTab === 'users' && (
           <View style={styles.searchBoxWrapper}>
             <View style={styles.searchBox}>
               <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
-              <TextInput style={styles.searchInput} placeholder="Search" placeholderTextColor="#999" value={searchQuery} onChangeText={setSearchQuery} returnKeyType="search" onSubmitEditing={performSearch} />
+              <TextInput style={styles.searchInput} placeholder="Search" placeholderTextColor="#999" value={searchQuery} onChangeText={setSearchQuery} returnKeyType="search" onSubmitEditing={() => {
+  if (activeTab === 'map') {
+    handleMapSearch(searchQuery);
+  } else {
+    performSearch();
+  }
+}} />
               <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
-                <LinearGradient colors={["#E94A37", "#F2CF68", "#1B7C82"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBorder}>
-                  <View style={styles.inlineFilterButton}>
-                    <Ionicons name="options-outline" size={18} color="#FFF" />
-                    <Text style={styles.inlineFilterText}>{appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}</Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+  <LinearGradient 
+    colors={["#E94A37", "#F2CF68", "#1B7C82"]} 
+    start={{ x: 0, y: 0 }} 
+    end={{ x: 1, y: 0 }} 
+    style={styles.categoryButtonGradient}
+  >
+    <Ionicons name="options-outline" size={18} color="#FFF" />
+    <Text style={styles.categoryButtonText}>
+      {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
+    </Text>
+  </LinearGradient>
+</TouchableOpacity>
             </View>
           </View>
-        )}
       </View>
 
-      {/* MAP | USERS TABS */}
-      <View style={[styles.tabContainer, activeTab === 'map' && styles.tabContainerMap]}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'map' && styles.activeTab]}
-          onPress={() => {
-            if (activeTab !== 'map') {
-              setActiveTab('map');
-              setPlayingVideos([]);
-            }
-          }}
-        >
-          <Ionicons name="map" size={16} color={activeTab === 'map' ? '#000' : '#999'} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabText, activeTab === 'map' && styles.activeTabText]}>MAP</Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
-          onPress={() => {
-            if (activeTab !== 'users') {
-              setActiveTab('users');
-              setPosts([]);
-              setPage(1);
-              setHasMore(true);
-              setLoading(true);
-              fetchPosts(true, [], 'users');
-            }
-          }}
-        >
-          <Ionicons name="people" size={16} color={activeTab === 'users' ? '#000' : '#999'} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>USERS</Text>
-        </TouchableOpacity>
-      </View>
+{/* QUICK CATEGORY CHIPS */}
+<ScrollView 
+  horizontal 
+  showsHorizontalScrollIndicator={false} 
+  style={styles.quickCategoryScroll}
+  contentContainerStyle={styles.quickCategoryContainer}
+>
+  {QUICK_CATEGORIES.map((category) => (
+    <TouchableOpacity
+      key={category.id}
+      style={[
+        styles.quickCategoryChip,
+        selectedQuickCategory === category.id && styles.quickCategoryChipActive
+      ]}
+      onPress={() => handleQuickCategoryPress(category)}
+      activeOpacity={0.7}
+    >
+      <Text style={styles.quickCategoryEmoji}>{category.emoji}</Text>
+      <Text style={[
+        styles.quickCategoryText,
+        selectedQuickCategory === category.id && styles.quickCategoryTextActive
+      ]}>
+        {category.name}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</ScrollView>
+
+      {/* MAP | USERS TOGGLE */}
+<View style={styles.toggleContainer}>
+  <View style={styles.toggleBackground}>
+    <TouchableOpacity 
+      style={[styles.toggleTab, activeTab === 'map' && styles.toggleTabActive]}
+      onPress={() => {
+        if (activeTab !== 'map') {
+          setActiveTab('map');
+          setPlayingVideos([]);
+        }
+      }}
+    >
+      <Ionicons 
+        name="location" 
+        size={16} 
+        color={activeTab === 'map' ? '#E94A37' : '#999'} 
+        style={{ marginRight: 6 }} 
+      />
+      <Text style={[styles.toggleTabText, activeTab === 'map' && styles.toggleTabTextActive]}>
+        Map
+      </Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity 
+  style={[styles.toggleTab, activeTab === 'users' && styles.toggleTabActive]}
+  onPress={() => {
+    if (activeTab !== 'users') {
+      setActiveTab('users');
+      // Only fetch if no posts cached
+      if (posts.length === 0) {
+        setLoading(true);
+        fetchPosts(true, [], 'users');
+      }
+    }
+  }}
+>
+      <Ionicons 
+        name="person" 
+        size={16} 
+        color={activeTab === 'users' ? '#E94A37' : '#999'} 
+        style={{ marginRight: 6 }} 
+      />
+      <Text style={[styles.toggleTabText, activeTab === 'users' && styles.toggleTabTextActive]}>
+        Users
+      </Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
       {/* USERS TAB: Category Tags */}
       {activeTab === 'users' && appliedCategories.length > 0 && (
@@ -900,7 +986,21 @@ export default function ExploreScreen() {
                 <Text style={styles.selectedTagText}>{cat}</Text><Ionicons name="close-circle" size={16} color="#666" />
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.clearAllButton} onPress={() => { setSelectedCategories([]); setAppliedCategories([]); fetchPostsWithCategories([]); }}><Text style={styles.clearAllText}>Clear All</Text></TouchableOpacity>
+            <TouchableOpacity 
+  style={styles.clearAllButton} 
+  onPress={() => { 
+    setSelectedCategories([]); 
+    setAppliedCategories([]); 
+    setSelectedQuickCategory(null); // Add this line
+    if (activeTab === 'map') {
+      fetchMapPins();
+    } else {
+      fetchPostsWithCategories([]); 
+    }
+  }}
+>
+  <Text style={styles.clearAllText}>Clear All</Text>
+</TouchableOpacity>
           </ScrollView>
         </View>
       )}
@@ -990,9 +1090,36 @@ export default function ExploreScreen() {
               );
             }} contentContainerStyle={styles.categoryList} />
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.doneButton} onPress={() => { setAppliedCategories(selectedCategories); setShowCategoryModal(false); setPosts([]); setPage(1); setHasMore(true); setPlayingVideos([]); fetchPostsWithCategories(selectedCategories); }}>
-                <Text style={styles.doneButtonText}>Apply Filters {selectedCategories.length > 0 ? `(${selectedCategories.length})` : ""}</Text>
-              </TouchableOpacity>
+             <TouchableOpacity 
+  style={styles.doneButton} 
+  onPress={() => { 
+    setAppliedCategories(selectedCategories); 
+    setShowCategoryModal(false); 
+    
+    if (activeTab === 'map') {
+      // For map tab - search with selected categories
+      if (selectedCategories.length > 0) {
+        fetchMapPins(selectedCategories.join(' '));
+      } else {
+        fetchMapPins();
+      }
+    } else {
+      // For users tab - existing logic
+      setPosts([]); 
+      setPage(1); 
+      setHasMore(true); 
+      setPlayingVideos([]); 
+      fetchPostsWithCategories(selectedCategories); 
+    }
+    
+    // Clear quick category selection when using modal
+    setSelectedQuickCategory(null);
+  }}
+>
+  <Text style={styles.doneButtonText}>
+    Apply Filters {selectedCategories.length > 0 ? `(${selectedCategories.length})` : ""}
+  </Text>
+</TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1265,6 +1392,20 @@ const styles = StyleSheet.create({
     borderTopColor: '#fff',
     marginTop: -2,
   },
+  categoryButtonGradient: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderRadius: 20,
+  paddingVertical: 8,
+  paddingHorizontal: 14,
+  gap: 6,
+},
+categoryButtonText: {
+  fontSize: 12,
+  color: '#FFF',
+  fontWeight: '600',
+  maxWidth: 80,
+},
 
   // ======================================================
   // POST MARKER STYLES
@@ -1273,13 +1414,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postMarkerBubble: {
-    width: 40,
-    height: 40,
+    width: 65,
+    height: 65,
     borderRadius: 8,
     backgroundColor: '#F2CF68',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1289,8 +1430,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   postMarkerImage: {
-    width: '100%',
-    height: '100%',
+    width: '120%',
+    height: '120%',
     borderRadius: 6,
   },
   postMarkerPlaceholder: {
@@ -1330,6 +1471,130 @@ const styles = StyleSheet.create({
     borderTopColor: '#fff',
     marginTop: -1,
   },
+
+  // ======================================================
+// SEARCH BAR STYLES (Outside Map)
+// ======================================================
+searchBarContainer: {
+  paddingHorizontal: 16,
+  marginTop: -20,
+  marginBottom: 12,
+  zIndex: 20,
+},
+searchBarBox: {
+  backgroundColor: '#fff',
+  borderRadius: 25,
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  flexDirection: 'row',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 4,
+},
+searchBarInput: {
+  flex: 1,
+  fontSize: 15,
+  color: '#333',
+  paddingVertical: 2,
+},
+searchBarBtn: {
+  borderRadius: 20,
+  overflow: 'hidden',
+  marginLeft: 8,
+},
+searchBarBtnGradient: {
+  paddingVertical: 10,
+  paddingHorizontal: 20,
+  borderRadius: 20,
+},
+searchBarBtnText: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '600',
+},
+
+// ======================================================
+// QUICK CATEGORY CHIPS STYLES
+// ======================================================
+quickCategoryScroll: {
+  maxHeight: 50,
+  marginBottom: 12,
+},
+quickCategoryContainer: {
+  paddingHorizontal: 16,
+  gap: 10,
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+quickCategoryChip: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FFF8F0',
+  borderRadius: 20,
+  paddingVertical: 8,
+  paddingHorizontal: 14,
+  borderWidth: 1,
+  borderColor: '#F2CF68',
+},
+quickCategoryChipActive: {
+  backgroundColor: '#E94A37',
+  borderColor: '#E94A37',
+},
+quickCategoryEmoji: {
+  fontSize: 18,
+  marginRight: 6,
+},
+quickCategoryText: {
+  fontSize: 13,
+  fontWeight: '500',
+  color: '#333',
+},
+quickCategoryTextActive: {
+  color: '#fff',
+},
+
+// ======================================================
+// TOGGLE TABS STYLES (Pill Style)
+// ======================================================
+toggleContainer: {
+  alignItems: 'center',
+  marginBottom: 12,
+  paddingHorizontal: 16,
+},
+toggleBackground: {
+  flexDirection: 'row',
+  backgroundColor: '#F5F5F5',
+  borderRadius: 25,
+  padding: 4,
+},
+toggleTab: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 10,
+  paddingHorizontal: 24,
+  borderRadius: 22,
+},
+toggleTabActive: {
+  backgroundColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.1,
+  shadowRadius: 2,
+  elevation: 2,
+},
+toggleTabText: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#999',
+},
+toggleTabTextActive: {
+  color: '#E94A37',
+  fontWeight: '600',
+},
 
   // ======================================================
   // DETAIL MODAL STYLES
