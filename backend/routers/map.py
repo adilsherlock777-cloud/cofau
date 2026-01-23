@@ -215,67 +215,40 @@ async def get_map_pins(
 ):
     """
     Get all map pins (restaurants + posts) within radius of user's location.
-    
-    Returns:
-    - restaurants: List of restaurants with coordinates and review counts
-    - posts: List of posts with coordinates
     """
     db = get_database()
-
-    # ✅ FIRST: Get posts that ALREADY have coordinates stored
-    posts_with_coords = await db.posts.find({
-        "latitude": {"$exists": True, "$ne": None},
-        "longitude": {"$exists": True, "$ne": None}
-    }).to_list(None)
-    
-    # ✅ SECOND: Get posts WITHOUT coordinates (for lazy geocoding)
-    posts_without_coords = await db.posts.find({
-        "map_link": {"$exists": True, "$ne": None, "$ne": ""},
-        "$or": [
-            {"latitude": {"$exists": False}},
-            {"latitude": None}
-        ]
-    }).limit(20).to_list(None)  # Limit to avoid too many API calls
-    
-    # Process posts with coords (fast - no API call)
-    for post in posts_with_coords:
-        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
-        if distance <= radius_km:
-            # Add to results...
-    
-    # Geocode posts without coords (slow - but limited)
-    for post in posts_without_coords:
-        coords = await get_coordinates_for_map_link(post.get("map_link"))
-        if coords:
-            # Store coordinates for next time
-            await db.posts.update_one(
-                {"_id": post["_id"]},
-                {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
-            )
-            # Check distance and add to results...
     
     restaurants_pins = []
     posts_pins = []
     
     # ==================== RESTAURANTS ====================
-    # Get all restaurants that have map_link
     restaurants = await db.restaurants.find({
-        "map_link": {"$exists": True, "$ne": None, "$ne": ""}
+        "$or": [
+            {"latitude": {"$exists": True, "$ne": None}},
+            {"map_link": {"$exists": True, "$ne": None, "$ne": ""}}
+        ]
     }).to_list(None)
     
     for restaurant in restaurants:
-        coords = await get_coordinates_for_map_link(restaurant.get("map_link"))
+        # Use stored coordinates first, otherwise geocode
+        if restaurant.get("latitude") and restaurant.get("longitude"):
+            coords = {
+                "latitude": restaurant["latitude"],
+                "longitude": restaurant["longitude"]
+            }
+        else:
+            coords = await get_coordinates_for_map_link(restaurant.get("map_link"))
+            # Store coordinates for next time
+            if coords and coords.get("latitude"):
+                await db.restaurants.update_one(
+                    {"_id": restaurant["_id"]},
+                    {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
+                )
         
         if coords and coords.get("latitude") and coords.get("longitude"):
-            # Calculate distance from user
-            distance = calculate_distance_km(
-                lat, lng,
-                coords["latitude"], coords["longitude"]
-            )
+            distance = calculate_distance_km(lat, lng, coords["latitude"], coords["longitude"])
             
-            # Only include if within radius
             if distance <= radius_km:
-                # Get review count (posts that tagged this restaurant)
                 review_count = await db.posts.count_documents({
                     "tagged_restaurant_id": str(restaurant["_id"])
                 })
@@ -294,27 +267,58 @@ async def get_map_pins(
                     "is_verified": restaurant.get("is_verified", False)
                 })
     
-    # ==================== USER POSTS ====================
-    # Get all posts that have map_link
-    posts = await db.posts.find({
-        "map_link": {"$exists": True, "$ne": None, "$ne": ""}
+    # ==================== POSTS ====================
+    # FIRST: Get posts that ALREADY have coordinates (fast)
+    posts_with_coords = await db.posts.find({
+        "latitude": {"$exists": True, "$ne": None},
+        "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
     
-    for post in posts:
+    for post in posts_with_coords:
+        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
+        if distance <= radius_km:
+            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+            posts_pins.append({
+                "id": str(post["_id"]),
+                "type": "post",
+                "user_id": post["user_id"],
+                "username": user.get("full_name", "Unknown") if user else "Unknown",
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "latitude": post["latitude"],
+                "longitude": post["longitude"],
+                "distance_km": round(distance, 2),
+                "media_url": post.get("media_url") or post.get("image_url"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": post.get("media_type", "image"),
+                "rating": post.get("rating"),
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "review_text": post.get("review_text", "")[:100],
+                "likes_count": post.get("likes_count", 0),
+                "map_link": post.get("map_link")
+            })
+    
+    # SECOND: Get posts WITHOUT coordinates (limited, for lazy geocoding)
+    posts_without_coords = await db.posts.find({
+        "map_link": {"$exists": True, "$ne": None, "$ne": ""},
+        "$or": [
+            {"latitude": {"$exists": False}},
+            {"latitude": None}
+        ]
+    }).limit(20).to_list(None)
+    
+    for post in posts_without_coords:
         coords = await get_coordinates_for_map_link(post.get("map_link"))
-        
         if coords and coords.get("latitude") and coords.get("longitude"):
-            # Calculate distance from user
-            distance = calculate_distance_km(
-                lat, lng,
-                coords["latitude"], coords["longitude"]
+            # Store coordinates for next time
+            await db.posts.update_one(
+                {"_id": post["_id"]},
+                {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
             )
             
-            # Only include if within radius
+            distance = calculate_distance_km(lat, lng, coords["latitude"], coords["longitude"])
             if distance <= radius_km:
-                # Get user info
                 user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-                
                 posts_pins.append({
                     "id": str(post["_id"]),
                     "type": "post",
@@ -330,7 +334,7 @@ async def get_map_pins(
                     "rating": post.get("rating"),
                     "location_name": post.get("location_name"),
                     "category": post.get("category"),
-                    "review_text": post.get("review_text", "")[:100],  # First 100 chars
+                    "review_text": post.get("review_text", "")[:100],
                     "likes_count": post.get("likes_count", 0),
                     "map_link": post.get("map_link")
                 })
