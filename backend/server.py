@@ -701,8 +701,6 @@ async def create_post(
 
     # Detect media type
     media_type = "video" if file_ext in ["mp4", "mov", "m4v"] else "image"
-    
-
 
     # ======================================================
     # VIDEO OPTIMIZATION - Transcode to 720p H.264 and generate thumbnail
@@ -717,7 +715,6 @@ async def create_post(
         
         try:
             # Always optimize video to 720p and generate thumbnail
-            # This converts iOS MOV to MP4 and re-encodes Android MP4 for compatibility
             video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
             
             # Update file_path and filename to point to the optimized file
@@ -734,8 +731,6 @@ async def create_post(
             print(f"❌ Video optimization failed: {str(e)}")
             import traceback
             traceback.print_exc()
-            # Don't continue with original file - fail the upload
-            # This ensures all videos are properly formatted
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
@@ -757,12 +752,10 @@ async def create_post(
         )
         
         if not moderation_response.allowed:
-            # ❌ BANNED CONTENT DETECTED - Delete file immediately (NOT uploaded to server)
             print(f"🚫 BANNED CONTENT DETECTED - User: {current_user.get('full_name', 'Unknown')} (ID: {current_user['_id']})")
             print(f"   Reason: {moderation_response.reason}")
             print(f"   File: {file_path}")
             
-            # Delete the file immediately - it will NOT be saved to server
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -771,72 +764,60 @@ async def create_post(
                     print(f"⚠️ File not found (may have been deleted already): {file_path}")
             except Exception as e:
                 print(f"❌ CRITICAL: Failed to delete banned file: {str(e)}")
-                # Try again
                 try:
                     os.remove(file_path)
                 except:
                     pass
             
-            # Save moderation result for tracking (even though file is deleted)
             if moderation_response.moderation_result:
                 await save_moderation_result(
                     db=db,
                     moderation_result=moderation_response.moderation_result,
-                    post_id=None  # No post created - upload was blocked
+                    post_id=None
                 )
             
-            # Block the upload - return error to user
             raise HTTPException(
                 status_code=400,
                 detail=f"Content not allowed: {moderation_response.reason or 'Banned content detected. Image contains nudity, alcohol, or other prohibited content.'}"
             )
         
-        # Save moderation result for allowed content
         if moderation_response.moderation_result:
-            # We'll save this after post creation with the post_id
             moderation_result = moderation_response.moderation_result
-    # Note: For videos, moderation is optional (Sightengine supports video but it's more expensive)
-    # You can add video moderation later if needed
 
-      # Clean map link
-clean_map_link = None
-if map_link:
-    map_link = map_link.strip()
-    if not map_link.startswith("http"):
-        map_link = "https://" + map_link
-    if "google.com/maps" in map_link or "goo.gl/maps" in map_link or "maps.app" in map_link:
-        clean_map_link = map_link
+    # ======================================================
+    # CLEAN MAP LINK
+    # ======================================================
+    clean_map_link = None
+    if map_link:
+        map_link = map_link.strip()
+        if not map_link.startswith("http"):
+            map_link = "https://" + map_link
+        if "google.com/maps" in map_link or "goo.gl/maps" in map_link or "maps.app" in map_link:
+            clean_map_link = map_link
 
-# ======================================================
-# EXTRACT COORDINATES FROM MAP LINK
-# ======================================================
-latitude = None
-longitude = None
+    # ======================================================
+    # EXTRACT COORDINATES FROM MAP LINK
+    # ======================================================
+    latitude = None
+    longitude = None
 
-if clean_map_link:
-    try:
-        from routers.map import get_coordinates_for_map_link
-        coords = await get_coordinates_for_map_link(clean_map_link)
-        if coords:
-            latitude = coords.get("latitude")
-            longitude = coords.get("longitude")
-            print(f"📍 Coordinates extracted: {latitude}, {longitude}")
-    except Exception as e:
-        print(f"⚠️ Error extracting coordinates: {e}")
+    if clean_map_link:
+        try:
+            from routers.map import get_coordinates_for_map_link
+            coords = await get_coordinates_for_map_link(clean_map_link)
+            if coords:
+                latitude = coords.get("latitude")
+                longitude = coords.get("longitude")
+                print(f"📍 Coordinates extracted: {latitude}, {longitude}")
+        except Exception as e:
+            print(f"⚠️ Error extracting coordinates: {e}")
 
-    # FIX MEDIA PATH - Calculate relative path from static directory
-    # file_path is absolute: /root/cofau/backend/static/uploads/filename.jpg
-    # We need: uploads/filename.jpg for URL: /api/static/uploads/filename.jpg
-    # IMPORTANT: Always use consistent format: /api/static/uploads/filename to match existing posts
-    
-    # Extract just the filename from the file_path (updated after transcoding if applicable)
+    # ======================================================
+    # FIX MEDIA PATH
+    # ======================================================
     final_filename = os.path.basename(file_path)
-    
-    # Always use the consistent format: /api/static/uploads/filename
-    # This ensures backward compatibility with existing posts
     media_url = f"/api/static/uploads/{final_filename}"
     
-    # Debug logging
     print(f"📁 File saved: {file_path}")
     print(f"📁 Filename: {final_filename}")
     print(f"📁 Media URL: {media_url}")
@@ -850,7 +831,6 @@ if clean_map_link:
     if location_name and location_name.strip():
         final_location_name = location_name.strip()
         
-        # Get existing locations for matching
         pipeline = [
             {"$match": {"location_name": {"$exists": True, "$ne": None, "$ne": ""}}},
             {"$group": {
@@ -866,15 +846,12 @@ if clean_map_link:
         existing_locations_cursor = db.posts.aggregate(pipeline)
         existing_locations = await existing_locations_cursor.to_list(None)
         
-        # Add normalized names
         for loc in existing_locations:
             loc['normalized_name'] = normalize_location_name(loc['location_name'])
         
-        # Check for similar existing location
         match = find_similar_location(final_location_name, existing_locations, threshold=80)
         
         if match:
-            # Use existing location name (canonical version)
             final_location_name = match['location_name']
             print(f"📍 Location matched: '{location_name.strip()}' → '{final_location_name}' ({match.get('similarity_score', 0)}% similar)")
         
@@ -883,50 +860,47 @@ if clean_map_link:
     # ======================================================
     # QUALITY SCORING - Analyze media quality for leaderboard
     # ======================================================
-    quality_score = 50.0  # Default score
+    quality_score = 50.0
     try:
         from utils.sightengine_quality import analyze_media_quality
-        
-        # Build full URL for Sightengine API
-        # Assuming backend is accessible at settings.BACKEND_URL or construct it
         backend_url = os.getenv("BACKEND_URL", "https://api.cofau.com")
         full_media_url = f"{backend_url}{media_url}"
-        
-        # Analyze quality asynchronously
         quality_score = await analyze_media_quality(full_media_url, media_type)
         print(f"✅ Quality score calculated: {quality_score} for {full_media_url}")
     except Exception as e:
         print(f"⚠️ Quality scoring failed, using default: {str(e)}")
         quality_score = 50.0
 
+    # ======================================================
+    # CREATE POST DOCUMENT
+    # ======================================================
     post_doc = {
         "user_id": str(current_user["_id"]),
         "media_url": media_url,
-        "image_url": media_url if media_type == "image" else None,  # Only set image_url for images
-        "thumbnail_url": thumbnail_url,  # Thumbnail for videos
+        "image_url": media_url if media_type == "image" else None,
+        "thumbnail_url": thumbnail_url,
         "media_type": media_type,
         "rating": rating,
         "review_text": review_text,
         "map_link": clean_map_link,
-        "latitude": latitude,      # ← Make sure this uses the variable
-        "longitude": longitude, 
-        "location_name": final_location_name, 
+        "latitude": latitude,
+        "longitude": longitude,
+        "location_name": final_location_name,
         "normalized_location_name": normalized_location,
-        "category": category.strip() if category else None,  # Add category
-        "tagged_restaurant_id": tagged_restaurant_id if tagged_restaurant_id else None,  # ← ADD THIS LINE
+        "category": category.strip() if category else None,
+        "tagged_restaurant_id": tagged_restaurant_id if tagged_restaurant_id else None,
         "likes_count": 0,
         "comments_count": 0,
         "popular_photos": [],
-        "quality_score": quality_score,  # Add quality score for leaderboard
-        "engagement_score": 0.0,  # Will be calculated dynamically
-        "combined_score": quality_score * 0.6,  # Initial combined score (60% quality, 0% engagement)
-        "created_at": datetime.utcnow(),  # Store as datetime object for proper MongoDB sorting (newest first)
+        "quality_score": quality_score,
+        "engagement_score": 0.0,
+        "combined_score": quality_score * 0.6,
+        "created_at": datetime.utcnow(),
     }
 
     result = await db.posts.insert_one(post_doc)
     post_id = str(result.inserted_id)
     
-    # Debug: Verify category was saved
     print(f"✅ Post created with ID: {post_id}, category: '{post_doc.get('category')}'")
 
     # Save moderation result with post_id
