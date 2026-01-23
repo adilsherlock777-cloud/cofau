@@ -286,7 +286,7 @@ async def get_map_pins(
                     "is_verified": restaurant.get("is_verified", False)
                 })
     
-  # ==================== POSTS ====================
+    # ==================== POSTS ====================
     posts = await db.posts.find({
         "map_link": {"$exists": True, "$ne": None, "$ne": ""}
     }).to_list(None)
@@ -331,6 +331,19 @@ async def get_map_pins(
                     "likes_count": post.get("likes_count", 0),
                     "map_link": post.get("map_link")
                 })
+    
+    # Sort by distance (nearest first)
+    restaurants_pins.sort(key=lambda x: x["distance_km"])
+    posts_pins.sort(key=lambda x: x["distance_km"])
+    
+    return {
+        "user_location": {"latitude": lat, "longitude": lng},
+        "radius_km": radius_km,
+        "restaurants": restaurants_pins,
+        "posts": posts_pins,
+        "total_restaurants": len(restaurants_pins),
+        "total_posts": len(posts_pins)
+    }
 
 
 @router.get("/search")
