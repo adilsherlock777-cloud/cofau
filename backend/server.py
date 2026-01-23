@@ -798,14 +798,31 @@ async def create_post(
     # Note: For videos, moderation is optional (Sightengine supports video but it's more expensive)
     # You can add video moderation later if needed
 
-    # Clean map link
-    clean_map_link = None
-    if map_link:
-        map_link = map_link.strip()
-        if not map_link.startswith("http"):
-            map_link = "https://" + map_link
-        if "google.com/maps" in map_link or "goo.gl/maps" in map_link:
-            clean_map_link = map_link
+      # Clean map link
+clean_map_link = None
+if map_link:
+    map_link = map_link.strip()
+    if not map_link.startswith("http"):
+        map_link = "https://" + map_link
+    if "google.com/maps" in map_link or "goo.gl/maps" in map_link or "maps.app" in map_link:
+        clean_map_link = map_link
+
+# ======================================================
+# EXTRACT COORDINATES FROM MAP LINK
+# ======================================================
+latitude = None
+longitude = None
+
+if clean_map_link:
+    try:
+        from routers.map import get_coordinates_for_map_link
+        coords = await get_coordinates_for_map_link(clean_map_link)
+        if coords:
+            latitude = coords.get("latitude")
+            longitude = coords.get("longitude")
+            print(f"📍 Coordinates extracted: {latitude}, {longitude}")
+    except Exception as e:
+        print(f"⚠️ Error extracting coordinates: {e}")
 
     # FIX MEDIA PATH - Calculate relative path from static directory
     # file_path is absolute: /root/cofau/backend/static/uploads/filename.jpg
@@ -891,8 +908,8 @@ async def create_post(
         "rating": rating,
         "review_text": review_text,
         "map_link": clean_map_link,
-        "latitude": None,      # ← ADD THIS
-        "longitude": None,
+        "latitude": latitude,      # ← Make sure this uses the variable
+        "longitude": longitude, 
         "location_name": final_location_name, 
         "normalized_location_name": normalized_location,
         "category": category.strip() if category else None,  # Add category

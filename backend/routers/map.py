@@ -672,7 +672,7 @@ async def expand_short_url(short_url: str) -> str:
     """Expand shortened Google Maps URLs (goo.gl, maps.app.goo.gl)"""
     try:
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.head(short_url, timeout=10)
+            response = await client.get(short_url, timeout=10)
             return str(response.url)
     except Exception as e:
         print(f"Error expanding URL {short_url}: {e}")
