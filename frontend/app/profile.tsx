@@ -308,12 +308,12 @@ export default function ProfileScreen() {
   const [reviewFilter, setReviewFilter] = useState<string | null>(null);
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
-  //const [otp, setOtp] = useState('');
-  //const [otpSent, setOtpSent] = useState(false);
-  //const [sendingOtp, setSendingOtp] = useState(false);
-  //const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  const [confirm, setConfirm] = useState<any>(null);
+  //const [confirm, setConfirm] = useState<any>(null);
   const [updatingPhone, setUpdatingPhone] = useState(false);
   const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false);
   const [reviewFilterCounts, setReviewFilterCounts] = useState({
@@ -1695,38 +1695,10 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
   return phone.startsWith('+') ? phone : `+${cleaned}`;
 };
 
-// Send OTP
 const handleSendOtp = async () => {
-  // Firebase disabled - auto verify for now
   Alert.alert('Info', 'Phone verification will be available soon');
   setOtpSent(true);
   setOtpVerified(true);
-
-  // if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
-  //   Alert.alert('Error', 'Please enter a valid phone number');
-  //   return;
-  // }
-
-  // setSendingOtp(true);
-  // try {
-  //   const formattedPhone = formatPhoneNumber(phoneNumber);
-  //   const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
-  //   setConfirm(confirmation);
-  //   setOtpSent(true);
-  //   setResendTimer(60);
-  //   Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
-  // } catch (error: any) {
-  //   console.error('Error sending OTP:', error);
-  //   let errorMessage = 'Failed to send OTP. Please try again.';
-  //   if (error.code === 'auth/invalid-phone-number') {
-  //     errorMessage = 'Invalid phone number format.';
-  //   } else if (error.code === 'auth/too-many-requests') {
-  //     errorMessage = 'Too many attempts. Please try again later.';
-  //   }
-  //   Alert.alert('Error', errorMessage);
-  // } finally {
-  //   setSendingOtp(false);
-  // }
 };
 
 const handleVerifyAndUpdatePhone = async () => {
@@ -1765,7 +1737,7 @@ const resetPhoneModal = () => {
   setPhoneNumber('');
   setOtp('');
   setOtpSent(false);
-  setConfirm(null);
+  //setConfirm(null);
   setResendTimer(0);
 };
 
@@ -2711,7 +2683,7 @@ const renderRestaurantProfile = () => {
           value={phoneNumber}
           onChangeText={setPhoneNumber}
           keyboardType="phone-pad"
-          editable={!otpSent}
+          editable={true}
         />
         {!otpSent && (
           <TouchableOpacity
@@ -2721,7 +2693,7 @@ const renderRestaurantProfile = () => {
               borderRadius: 10,
               justifyContent: 'center',
             }}
-            onPress={handleSendPhoneOtp}
+            onPress={handleSendOtp}
             disabled={sendingOtp}
           >
             {sendingOtp ? (
@@ -2747,7 +2719,7 @@ const renderRestaurantProfile = () => {
           />
           
           <TouchableOpacity
-            onPress={handleSendPhoneOtp}
+            onPress={handleSendOtp}
             disabled={resendTimer > 0}
             style={{ alignSelf: 'center', marginTop: 12 }}
           >
@@ -4077,7 +4049,7 @@ if (isRestaurantProfile) {
               borderRadius: 10,
               justifyContent: 'center',
             }}
-            onPress={handleSendPhoneOtp}
+            onPress={handleSendOtp}
             disabled={sendingOtp}
           >
             {sendingOtp ? (
@@ -4103,7 +4075,7 @@ if (isRestaurantProfile) {
           />
           
           <TouchableOpacity
-            onPress={handleSendPhoneOtp}
+            onPress={handleSendOtp}
             disabled={resendTimer > 0}
             style={{ alignSelf: 'center', marginTop: 12 }}
           >

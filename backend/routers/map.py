@@ -175,6 +175,10 @@ async def get_coordinates_for_map_link(map_link: str, db=None) -> dict:
     # Check cache first
     if map_link in geocode_cache:
         return geocode_cache[map_link]
+
+    # Expand short URLs first
+    if 'goo.gl' in map_link or 'maps.app' in map_link:
+        map_link = await expand_short_url(map_link)
     
     # Extract/parse coordinates
     result = extract_coordinates_from_map_link(map_link)
@@ -217,6 +221,38 @@ async def get_map_pins(
     - posts: List of posts with coordinates
     """
     db = get_database()
+
+    # ✅ FIRST: Get posts that ALREADY have coordinates stored
+    posts_with_coords = await db.posts.find({
+        "latitude": {"$exists": True, "$ne": None},
+        "longitude": {"$exists": True, "$ne": None}
+    }).to_list(None)
+    
+    # ✅ SECOND: Get posts WITHOUT coordinates (for lazy geocoding)
+    posts_without_coords = await db.posts.find({
+        "map_link": {"$exists": True, "$ne": None, "$ne": ""},
+        "$or": [
+            {"latitude": {"$exists": False}},
+            {"latitude": None}
+        ]
+    }).limit(20).to_list(None)  # Limit to avoid too many API calls
+    
+    # Process posts with coords (fast - no API call)
+    for post in posts_with_coords:
+        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
+        if distance <= radius_km:
+            # Add to results...
+    
+    # Geocode posts without coords (slow - but limited)
+    for post in posts_without_coords:
+        coords = await get_coordinates_for_map_link(post.get("map_link"))
+        if coords:
+            # Store coordinates for next time
+            await db.posts.update_one(
+                {"_id": post["_id"]},
+                {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
+            )
+            # Check distance and add to results...
     
     restaurants_pins = []
     posts_pins = []
@@ -627,3 +663,13 @@ async def batch_geocode_posts(
         "failed": failed,
         "message": f"Geocoded {success} out of {processed} posts"
     }
+
+async def expand_short_url(short_url: str) -> str:
+    """Expand shortened Google Maps URLs (goo.gl, maps.app.goo.gl)"""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.head(short_url, timeout=10)
+            return str(response.url)
+    except Exception as e:
+        print(f"Error expanding URL {short_url}: {e}")
+        return short_url
