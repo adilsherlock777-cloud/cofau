@@ -383,6 +383,8 @@ const handlePost = async () => {
       return;
 
     } else {
+      console.log('🏷️ Tagged restaurant object:', JSON.stringify(taggedRestaurant, null, 2));
+      console.log('🏷️ Tagged restaurant ID being sent:', taggedRestaurant?.id);
       const postData = {
         rating: numericRating,
         review_text: review.trim(),
@@ -555,6 +557,8 @@ const handleRestaurantSearchChange = (text: string) => {
 };
 
 const selectRestaurant = (restaurant: any) => {
+  console.log('🏷️ FULL restaurant object:', JSON.stringify(restaurant, null, 2));
+  console.log('🏷️ Restaurant ID being saved:', restaurant.id);
   setTaggedRestaurant(restaurant);
   setRestaurantSearchQuery('');
   setShowRestaurantSuggestions(false);

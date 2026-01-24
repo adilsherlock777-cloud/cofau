@@ -68,7 +68,11 @@ function FeedCard({
   onMuteToggle,
 }) {
   // Add debug log HERE - inside the function
-  console.log('🔍 FeedCard post data:', {
+
+  // Add this at the top of your FeedCard function to see what's coming through
+console.log('🏷️ Tagged restaurant:', post.id, post.tagged_restaurant);
+
+console.log('🔍 FeedCard post data:', {
     id: post.id,
     username: post.username,
     price: post.price,
@@ -693,7 +697,7 @@ postId={post.id}
 )}
 
 {/* Restaurant Tag Overlay */}
-{post.tagged_restaurant && (
+{post.tagged_restaurant && post.tagged_restaurant.restaurant_name ? (
   <TouchableOpacity
     style={styles.restaurantTagOverlay}
     onPress={() => router.push(`/restaurant/${post.tagged_restaurant.id}`)}
@@ -704,7 +708,7 @@ postId={post.id}
       {post.tagged_restaurant.restaurant_name}
     </Text>
   </TouchableOpacity>
-)}
+) : null}
 
 {/* RATING (Users) or PRICE (Restaurants) */}
 {post.rating != null && !post.price && (

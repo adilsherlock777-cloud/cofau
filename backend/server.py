@@ -596,6 +596,8 @@ async def create_post(
 ):
     db = get_database()
     
+    print(f"🏷️ Received tagged_restaurant_id: {tagged_restaurant_id}")
+    
     # Debug logging for category
     print(f"📝 Creating post with category: '{category}' (type: {type(category)})")
     if category:
