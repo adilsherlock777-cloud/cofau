@@ -43,7 +43,6 @@ export default function RestaurantSignupScreen() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  const [mapLink, setMapLink] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
 
@@ -293,7 +292,6 @@ const handleVerifyOtp = async () => {
   confirm_password: confirmPassword,
   phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,
   phone_verified: otpVerified,
-  map_link: mapLink.trim() || null,
   latitude: latitude,
   longitude: longitude,
 });
@@ -445,19 +443,7 @@ const handleVerifyOtp = async () => {
   )}
 </View>
 
-{/* Optional: Keep Google Maps Link as backup */}
-<View style={styles.inputContainer}>
-  <Ionicons name="link-outline" size={20} color="#999" style={styles.inputIcon} />
-  <TextInput
-    style={styles.input}
-    placeholder="Or paste Google Maps Link (optional)"
-    placeholderTextColor="#999"
-    value={mapLink}
-    onChangeText={setMapLink}
-    autoCapitalize="none"
-    autoCorrect={false}
-  />
-</View>
+
 
           {/* Phone Number Input with OTP */}
           <View style={styles.phoneContainer}>

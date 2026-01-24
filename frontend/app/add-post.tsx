@@ -66,42 +66,45 @@ export default function AddPostScreen() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
 
-  // Categories list
-  const CATEGORIES = [
-    'Vegetarian/Vegan',
-    'Non vegetarian',
-    'Biryani',
-    'Desserts',
-    'SeaFood',
-    'Chinese',
-    'Chaats',
-    'Arabic',
-    'BBQ/Tandoor',
-    'Fast Food',
-    'Tea/Coffee',
-    'Salad',
-    'Karnataka Style',
-    'Hyderabadi Style',
-    'Kerala Style',
-    'Andhra Style',
-    'North Indian Style',
-    'South Indian Style',
-    'Punjabi Style',
-    'Bengali Style',
-    'Odia Style',
-    'Gujurati Style',
-    'Rajasthani Style',
-    'Mangaluru Style',
-    'Goan',
-    'Kashmiri',
-    'Continental',
-    'Italian',
-    'Japanese',
-    'Korean',
-    'Mexican',
-    'Persian',
-    'Drinks / sodas',
-  ];
+// Categories list with emojis
+const CATEGORIES = [
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
+  { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'desserts', name: 'Desserts', emoji: '🍰' },
+  { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
+  { id: 'chinese', name: 'Chinese', emoji: '🍜' },
+  { id: 'chaats', name: 'Chaats', emoji: '🥘' },
+  { id: 'arabic', name: 'Arabic', emoji: '🧆' },
+  { id: 'bbq-tandoor', name: 'BBQ/Tandoor', emoji: '🍗' },
+  { id: 'fast-food', name: 'Fast Food', emoji: '🍔' },
+  { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
+  { id: 'salad', name: 'Salad', emoji: '🥗' },
+  { id: 'karnataka-style', name: 'Karnataka Style', emoji: '🍃' },
+  { id: 'hyderabadi-style', name: 'Hyderabadi Style', emoji: '🌶️' },
+  { id: 'kerala-style', name: 'Kerala Style', emoji: '🥥' },
+  { id: 'andhra-style', name: 'Andhra Style', emoji: '🔥' },
+  { id: 'north-indian-style', name: 'North Indian Style', emoji: '🫓' },
+  { id: 'south-indian-style', name: 'South Indian Style', emoji: '🥞' },
+  { id: 'punjabi-style', name: 'Punjabi Style', emoji: '🧈' },
+  { id: 'bengali-style', name: 'Bengali Style', emoji: '🐟' },
+  { id: 'odia-style', name: 'Odia Style', emoji: '🍚' },
+  { id: 'gujarati-style', name: 'Gujurati Style', emoji: '🥣' },
+  { id: 'rajasthani-style', name: 'Rajasthani Style', emoji: '🏜️' },
+  { id: 'mangaluru-style', name: 'Mangaluru Style', emoji: '🦀' },
+  { id: 'goan', name: 'Goan', emoji: '🏖️' },
+  { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
+  { id: 'continental', name: 'Continental', emoji: '🌍' },
+  { id: 'italian', name: 'Italian', emoji: '🍝' },
+  { id: 'japanese', name: 'Japanese', emoji: '🍣' },
+  { id: 'korean', name: 'Korean', emoji: '🍱' },
+  { id: 'mexican', name: 'Mexican', emoji: '🌮' },
+  { id: 'persian', name: 'Persian', emoji: '🫖' },
+  { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
+  { id: 'pizza', name: 'Pizza', emoji: '🍕' },
+  { id: 'dosa', name: 'Dosa', emoji: '🫕' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
+];
 
   // ------------------------------ MEDIA PICKERS ------------------------------
 
@@ -232,13 +235,13 @@ export default function AddPostScreen() {
 
   // ------------------------------ CATEGORY TOGGLE ------------------------------
 
-  const toggleCategory = (item: string) => {
-    setCategories(prev => 
-      prev.includes(item) 
-        ? prev.filter(c => c !== item)  // Remove if already selected
-        : [...prev, item]               // Add if not selected
-    );
-  };
+const toggleCategory = (itemName: string) => {
+  setCategories(prev => 
+    prev.includes(itemName) 
+      ? prev.filter(c => c !== itemName)
+      : [...prev, itemName]
+  );
+};
 
   // ------------------------------ POST SUBMISSION ------------------------------
 
@@ -975,71 +978,77 @@ return (
     />
 
     {/* Category Selection Modal - MULTI-SELECT */}
-    <Modal
-      visible={showCategoryModal}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowCategoryModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.categoryModal}>
-          <View style={styles.categoryModalHeader}>
-            <Text style={styles.categoryModalTitle}>Select Categories</Text>
-            <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-          
-          {/* Selected Count */}
-          {categories.length > 0 && (
-            <View style={styles.selectedCountContainer}>
-              <Text style={styles.selectedCountText}>
-                {categories.length} selected
+<Modal
+  visible={showCategoryModal}
+  transparent={true}
+  animationType="slide"
+  onRequestClose={() => setShowCategoryModal(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.categoryModal}>
+      <View style={styles.categoryModalHeader}>
+        <Text style={styles.categoryModalTitle}>Select Categories</Text>
+        <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+          <Ionicons name="close" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+      
+      {/* Selected Count */}
+      {categories.length > 0 && (
+        <View style={styles.selectedCountContainer}>
+          <Text style={styles.selectedCountText}>
+            {categories.length} selected
+          </Text>
+          <TouchableOpacity onPress={() => setCategories([])}>
+            <Text style={styles.clearAllText}>Clear All</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      <FlatList
+        data={CATEGORIES}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.categoryItem,
+              categories.includes(item.name) && styles.categoryItemSelected
+            ]}
+            onPress={() => toggleCategory(item.name)}
+          >
+            <View style={styles.categoryItemContent}>
+              <Text style={styles.categoryEmoji}>{item.emoji}</Text>
+              <Text style={[
+                styles.categoryItemText,
+                categories.includes(item.name) && styles.categoryItemTextSelected
+              ]}>
+                {item.name}
               </Text>
             </View>
-          )}
-          
-          <FlatList
-            data={CATEGORIES}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.categoryItem,
-                  categories.includes(item) && styles.categoryItemSelected
-                ]}
-                onPress={() => toggleCategory(item)}
-              >
-                <Text style={[
-                  styles.categoryItemText,
-                  categories.includes(item) && styles.categoryItemTextSelected
-                ]}>
-                  {item}
-                </Text>
-                {categories.includes(item) ? (
-                  <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
-                ) : (
-                  <Ionicons name="ellipse-outline" size={24} color="#CCC" />
-                )}
-              </TouchableOpacity>
+            {categories.includes(item.name) ? (
+              <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+            ) : (
+              <Ionicons name="ellipse-outline" size={24} color="#CCC" />
             )}
-            contentContainerStyle={styles.categoryList}
-          />
-          
-          {/* Done Button */}
-          <View style={styles.modalFooter}>
-            <TouchableOpacity 
-              style={styles.doneButton}
-              onPress={() => setShowCategoryModal(false)}
-            >
-              <Text style={styles.doneButtonText}>
-                Done {categories.length > 0 ? `(${categories.length})` : ''}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.categoryList}
+      />
+      
+      {/* Done Button */}
+      <View style={styles.modalFooter}>
+        <TouchableOpacity 
+          style={styles.doneButton}
+          onPress={() => setShowCategoryModal(false)}
+        >
+          <Text style={styles.doneButtonText}>
+            Done {categories.length > 0 ? `(${categories.length})` : ''}
+          </Text>
+        </TouchableOpacity>
       </View>
-    </Modal>
+    </View>
+  </View>
+</Modal>
   </View>
 );
 }
@@ -1414,6 +1423,22 @@ suggestionNewText: {
   fontStyle: 'italic',
 },
 
+// Add these styles
+categoryItemContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+},
+categoryEmoji: {
+  fontSize: 24,
+  marginRight: 12,
+},
+clearAllText: {
+  fontSize: 14,
+  color: '#E94A37',
+  fontWeight: '600',
+},
+
   // Category Modal
   modalOverlay: {
     flex: 1,
@@ -1448,10 +1473,13 @@ mapsButtonTextDisabled: {
   color: '#CCC',
 },
   selectedCountContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#F0F9F9',
-  },
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  backgroundColor: '#F0F9F9',
+},
   selectedCountText: {
     fontSize: 14,
     color: '#4ECDC4',

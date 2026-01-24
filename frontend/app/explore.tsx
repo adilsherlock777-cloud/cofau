@@ -206,12 +206,13 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
             />
           ) : (
             <View style={styles.restaurantMarkerPlaceholder}>
-              <Ionicons name="restaurant" size={16} color="#fff" />
+              <Ionicons name="restaurant" size={28} color="#fff" />
             </View>
           )}
-          <View style={styles.reviewBadge}>
-            <Text style={styles.reviewBadgeText}>{restaurant.review_count}</Text>
-          </View>
+        </View>
+        <View style={styles.reviewsBadge}>
+          <Ionicons name="chatbubble" size={10} color="#fff" />
+          <Text style={styles.reviewsBadgeText}>{restaurant.review_count || 0}</Text>
         </View>
         <View style={styles.markerArrow} />
       </View>
@@ -243,24 +244,21 @@ const PostMarker = memo(({ post, onPress }: any) => {
             />
           ) : (
             <View style={styles.postMarkerPlaceholder}>
-              <Ionicons name="image" size={20} color="#fff" />
-            </View>
-          )}
-          {post.rating && (
-            <View style={styles.ratingBadge}>
-              <Text style={styles.ratingBadgeText}>{post.rating}</Text>
+              <Ionicons name="image" size={24} color="#fff" />
             </View>
           )}
         </View>
+        {post.rating && (
+          <View style={styles.ratingBadge}>
+            <Ionicons name="star" size={10} color="#FFD700" />
+            <Text style={styles.ratingBadgeText}>{post.rating}</Text>
+          </View>
+        )}
         <View style={styles.postMarkerArrow} />
       </View>
     </Marker>
   );
 });
-
-// ======================================================
-// MAP VIEW COMPONENT
-// ======================================================
 
 const MapViewComponent = memo(({ 
   userLocation, 
@@ -272,26 +270,12 @@ const MapViewComponent = memo(({
   onSearch,
   isLoading,
   mapRef,
+  filterType,
+  onFilterChange,
 }: any) => {
-  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery || "");
-
-  const handleSearch = () => {
-    if (localSearchQuery.trim()) {
-      onSearch(localSearchQuery.trim());
-    }
-  };
-
-  const handleClearSearch = () => {
-    setLocalSearchQuery("");
-    onSearch("");
-  };
 
   return (
     <View style={styles.mapContainer}>
-      {/* Search Bar */}
-      <View style={styles.mapSearchContainer}>
-      </View>
-
       {/* Map */}
       {userLocation ? (
         <MapView
@@ -308,8 +292,8 @@ const MapViewComponent = memo(({
           showsMyLocationButton={true}
           showsCompass={true}
         >
-          {/* Restaurant Markers */}
-          {restaurants.map((restaurant: any) => (
+          {/* Restaurant Markers - only show when filterType is 'restaurants' */}
+          {filterType === 'restaurants' && restaurants.map((restaurant: any) => (
             <RestaurantMarker
               key={`restaurant-${restaurant.id}`}
               restaurant={restaurant}
@@ -317,8 +301,8 @@ const MapViewComponent = memo(({
             />
           ))}
 
-          {/* Post Markers */}
-          {posts.map((post: any) => (
+          {/* Post Markers - only show when filterType is 'posts' */}
+          {filterType === 'posts' && posts.map((post: any) => (
             <PostMarker
               key={`post-${post.id}`}
               post={post}
@@ -333,19 +317,77 @@ const MapViewComponent = memo(({
         </View>
       )}
 
+      {/* FLOATING TOGGLE - Top Right Inside Map */}
+      <View style={styles.mapFloatingToggle}>
+        <TouchableOpacity
+          style={[
+            styles.mapToggleOption,
+            filterType === 'posts' && styles.mapToggleOptionActive
+          ]}
+          onPress={() => onFilterChange('posts')}
+        >
+          <Text style={[
+            styles.mapToggleText,
+            filterType === 'posts' && styles.mapToggleTextActive
+          ]}>Posts</Text>
+        </TouchableOpacity>
+
+        <View style={styles.mapToggleDivider} />
+
+        <TouchableOpacity
+          style={[
+            styles.mapToggleOption,
+            filterType === 'restaurants' && styles.mapToggleOptionActive
+          ]}
+          onPress={() => onFilterChange('restaurants')}
+        >
+          <Text style={[
+            styles.mapToggleText,
+            filterType === 'restaurants' && styles.mapToggleTextActive
+          ]}>Restaurants</Text>
+        </TouchableOpacity>
+
+        <View style={styles.mapToggleDivider} />
+
+        <TouchableOpacity
+          style={[
+            styles.mapToggleOption,
+            filterType === 'squad' && styles.mapToggleOptionActive
+          ]}
+          onPress={() => onFilterChange('squad')}
+        >
+          <Text style={[
+            styles.mapToggleText,
+            filterType === 'squad' && styles.mapToggleTextActive
+          ]}>Squad</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Loading Overlay */}
       {isLoading && (
         <View style={styles.mapLoadingOverlay}>
-          <ActivityIndicator size="small" color="#4dd0e1" />
+          <ActivityIndicator size="small" color="#E94A37" />
         </View>
       )}
 
       {/* Results Count */}
-      {(restaurants.length > 0 || posts.length > 0) && (
+      {filterType !== 'squad' && (
         <View style={styles.resultsCountContainer}>
           <Text style={styles.resultsCountText}>
-            {restaurants.length} restaurants • {posts.length} posts nearby
+            {filterType === 'posts' 
+              ? `${posts.length} posts nearby`
+              : `${restaurants.length} restaurants nearby`
+            }
           </Text>
+        </View>
+      )}
+
+      {/* Squad Coming Soon Overlay */}
+      {filterType === 'squad' && (
+        <View style={styles.squadOverlay}>
+          <Ionicons name="people" size={48} color="#E94A37" />
+          <Text style={styles.squadOverlayTitle}>Squad Feature</Text>
+          <Text style={styles.squadOverlayText}>Coming Soon!</Text>
         </View>
       )}
     </View>
@@ -566,25 +608,72 @@ export default function ExploreScreen() {
   const [showRestaurantModal, setShowRestaurantModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedQuickCategory, setSelectedQuickCategory] = useState<string | null>(null);
+  const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'squad'>('posts');
 
   const POSTS_PER_PAGE = 30;
-  const CATEGORIES = ["All", "Vegetarian/Vegan", "Non vegetarian", "Biryani", "Desserts", "SeaFood", "Chinese", "Chaats", "Arabic", "BBQ/Tandoor", "Fast Food", "Tea/Coffee", "Salad", "Karnataka Style", "Hyderabadi Style", "Kerala Style", "Andhra Style", "North Indian Style", "South Indian Style", "Punjabi Style", "Bengali Style", "Odia Style", "Gujurati Style", "Rajasthani Style", "Mangaluru Style", "Goan", "Kashmiri", "Continental", "Italian", "Japanese", "Korean", "Mexican", "Persian", "Drinks / sodas"];
-  const QUICK_CATEGORIES = [
+  const CATEGORIES = [
+  { id: 'all', name: 'All', emoji: '🍽️' },
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
-  { id: 'pizza', name: 'Pizza', emoji: '🍕' },
-  { id: 'dosa', name: 'Dosa', emoji: '🥘' },
-  { id: 'cafe', name: 'Cafe', emoji: '☕' },
-  { id: 'chinese', name: 'Chinese', emoji: '🍜' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
-  { id: 'fast-food', name: 'Fast Food', emoji: '🍔' },
-  { id: 'bbq', name: 'BBQ', emoji: '🍗' },
   { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
+  { id: 'chinese', name: 'Chinese', emoji: '🍜' },
+  { id: 'chaats', name: 'Chaats', emoji: '🥘' },
+  { id: 'arabic', name: 'Arabic', emoji: '🧆' },
+  { id: 'bbq-tandoor', name: 'BBQ/Tandoor', emoji: '🍗' },
+  { id: 'fast-food', name: 'Fast Food', emoji: '🍔' },
+  { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
   { id: 'salad', name: 'Salad', emoji: '🥗' },
-  { id: 'drinks', name: 'Drinks', emoji: '🍹' },
-  { id: 'japanese', name: 'Japanese', emoji: '🍣' },
+  { id: 'karnataka-style', name: 'Karnataka Style', emoji: '🍃' },
+  { id: 'hyderabadi-style', name: 'Hyderabadi Style', emoji: '🌶️' },
+  { id: 'kerala-style', name: 'Kerala Style', emoji: '🥥' },
+  { id: 'andhra-style', name: 'Andhra Style', emoji: '🔥' },
+  { id: 'north-indian-style', name: 'North Indian Style', emoji: '🫓' },
+  { id: 'south-indian-style', name: 'South Indian Style', emoji: '🥞' },
+  { id: 'punjabi-style', name: 'Punjabi Style', emoji: '🧈' },
+  { id: 'bengali-style', name: 'Bengali Style', emoji: '🐟' },
+  { id: 'odia-style', name: 'Odia Style', emoji: '🍚' },
+  { id: 'gujarati-style', name: 'Gujurati Style', emoji: '🥣' },
+  { id: 'rajasthani-style', name: 'Rajasthani Style', emoji: '🏜️' },
+  { id: 'mangaluru-style', name: 'Mangaluru Style', emoji: '🦀' },
+  { id: 'goan', name: 'Goan', emoji: '🏖️' },
+  { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
+  { id: 'continental', name: 'Continental', emoji: '🌍' },
   { id: 'italian', name: 'Italian', emoji: '🍝' },
+  { id: 'japanese', name: 'Japanese', emoji: '🍣' },
+  { id: 'korean', name: 'Korean', emoji: '🍱' },
   { id: 'mexican', name: 'Mexican', emoji: '🌮' },
+  { id: 'persian', name: 'Persian', emoji: '🫖' },
+  { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
+  { id: 'pizza', name: 'Pizza', emoji: '🍕' },
+  { id: 'dosa', name: 'Dosa', emoji: '🫕' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
 ];
+
+// Show only popular categories in quick chips (names must match CATEGORIES exactly)
+const QUICK_CATEGORIES = [
+  { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
+  { id: 'desserts', name: 'Desserts', emoji: '🍰' },
+  { id: 'arabic', name: 'Arabic', emoji: '🧆' },
+  { id: 'karnataka-style', name: 'Karnataka Style', emoji: '🍃' },
+  { id: 'north-indian-style', name: 'North Indian Style', emoji: '🫓' },
+  { id: 'south-indian-style', name: 'South Indian Style', emoji: '🥞' },
+  { id: 'hyderabadi-style', name: 'Hyderabadi Style', emoji: '🌶️' },
+  { id: 'kerala-style', name: 'Kerala Style', emoji: '🥥' },
+  { id: 'andhra-style', name: 'Andhra Style', emoji: '🔥' },
+  { id: 'punjabi-style', name: 'Punjabi Style', emoji: '🧈' },
+  { id: 'bengali-style', name: 'Bengali Style', emoji: '🐟' },
+  { id: 'odia-style', name: 'Odia Style', emoji: '🍚' },
+  { id: 'gujarati-style', name: 'Gujurati Style', emoji: '🥣' },
+  { id: 'rajasthani-style', name: 'Rajasthani Style', emoji: '🏜️' },
+  { id: 'mangaluru-style', name: 'Mangaluru Style', emoji: '🦀' },
+  { id: 'goan', name: 'Goan', emoji: '🏖️' },
+  { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
+];
+
   // ======================================================
   // LOCATION PERMISSION & FETCH
   // ======================================================
@@ -678,12 +767,12 @@ export default function ExploreScreen() {
     }
   };
 
-  const handleQuickCategoryPress = (category: any) => {
+ const handleQuickCategoryPress = (category: any) => {
   if (selectedQuickCategory === category.id) {
     // Deselect if already selected
     setSelectedQuickCategory(null);
     if (activeTab === 'map') {
-      fetchMapPins(); // Fetch all pins
+      fetchMapPins();
     } else {
       setAppliedCategories([]);
       setSelectedCategories([]);
@@ -693,7 +782,7 @@ export default function ExploreScreen() {
     // Select and search
     setSelectedQuickCategory(category.id);
     if (activeTab === 'map') {
-      fetchMapPins(category.name); // Search by category name
+      fetchMapPins(category.name);
     } else {
       setAppliedCategories([category.name]);
       setSelectedCategories([category.name]);
@@ -855,7 +944,13 @@ useEffect(() => {
 
   const fetchPostsWithCategories = (categories: string[]) => fetchPosts(true, categories);
   const performSearch = () => { if (searchQuery.trim()) router.push({ pathname: "/search-results", params: { query: searchQuery.trim() } }); };
-  const toggleCategory = (item: string) => { if (item === "All") setSelectedCategories([]); else setSelectedCategories((prev) => prev.includes(item) ? prev.filter((c) => c !== item) : [...prev, item]); };
+  const toggleCategory = (itemName: string) => { 
+  setSelectedCategories((prev) => 
+    prev.includes(itemName) 
+      ? prev.filter((c) => c !== itemName) 
+      : [...prev, itemName]
+  ); 
+};
   const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch (err) { console.log("Like error:", err); } };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
   const handlePostPressGrid = (postId: string) => { setPlayingVideos([]); router.push(`/post-details/${postId}`); };
@@ -1007,19 +1102,21 @@ useEffect(() => {
 
       {/* CONTENT AREA */}
       {activeTab === 'map' ? (
-        // MAP VIEW
-        <MapViewComponent
-          userLocation={userLocation}
-          restaurants={mapRestaurants}
-          posts={mapPosts}
-          onRestaurantPress={handleRestaurantPress}
-          onPostPress={handlePostPress}
-          searchQuery={mapSearchQuery}
-          onSearch={handleMapSearch}
-          isLoading={mapLoading}
-          mapRef={mapRef}
-        />
-      ) : (
+  // MAP VIEW
+  <MapViewComponent
+    userLocation={userLocation}
+    restaurants={mapRestaurants}
+    posts={mapPosts}
+    onRestaurantPress={handleRestaurantPress}
+    onPostPress={handlePostPress}
+    searchQuery={mapSearchQuery}
+    onSearch={handleMapSearch}
+    isLoading={mapLoading}
+    mapRef={mapRef}
+    filterType={mapFilterType}
+    onFilterChange={setMapFilterType}
+  />
+) : (
         // USERS GRID VIEW
         <>
           {loading && posts.length === 0 ? (
@@ -1080,15 +1177,48 @@ useEffect(() => {
               <TouchableOpacity onPress={() => { setSelectedCategories(appliedCategories); setShowCategoryModal(false); }}><Ionicons name="close" size={24} color="#333" /></TouchableOpacity>
             </View>
             {selectedCategories.length > 0 && <View style={styles.selectedCountContainer}><Text style={styles.selectedCountText}>{selectedCategories.length} categories selected</Text><TouchableOpacity onPress={() => setSelectedCategories([])}><Text style={styles.clearAllModalText}>Clear All</Text></TouchableOpacity></View>}
-            <FlatList data={CATEGORIES} keyExtractor={(item) => item} renderItem={({ item }) => {
-              const isSelected = item === "All" ? selectedCategories.length === 0 : selectedCategories.includes(item);
-              return (
-                <TouchableOpacity style={[styles.categoryItem, isSelected && styles.categoryItemSelected]} onPress={() => { if (item === "All") { setSelectedCategories([]); setShowCategoryModal(false); setAppliedCategories([]); fetchPostsWithCategories([]); } else toggleCategory(item); }}>
-                  <View style={styles.categoryItemContent}><Ionicons name={getCategoryIcon(item)} size={24} color={isSelected ? "#fff" : "#666"} /><Text style={[styles.categoryItemText, isSelected && styles.categoryItemTextSelected]}>{item}</Text></View>
-                  {isSelected ? <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" /> : <Ionicons name="ellipse-outline" size={24} color="#CCC" />}
-                </TouchableOpacity>
-              );
-            }} contentContainerStyle={styles.categoryList} />
+            <FlatList 
+  data={CATEGORIES} 
+  keyExtractor={(item) => item.id} 
+  renderItem={({ item }) => {
+    const isSelected = item.name === "All" 
+      ? selectedCategories.length === 0 
+      : selectedCategories.includes(item.name);
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.categoryItem, isSelected && styles.categoryItemSelected]} 
+        onPress={() => { 
+          if (item.name === "All") { 
+            setSelectedCategories([]); 
+            setShowCategoryModal(false); 
+            setAppliedCategories([]); 
+            setSelectedQuickCategory(null);
+            if (activeTab === 'map') {
+              fetchMapPins();
+            } else {
+              fetchPostsWithCategories([]); 
+            }
+          } else {
+            toggleCategory(item.name); 
+          }
+        }}
+      >
+        <View style={styles.categoryItemContent}>
+          <Text style={styles.categoryEmoji}>{item.emoji}</Text>
+          <Text style={[styles.categoryItemText, isSelected && styles.categoryItemTextSelected]}>
+            {item.name}
+          </Text>
+        </View>
+        {isSelected ? (
+          <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+        ) : (
+          <Ionicons name="ellipse-outline" size={24} color="#CCC" />
+        )}
+      </TouchableOpacity>
+    );
+  }} 
+            contentContainerStyle={styles.categoryList} />
             <View style={styles.modalFooter}>
              <TouchableOpacity 
   style={styles.doneButton} 
@@ -1144,10 +1274,7 @@ useEffect(() => {
   );
 }
 
-function getCategoryIcon(category: string): any {
-  const icons: { [key: string]: string } = { All: "grid-outline", "Vegetarian/Vegan": "leaf-outline", "Non vegetarian": "restaurant-outline", Biryani: "restaurant", SeaFood: "fish-outline", Chinese: "restaurant-outline", Chats: "cafe-outline", Desserts: "ice-cream-outline", Arabic: "restaurant-outline", "BBQ/Tandoor": "flame-outline", "Fast Food": "fast-food-outline", "Tea/Coffee": "cafe-outline", Salad: "nutrition-outline", Continental: "globe-outline", Italian: "pizza-outline", "Drinks / sodas": "wine-outline" };
-  return icons[category] || "location-outline";
-}
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
@@ -1328,70 +1455,69 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ======================================================
-  // RESTAURANT MARKER STYLES
-  // ======================================================
-  restaurantMarkerContainer: {
-    alignItems: 'center',
-  },
-  restaurantMarkerBubble: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E94A37',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  restaurantMarkerImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 22,
-  },
-  restaurantMarkerPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E94A37',
-  },
-  reviewBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#1B7C82',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  reviewBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  markerArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 10,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#fff',
-    marginTop: -2,
-  },
+ // ======================================================
+// RESTAURANT MARKER STYLES - UPDATED
+// ======================================================
+restaurantMarkerContainer: {
+  alignItems: 'center',
+},
+restaurantMarkerBubble: {
+  width: 80,  // Increased from 50
+  height: 80, // Increased from 50
+  borderRadius: 40,
+  backgroundColor: '#E94A37',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 5,
+  overflow: 'hidden',
+},
+restaurantMarkerImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 37,
+},
+restaurantMarkerPlaceholder: {
+  width: '100%',
+  height: '100%',
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#E94A37',
+},
+reviewsBadge: {
+  position: 'absolute',
+  bottom: 8,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#E94A37',
+  borderRadius: 10,
+  paddingVertical: 3,
+  paddingHorizontal: 6,
+  gap: 3,
+  borderWidth: 1.5,
+  borderColor: '#fff',
+},
+reviewsBadgeText: {
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: 'bold',
+},
+markerArrow: {
+  width: 0,
+  height: 0,
+  borderLeftWidth: 8,
+  borderRightWidth: 8,
+  borderTopWidth: 10,
+  borderLeftColor: 'transparent',
+  borderRightColor: 'transparent',
+  borderTopColor: '#fff',
+  marginTop: -2,
+},
   categoryButtonGradient: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -1407,70 +1533,129 @@ categoryButtonText: {
   maxWidth: 80,
 },
 
-  // ======================================================
-  // POST MARKER STYLES
-  // ======================================================
-  postMarkerContainer: {
-    alignItems: 'center',
-  },
-  postMarkerBubble: {
-    width: 65,
-    height: 65,
-    borderRadius: 8,
-    backgroundColor: '#F2CF68',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  postMarkerImage: {
-    width: '120%',
-    height: '120%',
-    borderRadius: 6,
-  },
-  postMarkerPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F2CF68',
-  },
-  ratingBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    backgroundColor: '#E94A37',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  ratingBadgeText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
-  postMarkerArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#fff',
-    marginTop: -1,
-  },
+// ======================================================
+// POST MARKER STYLES - UPDATED
+// ======================================================
+postMarkerContainer: {
+  alignItems: 'center',
+},
+postMarkerBubble: {
+  width: 80,  // Increased from 65
+  height: 80, // Increased from 65
+  borderRadius: 10,
+  backgroundColor: '#F2CF68',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 5,
+  overflow: 'hidden',
+},
+postMarkerImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 8,
+},
+postMarkerPlaceholder: {
+  width: '100%',
+  height: '100%',
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#F2CF68',
+},
+ratingBadge: {
+  position: 'absolute',
+  bottom: 8,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#E94A37',
+  borderRadius: 10,
+  paddingVertical: 3,
+  paddingHorizontal: 6,
+  gap: 2,
+  borderWidth: 1.5,
+  borderColor: '#fff',
+},
+ratingBadgeText: {
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: 'bold',
+},
+postMarkerArrow: {
+  width: 0,
+  height: 0,
+  borderLeftWidth: 8,
+  borderRightWidth: 8,
+  borderTopWidth: 10,
+  borderLeftColor: 'transparent',
+  borderRightColor: 'transparent',
+  borderTopColor: '#fff',
+  marginTop: -2,
+},
+// FLOATING MAP TOGGLE STYLES
+mapFloatingToggle: {
+  position: 'absolute',
+  top: 12,
+  right: 12,
+  flexDirection: 'row',
+  backgroundColor: '#F5F5F5',
+  borderRadius: 25,
+  padding: 4,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.15,
+  shadowRadius: 4,
+  elevation: 5,
+},
+mapToggleOption: {
+  paddingVertical: 8,
+  paddingHorizontal: 14,
+  borderRadius: 20,
+},
+mapToggleOptionActive: {
+  backgroundColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.1,
+  shadowRadius: 2,
+  elevation: 2,
+},
+mapToggleText: {
+  fontSize: 12,
+  fontWeight: '500',
+  color: '#999',
+},
+mapToggleTextActive: {
+  color: '#E94A37',
+  fontWeight: '600',
+},
+
+// SQUAD OVERLAY
+squadOverlay: {
+  position: 'absolute',
+  top: 60,
+  left: 0,
+  right: 0,
+  bottom: 90,
+  backgroundColor: 'rgba(255,255,255,0.95)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+squadOverlayTitle: {
+  fontSize: 24,
+  fontWeight: 'bold',
+  color: '#E94A37',
+  marginTop: 16,
+},
+squadOverlayText: {
+  fontSize: 16,
+  color: '#E94A37',
+  marginTop: 8,
+},
 
   // ======================================================
 // SEARCH BAR STYLES (Outside Map)
@@ -1678,6 +1863,10 @@ toggleTabTextActive: {
     color: '#666',
     marginTop: 4,
   },
+  categoryEmoji: {
+  fontSize: 24,
+  marginRight: 12,
+},
   statDivider: {
     width: 1,
     height: 40,

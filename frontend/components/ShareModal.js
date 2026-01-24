@@ -12,11 +12,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
+import React, { useState, useRef } from 'react';  // ← Add useRef here
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
+import InstagramStoryCard from './InstagramStoryCard';
 import { BACKEND_URL } from '../utils/imageUrlFix';
 
 export default function ShareModal({ visible, onClose, post }) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const storyCardRef = useRef(null);
 
   if (!post) return null;
 
@@ -89,29 +95,44 @@ export default function ShareModal({ visible, onClose, post }) {
     }
   }
 
-  // =====================================================
-  // INSTAGRAM
-  // =====================================================
-  async function shareToInstagram() {
-    try {
-      setLoading(true);
+// =====================================================
+// INSTAGRAM STORY (with custom card image)
+// =====================================================
+async function shareToInstagram() {
+  try {
+    setLoading(true);
 
-      const appUrl = "instagram://story-camera";
-      const canOpen = await Linking.canOpenURL(appUrl);
+    // Step 1: Capture the story card as an image
+    const uri = await captureRef(storyCardRef, {
+      format: 'png',
+      quality: 1,
+      result: 'tmpfile',
+    });
 
-      if (canOpen) {
-        await Linking.openURL(appUrl);
-      } else {
-        Alert.alert("Instagram Not Installed", "Please install Instagram to share stories.");
-      }
-
-    } catch (error) {
-      console.error("Instagram error:", error);
-      await shareToMore();
-    } finally {
-      setLoading(false);
+    // Step 2: Check if sharing is available
+    const isAvailable = await Sharing.isAvailableAsync();
+    
+    if (!isAvailable) {
+      Alert.alert('Error', 'Sharing is not available on this device');
+      return;
     }
+
+    // Step 3: Share the image (this opens share sheet where user can select Instagram Stories)
+    await Sharing.shareAsync(uri, {
+      mimeType: 'image/png',
+      dialogTitle: 'Share to Instagram Story',
+      UTI: 'public.png', // iOS specific
+    });
+
+    onClose();
+
+  } catch (error) {
+    console.error("Instagram share error:", error);
+    Alert.alert("Error", "Failed to share to Instagram. Please try again.");
+  } finally {
+    setLoading(false);
   }
+}
 
   // =====================================================
   // FACEBOOK
@@ -194,7 +215,10 @@ export default function ShareModal({ visible, onClose, post }) {
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
-        <TouchableOpacity style={styles.backdrop} onPress={onClose} />
+         {/* Hidden Story Card for Instagram - ADD THIS */}
+      <InstagramStoryCard ref={storyCardRef} post={post} />
+
+      <TouchableOpacity style={styles.backdrop} onPress={onClose} />
 
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>

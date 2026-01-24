@@ -1169,12 +1169,12 @@ async def get_feed(
                 "user_id": restaurant_id,
                 "username": post.get("restaurant_name") or (restaurant["restaurant_name"] if restaurant else "Unknown"),
                 "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
-                "user_level": None,  # Restaurants don't have levels
+                "user_level": None,
                 "media_url": post.get("media_url", ""),
                 "image_url": post.get("image_url"),
                 "thumbnail_url": post.get("thumbnail_url"),
                 "media_type": post.get("media_type", "image"),
-                "rating": None,  # Restaurants use price instead
+                "rating": None,
                 "price": post.get("price", ""),
                 "review_text": post.get("about", ""),
                 "about": post.get("about", ""),
@@ -1188,12 +1188,26 @@ async def get_feed(
                 "is_saved_by_user": is_saved,
                 "is_following": False,
                 "account_type": "restaurant",
+                "tagged_restaurant": None,
                 "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
             })
         else:
             # User post
             user_id = post["user_id"]
             user = await db.users.find_one({"_id": ObjectId(user_id)})
+
+            # Lookup tagged restaurant
+            tagged_restaurant = None
+            if post.get("tagged_restaurant_id"):
+                try:
+                    restaurant = await db.restaurants.find_one({"_id": ObjectId(post["tagged_restaurant_id"])})
+                    if restaurant:
+                        tagged_restaurant = {
+                            "id": str(restaurant["_id"]),
+                            "restaurant_name": restaurant["restaurant_name"]
+                        }
+                except Exception as e:
+                    print(f"Error fetching tagged restaurant: {e}")
 
             is_liked = await db.likes.find_one({
                 "post_id": post_id,
@@ -1226,7 +1240,7 @@ async def get_feed(
                 "thumbnail_url": post.get("thumbnail_url"),
                 "media_type": media_type,
                 "rating": post.get("rating", 0),
-                "price": None,  # Users use rating instead
+                "price": None,
                 "review_text": post.get("review_text", ""),
                 "description": post.get("review_text", ""),
                 "map_link": post.get("map_link"),
@@ -1238,6 +1252,7 @@ async def get_feed(
                 "is_saved_by_user": is_saved,
                 "is_following": is_following,
                 "account_type": "user",
+                "tagged_restaurant": tagged_restaurant,
                 "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
             })
 

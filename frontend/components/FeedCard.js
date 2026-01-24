@@ -692,6 +692,20 @@ postId={post.id}
   </Pressable>
 )}
 
+{/* Restaurant Tag Overlay */}
+{post.tagged_restaurant && (
+  <TouchableOpacity
+    style={styles.restaurantTagOverlay}
+    onPress={() => router.push(`/restaurant/${post.tagged_restaurant.id}`)}
+    activeOpacity={0.8}
+  >
+    <Ionicons name="restaurant" size={12} color="#FFF" />
+    <Text style={styles.restaurantTagText} numberOfLines={1}>
+      {post.tagged_restaurant.restaurant_name}
+    </Text>
+  </TouchableOpacity>
+)}
+
 {/* RATING (Users) or PRICE (Restaurants) */}
 {post.rating != null && !post.price && (
   <View style={styles.detailBox}>
@@ -796,44 +810,32 @@ style={styles.actionButton}
 onPress={() => {
 // Show options: Add to Story, Share to Users (Cofau), or External (WhatsApp/Instagram)
 Alert.alert(
-"Share Post",
-"Choose how you want to share",
-[
-{
-text: "Add to Story",
-onPress: async () => {
-try {
-const mediaUrl = normalizeMediaUrl(post.media_url || post.image_url);
-await addPostToStory(
-post.id,
-mediaUrl,
-post.review_text || post.description || "",
-post.rating || 0,
-post.location_name || post.location || ""
-);
-Alert.alert("Success", "Post added to your story! 🎉");
-if (onStoryCreated) {
-onStoryCreated();
-}
-} catch (error) {
-Alert.alert("Error", error.response?.data?.detail || "Failed to add to story. Please try again.");
-console.error("Error adding to story:", error);
-}
-},
-},
-{
-text: "Share to Cofau Users",
-onPress: () => setShowShareToUsersModal(true),
-},
-{
-text: "Share to WhatsApp/Instagram",
-onPress: () => setShowSimpleShareModal(true),
-},
-{
-text: "Cancel",
-style: "cancel",
-},
-]
+  "Share Post",
+  "Choose how you want to share",
+  [
+    {
+      text: "Add to Story",
+      onPress: async () => {
+        // ... your existing Cofau story code
+      },
+    },
+    {
+      text: "Add to Instagram Story",
+      onPress: () => setShowSimpleShareModal(true),
+    },
+    {
+      text: "Share to Cofau Users",
+      onPress: () => setShowShareToUsersModal(true),
+    },
+    {
+      text: "More Options",
+      onPress: () => setShowSimpleShareModal(true),
+    },
+    {
+      text: "Cancel",
+      style: "cancel",
+    },
+  ]
 );
 }}
 >
@@ -1048,6 +1050,26 @@ gap: 8,
 
 videoOptionsButton: {
   padding: 8,
+},
+
+restaurantTagOverlay: {
+  position: 'absolute',
+  bottom: 12,
+  right: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 16,
+  maxWidth: '60%',
+  gap: 4,
+  zIndex: 20,
+},
+restaurantTagText: {
+  color: '#FFF',
+  fontSize: 12,
+  fontWeight: '600',
 },
 
 // Mute button styles

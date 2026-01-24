@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -356,16 +357,13 @@ const handleVerifyOtp = async () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Logo */}
-        <View style={styles.logoContainer}>
-          <LinearGradient
-            colors={['#4dd0e1', '#ba68c8', '#ff80ab']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logo}
-          >
-            <Text style={styles.logoText}>C</Text>
-          </LinearGradient>
-        </View>
+<View style={styles.logoContainer}>
+  <Image
+    source={require('../../assets/images/icon.png')}
+    style={styles.logo}
+    resizeMode="contain"
+  />
+</View>
 
         {/* Title */}
         <Text style={styles.title}>Create Account</Text>
@@ -661,22 +659,10 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  logoText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
+  width: 120,
+  height: 120,
+  borderRadius: 60,
+},
   title: {
     fontSize: 32,
     fontWeight: 'bold',

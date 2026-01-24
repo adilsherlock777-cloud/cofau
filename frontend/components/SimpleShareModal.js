@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -14,14 +14,221 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Video } from 'expo-av';
-// Using native Share API which supports URL previews
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
+import * as Linking from 'expo-linking';
 import { normalizeMediaUrl, BACKEND_URL } from '../utils/imageUrlFix';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Story card dimensions (9:16 aspect ratio for Instagram Stories)
+const STORY_WIDTH = SCREEN_WIDTH;
+const STORY_HEIGHT = STORY_WIDTH * (16 / 9);
+const CARD_WIDTH = STORY_WIDTH * 0.88;
+
+// =====================================================
+// INSTAGRAM STORY CARD - Beautiful card with blur background
+// =====================================================
+const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
+    const mediaUrl = normalizeMediaUrl(post?.media_url || post?.image_url);
+
+    return (
+        <View
+            ref={ref}
+            style={storyCardStyles.container}
+            collapsable={false}
+        >
+            {/* Blurred Background Image */}
+            {mediaUrl && (
+                <Image
+                    source={{ uri: mediaUrl }}
+                    style={storyCardStyles.blurredBackground}
+                    contentFit="cover"
+                    blurRadius={30}
+                />
+            )}
+
+            {/* Dark Overlay for better contrast */}
+            <View style={storyCardStyles.darkOverlay} />
+
+            {/* Main Card */}
+            <View style={storyCardStyles.card}>
+                {/* Food Image with Cofau Watermark */}
+                <View style={storyCardStyles.imageWrapper}>
+                    {mediaUrl ? (
+                        <Image
+                            source={{ uri: mediaUrl }}
+                            style={storyCardStyles.foodImage}
+                            contentFit="cover"
+                        />
+                    ) : (
+                        <View style={storyCardStyles.placeholderImage}>
+                            <Ionicons name="image-outline" size={60} color="#ccc" />
+                        </View>
+                    )}
+
+                    {/* Cofau Watermark on Image */}
+                    <View style={storyCardStyles.watermarkContainer}>
+                        <Text style={storyCardStyles.watermarkText}>Cofau</Text>
+                    </View>
+                </View>
+
+                {/* Three Info Boxes */}
+                <View style={storyCardStyles.infoBoxesContainer}>
+                    {/* Rating Box */}
+                    <View style={storyCardStyles.infoBox}>
+                        <Ionicons name="star" size={22} color="#FFD700" />
+                        <Text style={storyCardStyles.infoBoxLabel}>Rating</Text>
+                        <Text style={storyCardStyles.infoBoxValue}>
+                            {post?.rating ? `${post.rating}/10` : '-'}
+                        </Text>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={storyCardStyles.divider} />
+
+                    {/* Review Box */}
+                    <View style={[storyCardStyles.infoBox, storyCardStyles.reviewBox]}>
+                        <Ionicons name="chatbubble-ellipses" size={22} color="#4CAF50" />
+                        <Text style={storyCardStyles.infoBoxLabel}>Review</Text>
+                        <Text style={storyCardStyles.infoBoxValue} numberOfLines={2}>
+                            {post?.review_text || post?.description || '-'}
+                        </Text>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={storyCardStyles.divider} />
+
+                    {/* Location Box */}
+                    <View style={storyCardStyles.infoBox}>
+                        <Ionicons name="location" size={22} color="#E53935" />
+                        <Text style={storyCardStyles.infoBoxLabel}>Location</Text>
+                        <Text style={storyCardStyles.infoBoxValue} numberOfLines={2}>
+                            {post?.location_name || '-'}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+});
+
+// =====================================================
+// STORY CARD STYLES
+// =====================================================
+const storyCardStyles = StyleSheet.create({
+    container: {
+        width: STORY_WIDTH,
+        height: STORY_HEIGHT,
+        position: 'absolute',
+        left: -9999,
+        top: 0,
+        backgroundColor: '#000',
+    },
+    blurredBackground: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+    },
+    darkOverlay: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    },
+    card: {
+        position: 'absolute',
+        top: '10%',
+        left: (STORY_WIDTH - CARD_WIDTH) / 2,
+        width: CARD_WIDTH,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 15,
+    },
+    imageWrapper: {
+        width: '100%',
+        aspectRatio: 1,
+        position: 'relative',
+    },
+    foodImage: {
+        width: '100%',
+        height: '100%',
+    },
+    placeholderImage: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#E0E0E0',
+    },
+    watermarkContainer: {
+        position: 'absolute',
+        bottom: 16,
+        right: 16,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+    },
+    watermarkText: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        fontStyle: 'italic',
+        letterSpacing: 1,
+        // If you have Lobster font loaded, use:
+        // fontFamily: 'Lobster_400Regular',
+    },
+    infoBoxesContainer: {
+        flexDirection: 'row',
+        paddingVertical: 20,
+        paddingHorizontal: 12,
+        backgroundColor: '#FFFFFF',
+    },
+    infoBox: {
+        flex: 1,
+        alignItems: 'center',
+        paddingHorizontal: 6,
+    },
+    reviewBox: {
+        flex: 1.4,
+    },
+    infoBoxLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#999',
+        marginTop: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+    },
+    infoBoxValue: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#333',
+        marginTop: 4,
+        textAlign: 'center',
+        lineHeight: 18,
+    },
+    divider: {
+        width: 1,
+        backgroundColor: '#E8E8E8',
+        marginVertical: 8,
+    },
+});
+
+// =====================================================
+// MAIN COMPONENT
+// =====================================================
 export default function SimpleShareModal({ visible, onClose, post }) {
     const [loading, setLoading] = useState(false);
     const [sharingPlatform, setSharingPlatform] = useState(null);
+    const storyCardRef = useRef(null);
 
     if (!post) return null;
 
@@ -30,14 +237,12 @@ export default function SimpleShareModal({ visible, onClose, post }) {
     const isVideo = post.media_type === 'video' || mediaUrl?.toLowerCase().endsWith('.mp4');
     const shareUrl = `${BACKEND_URL}/share/${post.id}`;
 
-
     // Share to WhatsApp
     const shareToWhatsApp = async () => {
         try {
             setLoading(true);
             setSharingPlatform('whatsapp');
 
-            // Build message with details
             let message = `📷 ${post.username || 'User'} shared a post on Cofau!\n\n`;
             if (post.review_text) {
                 message += `${post.review_text}\n\n`;
@@ -50,16 +255,13 @@ export default function SimpleShareModal({ visible, onClose, post }) {
             }
             message += `\nView on Cofau: ${shareUrl}`;
 
-            // Share with share URL - WhatsApp will fetch Open Graph meta tags for large preview
-            // The backend /share/{post_id} endpoint provides optimized OG tags with 1920x1080 dimensions
             const shareContent = {
                 message: message,
-                url: shareUrl, // Use share URL which has Open Graph meta tags for large preview
+                url: shareUrl,
                 title: `${post.username} shared a post on Cofau`,
             };
 
             await RNShare.share(shareContent);
-
             onClose();
         } catch (error) {
             console.error('WhatsApp share error:', error);
@@ -70,13 +272,51 @@ export default function SimpleShareModal({ visible, onClose, post }) {
         }
     };
 
-    // Share to Instagram
+    // Share to Instagram Story - via Share Sheet
+    const shareToInstagramStory = async () => {
+        try {
+            setLoading(true);
+            setSharingPlatform('instagram-story');
+
+            // Step 1: Capture the story card as an image
+            const uri = await captureRef(storyCardRef, {
+                format: 'png',
+                quality: 1,
+                result: 'tmpfile',
+            });
+
+            // Step 2: Save to camera roll
+            const { status } = await MediaLibrary.requestPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Please allow access to save images.');
+                return;
+            }
+
+            await MediaLibrary.createAssetAsync(uri);
+
+            // Step 3: Open share sheet
+            await Sharing.shareAsync(uri, {
+                mimeType: 'image/png',
+                dialogTitle: 'Share to Instagram Story',
+                UTI: 'public.png',
+            });
+
+            onClose();
+        } catch (error) {
+            console.error('Instagram Story share error:', error);
+            Alert.alert('Error', 'Failed to create story image. Please try again.');
+        } finally {
+            setLoading(false);
+            setSharingPlatform(null);
+        }
+    };
+
+    // Share to Instagram (general - via share sheet)
     const shareToInstagram = async () => {
         try {
             setLoading(true);
             setSharingPlatform('instagram');
 
-            // Build message with details
             let message = `📷 ${post.username || 'User'} shared a post on Cofau!\n\n`;
             if (post.review_text) {
                 message += `${post.review_text}\n\n`;
@@ -89,16 +329,13 @@ export default function SimpleShareModal({ visible, onClose, post }) {
             }
             message += `\nView on Cofau: ${shareUrl}`;
 
-            // Share with share URL - Instagram will fetch Open Graph meta tags for large preview
-            // The backend /share/{post_id} endpoint provides optimized OG tags with 1920x1080 dimensions
             const shareContent = {
                 message: message,
-                url: shareUrl, // Use share URL which has Open Graph meta tags for large preview
+                url: shareUrl,
                 title: `${post.username} shared a post on Cofau`,
             };
 
             await RNShare.share(shareContent);
-
             onClose();
         } catch (error) {
             console.error('Instagram share error:', error);
@@ -126,6 +363,9 @@ export default function SimpleShareModal({ visible, onClose, post }) {
                     activeOpacity={1}
                     onPress={(e) => e.stopPropagation()}
                 >
+                    {/* Hidden Story Card for Instagram */}
+                    <InstagramStoryCard ref={storyCardRef} post={post} />
+
                     {/* Header */}
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>Share Post</Text>
@@ -136,7 +376,6 @@ export default function SimpleShareModal({ visible, onClose, post }) {
 
                     {/* Post Preview */}
                     <View style={styles.postPreview}>
-                        {/* Post Image/Video */}
                         <View style={styles.imageContainer}>
                             {isVideo ? (
                                 <Video
@@ -156,7 +395,6 @@ export default function SimpleShareModal({ visible, onClose, post }) {
                             )}
                         </View>
 
-                        {/* Post Details */}
                         <View style={styles.postInfo}>
                             {post.rating && (
                                 <View style={styles.infoRow}>
@@ -187,6 +425,27 @@ export default function SimpleShareModal({ visible, onClose, post }) {
 
                     {/* Share Options */}
                     <View style={styles.shareOptions}>
+                        {/* Instagram Story */}
+                        <TouchableOpacity
+                            style={[
+                                styles.shareOption,
+                                sharingPlatform === 'instagram-story' && styles.shareOptionActive,
+                            ]}
+                            onPress={shareToInstagramStory}
+                            disabled={loading}
+                        >
+                            {loading && sharingPlatform === 'instagram-story' ? (
+                                <ActivityIndicator color="#C13584" size="small" />
+                            ) : (
+                                <>
+                                    <View style={[styles.shareIconCircle, { backgroundColor: '#C13584' }]}>
+                                        <Ionicons name="add-circle" size={32} color="#FFF" />
+                                    </View>
+                                    <Text style={styles.shareLabel}>Instagram{'\n'}Story</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+
                         {/* WhatsApp */}
                         <TouchableOpacity
                             style={[
@@ -197,7 +456,7 @@ export default function SimpleShareModal({ visible, onClose, post }) {
                             disabled={loading}
                         >
                             {loading && sharingPlatform === 'whatsapp' ? (
-                                <ActivityIndicator color="#FFF" size="small" />
+                                <ActivityIndicator color="#25D366" size="small" />
                             ) : (
                                 <>
                                     <View style={[styles.shareIconCircle, { backgroundColor: '#25D366' }]}>
@@ -208,7 +467,7 @@ export default function SimpleShareModal({ visible, onClose, post }) {
                             )}
                         </TouchableOpacity>
 
-                        {/* Instagram */}
+                        {/* Instagram DM */}
                         <TouchableOpacity
                             style={[
                                 styles.shareOption,
@@ -218,7 +477,7 @@ export default function SimpleShareModal({ visible, onClose, post }) {
                             disabled={loading}
                         >
                             {loading && sharingPlatform === 'instagram' ? (
-                                <ActivityIndicator color="#FFF" size="small" />
+                                <ActivityIndicator color="#E4405F" size="small" />
                             ) : (
                                 <>
                                     <View style={[styles.shareIconCircle, { backgroundColor: '#E4405F' }]}>
@@ -235,6 +494,9 @@ export default function SimpleShareModal({ visible, onClose, post }) {
     );
 }
 
+// =====================================================
+// MODAL STYLES
+// =====================================================
 const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
@@ -324,10 +586,10 @@ const styles = StyleSheet.create({
     },
     shareOption: {
         alignItems: 'center',
-        gap: 12,
-        padding: 12,
+        gap: 8,
+        padding: 8,
         borderRadius: 12,
-        minWidth: 100,
+        minWidth: 80,
     },
     shareOptionActive: {
         backgroundColor: '#F5F5F5',
@@ -345,9 +607,9 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     shareLabel: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: '#333',
+        textAlign: 'center',
     },
 });
-
