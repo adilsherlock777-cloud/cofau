@@ -777,3 +777,242 @@ async def refresh_leaderboard(current_user: dict = Depends(get_current_user)):
             detail=f"Failed to refresh leaderboard: {str(e)}"
         )
 
+# ======================================================
+# TOP CONTRIBUTORS ENDPOINTS (New Feature)
+# ======================================================
+
+@router.get("/top-contributors/users")
+async def get_top_contributor_users(
+    limit: int = Query(10, description="Number of top contributors to return"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get top 10 users ranked by posts count (descending).
+    Each user includes their 3 latest posts and 2 most liked posts.
+    """
+    db = get_database()
+    current_user_id = str(current_user["_id"])
+    
+    # Get blocked user IDs to exclude
+    blocked_user_ids = []
+    try:
+        blocks = await db.blocks.find({"blocker_id": current_user_id}).to_list(None)
+        blocked_user_ids = [block["blocked_id"] for block in blocks]
+    except Exception as e:
+        logger.warning(f"Could not fetch blocked users: {e}")
+    
+    # Aggregate posts count per user
+    match_stage = {}
+    if blocked_user_ids:
+        match_stage = {"user_id": {"$nin": blocked_user_ids}}
+    
+    pipeline = [
+        {"$match": match_stage} if match_stage else {"$match": {}},
+        {"$group": {
+            "_id": "$user_id",
+            "posts_count": {"$sum": 1}
+        }},
+        {"$match": {"posts_count": {"$gt": 0}}},
+        {"$sort": {"posts_count": -1}},
+        {"$limit": limit}
+    ]
+    
+    top_users_cursor = db.posts.aggregate(pipeline)
+    top_users_data = await top_users_cursor.to_list(limit)
+    
+    contributors = []
+    
+    for idx, user_data in enumerate(top_users_data):
+        user_id = user_data["_id"]
+        posts_count = user_data["posts_count"]
+        
+        if not user_id:
+            continue
+        
+        # Get user details
+        user = None
+        try:
+            user = await db.users.find_one({"_id": ObjectId(user_id)})
+        except:
+            try:
+                user = await db.users.find_one({"_id": user_id})
+            except:
+                pass
+        
+        if not user:
+            logger.warning(f"User {user_id} not found, skipping")
+            continue
+        
+        # Get 3 latest posts
+        latest_posts_cursor = db.posts.find({"user_id": user_id}).sort("created_at", -1).limit(3)
+        latest_posts_raw = await latest_posts_cursor.to_list(3)
+        
+        latest_posts = []
+        for post in latest_posts_raw:
+            media_type = post.get("media_type", "image")
+            thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
+            latest_posts.append({
+                "post_id": str(post["_id"]),
+                "thumbnail_url": thumbnail,
+                "media_url": post.get("media_url"),
+                "media_type": media_type
+            })
+        
+        # Get 2 most liked posts (excluding duplicates from latest)
+        latest_post_ids = [p["post_id"] for p in latest_posts]
+        most_liked_cursor = db.posts.find({"user_id": user_id}).sort("likes_count", -1).limit(5)
+        most_liked_raw = await most_liked_cursor.to_list(5)
+        
+        most_liked_posts = []
+        for post in most_liked_raw:
+            post_id = str(post["_id"])
+            # Skip if already in latest posts
+            if post_id in latest_post_ids and len(most_liked_posts) < 2:
+                # Include anyway if we need more posts
+                pass
+            media_type = post.get("media_type", "image")
+            thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
+            most_liked_posts.append({
+                "post_id": post_id,
+                "thumbnail_url": thumbnail,
+                "media_url": post.get("media_url"),
+                "media_type": media_type,
+                "likes_count": post.get("likes_count", 0)
+            })
+            if len(most_liked_posts) >= 2:
+                break
+        
+        # Check if current user is following this user
+        is_following = await db.follows.find_one({
+            "followerId": current_user_id,
+            "followingId": user_id
+        }) is not None
+        
+        contributors.append({
+            "rank": idx + 1,
+            "user_id": user_id,
+            "username": user.get("username") or user.get("full_name") or "Unknown",
+            "full_name": user.get("full_name") or user.get("username") or "Unknown",
+            "profile_picture": user.get("profile_picture"),
+            "bio": user.get("bio"),
+            "level": user.get("level", 1),
+            "followers_count": user.get("followers_count", 0),
+            "posts_count": posts_count,
+            "is_following": is_following,
+            "latest_posts": latest_posts,
+            "most_liked_posts": most_liked_posts
+        })
+    
+    logger.info(f"✅ Top Contributors (Users): Returned {len(contributors)} users")
+    
+    return {"contributors": contributors}
+
+
+@router.get("/top-contributors/restaurants")
+async def get_top_contributor_restaurants(
+    limit: int = Query(10, description="Number of top contributors to return"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get top 10 restaurants ranked by posts count (descending).
+    Each restaurant includes their 3 latest posts and 2 most liked posts.
+    """
+    db = get_database()
+    current_user_id = str(current_user["_id"])
+    
+    # Aggregate posts count per restaurant
+    pipeline = [
+        {"$match": {"restaurant_id": {"$exists": True, "$ne": None}}},
+        {"$group": {
+            "_id": "$restaurant_id",
+            "posts_count": {"$sum": 1}
+        }},
+        {"$match": {"posts_count": {"$gt": 0}}},
+        {"$sort": {"posts_count": -1}},
+        {"$limit": limit}
+    ]
+    
+    top_restaurants_cursor = db.restaurant_posts.aggregate(pipeline)
+    top_restaurants_data = await top_restaurants_cursor.to_list(limit)
+    
+    contributors = []
+    
+    for idx, rest_data in enumerate(top_restaurants_data):
+        restaurant_id = rest_data["_id"]
+        posts_count = rest_data["posts_count"]
+        
+        if not restaurant_id:
+            continue
+        
+        # Get restaurant details
+        restaurant = None
+        try:
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+        except:
+            try:
+                restaurant = await db.restaurants.find_one({"_id": restaurant_id})
+            except:
+                pass
+        
+        if not restaurant:
+            logger.warning(f"Restaurant {restaurant_id} not found, skipping")
+            continue
+        
+        # Get 3 latest posts
+        latest_posts_cursor = db.restaurant_posts.find({"restaurant_id": restaurant_id}).sort("created_at", -1).limit(3)
+        latest_posts_raw = await latest_posts_cursor.to_list(3)
+        
+        latest_posts = []
+        for post in latest_posts_raw:
+            media_type = post.get("media_type", "image")
+            thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
+            latest_posts.append({
+                "post_id": str(post["_id"]),
+                "thumbnail_url": thumbnail,
+                "media_url": post.get("media_url"),
+                "media_type": media_type
+            })
+        
+        # Get 2 most liked posts
+        most_liked_cursor = db.restaurant_posts.find({"restaurant_id": restaurant_id}).sort("likes_count", -1).limit(2)
+        most_liked_raw = await most_liked_cursor.to_list(2)
+        
+        most_liked_posts = []
+        for post in most_liked_raw:
+            media_type = post.get("media_type", "image")
+            thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
+            most_liked_posts.append({
+                "post_id": str(post["_id"]),
+                "thumbnail_url": thumbnail,
+                "media_url": post.get("media_url"),
+                "media_type": media_type,
+                "likes_count": post.get("likes_count", 0)
+            })
+        
+        # Check if current user is following this restaurant
+        is_following = await db.follows.find_one({
+            "followerId": current_user_id,
+            "followingId": restaurant_id
+        }) is not None
+        
+        # Get followers count
+        followers_count = await db.follows.count_documents({"followingId": restaurant_id})
+        
+        contributors.append({
+            "rank": idx + 1,
+            "user_id": restaurant_id,
+            "username": restaurant.get("restaurant_name") or "Unknown",
+            "full_name": restaurant.get("restaurant_name") or "Unknown",
+            "profile_picture": restaurant.get("profile_picture"),
+            "bio": restaurant.get("bio"),
+            "level": None,  # Restaurants don't have levels
+            "followers_count": followers_count,
+            "posts_count": posts_count,
+            "is_following": is_following,
+            "latest_posts": latest_posts,
+            "most_liked_posts": most_liked_posts
+        })
+    
+    logger.info(f"✅ Top Contributors (Restaurants): Returned {len(contributors)} restaurants")
+    
+    return {"contributors": contributors}

@@ -38,34 +38,47 @@ export default function RestaurantDashboard() {
   }, []);
 
   const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      
-      // TODO: Replace with actual API endpoint when backend is ready
-      // const response = await axios.get(`${API_URL}/restaurant/analytics`, {
-      //   headers: { Authorization: `Bearer ${token}` }
-      // });
-      // setAnalytics(response.data);
-      
-      // Mock data for now - replace with API call later
-      setTimeout(() => {
-        setAnalytics({
-          total_posts: 12,
-          followers_count: 248,
-          customer_reviews: 45,
-          profile_visits: 1520,
-          search_appearances: 3200,
-          post_clicks: 890,
-          profile_views: 2100,
-        });
-        setLoading(false);
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    
+    const response = await axios.get(`${API_URL}/restaurant/analytics`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    setAnalytics({
+      total_posts: response.data.total_posts || 0,
+      followers_count: response.data.followers_count || 0,
+      customer_reviews: response.data.customer_reviews || 0,
+      profile_views: response.data.profile_views || 0,
+      profile_views_trend: response.data.profile_views_trend || '',
+      profile_visits: response.data.profile_visits || 0,
+      profile_visits_trend: response.data.profile_visits_trend || '',
+      search_appearances: response.data.search_appearances || 0,
+      search_appearances_trend: response.data.search_appearances_trend || '',
+      post_clicks: response.data.post_clicks || 0,
+      post_clicks_trend: response.data.post_clicks_trend || '',
+    });
+    
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    // Set zeros on error
+    setAnalytics({
+      total_posts: 0,
+      followers_count: 0,
+      customer_reviews: 0,
+      profile_views: 0,
+      profile_views_trend: '',
+      profile_visits: 0,
+      profile_visits_trend: '',
+      search_appearances: 0,
+      search_appearances_trend: '',
+      post_clicks: 0,
+      post_clicks_trend: '',
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const StatCard = ({ 
     icon, 
@@ -89,6 +102,7 @@ export default function RestaurantDashboard() {
       {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
     </View>
   );
+
 
   const LargeStatCard = ({ 
     icon, 
@@ -202,36 +216,36 @@ export default function RestaurantDashboard() {
         </View>
 
         <LargeStatCard
-          icon="eye"
-          label="Profile Views"
-          value={analytics.profile_views}
-          color="#9C27B0"
-          trend="+12% this week"
-        />
+  icon="eye"
+  label="Profile Views"
+  value={analytics.profile_views}
+  color="#9C27B0"
+  trend={analytics.profile_views_trend}
+/>
 
-        <LargeStatCard
-          icon="footsteps"
-          label="Profile Visits"
-          value={analytics.profile_visits}
-          color="#2196F3"
-          trend="+8% this week"
-        />
+<LargeStatCard
+  icon="footsteps"
+  label="Profile Visits"
+  value={analytics.profile_visits}
+  color="#2196F3"
+  trend={analytics.profile_visits_trend}
+/>
 
-        <LargeStatCard
-          icon="search"
-          label="Search Appearances"
-          value={analytics.search_appearances}
-          color="#FF9800"
-          trend="+15% this week"
-        />
+<LargeStatCard
+  icon="search"
+  label="Search Appearances"
+  value={analytics.search_appearances}
+  color="#FF9800"
+  trend={analytics.search_appearances_trend}
+/>
 
-        <LargeStatCard
-          icon="hand-left"
-          label="Post Clicks"
-          value={analytics.post_clicks}
-          color="#4CAF50"
-          trend="+5% this week"
-        />
+<LargeStatCard
+  icon="hand-left"
+  label="Post Clicks"
+  value={analytics.post_clicks}
+  color="#4CAF50"
+  trend={analytics.post_clicks_trend}
+/>
 
         {/* Info Card */}
         <View style={styles.infoCard}>
