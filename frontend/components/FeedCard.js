@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaskedView from "@react-native-masked-view/masked-view";
 import CommentsModal from './CommentsModal';
 
@@ -108,6 +109,24 @@ const [lastTap, setLastTap] = useState(0);
 const [showHeartAnimation, setShowHeartAnimation] = useState(false);
 const [showCommentsModal, setShowCommentsModal] = useState(false);
 const [isBlocked, setIsBlocked] = useState(post.is_blocked || false);
+
+// Track restaurant post click for analytics
+const trackRestaurantPostClick = async () => {
+  if (post.account_type === 'restaurant') {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      axios.post(`${API_URL}/restaurant/analytics/track`, {
+        restaurant_id: post.user_id,
+        event_type: 'post_click',
+        post_id: post.id
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => console.log('Analytics tracking error:', err));
+    } catch (err) {
+      console.log('Analytics tracking error:', err);
+    }
+  }
+};
 
 // Update isFollowing state when post data changes
 useEffect(() => {
@@ -364,16 +383,17 @@ const handleBlockUser = async () => {
 
 const handleDoubleTap = () => {
   const now = Date.now();
-  const DOUBLE_TAP_DELAY = 300; // milliseconds
+  const DOUBLE_TAP_DELAY = 300;
 
   if (now - lastTap < DOUBLE_TAP_DELAY) {
-    // Double tap detected
     if (!isLiked) {
       handleLike();
     }
-    // Show heart animation
     setShowHeartAnimation(true);
     setTimeout(() => setShowHeartAnimation(false), 1000);
+  } else {
+    // Single tap - track post click for restaurants
+    trackRestaurantPostClick();
   }
   setLastTap(now);
 };
@@ -385,7 +405,20 @@ return (
 <View style={styles.userHeader}>
 <TouchableOpacity
 style={styles.userInfo}
-onPress={() => router.push(`/profile?userId=${post.user_id}`)}
+onPress={() => {
+  // Track profile view for restaurant
+  if (post.account_type === 'restaurant') {
+    AsyncStorage.getItem('token').then(token => {
+      axios.post(`${API_URL}/restaurant/analytics/track`, {
+        restaurant_id: post.user_id,
+        event_type: 'profile_view'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => console.log('Analytics tracking error:', err));
+    });
+  }
+  router.push(`/profile?userId=${post.user_id}`);
+}}
 >
 <UserAvatar
 profilePicture={dpRaw}
@@ -479,7 +512,20 @@ postId={post.id}
         <View style={styles.videoOverlayHeader}>
           <TouchableOpacity
             style={styles.videoUserInfo}
-            onPress={() => router.push(`/profile?userId=${post.user_id}`)}
+            onPress={() => {
+  // Track profile view for restaurant
+  if (post.account_type === 'restaurant') {
+    AsyncStorage.getItem('token').then(token => {
+      axios.post(`${API_URL}/restaurant/analytics/track`, {
+        restaurant_id: post.user_id,
+        event_type: 'profile_view'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => console.log('Analytics tracking error:', err));
+    });
+  }
+  router.push(`/profile?userId=${post.user_id}`);
+}}
           >
             <UserAvatar
               profilePicture={dpRaw}

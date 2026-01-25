@@ -681,30 +681,67 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
           </View>
         )}
 
-        {/* Options Menu Modal */}
-        {showOptionsMenu && (
-          <>
-            <TouchableOpacity
-              style={styles.optionsMenuBackdrop}
-              activeOpacity={1}
-              onPress={() => setShowOptionsMenu(false)}
-            />
-            <View style={styles.optionsMenuOverlay}>
-              <TouchableOpacity
-                style={styles.optionsMenuItem}
-                onPress={() => {
-                  setShowOptionsMenu(false);
-                  setShowReportModal(true);
-                }}
-              >
-                <Ionicons name="flag-outline" size={20} color="#E94A37" />
-                <Text style={styles.optionsMenuText}>Report Post</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+      {/* Options Menu Modal */}
+{showOptionsMenu && (
+  <>
+    <TouchableOpacity
+      style={styles.optionsMenuBackdrop}
+      activeOpacity={1}
+      onPress={() => setShowOptionsMenu(false)}
+    />
+    <View style={styles.optionsMenuOverlay}>
+      {/* Delete Post - Only show for own posts */}
+      {isOwnPost && (
+        <TouchableOpacity
+          style={styles.optionsMenuItem}
+          onPress={() => {
+            setShowOptionsMenu(false);
+            Alert.alert(
+              "Delete Post",
+              "Are you sure you want to delete this post?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await axios.delete(`${API_URL}/posts/${post.id}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      Alert.alert("Success", "Post deleted successfully");
+                      router.back();
+                    } catch (error) {
+                      console.error("Delete error:", error);
+                      Alert.alert("Error", "Failed to delete post");
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="trash-outline" size={20} color="#E94A37" />
+          <Text style={styles.optionsMenuText}>Delete Post</Text>
+        </TouchableOpacity>
+      )}
+      
+      {/* Report Post - Show for all users */}
+      <TouchableOpacity
+        style={styles.optionsMenuItem}
+        onPress={() => {
+          setShowOptionsMenu(false);
+          setShowReportModal(true);
+        }}
+      >
+        <Ionicons name="flag-outline" size={20} color="#E94A37" />
+        <Text style={styles.optionsMenuText}>Report Post</Text>
+      </TouchableOpacity>
+    </View>
+  </>
+)}
 
-        {/* Report Modal */}
+{/* Report Modal */}
         <ReportModal
           visible={showReportModal}
           onClose={() => setShowReportModal(false)}
@@ -712,44 +749,52 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
         />
 
         {/* Glass Bottom Overlay - Evenly Distributed Items */}
-        {!showDetails && (
-          <TouchableOpacity 
-            style={[styles.glassBottomOverlay, { bottom: BOTTOM_NAV_HEIGHT + 10 }]}
-            activeOpacity={0.7}
-            onPress={() => setShowDetails(true)}
-          >
-            <View style={styles.glassBackground} />
-            <View style={styles.glassContentRow}>
-              {/* Rating */}
-              <View style={styles.glassInfoItem}>
-                <Ionicons name="star" size={12} color="#FFD700" />
-                <Text style={styles.glassInfoText}>{post.rating || "N/A"}/10</Text>
-              </View>
-              
-              {/* Location */}
-              <View style={styles.glassInfoItem}>
-                <Ionicons name="location" size={12} color="#FFD700" />
-                <Text style={styles.glassInfoText} numberOfLines={1}>
-                  {post.location_name || "N/A"}
-                </Text>
-              </View>
-              
-              {/* Username */}
-              <View style={styles.glassInfoItem}>
-                <Ionicons name="person" size={12} color="#FFD700" />
-                <Text style={styles.glassInfoText} numberOfLines={1}>
-                  {post.username || "N/A"}
-                </Text>
-              </View>
-              
-              {/* Chevron */}
-              <View style={styles.glassChevronContainer}>
-                <Ionicons name="chevron-up" size={18} color="#FFF" />
-              </View>
-            </View>
-          </TouchableOpacity>
+{!showDetails && (
+  <TouchableOpacity 
+    style={[styles.glassBottomOverlay, { bottom: BOTTOM_NAV_HEIGHT + 10 }]}
+    activeOpacity={0.7}
+    onPress={() => setShowDetails(true)}
+  >
+    <View style={styles.glassBackground} />
+    <View style={styles.glassContentRow}>
+      {/* Rating (Regular User) OR Price (Restaurant) */}
+      <View style={styles.glassInfoItem}>
+        {post.account_type === 'restaurant' || post.is_restaurant_post ? (
+          <>
+            <Ionicons name="pricetag" size={12} color="#FFD700" />
+            <Text style={styles.glassInfoText}>₹{post.price || "N/A"}</Text>
+          </>
+        ) : (
+          <>
+            <Ionicons name="star" size={12} color="#FFD700" />
+            <Text style={styles.glassInfoText}>{post.rating || "N/A"}/10</Text>
+          </>
         )}
       </View>
+      
+      {/* Location */}
+      <View style={styles.glassInfoItem}>
+        <Ionicons name="location" size={12} color="#FFD700" />
+        <Text style={styles.glassInfoText} numberOfLines={1}>
+          {post.location_name || "N/A"}
+        </Text>
+      </View>
+      
+      {/* Username */}
+      <View style={styles.glassInfoItem}>
+        <Ionicons name="person" size={12} color="#FFD700" />
+        <Text style={styles.glassInfoText} numberOfLines={1}>
+          {post.username || "N/A"}
+        </Text>
+      </View>
+      
+      {/* Chevron */}
+      <View style={styles.glassChevronContainer}>
+        <Ionicons name="chevron-up" size={18} color="#FFF" />
+      </View>
+    </View>
+  </TouchableOpacity>
+)}
 
       {/* GLASS OVERLAY DETAILS - Full screen with transparent bottom sheet */}
       {showDetails && (
@@ -855,27 +900,57 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                 </TouchableOpacity>
               </View>
 
-              {/* RATING Section */}
-              {post.rating && (
-                <View style={styles.detailsCard}>
-                  <View style={styles.detailsCardHeader}>
-                    <Ionicons name="star" size={16} color="#FFD700" />
-                    <Text style={styles.detailsCardLabel}>RATING</Text>
-                  </View>
-                  <Text style={styles.detailsRatingValue}>{post.rating}/10</Text>
-                </View>
-              )}
+              {/* RATING Section (Regular User) OR PRICE Section (Restaurant) */}
+{post.account_type === 'restaurant' || post.is_restaurant_post ? (
+  // Restaurant Post - Show PRICE
+  post.price && (
+    <View style={styles.detailsCard}>
+      <View style={styles.detailsCardHeader}>
+        <Ionicons name="pricetag" size={16} color="#FFD700" />
+        <Text style={styles.detailsCardLabel}>PRICE</Text>
+      </View>
+      <Text style={styles.detailsRatingValue}>₹{post.price}</Text>
+    </View>
+  )
+) : (
+  // Regular User Post - Show RATING
+  post.rating && (
+    <View style={styles.detailsCard}>
+      <View style={styles.detailsCardHeader}>
+        <Ionicons name="star" size={16} color="#FFD700" />
+        <Text style={styles.detailsCardLabel}>RATING</Text>
+      </View>
+      <Text style={styles.detailsRatingValue}>{post.rating}/10</Text>
+    </View>
+  )
+)}
 
-              {/* REVIEW Section */}
-              {post.review_text && (
-                <View style={styles.detailsCard}>
-                  <View style={styles.detailsCardHeader}>
-                    <Ionicons name="create" size={16} color="#FFD700" />
-                    <Text style={styles.detailsCardLabel}>REVIEW</Text>
-                  </View>
-                  <Text style={styles.detailsReviewText}>{post.review_text}</Text>
-                </View>
-              )}
+              {/* REVIEW Section (Regular User) OR ABOUT Section (Restaurant) */}
+{post.account_type === 'restaurant' || post.is_restaurant_post ? (
+  // Restaurant Post - Show ABOUT (Dish Details)
+  (post.dish_details || post.description || post.review_text) && (
+    <View style={styles.detailsCard}>
+      <View style={styles.detailsCardHeader}>
+        <Ionicons name="information-circle" size={16} color="#FFD700" />
+        <Text style={styles.detailsCardLabel}>ABOUT</Text>
+      </View>
+      <Text style={styles.detailsReviewText}>
+        {post.dish_details || post.description || post.review_text}
+      </Text>
+    </View>
+  )
+) : (
+  // Regular User Post - Show REVIEW
+  post.review_text && (
+    <View style={styles.detailsCard}>
+      <View style={styles.detailsCardHeader}>
+        <Ionicons name="create" size={16} color="#FFD700" />
+        <Text style={styles.detailsCardLabel}>REVIEW</Text>
+      </View>
+      <Text style={styles.detailsReviewText}>{post.review_text}</Text>
+    </View>
+  )
+)}
 
               {/* LOCATION Section */}
               {post.location_name && (
@@ -956,6 +1031,14 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
           </View>
         </View>
       )}
+       </View>
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        postId={post.id}
+      />
 
       {/* Share Modal */}
       <SharePreviewModal
@@ -969,7 +1052,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
 
 export default function PostDetailsScreen() {
   const router = useRouter();
-  const { postId } = useLocalSearchParams();
+  const { postId, profileUserId, profilePicture, profileUsername, profileLevel } = useLocalSearchParams();
   const { token, user } = useAuth() as any;
   const insets = useSafeAreaInsets();
 
@@ -1041,17 +1124,24 @@ export default function PostDetailsScreen() {
   // Background loading for smooth scrolling experience
   const loadMorePostsInBackground = async () => {
     try {
-      const res = await axios.get(`${API_URL}/feed?limit=${LIMIT}&skip=0`, {
+      const endpoint = profileUserId 
+  ? `${API_URL}/users/${profileUserId}/posts?limit=${LIMIT}&skip=0`
+  : `${API_URL}/feed?limit=${LIMIT}&skip=0`;
+const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const normalized = res.data.map((p: any) => ({
-        ...p,
-        media_url: normalizeUrl(p.media_url),
-        image_url: normalizeUrl(p.image_url || p.media_url),
-        thumbnail_url: normalizeUrl(p.thumbnail_url),
-        user_profile_picture: normalizeUrl(p.user_profile_picture),
-      }));
+  ...p,
+  media_url: normalizeUrl(p.media_url),
+  image_url: normalizeUrl(p.image_url || p.media_url),
+  thumbnail_url: normalizeUrl(p.thumbnail_url),
+  // If coming from profile, use first post's user info for all posts
+ user_profile_picture: normalizeUrl(p.user_profile_picture) || (profileUserId ? decodeURIComponent(profilePicture as string || '') : null),
+username: p.username || (profileUserId ? decodeURIComponent(profileUsername as string || '') : null),
+user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
+  user_id: p.user_id || profileUserId,
+}));
 
       // Add posts that aren't the current one
       const otherPosts = normalized.filter((p: any) => p.id !== postId);
@@ -1109,7 +1199,10 @@ export default function PostDetailsScreen() {
     if (loadingMore || !hasMore) return;
     try {
       setLoadingMore(true);
-      const res = await axios.get(`${API_URL}/feed?limit=${LIMIT}&skip=${skip}`, {
+      const endpoint = profileUserId 
+  ? `${API_URL}/users/${profileUserId}/posts?limit=${LIMIT}&skip=${skip}`
+  : `${API_URL}/feed?limit=${LIMIT}&skip=${skip}`;
+const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -1119,12 +1212,16 @@ export default function PostDetailsScreen() {
       }
 
       const normalized = res.data.map((p: any) => ({
-        ...p,
-        media_url: normalizeUrl(p.media_url),
-        image_url: normalizeUrl(p.image_url || p.media_url),
-        thumbnail_url: normalizeUrl(p.thumbnail_url),
-        user_profile_picture: normalizeUrl(p.user_profile_picture),
-      }));
+  ...p,
+  media_url: normalizeUrl(p.media_url),
+  image_url: normalizeUrl(p.image_url || p.media_url),
+  thumbnail_url: normalizeUrl(p.thumbnail_url),
+  // If coming from profile, use first post's user info for all posts
+user_profile_picture: normalizeUrl(p.user_profile_picture) || (profileUserId ? decodeURIComponent(profilePicture as string || '') : null),
+username: p.username || (profileUserId ? decodeURIComponent(profileUsername as string || '') : null),
+user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
+  user_id: p.user_id || profileUserId,
+}));
 
       const existingIds = new Set(posts.map((p: any) => p.id));
       const newPosts = normalized.filter((p: any) => !existingIds.has(p.id));

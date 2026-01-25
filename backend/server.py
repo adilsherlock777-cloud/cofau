@@ -27,6 +27,7 @@ from routers.moderation import router as moderation_router
 from routers.leaderboard import router as leaderboard_router
 from routers import restaurant_auth
 from routers import restaurant_posts
+from routers.restaurant_analytics import router as restaurant_analytics_router
 from routers.map import router as map_router
 
 # Import utils
@@ -425,6 +426,8 @@ app.include_router(moderation_router)
 app.include_router(leaderboard_router)
 app.include_router(restaurant_posts.router)
 app.include_router(map_router)
+app.include_router(restaurant_analytics_router)
+
 
 
 # ======================================================
@@ -597,7 +600,7 @@ async def create_post(
     db = get_database()
     
     print(f"🏷️ Received tagged_restaurant_id: {tagged_restaurant_id}")
-    
+
     # Debug logging for category
     print(f"📝 Creating post with category: '{category}' (type: {type(category)})")
     if category:
@@ -2531,7 +2534,22 @@ async def search_restaurants_for_tagging(
             "is_verified": restaurant.get("is_verified", False),
         })
     
-    return result
+    # ✅ Track search appearances - INSIDE the function, BEFORE return
+    if result:  # Only track if restaurants were found
+        try:
+            for restaurant in restaurants:
+                await db.restaurant_analytics.insert_one({
+                    "restaurant_id": str(restaurant["_id"]),
+                    "event_type": "search_appearance",
+                    "search_query": q.strip(),
+                    "user_id": str(current_user.get("_id")) if current_user else None,
+                    "created_at": datetime.utcnow()
+                })
+        except Exception as e:
+            print(f"Analytics tracking error: {e}")
+            # Don't fail the search if analytics fails
+    
+    return result  # ✅ Return AFTER tracking
 
 @app.get("/api/restaurants/{restaurant_id}/reviews")
 async def get_restaurant_reviews(

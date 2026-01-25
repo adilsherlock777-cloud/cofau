@@ -25,6 +25,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost } from "../utils/api";
 import MapView, { Marker, PROVIDER_GOOGLE, Callout } from "react-native-maps";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from "expo-location";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
@@ -749,6 +750,14 @@ const QUICK_CATEGORIES = [
       } else {
         // All pins return both
         setMapRestaurants(response.data.restaurants || []);
+        // Track search appearances for restaurants
+const restaurants = response.data.restaurants || [];
+restaurants.forEach((restaurant: any) => {
+  axios.post(`${API_URL}/restaurant/analytics/track-anonymous`, {
+    restaurant_id: restaurant.id,
+    event_type: 'search_appearance'
+  }).catch(err => console.log('Analytics tracking error:', err));
+});
         setMapPosts(response.data.posts || []);
       }
     } catch (error) {
@@ -801,15 +810,54 @@ const QUICK_CATEGORIES = [
     setShowPostModal(true);
   };
 
-  const handleViewRestaurantProfile = (restaurant: any) => {
-    setShowRestaurantModal(false);
-    router.push(`/restaurant/${restaurant.id}`);
-  };
+  const handleViewRestaurantProfile = async (restaurant: any) => {
+  setShowRestaurantModal(false);
+  
+  // Track profile view for restaurant
+  try {
+    const token = await AsyncStorage.getItem('token');
+    axios.post(`${API_URL}/restaurant/analytics/track`, {
+      restaurant_id: restaurant.id,
+      event_type: 'profile_view'
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).catch(err => console.log('Analytics tracking error:', err));
+    
+    // Also track profile visit
+    axios.post(`${API_URL}/restaurant/analytics/track`, {
+      restaurant_id: restaurant.id,
+      event_type: 'profile_visit'
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).catch(err => console.log('Analytics tracking error:', err));
+  } catch (err) {
+    console.log('Analytics tracking error:', err);
+  }
+  
+  router.push(`/restaurant/${restaurant.id}`);
+};
 
-  const handleViewPost = (post: any) => {
-    setShowPostModal(false);
-    router.push(`/post-details/${post.id}`);
-  };
+  const handleViewPost = async (post: any) => {
+  setShowPostModal(false);
+  
+  // Track if it's a restaurant post
+  if (post.account_type === 'restaurant' || post.restaurant_id) {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      axios.post(`${API_URL}/restaurant/analytics/track`, {
+        restaurant_id: post.restaurant_id || post.user_id,
+        event_type: 'post_click',
+        post_id: post.id
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => console.log('Analytics tracking error:', err));
+    } catch (err) {
+      console.log('Analytics tracking error:', err);
+    }
+  }
+  
+  router.push(`/post-details/${post.id}`);
+};
 
   // ======================================================
   // INITIALIZE MAP WHEN TAB CHANGES
@@ -953,7 +1001,29 @@ useEffect(() => {
 };
   const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch (err) { console.log("Like error:", err); } };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
-  const handlePostPressGrid = (postId: string) => { setPlayingVideos([]); router.push(`/post-details/${postId}`); };
+  const handlePostPressGrid = async (postId: string) => {
+  setPlayingVideos([]);
+  
+  // Find the post to check if it's a restaurant post
+  const post = posts.find(p => p.id === postId);
+  if (post && post.account_type === 'restaurant') {
+    // Track post click for restaurant
+    try {
+      const token = await AsyncStorage.getItem('token');
+      axios.post(`${API_URL}/restaurant/analytics/track`, {
+        restaurant_id: post.user_id,
+        event_type: 'post_click',
+        post_id: postId
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => console.log('Analytics tracking error:', err));
+    } catch (err) {
+      console.log('Analytics tracking error:', err);
+    }
+  }
+  
+  router.push(`/post-details/${postId}`);
+};
 
   if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Authenticating…</Text></View>;
 

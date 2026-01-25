@@ -130,6 +130,7 @@ useEffect(() => {
   } 
 }, []);
 
+
 const fetchRestaurantReviewsCount = async () => {
   if (!token || !user?.id || accountType !== 'restaurant') return;
   try {
