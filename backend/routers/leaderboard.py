@@ -778,7 +778,7 @@ async def refresh_leaderboard(current_user: dict = Depends(get_current_user)):
         )
 
 # ======================================================
-# TOP CONTRIBUTORS ENDPOINTS (New Feature)
+# TOP CONTRIBUTORS - LAST 3 DAYS (New Feature)
 # ======================================================
 
 @router.get("/top-contributors/users")
@@ -787,11 +787,17 @@ async def get_top_contributor_users(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get top 10 users ranked by posts count (descending).
+    Get top 10 users ranked by posts count in the LAST 3 DAYS.
     Each user includes their 3 latest posts and 2 most liked posts.
     """
     db = get_database()
     current_user_id = str(current_user["_id"])
+    
+    # Calculate date range - last 3 days
+    to_date = datetime.utcnow()
+    from_date = to_date - timedelta(days=3)
+    
+    logger.info(f"📊 Fetching top contributors from {from_date.isoformat()} to {to_date.isoformat()}")
     
     # Get blocked user IDs to exclude
     blocked_user_ids = []
@@ -801,39 +807,61 @@ async def get_top_contributor_users(
     except Exception as e:
         logger.warning(f"Could not fetch blocked users: {e}")
     
-    # Aggregate posts count per user
-    match_stage = {}
-    if blocked_user_ids:
-        match_stage = {"user_id": {"$nin": blocked_user_ids}}
+    # Get all posts from last 3 days
+    all_posts = await db.posts.find().to_list(None)
     
-    pipeline = [
-        {"$match": match_stage} if match_stage else {"$match": {}},
-        {"$group": {
-            "_id": "$user_id",
-            "posts_count": {"$sum": 1}
-        }},
-        {"$match": {"posts_count": {"$gt": 0}}},
-        {"$sort": {"posts_count": -1}},
-        {"$limit": limit}
-    ]
+    # Filter posts from last 3 days
+    recent_posts = []
+    for post in all_posts:
+        created_at_raw = post.get("created_at")
+        if not created_at_raw:
+            continue
+        
+        # Parse datetime
+        created_at = parse_datetime_safe(created_at_raw)
+        
+        # Convert IST to UTC if needed
+        created_at = (
+            created_at
+            .replace(tzinfo=IST)
+            .astimezone(UTC)
+            .replace(tzinfo=None)
+        )
+        
+        # Check if within last 3 days
+        if from_date <= created_at <= to_date:
+            user_id = post.get("user_id")
+            # Exclude blocked users
+            if user_id and user_id not in blocked_user_ids:
+                recent_posts.append(post)
     
-    top_users_cursor = db.posts.aggregate(pipeline)
-    top_users_data = await top_users_cursor.to_list(limit)
+    logger.info(f"📊 Found {len(recent_posts)} posts in last 3 days")
+    
+    # Group posts by user_id and count
+    user_posts_count = {}
+    for post in recent_posts:
+        user_id = post.get("user_id")
+        if user_id:
+            if user_id not in user_posts_count:
+                user_posts_count[user_id] = 0
+            user_posts_count[user_id] += 1
+    
+    # Sort by posts count (descending) and take top N
+    sorted_users = sorted(user_posts_count.items(), key=lambda x: x[1], reverse=True)[:limit]
+    
+    logger.info(f"📊 Top {len(sorted_users)} users by post count in last 3 days")
     
     contributors = []
     
-    for idx, user_data in enumerate(top_users_data):
-        user_id = user_data["_id"]
-        posts_count = user_data["posts_count"]
-        
-        if not user_id:
-            continue
-        
+    for idx, (user_id, posts_count_3days) in enumerate(sorted_users):
         # Get user details
         user = None
         try:
             user = await db.users.find_one({"_id": ObjectId(user_id)})
         except:
+            pass
+        
+        if not user:
             try:
                 user = await db.users.find_one({"_id": user_id})
             except:
@@ -843,12 +871,15 @@ async def get_top_contributor_users(
             logger.warning(f"User {user_id} not found, skipping")
             continue
         
-        # Get 3 latest posts
-        latest_posts_cursor = db.posts.find({"user_id": user_id}).sort("created_at", -1).limit(3)
-        latest_posts_raw = await latest_posts_cursor.to_list(3)
+        # Get total posts count (all time)
+        total_posts_count = await db.posts.count_documents({"user_id": user_id})
+        
+        # Get 3 latest posts (from last 3 days)
+        user_recent_posts = [p for p in recent_posts if p.get("user_id") == user_id]
+        user_recent_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
         
         latest_posts = []
-        for post in latest_posts_raw:
+        for post in user_recent_posts[:3]:
             media_type = post.get("media_type", "image")
             thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
             latest_posts.append({
@@ -858,35 +889,30 @@ async def get_top_contributor_users(
                 "media_type": media_type
             })
         
-        # Get 2 most liked posts (excluding duplicates from latest)
-        latest_post_ids = [p["post_id"] for p in latest_posts]
-        most_liked_cursor = db.posts.find({"user_id": user_id}).sort("likes_count", -1).limit(5)
-        most_liked_raw = await most_liked_cursor.to_list(5)
+        # Get 2 most liked posts (from last 3 days)
+        user_recent_posts.sort(key=lambda x: x.get("likes_count", 0), reverse=True)
         
         most_liked_posts = []
-        for post in most_liked_raw:
-            post_id = str(post["_id"])
-            # Skip if already in latest posts
-            if post_id in latest_post_ids and len(most_liked_posts) < 2:
-                # Include anyway if we need more posts
-                pass
+        for post in user_recent_posts[:2]:
             media_type = post.get("media_type", "image")
             thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
             most_liked_posts.append({
-                "post_id": post_id,
+                "post_id": str(post["_id"]),
                 "thumbnail_url": thumbnail,
                 "media_url": post.get("media_url"),
                 "media_type": media_type,
                 "likes_count": post.get("likes_count", 0)
             })
-            if len(most_liked_posts) >= 2:
-                break
         
         # Check if current user is following this user
         is_following = await db.follows.find_one({
             "followerId": current_user_id,
             "followingId": user_id
         }) is not None
+        
+        user_level = user.get("level", 1)
+        if user_level is None or user_level < 1:
+            user_level = 1
         
         contributors.append({
             "rank": idx + 1,
@@ -895,17 +921,23 @@ async def get_top_contributor_users(
             "full_name": user.get("full_name") or user.get("username") or "Unknown",
             "profile_picture": user.get("profile_picture"),
             "bio": user.get("bio"),
-            "level": user.get("level", 1),
+            "level": user_level,
             "followers_count": user.get("followers_count", 0),
-            "posts_count": posts_count,
+            "posts_count": total_posts_count,  # Total posts (all time)
+            "posts_count_3days": posts_count_3days,  # Posts in last 3 days
             "is_following": is_following,
             "latest_posts": latest_posts,
             "most_liked_posts": most_liked_posts
         })
     
-    logger.info(f"✅ Top Contributors (Users): Returned {len(contributors)} users")
+    logger.info(f"✅ Top Contributors (Users): Returned {len(contributors)} users from last 3 days")
     
-    return {"contributors": contributors}
+    return {
+        "contributors": contributors,
+        "from_date": from_date.isoformat(),
+        "to_date": to_date.isoformat(),
+        "window_days": 3
+    }
 
 
 @router.get("/top-contributors/restaurants")
@@ -914,41 +946,72 @@ async def get_top_contributor_restaurants(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get top 10 restaurants ranked by posts count (descending).
+    Get top 10 restaurants ranked by posts count in the LAST 3 DAYS.
     Each restaurant includes their 3 latest posts and 2 most liked posts.
     """
     db = get_database()
     current_user_id = str(current_user["_id"])
     
-    # Aggregate posts count per restaurant
-    pipeline = [
-        {"$match": {"restaurant_id": {"$exists": True, "$ne": None}}},
-        {"$group": {
-            "_id": "$restaurant_id",
-            "posts_count": {"$sum": 1}
-        }},
-        {"$match": {"posts_count": {"$gt": 0}}},
-        {"$sort": {"posts_count": -1}},
-        {"$limit": limit}
-    ]
+    # Calculate date range - last 3 days
+    to_date = datetime.utcnow()
+    from_date = to_date - timedelta(days=3)
     
-    top_restaurants_cursor = db.restaurant_posts.aggregate(pipeline)
-    top_restaurants_data = await top_restaurants_cursor.to_list(limit)
+    logger.info(f"📊 Fetching top restaurant contributors from {from_date.isoformat()} to {to_date.isoformat()}")
+    
+    # Get all restaurant posts from last 3 days
+    all_posts = await db.restaurant_posts.find().to_list(None)
+    
+    # Filter posts from last 3 days
+    recent_posts = []
+    for post in all_posts:
+        created_at_raw = post.get("created_at")
+        if not created_at_raw:
+            continue
+        
+        # Parse datetime
+        created_at = parse_datetime_safe(created_at_raw)
+        
+        # Convert IST to UTC if needed
+        created_at = (
+            created_at
+            .replace(tzinfo=IST)
+            .astimezone(UTC)
+            .replace(tzinfo=None)
+        )
+        
+        # Check if within last 3 days
+        if from_date <= created_at <= to_date:
+            restaurant_id = post.get("restaurant_id")
+            if restaurant_id:
+                recent_posts.append(post)
+    
+    logger.info(f"📊 Found {len(recent_posts)} restaurant posts in last 3 days")
+    
+    # Group posts by restaurant_id and count
+    restaurant_posts_count = {}
+    for post in recent_posts:
+        restaurant_id = post.get("restaurant_id")
+        if restaurant_id:
+            if restaurant_id not in restaurant_posts_count:
+                restaurant_posts_count[restaurant_id] = 0
+            restaurant_posts_count[restaurant_id] += 1
+    
+    # Sort by posts count (descending) and take top N
+    sorted_restaurants = sorted(restaurant_posts_count.items(), key=lambda x: x[1], reverse=True)[:limit]
+    
+    logger.info(f"📊 Top {len(sorted_restaurants)} restaurants by post count in last 3 days")
     
     contributors = []
     
-    for idx, rest_data in enumerate(top_restaurants_data):
-        restaurant_id = rest_data["_id"]
-        posts_count = rest_data["posts_count"]
-        
-        if not restaurant_id:
-            continue
-        
+    for idx, (restaurant_id, posts_count_3days) in enumerate(sorted_restaurants):
         # Get restaurant details
         restaurant = None
         try:
             restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
         except:
+            pass
+        
+        if not restaurant:
             try:
                 restaurant = await db.restaurants.find_one({"_id": restaurant_id})
             except:
@@ -958,12 +1021,15 @@ async def get_top_contributor_restaurants(
             logger.warning(f"Restaurant {restaurant_id} not found, skipping")
             continue
         
-        # Get 3 latest posts
-        latest_posts_cursor = db.restaurant_posts.find({"restaurant_id": restaurant_id}).sort("created_at", -1).limit(3)
-        latest_posts_raw = await latest_posts_cursor.to_list(3)
+        # Get total posts count (all time)
+        total_posts_count = await db.restaurant_posts.count_documents({"restaurant_id": restaurant_id})
+        
+        # Get 3 latest posts (from last 3 days)
+        rest_recent_posts = [p for p in recent_posts if p.get("restaurant_id") == restaurant_id]
+        rest_recent_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
         
         latest_posts = []
-        for post in latest_posts_raw:
+        for post in rest_recent_posts[:3]:
             media_type = post.get("media_type", "image")
             thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
             latest_posts.append({
@@ -973,12 +1039,11 @@ async def get_top_contributor_restaurants(
                 "media_type": media_type
             })
         
-        # Get 2 most liked posts
-        most_liked_cursor = db.restaurant_posts.find({"restaurant_id": restaurant_id}).sort("likes_count", -1).limit(2)
-        most_liked_raw = await most_liked_cursor.to_list(2)
+        # Get 2 most liked posts (from last 3 days)
+        rest_recent_posts.sort(key=lambda x: x.get("likes_count", 0), reverse=True)
         
         most_liked_posts = []
-        for post in most_liked_raw:
+        for post in rest_recent_posts[:2]:
             media_type = post.get("media_type", "image")
             thumbnail = post.get("thumbnail_url") if media_type == "video" else post.get("media_url")
             most_liked_posts.append({
@@ -1007,12 +1072,18 @@ async def get_top_contributor_restaurants(
             "bio": restaurant.get("bio"),
             "level": None,  # Restaurants don't have levels
             "followers_count": followers_count,
-            "posts_count": posts_count,
+            "posts_count": total_posts_count,  # Total posts (all time)
+            "posts_count_3days": posts_count_3days,  # Posts in last 3 days
             "is_following": is_following,
             "latest_posts": latest_posts,
             "most_liked_posts": most_liked_posts
         })
     
-    logger.info(f"✅ Top Contributors (Restaurants): Returned {len(contributors)} restaurants")
+    logger.info(f"✅ Top Contributors (Restaurants): Returned {len(contributors)} restaurants from last 3 days")
     
-    return {"contributors": contributors}
+    return {
+        "contributors": contributors,
+        "from_date": from_date.isoformat(),
+        "to_date": to_date.isoformat(),
+        "window_days": 3
+    }

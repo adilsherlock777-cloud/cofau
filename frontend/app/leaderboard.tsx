@@ -20,6 +20,11 @@ import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../util
 import { followUser, unfollowUser } from "../utils/api";
 import UserAvatar from "../components/UserAvatar";
 import { BlurView } from 'expo-blur';
+import { Dimensions } from "react-native";
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_HORIZONTAL_PADDING = 32; // 16 padding on each side
+const THUMBNAIL_GAP = 8;
 
 export default function LeaderboardScreen() {
   const router = useRouter();
@@ -901,38 +906,44 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 20,
   },
-  thumbnailsContainer: {
-    marginTop: 8,
-  },
-  thumbnailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  thumbnailRowBottom: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-  },
-  thumbnail: {
-    width: "31%",
-    aspectRatio: 1,
-    borderRadius: 12,
-    backgroundColor: "#f0f0f0",
-  },
-  thumbnailSmall: {
-    width: "45%",
-    aspectRatio: 1.5,
-    borderRadius: 12,
-    backgroundColor: "#f0f0f0",
-  },
-  thumbnailPlaceholder: {
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderStyle: "dashed",
-  },
+thumbnailsContainer: {
+  marginTop: 12,
+  width: '100%',
+},
+
+thumbnailRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  marginBottom: 8,
+},
+
+thumbnailRowBottom: {
+  flexDirection: "row",
+  justifyContent: "center",
+  gap: 8,
+},
+
+thumbnail: {
+  width: (SCREEN_WIDTH - CARD_HORIZONTAL_PADDING - 32 - THUMBNAIL_GAP * 2) / 3,
+  height: (SCREEN_WIDTH - CARD_HORIZONTAL_PADDING - 32 - THUMBNAIL_GAP * 2) / 3,
+  borderRadius: 12,
+  backgroundColor: "#f0f0f0",
+},
+
+thumbnailSmall: {
+  width: (SCREEN_WIDTH - CARD_HORIZONTAL_PADDING - 32 - THUMBNAIL_GAP) / 2.3,
+  height: (SCREEN_WIDTH - CARD_HORIZONTAL_PADDING - 32 - THUMBNAIL_GAP * 2) / 3,
+  borderRadius: 12,
+  backgroundColor: "#f0f0f0",
+},
+
+thumbnailPlaceholder: {
+  justifyContent: "center",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: "#e0e0e0",
+  borderStyle: "dashed",
+},
   bottomSpacer: {
     height: 20,
   },
