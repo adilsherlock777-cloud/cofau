@@ -223,25 +223,30 @@ async def send_push_notification(
     
     # Send to Android devices via FCM
     if android_tokens:
-        try:
-            # Initialize Firebase if not already done
+        if not FIREBASE_FCM_AVAILABLE:
+            print("⚠️ Firebase FCM not available - Android notifications will not be sent")
+            print("   Install firebase-admin: pip install firebase-admin")
+            results["android"] = {"error": "Firebase FCM not available"}
+        else:
             try:
-                initialize_firebase()
+                # Initialize Firebase if not already done
+                try:
+                    initialize_firebase()
+                except Exception as e:
+                    print(f"⚠️ Firebase initialization warning: {str(e)}")
+                
+                fcm_result = await send_fcm_notification(
+                    device_tokens=android_tokens,
+                    title=title,
+                    body=body,
+                    data=data
+                )
+                results["android"] = fcm_result
+                if fcm_result and "success" in fcm_result:
+                    results["total_sent"] += fcm_result.get("success", 0)
             except Exception as e:
-                print(f"⚠️ Firebase initialization warning: {str(e)}")
-            
-            fcm_result = await send_fcm_notification(
-                device_tokens=android_tokens,
-                title=title,
-                body=body,
-                data=data
-            )
-            results["android"] = fcm_result
-            if fcm_result and "success" in fcm_result:
-                results["total_sent"] += fcm_result.get("success", 0)
-        except Exception as e:
-            print(f"❌ Error sending FCM notifications: {str(e)}")
-            results["android"] = {"error": str(e)}
+                print(f"❌ Error sending FCM notifications: {str(e)}")
+                results["android"] = {"error": str(e)}
     
     return results
 
@@ -317,7 +322,7 @@ async def register_device_token(user_id: str, device_token: str, platform: str =
             if device_token.startswith("ExponentPushToken["):
                 platform_lower = "ios"
                 print(f"🔍 Auto-detected platform as iOS from token format")
-            elif is_fcm_token(device_token):
+            elif FIREBASE_FCM_AVAILABLE and is_fcm_token and is_fcm_token(device_token):
                 platform_lower = "android"
                 print(f"🔍 Auto-detected platform as Android from token format")
         
