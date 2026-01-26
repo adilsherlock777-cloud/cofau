@@ -1,0 +1,26 @@
+#!/usr/bin/expect -f
+# Expect script to automate EAS credentials upload
+
+set timeout 300
+spawn npx eas credentials --platform android
+
+# Wait for platform selection (should already be Android)
+expect {
+    "What platform" { send "android\r"; exp_continue }
+    "What build profile" { send "preview\r"; exp_continue }
+    "What do you want to do" { send "Update credentials\r"; exp_continue }
+    "Select credential type" { 
+        # Look for FCM V1 option
+        send "\r"; 
+        exp_continue 
+    }
+    "Upload a file" { send "Upload a file\r"; exp_continue }
+    "Path to the file" { send "./firebase-service-account.json\r"; exp_continue }
+    "credentials.json" { 
+        send "\r"; 
+        exp_continue 
+    }
+    eof
+}
+
+interact
