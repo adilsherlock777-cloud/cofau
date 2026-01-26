@@ -40,8 +40,22 @@ def initialize_firebase():
         # Not initialized yet, proceed with initialization
         pass
     
-    # Try to get credentials from environment variables
-    cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    # Hardcoded path - no environment variable needed
+    # Try multiple possible locations
+    possible_paths = [
+        "/root/backend/backend/secrets/cofau-23116-firebase-adminsdk-fbsvc-ed3d669985.json",  # Current location
+        "/root/cofau/backend/credentials/firebase-credentials.json",  # ChatGPT suggested path
+        "/root/backend/backend/credentials/firebase-credentials.json",  # Alternative
+        os.getenv("FIREBASE_CREDENTIALS_PATH"),  # Env variable (optional fallback)
+        os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),  # Standard env variable (optional fallback)
+    ]
+    
+    cred_path = None
+    for path in possible_paths:
+        if path and os.path.exists(path):
+            cred_path = path
+            break
+    
     cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
     
     if cred_path and os.path.exists(cred_path):
