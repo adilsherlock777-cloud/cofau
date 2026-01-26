@@ -12,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import React, { useState, useRef } from 'react';  // ← Add useRef here
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';

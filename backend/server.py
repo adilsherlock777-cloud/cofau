@@ -3196,6 +3196,7 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
             "location_name": post.get("location_name"),  # ✅ Include location_name
             "location": post.get("location_name"),  # For backward compatibility
             "place_name": post.get("location_name"),  # For backward compatibility
+            "category": post.get("category"), 
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
             "created_at": post["created_at"]

@@ -23,6 +23,7 @@ import { Video, ResizeMode } from 'expo-av';
 import { createPost, createRestaurantPost, createMenuItem } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
+import ImageCropper from '../components/ImageCropper';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
 import axios from 'axios';
 
@@ -42,7 +43,9 @@ export default function AddPostScreen() {
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
-  const [rating, setRating] = useState('');
+  const [tasteRating, setTasteRating] = useState(0);
+  const [valueRating, setValueRating] = useState(0);
+  const [portionRating, setPortionRating] = useState(0);
   const [review, setReview] = useState('');
 
   const [locationName, setLocationName] = useState('');
@@ -53,6 +56,9 @@ export default function AddPostScreen() {
   const [loading, setLoading] = useState(false);
   const [showPointsAnimation, setShowPointsAnimation] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
+  // Crop states
+  const [showCropper, setShowCropper] = useState(false);
+  const [tempImageUri, setTempImageUri] = useState<string | null>(null);
 
   // Tag Restaurant - Only for regular users
   const [taggedRestaurant, setTaggedRestaurant] = useState<any>(null);
@@ -109,44 +115,62 @@ const CATEGORIES = [
   // ------------------------------ MEDIA PICKERS ------------------------------
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission Required', 'Enable gallery permissions to continue.');
-      return;
-    }
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert('Permission Required', 'Enable gallery permissions to continue.');
+    return;
+  }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      aspect: [4, 5],
-      quality: 0.8,
-    });
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: false,  // We'll use our own cropper
+    quality: 0.8,
+  });
 
-    if (!result.canceled && result.assets[0]) {
-      setMediaUri(result.assets[0].uri);
-      setMediaType('image');
-    }
-  };
+  if (!result.canceled && result.assets[0]) {
+    // Store temp URI and open cropper
+    setTempImageUri(result.assets[0].uri);
+    setShowCropper(true);
+  }
+};
+
+const getAverageRating = () => {
+  const total = tasteRating + valueRating + portionRating;
+  if (total === 0) return 0;
+  return Math.round((total / 3) * 10) / 10; // Round to 1 decimal
+};
+
+const handleCropDone = (croppedUri: string) => {
+  setMediaUri(croppedUri);
+  setMediaType('image');
+  setShowCropper(false);
+  setTempImageUri(null);
+};
+
+const handleCropCancel = () => {
+  setShowCropper(false);
+  setTempImageUri(null);
+};
 
   const takePhoto = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission Required', 'Enable camera permissions to continue.');
-      return;
-    }
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert('Permission Required', 'Enable camera permissions to continue.');
+    return;
+  }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 5],
-      quality: 0.8,
-    });
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: false,  // We'll use our own cropper
+    quality: 0.8,
+  });
 
-    if (!result.canceled && result.assets[0]) {
-      setMediaUri(result.assets[0].uri);
-      setMediaType('image');
-    }
-  };
+  if (!result.canceled && result.assets[0]) {
+    // Store temp URI and open cropper
+    setTempImageUri(result.assets[0].uri);
+    setShowCropper(true);
+  }
+};
 
   const pickVideo = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -314,12 +338,12 @@ const handlePost = async () => {
   let numericRating = 0;
   
   if (accountType !== 'restaurant') {
-    numericRating = parseInt(rating, 10);
-    if (!numericRating || numericRating < 1 || numericRating > 10) {
-      Alert.alert('Rating Required', 'Please add a rating between 1-10.');
-      return;
-    }
+  if (tasteRating === 0 || valueRating === 0 || portionRating === 0) {
+    Alert.alert('Rating Required', 'Please rate all three categories (Taste, Value, Portion).');
+    return;
   }
+  numericRating = getAverageRating();
+}
 
   if (accountType === 'restaurant') {
     if (!price.trim()) {
@@ -695,16 +719,70 @@ return (
 {accountType !== 'restaurant' && (
   <View style={styles.section}>
     <Text style={styles.sectionLabel}>Rating</Text>
+    
+    {/* Average Rating Display */}
+    <View style={styles.avgRatingContainer}>
+      <Text style={styles.avgRatingLabel}>Average Rating</Text>
+      <Text style={styles.avgRatingNumber}>{getAverageRating()} / 10</Text>
+    </View>
+
+    {/* Taste Rating */}
     <View style={styles.ratingContainer}>
-      <Text style={styles.ratingNumber}>{rating || '0'} / 10</Text>
+      <View style={styles.ratingHeader}>
+        <Text style={{ fontSize: 20 }}>😋</Text>
+        <Text style={styles.ratingTitle}>Taste</Text>
+        <Text style={styles.ratingValue}>{tasteRating}/10</Text>
+      </View>
       <View style={styles.starsContainer}>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-          <TouchableOpacity key={num} onPress={() => setRating(num.toString())}>
+          <TouchableOpacity key={num} onPress={() => setTasteRating(num)}>
             <Ionicons
-              name={parseInt(rating) >= num ? 'star' : 'star-outline'}
-              size={28}
-              color={parseInt(rating) >= num ? '#F2CF68' : '#CCC'}
-              style={{ marginRight: 4, marginBottom: 4 }}
+              name={tasteRating >= num ? 'star' : 'star-outline'}
+              size={24}
+              color={tasteRating >= num ? '#E94A37' : '#CCC'}
+              style={{ marginRight: 2 }}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+
+    {/* Value for Money Rating */}
+    <View style={styles.ratingContainer}>
+      <View style={styles.ratingHeader}>
+       <Text style={{ fontSize: 20 }}>💰</Text>
+        <Text style={styles.ratingTitle}>Value for Money</Text>
+        <Text style={styles.ratingValue}>{valueRating}/10</Text>
+      </View>
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+          <TouchableOpacity key={num} onPress={() => setValueRating(num)}>
+            <Ionicons
+              name={tasteRating >= num ? 'star' : 'star-outline'}
+              size={24}
+              color={valueRating >= num ? '#4ECDC4' : '#CCC'}
+              style={{ marginRight: 2 }}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+
+    {/* Portion Rating */}
+    <View style={styles.ratingContainer}>
+      <View style={styles.ratingHeader}>
+        <Text style={{ fontSize: 20 }}>🍽️</Text>
+        <Text style={styles.ratingTitle}>Portion Size</Text>
+        <Text style={styles.ratingValue}>{portionRating}/10</Text>
+      </View>
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+          <TouchableOpacity key={num} onPress={() => setPortionRating(num)}>
+            <Ionicons
+              name={portionRating >= num ? 'star' : 'star-outline'}
+              size={24}
+              color={portionRating >= num ? '#F2CF68' : '#CCC'}
+              style={{ marginRight: 2 }}
             />
           </TouchableOpacity>
         ))}
@@ -1053,6 +1131,20 @@ return (
     </View>
   </View>
 </Modal>
+{/* Image Cropper Modal */}
+{showCropper && tempImageUri && (
+  <Modal
+    visible={showCropper}
+    animationType="slide"
+    onRequestClose={handleCropCancel}
+  >
+    <ImageCropper
+      imageUri={tempImageUri}
+      onCropDone={handleCropDone}
+      onCancel={handleCropCancel}
+    />
+  </Modal>
+)}
   </View>
 );
 }
@@ -1217,6 +1309,42 @@ postTypeTextActive: {
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
+  avgRatingContainer: {
+  backgroundColor: '#1B7C82',
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 12,
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+avgRatingLabel: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#FFF',
+},
+avgRatingNumber: {
+  fontSize: 24,
+  fontWeight: 'bold',
+  color: '#FFF',
+},
+ratingHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 10,
+  gap: 8,
+},
+ratingTitle: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#333',
+  flex: 1,
+},
+ratingValue: {
+  fontSize: 14,
+  fontWeight: 'bold',
+  color: '#666',
+},
   categoryButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',

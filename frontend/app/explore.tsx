@@ -221,7 +221,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
   );
 });
 
-const PostMarker = memo(({ post, onPress }: any) => {
+const PostMarker = memo(({ post, onPress, clusterCount = 1 }: any) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   
   return (
@@ -249,17 +249,30 @@ const PostMarker = memo(({ post, onPress }: any) => {
             </View>
           )}
         </View>
-        {post.rating && (
+        {/* Show cluster count if more than 1, otherwise show rating */}
+        {clusterCount > 1 ? (
+          <View style={styles.clusterBadge}>
+            <Text style={styles.clusterBadgeText}>{clusterCount}</Text>
+          </View>
+        ) : post.rating ? (
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={10} color="#FFD700" />
             <Text style={styles.ratingBadgeText}>{post.rating}</Text>
           </View>
-        )}
+        ) : null}
         <View style={styles.postMarkerArrow} />
       </View>
     </Marker>
   );
 });
+
+const LocationButton = memo(({ onPress }: { onPress: () => void }) => (
+  <TouchableOpacity style={styles.locationButton} onPress={onPress} activeOpacity={0.8}>
+    <View style={styles.locationButtonInner}>
+      <Ionicons name="locate" size={22} color="#E94A37" />
+    </View>
+  </TouchableOpacity>
+));
 
 const MapViewComponent = memo(({ 
   userLocation, 
@@ -273,7 +286,30 @@ const MapViewComponent = memo(({
   mapRef,
   filterType,
   onFilterChange,
+  onCenterLocation,
 }: any) => {
+
+  // Group posts by location to get accurate marker count
+  const groupedPosts = React.useMemo(() => {
+    const groups = new Map<string, any[]>();
+    
+    posts.forEach((post: any) => {
+      if (post.latitude && post.longitude) {
+        const key = `${post.latitude.toFixed(6)},${post.longitude.toFixed(6)}`;
+        if (!groups.has(key)) {
+          groups.set(key, []);
+        }
+        groups.get(key)!.push(post);
+      }
+    });
+    
+    // Return first post of each group with cluster count
+    return Array.from(groups.values()).map(group => ({
+      ...group[0],
+      clusterCount: group.length,
+      allPosts: group,
+    }));
+  }, [posts]);
 
   return (
     <View style={styles.mapContainer}>
@@ -302,12 +338,13 @@ const MapViewComponent = memo(({
             />
           ))}
 
-          {/* Post Markers - only show when filterType is 'posts' */}
-          {filterType === 'posts' && posts.map((post: any) => (
+          {/* Post Markers - use groupedPosts to avoid stacking */}
+          {filterType === 'posts' && groupedPosts.map((post: any) => (
             <PostMarker
               key={`post-${post.id}`}
               post={post}
               onPress={onPostPress}
+              clusterCount={post.clusterCount}
             />
           ))}
         </MapView>
@@ -371,17 +408,20 @@ const MapViewComponent = memo(({
         </View>
       )}
 
-      {/* Results Count */}
+      {/* Results Count - UPDATED to show both counts */}
       {filterType !== 'squad' && (
         <View style={styles.resultsCountContainer}>
           <Text style={styles.resultsCountText}>
             {filterType === 'posts' 
-              ? `${posts.length} posts nearby`
+              ? `${posts.length} posts at ${groupedPosts.length} locations`
               : `${restaurants.length} restaurants nearby`
             }
           </Text>
         </View>
       )}
+
+      {/* Location Button */}
+      <LocationButton onPress={onCenterLocation} />
 
       {/* Squad Coming Soon Overlay */}
       {filterType === 'squad' && (
@@ -394,6 +434,7 @@ const MapViewComponent = memo(({
     </View>
   );
 });
+
 
 // ======================================================
 // RESTAURANT DETAIL MODAL
@@ -626,21 +667,22 @@ export default function ExploreScreen() {
   { id: 'fast-food', name: 'Fast Food', emoji: '🍔' },
   { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
   { id: 'salad', name: 'Salad', emoji: '🥗' },
-  { id: 'karnataka-style', name: 'Karnataka Style', emoji: '🍃' },
-  { id: 'hyderabadi-style', name: 'Hyderabadi Style', emoji: '🌶️' },
-  { id: 'kerala-style', name: 'Kerala Style', emoji: '🥥' },
-  { id: 'andhra-style', name: 'Andhra Style', emoji: '🔥' },
-  { id: 'north-indian-style', name: 'North Indian Style', emoji: '🫓' },
-  { id: 'south-indian-style', name: 'South Indian Style', emoji: '🥞' },
-  { id: 'punjabi-style', name: 'Punjabi Style', emoji: '🧈' },
-  { id: 'bengali-style', name: 'Bengali Style', emoji: '🐟' },
-  { id: 'odia-style', name: 'Odia Style', emoji: '🍚' },
-  { id: 'gujarati-style', name: 'Gujurati Style', emoji: '🥣' },
-  { id: 'rajasthani-style', name: 'Rajasthani Style', emoji: '🏜️' },
-  { id: 'mangaluru-style', name: 'Mangaluru Style', emoji: '🦀' },
+  { id: 'karnataka-style', name: 'Karnataka', emoji: '🍃' },
+  { id: 'hyderabadi-style', name: 'Hyderabadi', emoji: '🌶️' },
+  { id: 'kerala-style', name: 'Kerala', emoji: '🥥' },
+  { id: 'andhra-style', name: 'Andhra', emoji: '🔥' },
+  { id: 'north-indian-style', name: 'North Indian', emoji: '🫓' },
+  { id: 'south-indian-style', name: 'South Indian', emoji: '🥞' },
+  { id: 'punjabi-style', name: 'Punjabi', emoji: '🧈' },
+  { id: 'bengali-style', name: 'Bengali', emoji: '🐟' },
+  { id: 'odia-style', name: 'Odia', emoji: '🍚' },
+  { id: 'gujarati-style', name: 'Gujurati', emoji: '🥣' },
+  { id: 'rajasthani-style', name: 'Rajasthani', emoji: '🏜️' },
+  { id: 'mangaluru-style', name: 'Mangaluru', emoji: '🦀' },
   { id: 'goan', name: 'Goan', emoji: '🏖️' },
   { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
   { id: 'continental', name: 'Continental', emoji: '🌍' },
+  { id: 'asian', name: 'Asian', emoji: '🥢' },
   { id: 'italian', name: 'Italian', emoji: '🍝' },
   { id: 'japanese', name: 'Japanese', emoji: '🍣' },
   { id: 'korean', name: 'Korean', emoji: '🍱' },
@@ -654,27 +696,51 @@ export default function ExploreScreen() {
 
 // Show only popular categories in quick chips (names must match CATEGORIES exactly)
 const QUICK_CATEGORIES = [
-  { id: 'biryani', name: 'Biryani', emoji: '🍛' },
   { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
   { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
+  { id: 'dosa', name: 'Dosa', emoji: '🫕' },
+  { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
+  { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'italian', name: 'Italian', emoji: '🍕' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'arabic', name: 'Arabic', emoji: '🧆' },
-  { id: 'karnataka-style', name: 'Karnataka Style', emoji: '🍃' },
-  { id: 'north-indian-style', name: 'North Indian Style', emoji: '🫓' },
-  { id: 'south-indian-style', name: 'South Indian Style', emoji: '🥞' },
-  { id: 'hyderabadi-style', name: 'Hyderabadi Style', emoji: '🌶️' },
-  { id: 'kerala-style', name: 'Kerala Style', emoji: '🥥' },
-  { id: 'andhra-style', name: 'Andhra Style', emoji: '🔥' },
-  { id: 'punjabi-style', name: 'Punjabi Style', emoji: '🧈' },
-  { id: 'bengali-style', name: 'Bengali Style', emoji: '🐟' },
-  { id: 'odia-style', name: 'Odia Style', emoji: '🍚' },
-  { id: 'gujarati-style', name: 'Gujurati Style', emoji: '🥣' },
-  { id: 'rajasthani-style', name: 'Rajasthani Style', emoji: '🏜️' },
-  { id: 'mangaluru-style', name: 'Mangaluru Style', emoji: '🦀' },
+  { id: 'karnataka-style', name: 'Karnataka', emoji: '🍃' },
+  { id: 'north-indian-style', name: 'North Indian', emoji: '🫓' },
+  { id: 'south-indian-style', name: 'South Indian', emoji: '🥞' },
+  { id: 'hyderabadi-style', name: 'Hyderabadi', emoji: '🌶️' },
+  { id: 'kerala-style', name: 'Kerala', emoji: '🥥' },
+  { id: 'andhra-style', name: 'Andhra', emoji: '🔥' },
+  { id: 'punjabi-style', name: 'Punjabi', emoji: '🧈' },
+  { id: 'bengali-style', name: 'Bengali', emoji: '🐟' },
+  { id: 'asian', name: 'Asian', emoji: '🥢' },
+  { id: 'odia-style', name: 'Odia', emoji: '🍚' },
+  { id: 'gujarati-style', name: 'Gujurati', emoji: '🥣' },
+  { id: 'rajasthani-style', name: 'Rajasthani', emoji: '🏜️' },
+  { id: 'mangaluru-style', name: 'Mangaluru', emoji: '🦀' },
   { id: 'goan', name: 'Goan', emoji: '🏖️' },
   { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
 ];
 
+const centerOnUserLocation = useCallback(async () => {
+  if (userLocation && mapRef.current) {
+    mapRef.current.animateToRegion({
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    }, 500);
+  } else {
+    const coords = await getCurrentLocation();
+    if (coords && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 500);
+    }
+  }
+}, [userLocation]);
   // ======================================================
   // LOCATION PERMISSION & FETCH
   // ======================================================
@@ -725,47 +791,53 @@ const QUICK_CATEGORIES = [
   // ======================================================
 
   const fetchMapPins = async (searchTerm?: string) => {
-    if (!userLocation) return;
+  if (!userLocation) return;
 
-    setMapLoading(true);
-    try {
-      let url: string;
-      
-      if (searchTerm && searchTerm.trim()) {
-        // Search endpoint
-        url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
-      } else {
-        // All pins endpoint
-        url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
-      }
+  setMapLoading(true);
+  try {
+    let url: string;
+    
+    if (searchTerm && searchTerm.trim()) {
+      url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+      console.log('=== CATEGORY SEARCH DEBUG ===');
+      console.log('Search term:', searchTerm);
+    } else {
+      url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+    }
 
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token || ""}` },
+    console.log('Fetching URL:', url);
+
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token || ""}` },
+    });
+
+    if (searchTerm && searchTerm.trim()) {
+      // Search results
+      console.log('=== SEARCH RESULTS DEBUG ===');
+      console.log('Total results from search:', response.data.results?.length);
+      console.log('Total count from API:', response.data.total);
+      response.data.results?.forEach((p: any, i: number) => {
+        console.log(`Result ${i}: ${p.id} | category: ${p.category} | lat: ${p.latitude}, lng: ${p.longitude}`);
       });
 
-      if (searchTerm && searchTerm.trim()) {
-        // Search results only return posts
-        setMapPosts(response.data.results || []);
-        setMapRestaurants([]);
-      } else {
-        // All pins return both
-        setMapRestaurants(response.data.restaurants || []);
-        // Track search appearances for restaurants
-const restaurants = response.data.restaurants || [];
-restaurants.forEach((restaurant: any) => {
-  axios.post(`${API_URL}/restaurant/analytics/track-anonymous`, {
-    restaurant_id: restaurant.id,
-    event_type: 'search_appearance'
-  }).catch(err => console.log('Analytics tracking error:', err));
-});
-        setMapPosts(response.data.posts || []);
-      }
-    } catch (error) {
-      console.log("Fetch map pins error:", error);
-    } finally {
-      setMapLoading(false);
+  
+      
+      setMapPosts(response.data.results || []);
+      setMapRestaurants([]);
+    } else {
+      // All pins
+      setMapRestaurants(response.data.restaurants || []);
+      console.log('=== MAP DEBUG ===');
+      console.log('Total posts from API:', response.data.posts?.length);
+      console.log('Total restaurants from API:', response.data.restaurants?.length);
+      setMapPosts(response.data.posts || []);
     }
-  };
+  } catch (error) {
+    console.log("Fetch map pins error:", error);
+  } finally {
+    setMapLoading(false);
+  }
+};
 
   const handleMapSearch = (query: string) => {
     setMapSearchQuery(query);
@@ -1170,6 +1242,8 @@ useEffect(() => {
         </View>
       )}
 
+
+
       {/* CONTENT AREA */}
       {activeTab === 'map' ? (
   // MAP VIEW
@@ -1185,6 +1259,7 @@ useEffect(() => {
     mapRef={mapRef}
     filterType={mapFilterType}
     onFilterChange={setMapFilterType}
+    onCenterLocation={centerOnUserLocation}
   />
 ) : (
         // USERS GRID VIEW
@@ -1559,6 +1634,25 @@ restaurantMarkerPlaceholder: {
   alignItems: 'center',
   backgroundColor: '#E94A37',
 },
+// Add to your StyleSheet:
+clusterBadge: {
+  position: 'absolute',
+  bottom: 8,
+  backgroundColor: '#E94A37',
+  borderRadius: 12,
+  minWidth: 24,
+  height: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 6,
+  borderWidth: 2,
+  borderColor: '#fff',
+},
+clusterBadgeText: {
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 'bold',
+},
 reviewsBadge: {
   position: 'absolute',
   bottom: 8,
@@ -1702,6 +1796,25 @@ mapToggleText: {
 mapToggleTextActive: {
   color: '#E94A37',
   fontWeight: '600',
+},
+locationButton: {
+  position: 'absolute',
+  bottom: 140,
+  right: 16,
+  zIndex: 100,
+},
+locationButtonInner: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: '#fff',
+  justifyContent: 'center',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 4,
+  elevation: 5,
 },
 
 // SQUAD OVERLAY

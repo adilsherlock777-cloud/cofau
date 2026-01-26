@@ -90,9 +90,9 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
 
                     {/* Review Box */}
                     <View style={[storyCardStyles.infoBox, storyCardStyles.reviewBox]}>
-                        <Ionicons name="chatbubble-ellipses" size={22} color="#4CAF50" />
+                        <Ionicons name="create" size={22} color="#1B7C82" />
                         <Text style={storyCardStyles.infoBoxLabel}>Review</Text>
-                        <Text style={storyCardStyles.infoBoxValue} numberOfLines={2}>
+                        <Text style={storyCardStyles.infoBoxValue}>
                             {post?.review_text || post?.description || '-'}
                         </Text>
                     </View>
@@ -104,7 +104,7 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
                     <View style={storyCardStyles.infoBox}>
                         <Ionicons name="location" size={22} color="#E53935" />
                         <Text style={storyCardStyles.infoBoxLabel}>Location</Text>
-                        <Text style={storyCardStyles.infoBoxValue} numberOfLines={2}>
+                        <Text style={storyCardStyles.infoBoxValue}>
                             {post?.location_name || '-'}
                         </Text>
                     </View>

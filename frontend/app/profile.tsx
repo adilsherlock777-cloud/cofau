@@ -55,6 +55,47 @@ const LEVEL_TABLE = [
   { level: 12, required_points: 12000 },
 ];
 
+const CATEGORIES = [
+  { id: 'all', name: 'All', emoji: '🍽️' },
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
+  { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'desserts', name: 'Desserts', emoji: '🍰' },
+  { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
+  { id: 'chinese', name: 'Chinese', emoji: '🍜' },
+  { id: 'chaats', name: 'Chaats', emoji: '🥘' },
+  { id: 'arabic', name: 'Arabic', emoji: '🧆' },
+  { id: 'bbq-tandoor', name: 'BBQ/Tandoor', emoji: '🍗' },
+  { id: 'fast-food', name: 'Fast Food', emoji: '🍔' },
+  { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
+  { id: 'salad', name: 'Salad', emoji: '🥗' },
+  { id: 'karnataka-style', name: 'Karnataka', emoji: '🍃' },
+  { id: 'hyderabadi-style', name: 'Hyderabadi', emoji: '🌶️' },
+  { id: 'kerala-style', name: 'Kerala', emoji: '🥥' },
+  { id: 'andhra-style', name: 'Andhra', emoji: '🔥' },
+  { id: 'north-indian-style', name: 'North Indian', emoji: '🫓' },
+  { id: 'south-indian-style', name: 'South Indian', emoji: '🥞' },
+  { id: 'punjabi-style', name: 'Punjabi', emoji: '🧈' },
+  { id: 'bengali-style', name: 'Bengali', emoji: '🐟' },
+  { id: 'odia-style', name: 'Odia', emoji: '🍚' },
+  { id: 'gujarati-style', name: 'Gujurati', emoji: '🥣' },
+  { id: 'rajasthani-style', name: 'Rajasthani', emoji: '🏜️' },
+  { id: 'mangaluru-style', name: 'Mangaluru', emoji: '🦀' },
+  { id: 'goan', name: 'Goan', emoji: '🏖️' },
+  { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
+  { id: 'continental', name: 'Continental', emoji: '🌍' },
+  { id: 'asian', name: 'Asian', emoji: '🥢' },
+  { id: 'italian', name: 'Italian', emoji: '🍝' },
+  { id: 'japanese', name: 'Japanese', emoji: '🍣' },
+  { id: 'korean', name: 'Korean', emoji: '🍱' },
+  { id: 'mexican', name: 'Mexican', emoji: '🌮' },
+  { id: 'persian', name: 'Persian', emoji: '🫖' },
+  { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
+  { id: 'pizza', name: 'Pizza', emoji: '🍕' },
+  { id: 'dosa', name: 'Dosa', emoji: '🫕' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
+];
+
 /**
  * Calculate points needed from current level to next level
  * @param currentLevel - Current user level
@@ -263,6 +304,65 @@ const ProfileSkeleton = () => {
     </View>
   );
 };
+
+const GridSkeleton = () => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, []);
+
+  const backgroundColor = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E8E8E8', '#F5F5F5'],
+  });
+
+  const SkeletonBox = ({ style = {} }) => (
+    <Animated.View
+      style={[
+        {
+          width: (SCREEN_WIDTH - 4) / 3,
+          height: (SCREEN_WIDTH - 4) / 3,
+          margin: 0.5,
+          borderRadius: 4,
+          backgroundColor,
+        },
+        style,
+      ]}
+    />
+  );
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+      {[...Array(9)].map((_, index) => (
+        <SkeletonBox key={index} />
+      ))}
+    </View>
+  );
+};
+
+const LoadingFooter = () => (
+  <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+    <ActivityIndicator size="small" color="#E94A37" />
+    <Text style={{ marginTop: 8, color: '#999', fontSize: 12 }}>Loading more...</Text>
+  </View>
+);
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams();
@@ -308,6 +408,8 @@ export default function ProfileScreen() {
   const [reviewFilter, setReviewFilter] = useState<string | null>(null);
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -316,6 +418,11 @@ export default function ProfileScreen() {
   //const [confirm, setConfirm] = useState<any>(null);
   const [updatingPhone, setUpdatingPhone] = useState(false);
   const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [postsPage, setPostsPage] = useState(0);
+  const POSTS_PER_PAGE = 21; // Load 21 posts at a time (divisible by 3 for grid)
   const [reviewFilterCounts, setReviewFilterCounts] = useState({
     topRated: 0,
     mostLoved: 0,
@@ -369,20 +476,21 @@ useEffect(() => {
   }
 }, [userData?.id]); // Only run once when userData loads
 
- useEffect(() => {
+useEffect(() => {
   if (userData) {
-    fetchUserPosts();
+    // Reset pagination when switching tabs or user changes
+    setPostsPage(0);
+    setHasMorePosts(true);
+    fetchUserPosts(false); // false = not loading more, fresh fetch
     fetchComplimentsCount();
     checkIfComplimented();
     
-    // Fetch menu items and reviews if restaurant account
     if (isRestaurantProfile || accountType === 'restaurant') {
       fetchMenuItems();
-      fetchRestaurantReviews();  // ← ADD THIS
+      fetchRestaurantReviews();
     }
   }
 }, [userData, activeTab, isRestaurantProfile]);
-
 
 
   // Animate sidebar when modal visibility changes
@@ -502,6 +610,33 @@ const getFilteredReviews = () => {
     default:
       return restaurantReviews;
   }
+};
+
+const getFilteredPostsByCategory = (posts: any[], isVideo: boolean) => {
+  // First filter by media type (photo or video)
+  const mediaFiltered = posts.filter((post: any) => isVideo ? post.isVideo : !post.isVideo);
+  
+  // Then filter by category if not 'all'
+  if (selectedCategory === 'all') {
+    return mediaFiltered;
+  }
+  
+  // Find the selected category's name from CATEGORIES array
+  const selectedCategoryData = CATEGORIES.find(c => c.id === selectedCategory);
+  const categoryName = selectedCategoryData?.name;
+
+  // DEBUG LOG
+  console.log('🔍 FILTER DEBUG:', {
+    selectedCategory,
+    categoryName,
+    postsWithCategory: mediaFiltered.filter(p => p.category).map(p => p.category).slice(0, 5),
+  });
+  
+  return mediaFiltered.filter((post: any) => {
+    if (!post.category || !categoryName) return false;
+    // Case-insensitive comparison
+    return post.category.toLowerCase() === categoryName.toLowerCase();
+  });
 };
 
   const GradientHeart = ({ size = 24 }) => (
@@ -649,84 +784,138 @@ try {
     }
   };
 
- const fetchUserPosts = async () => {
-    if (!userData) return;
+ const fetchUserPosts = async (loadMore = false) => {
+  if (!userData) return;
+  
+  // Prevent duplicate calls
+  if (loadMore && (loadingMore || !hasMorePosts)) return;
+  if (!loadMore && postsLoading) return;
 
-   try {
+  if (loadMore) {
+    setLoadingMore(true);
+  } else {
+    setPostsLoading(true);
+    setPostsPage(0);
+    setHasMorePosts(true);
+  }
+
+  try {
     let endpoint;
+    const currentPage = loadMore ? postsPage : 0;
+    const skip = currentPage * POSTS_PER_PAGE;
     
-    // Use different endpoint based on the PROFILE being viewed, not the visitor
+    // Use different endpoint based on the PROFILE being viewed
     if (isRestaurantProfile || userData?.account_type === 'restaurant') {
-      endpoint = `${API_URL}/restaurant/posts/public/restaurant/${userData.id}`;
+      endpoint = `${API_URL}/restaurant/posts/public/restaurant/${userData.id}?skip=${skip}&limit=${POSTS_PER_PAGE}`;
     } else {
-      endpoint = `${API_URL}/users/${userData.id}/posts`;
+      endpoint = `${API_URL}/users/${userData.id}/posts?skip=${skip}&limit=${POSTS_PER_PAGE}`;
     }
 
-      const response = await axios.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const posts = response.data || [];
+    console.log(`📡 Fetching posts: page=${currentPage}, skip=${skip}, limit=${POSTS_PER_PAGE}`);
 
-      const postsWithFullUrls = posts.map((post: any) => {
-        const mediaUrl = post.media_url || post.full_image_url;
-        const normalizedUrl = fixUrl(mediaUrl);
-        const thumbnailUrl = post.thumbnail_url ? fixUrl(post.thumbnail_url) : null;
-        const isVideo = 
-          post.media_type === 'video' ||
-          normalizedUrl?.toLowerCase().endsWith('.mp4') ||
-          normalizedUrl?.toLowerCase().endsWith('.mov') ||
-          normalizedUrl?.toLowerCase().endsWith('.avi') ||
-          normalizedUrl?.toLowerCase().endsWith('.webm');
-        
-        let locationName = post.location_name || post.location || post.place_name;
-        if (!locationName && post.map_link) {
-          try {
-            const url = new URL(post.map_link);
-            const queryParam = url.searchParams.get('query');
-            if (queryParam) {
-              locationName = decodeURIComponent(queryParam);
-            }
-          } catch (e) {
-            const match = post.map_link.match(/query=([^&]+)/);
-            if (match) {
-              locationName = decodeURIComponent(match[1]);
-            }
+    const response = await axios.get(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    const posts = response.data || [];
+    console.log(`✅ Received ${posts.length} posts`);
+
+    // Check if we have more posts to load
+    if (posts.length < POSTS_PER_PAGE) {
+      setHasMorePosts(false);
+    }
+
+    const postsWithFullUrls = posts.map((post: any) => {
+      const mediaUrl = post.media_url || post.full_image_url;
+      const normalizedUrl = fixUrl(mediaUrl);
+      const thumbnailUrl = post.thumbnail_url ? fixUrl(post.thumbnail_url) : null;
+      const isVideo = 
+        post.media_type === 'video' ||
+        normalizedUrl?.toLowerCase().endsWith('.mp4') ||
+        normalizedUrl?.toLowerCase().endsWith('.mov') ||
+        normalizedUrl?.toLowerCase().endsWith('.avi') ||
+        normalizedUrl?.toLowerCase().endsWith('.webm');
+      
+      let locationName = post.location_name || post.location || post.place_name;
+      if (!locationName && post.map_link) {
+        try {
+          const url = new URL(post.map_link);
+          const queryParam = url.searchParams.get('query');
+          if (queryParam) {
+            locationName = decodeURIComponent(queryParam);
+          }
+        } catch (e) {
+          const match = post.map_link.match(/query=([^&]+)/);
+          if (match) {
+            locationName = decodeURIComponent(match[1]);
           }
         }
-        
-        return {
-          ...post,
-          full_image_url: normalizedUrl,
-          media_url: normalizedUrl,
-          thumbnail_url: thumbnailUrl,
-          isVideo: isVideo,
-          location_name: locationName || null,
-          location: locationName || null,
-          place_name: locationName || null,
-        };
-      });
+      }
+      
+      return {
+        ...post,
+        full_image_url: normalizedUrl,
+        media_url: normalizedUrl,
+        thumbnail_url: thumbnailUrl,
+        isVideo: isVideo,
+        location_name: locationName || null,
+        location: locationName || null,
+        place_name: locationName || null,
+        category: post.category || null, // ✅ Include category
+      };
+    });
 
-      const sorted = postsWithFullUrls.sort((a: any, b: any) => {
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateB - dateA;
-      });
+    const sorted = postsWithFullUrls.sort((a: any, b: any) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA;
+    });
 
+    if (loadMore) {
+      // Append to existing posts
+      setUserPosts((prev) => [...prev, ...sorted]);
+      setPostsPage((prev) => prev + 1);
+    } else {
+      // Replace posts
       setUserPosts(sorted);
-      
-      // ✅ Update stats for restaurant profiles
-if (isRestaurantProfile || userData?.account_type === 'restaurant') {
-  setUserStats((prev: any) => ({
-    ...prev,
-    total_posts: sorted.length,
-  }));
-}
-      
-    } catch (err) {
-      console.error('❌ Error fetching user posts:', err);
+      setPostsPage(1);
+    }
+    
+    // Update stats for restaurant profiles
+    if (isRestaurantProfile || userData?.account_type === 'restaurant') {
+      if (!loadMore) {
+        // Only update on initial load, get total count
+        const totalResponse = await axios.get(
+          `${API_URL}/users/${userData.id}/stats`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ).catch(() => ({ data: { total_posts: sorted.length } }));
+        
+        setUserStats((prev: any) => ({
+          ...prev,
+          total_posts: totalResponse.data?.total_posts || sorted.length,
+        }));
+      }
+    }
+    
+  } catch (err) {
+    console.error('❌ Error fetching user posts:', err);
+    if (!loadMore) {
       setUserPosts([]);
     }
-  };
+  } finally {
+    setPostsLoading(false);
+    setLoadingMore(false);
+  }
+};
+
+// Function to load more posts (for infinite scroll)
+const loadMorePosts = () => {
+  if (!loadingMore && hasMorePosts) {
+    fetchUserPosts(true);
+  }
+};
+
+
 
 
 
@@ -2798,6 +2987,90 @@ const renderRestaurantProfile = () => {
     </View>
   </KeyboardAvoidingView>
 </Modal>
+{/* ================= CATEGORY FILTER MODAL ================= */}
+{console.log('🎯 Modal render check - categoryModalVisible:', categoryModalVisible)}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={categoryModalVisible}
+  onRequestClose={() => setCategoryModalVisible(false)}
+>
+  <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+    <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%', paddingBottom: 40 }}>
+      
+      {/* Header */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333' }}>Select Category</Text>
+        <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+          <Ionicons name="close" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Category List */}
+      <ScrollView>
+        {CATEGORIES.map((category) => {
+          const isSelected = selectedCategory === category.id;
+          const currentTabPosts = userPosts.filter((post: any) => 
+            activeTab === 'videos' ? post.isVideo : !post.isVideo
+          );
+          const postCount = currentTabPosts.filter((post: any) => {
+  if (category.id === 'all') return true;
+  if (!post.category) return false;
+  return post.category.toLowerCase() === category.name.toLowerCase();
+}).length;
+
+          return (
+            <TouchableOpacity
+              key={category.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f0f0f0',
+                backgroundColor: isSelected ? '#FFF5F5' : '#fff',
+              }}
+              onPress={() => {
+                console.log('✅ Selected category:', category.id);
+                setSelectedCategory(category.id);
+                setCategoryModalVisible(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 22, marginRight: 12 }}>{category.emoji}</Text>
+              <Text style={{ 
+                flex: 1, 
+                fontSize: 15, 
+                fontWeight: isSelected ? '600' : '500',
+                color: isSelected ? '#E94A37' : '#333' 
+              }}>
+                {category.name}
+              </Text>
+              <View style={{
+                backgroundColor: isSelected ? '#E94A37' : '#f0f0f0',
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 12,
+                marginRight: 8,
+              }}>
+                <Text style={{ 
+                  fontSize: 13, 
+                  fontWeight: '600',
+                  color: isSelected ? '#fff' : '#666' 
+                }}>
+                  {postCount}
+                </Text>
+              </View>
+              {isSelected && (
+                <Ionicons name="checkmark-circle" size={22} color="#E94A37" />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  </View>
+</Modal>
     </View>
   );
 };
@@ -3099,6 +3372,59 @@ const renderRestaurantProfile = () => {
           activeOpacity={0.7}
         >
           <Ionicons name="ellipsis-horizontal" size={18} color="#666" />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+const renderCategoryFilter = () => {
+  // Get the selected category name
+  const selectedCategoryData = CATEGORIES.find(c => c.id === selectedCategory);
+  
+  // Count posts for current tab
+  const currentTabPosts = userPosts.filter((post: any) => 
+    activeTab === 'videos' ? post.isVideo : !post.isVideo
+  );
+  
+  const filteredCount = selectedCategory === 'all' 
+    ? currentTabPosts.length 
+    : currentTabPosts.filter((post: any) => post.category === selectedCategory).length;
+
+  console.log('🔍 renderCategoryFilter called, categoryModalVisible:', categoryModalVisible);
+
+  return (
+    <View style={styles.categoryFilterContainer}>
+      <TouchableOpacity
+        style={styles.categoryDropdownButton}
+        onPress={() => {
+          console.log('🔥 Category button PRESSED!');
+          console.log('🔥 Before: categoryModalVisible =', categoryModalVisible);
+          setCategoryModalVisible(true);
+          console.log('🔥 Called setCategoryModalVisible(true)');
+        }}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.categoryDropdownEmoji}>
+          {selectedCategoryData?.emoji || '🍽️'}
+        </Text>
+        <Text style={styles.categoryDropdownText}>
+          {selectedCategoryData?.name || 'All'}
+        </Text>
+        <View style={styles.categoryDropdownCount}>
+          <Text style={styles.categoryDropdownCountText}>{filteredCount}</Text>
+        </View>
+        <Ionicons name="chevron-down" size={18} color="#666" />
+      </TouchableOpacity>
+      
+      {/* Clear filter button - show only when a category is selected */}
+      {selectedCategory !== 'all' && (
+        <TouchableOpacity
+          style={styles.clearCategoryButton}
+          onPress={() => setSelectedCategory('all')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close-circle" size={20} color="#E94A37" />
         </TouchableOpacity>
       )}
     </View>
@@ -3469,39 +3795,77 @@ if (isRestaurantProfile) {
 </View>
 
         {activeTab === 'videos' ? (
-  <FlatList
-    key="videos-grid-3col"
-    data={userPosts.filter((post: any) => post.isVideo)}
-    renderItem={renderGridWithLikes}
-    keyExtractor={(item: any) => item.id}
-    numColumns={3}
-    scrollEnabled={false}
-    columnWrapperStyle={{ gap: 1 }}
-    ListEmptyComponent={() => (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="videocam-outline" size={64} color="#ccc" />
-        <Text style={styles.emptyText}>No videos yet</Text>
-      </View>
+  <>
+    {renderCategoryFilter()}
+    {postsLoading ? (
+      <GridSkeleton />
+    ) : (
+      <FlatList
+        key={`videos-grid-3col-${selectedCategory}`}
+        data={getFilteredPostsByCategory(userPosts, true)}
+        renderItem={renderGridWithLikes}
+        keyExtractor={(item: any) => item.id}
+        numColumns={3}
+        scrollEnabled={false}
+        columnWrapperStyle={{ gap: 1 }}
+        onEndReached={loadMorePosts}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore && hasMorePosts ? <LoadingFooter /> : null
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="videocam-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>
+              {selectedCategory === 'all' ? 'No videos yet' : `No ${CATEGORIES.find(c => c.id === selectedCategory)?.name} videos`}
+            </Text>
+            {selectedCategory !== 'all' && (
+              <TouchableOpacity onPress={() => setSelectedCategory('all')} style={{ marginTop: 12 }}>
+                <Text style={{ color: '#E94A37', fontWeight: '600' }}>Show All Videos</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      />
     )}
-  />
+  </>
 ) : activeTab === 'favourite' ? (
   renderFavouriteSection()
 ) : (
-  <FlatList
-    key="photos-grid-3col"
-    data={userPosts.filter((post: any) => !post.isVideo)}
-    renderItem={renderGridWithLikes}
-    keyExtractor={(item: any) => item.id}
-    numColumns={3}
-    scrollEnabled={false}
-    columnWrapperStyle={{ gap: 1 }}
-    ListEmptyComponent={() => (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="images-outline" size={64} color="#ccc" />
-        <Text style={styles.emptyText}>No posts yet</Text>
-      </View>
+  <>
+    {renderCategoryFilter()}
+    {postsLoading ? (
+      <GridSkeleton />
+    ) : (
+      <FlatList
+        key={`photos-grid-3col-${selectedCategory}`}
+        data={getFilteredPostsByCategory(userPosts, false)}
+        renderItem={renderGridWithLikes}
+        keyExtractor={(item: any) => item.id}
+        numColumns={3}
+        scrollEnabled={false}
+        columnWrapperStyle={{ gap: 1 }}
+        onEndReached={loadMorePosts}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore && hasMorePosts ? <LoadingFooter /> : null
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="images-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>
+              {selectedCategory === 'all' ? 'No posts yet' : `No ${CATEGORIES.find(c => c.id === selectedCategory)?.name} posts`}
+            </Text>
+            {selectedCategory !== 'all' && (
+              <TouchableOpacity onPress={() => setSelectedCategory('all')} style={{ marginTop: 12 }}>
+                <Text style={{ color: '#E94A37', fontWeight: '600' }}>Show All Posts</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      />
     )}
-  />
+  </>
 )}
 
         <View style={styles.bottomSpacer} />
@@ -4153,6 +4517,89 @@ if (isRestaurantProfile) {
       )}
     </View>
   </KeyboardAvoidingView>
+</Modal>
+{/* ================= CATEGORY FILTER MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={categoryModalVisible}
+  onRequestClose={() => setCategoryModalVisible(false)}
+>
+  <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+    <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%', paddingBottom: 40 }}>
+      
+      {/* Header */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333' }}>Select Category</Text>
+        <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+          <Ionicons name="close" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Category List */}
+      <ScrollView>
+        {CATEGORIES.map((category) => {
+          const isSelected = selectedCategory === category.id;
+          const currentTabPosts = userPosts.filter((post: any) => 
+            activeTab === 'videos' ? post.isVideo : !post.isVideo
+          );
+          const postCount = currentTabPosts.filter((post: any) => {
+  if (category.id === 'all') return true;
+  if (!post.category) return false;
+  return post.category.toLowerCase() === category.name.toLowerCase();
+}).length;
+
+          return (
+            <TouchableOpacity
+              key={category.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f0f0f0',
+                backgroundColor: isSelected ? '#FFF5F5' : '#fff',
+              }}
+              onPress={() => {
+                console.log('✅ Selected category:', category.id);
+                setSelectedCategory(category.id);
+                setCategoryModalVisible(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 22, marginRight: 12 }}>{category.emoji}</Text>
+              <Text style={{ 
+                flex: 1, 
+                fontSize: 15, 
+                fontWeight: isSelected ? '600' : '500',
+                color: isSelected ? '#E94A37' : '#333' 
+              }}>
+                {category.name}
+              </Text>
+              <View style={{
+                backgroundColor: isSelected ? '#E94A37' : '#f0f0f0',
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 12,
+                marginRight: 8,
+              }}>
+                <Text style={{ 
+                  fontSize: 13, 
+                  fontWeight: '600',
+                  color: isSelected ? '#fff' : '#666' 
+                }}>
+                  {postCount}
+                </Text>
+              </View>
+              {isSelected && (
+                <Ionicons name="checkmark-circle" size={22} color="#E94A37" />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  </View>
 </Modal>
     </View>
   );
@@ -4877,6 +5324,124 @@ favouriteGridImage: {
   borderRadius: 12,
   gap: 4,
   zIndex: 10,
+},
+// Category Filter Styles
+categoryFilterContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+  backgroundColor: '#fff',
+  gap: 12,
+},
+categoryDropdownButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#f5f5f5',
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderRadius: 25,
+  gap: 8,
+  flex: 1,
+},
+categoryDropdownEmoji: {
+  fontSize: 18,
+},
+categoryDropdownText: {
+  fontSize: 14,
+  color: '#333',
+  fontWeight: '600',
+  flex: 1,
+},
+categoryDropdownCount: {
+  backgroundColor: '#E94A37',
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  borderRadius: 12,
+  minWidth: 28,
+  alignItems: 'center',
+},
+categoryDropdownCountText: {
+  fontSize: 12,
+  color: '#fff',
+  fontWeight: '700',
+},
+clearCategoryButton: {
+  padding: 8,
+},
+categoryModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'flex-end',
+},
+categoryModalContent: {
+  backgroundColor: '#fff',
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  maxHeight: '70%',
+},
+categoryModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+categoryModalTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#333',
+},
+categoryModalScroll: {
+  paddingBottom: 30,
+},
+categoryModalItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 14,
+  paddingHorizontal: 20,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f5f5f5',
+  gap: 12,
+},
+categoryModalItemSelected: {
+  backgroundColor: '#FFF5F5',
+},
+categoryModalEmoji: {
+  fontSize: 22,
+},
+categoryModalItemText: {
+  fontSize: 15,
+  color: '#333',
+  fontWeight: '500',
+  flex: 1,
+},
+categoryModalItemTextSelected: {
+  color: '#E94A37',
+  fontWeight: '600',
+},
+categoryModalItemCount: {
+  backgroundColor: '#f0f0f0',
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 12,
+  minWidth: 32,
+  alignItems: 'center',
+},
+categoryModalItemCountSelected: {
+  backgroundColor: '#E94A37',
+},
+categoryModalItemCountText: {
+  fontSize: 13,
+  color: '#666',
+  fontWeight: '600',
+},
+categoryModalItemCountTextSelected: {
+  color: '#fff',
 },
 reviewLikesText: {
   color: '#fff',
