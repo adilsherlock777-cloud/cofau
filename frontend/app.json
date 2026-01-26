@@ -87,7 +87,16 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Cofau to use your location to show nearby restaurants and posts."
         }
-      ]
+      ],
+      [
+        "@react-native-firebase/app",
+        {
+          "android": {
+            "googleServicesFile": "./google-services.json"
+          }
+        }
+      ],
+      "./plugins/withAndroidManifestFix.js"
     ],
     "updates": {
       "fallbackToCacheTimeout": 0

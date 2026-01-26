@@ -142,7 +142,8 @@ async def create_notification(
                     device_tokens=device_tokens,
                     title=title,
                     body=message,
-                    data=notification_data
+                    data=notification_data,
+                    user_id=to_user_id
                 )
             else:
                 print(f"⚠️ No device tokens found for user {to_user_id} - push notification skipped")

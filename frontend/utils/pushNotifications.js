@@ -4,6 +4,32 @@ import { Platform } from 'react-native';
 import axios from 'axios';
 import Constants from 'expo-constants';
 
+// Conditionally import Firebase Messaging for Android only
+let messaging = null;
+let firebaseApp = null;
+
+if (Platform.OS === 'android') {
+  try {
+
+    // Initialize Firebase App first (required for messaging)
+    firebaseApp = require('@react-native-firebase/app').default;
+    messaging = require('@react-native-firebase/messaging').default;
+    
+    // Verify Firebase is initialized
+    if (!firebaseApp.apps().length) {
+      console.warn('⚠️ Firebase App not initialized. Make sure google-services.json is configured.');
+      messaging = null;
+    } else {
+      console.log('✅ Firebase Messaging initialized for Android');
+    }
+  } catch (error) {
+    console.warn('⚠️ Firebase Messaging not available:', error.message);
+    console.warn('   Make sure @react-native-firebase/messaging is installed');
+    console.warn('   Run: npx expo prebuild --platform android');
+    messaging = null;
+  }
+}
+
 const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api`;
 
 // Configure how notifications are handled when app is in foreground
@@ -42,6 +68,68 @@ async function ensureNotificationChannel() {
 // Create channel immediately when module loads
 ensureNotificationChannel();
 
+/**
+ * Get FCM token for Android devices
+ */
+async function getFCMToken() {
+  if (Platform.OS !== 'android' || !messaging) {
+    return null;
+  }
+
+  try {
+    // Request permission for Android 13+
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+    if (!enabled) {
+      console.log('❌ FCM permission not granted');
+      return null;
+    }
+
+    // Get FCM token
+    const fcmToken = await messaging().getToken();
+    
+    if (fcmToken) {
+      console.log('✅ FCM token obtained:', fcmToken.substring(0, 50) + '...');
+      return fcmToken;
+    } else {
+      console.log('⚠️ FCM token is empty');
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error getting FCM token:', error);
+    return null;
+  }
+}
+
+/**
+ * Get Expo push token for iOS devices
+ */
+async function getExpoPushToken() {
+  if (Platform.OS === 'android') {
+    return null;
+  }
+
+  try {
+    const expoPushToken = await Notifications.getExpoPushTokenAsync({
+      projectId: Constants.expoConfig?.extra?.eas?.projectId,
+    });
+
+    if (expoPushToken?.data) {
+      console.log('✅ Expo push token obtained:', expoPushToken.data);
+      return expoPushToken.data;
+    } else {
+      console.log('❌ Failed to get Expo push token');
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error getting Expo push token:', error);
+    return null;
+  }
+}
+
 export async function registerForPushNotificationsAsync(token, retryCount = 0) {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000;
@@ -57,16 +145,46 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
   }
 
   try {
-    // Ensure channel exists before registering
+    // Ensure channel exists before registering (Android)
     await ensureNotificationChannel();
 
     // Request permissions
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      console.log('📱 Requesting push notification permissions...');
-      const { status } = await Notifications.requestPermissionsAsync();
+    let finalStatus = 'granted';
+    
+    if (Platform.OS === 'android') {
+      // For Android, FCM handles permissions
+      if (messaging) {
+        try {
+          const authStatus = await messaging().requestPermission();
+          finalStatus = 
+            authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+            authStatus === messaging.AuthorizationStatus.PROVISIONAL
+              ? 'granted'
+              : 'denied';
+        } catch (error) {
+          console.error('❌ Error requesting FCM permission:', error);
+          finalStatus = 'denied';
+        }
+      } else {
+        // Fallback to Expo notifications if Firebase is not available
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let status = existingStatus;
+        if (existingStatus !== 'granted') {
+          console.log('📱 Requesting push notification permissions...');
+          const { status: newStatus } = await Notifications.requestPermissionsAsync();
+          status = newStatus;
+        }
+        finalStatus = status;
+      }
+    } else {
+      // iOS - use Expo notifications
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let status = existingStatus;
+      if (existingStatus !== 'granted') {
+        console.log('📱 Requesting push notification permissions...');
+        const { status: newStatus } = await Notifications.requestPermissionsAsync();
+        status = newStatus;
+      }
       finalStatus = status;
     }
 
@@ -77,20 +195,40 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
 
     console.log('✅ Push notification permissions granted');
 
-    // Get the Expo push token
-    const expoPushToken = await Notifications.getExpoPushTokenAsync({
-      projectId: Constants.expoConfig?.extra?.eas?.projectId,
-    });
+    // Get device token based on platform
+    let deviceToken = null;
+    let platform = Platform.OS;
 
-    if (!expoPushToken?.data) {
-      console.log('❌ Failed to get Expo push token');
+    if (Platform.OS === 'android') {
+      // Android: Get FCM token
+      if (messaging) {
+        deviceToken = await getFCMToken();
+        if (!deviceToken) {
+          console.log('⚠️ Failed to get FCM token, falling back to Expo token');
+          // Fallback to Expo token if FCM fails
+          const expoToken = await getExpoPushToken();
+          deviceToken = expoToken;
+        }
+      } else {
+        // Fallback to Expo if Firebase is not available
+        console.log('⚠️ Firebase Messaging not available, using Expo token for Android');
+        const expoToken = await getExpoPushToken();
+        deviceToken = expoToken;
+      }
+    } else {
+      // iOS: Get Expo push token
+      deviceToken = await getExpoPushToken();
+    }
+
+    if (!deviceToken) {
+      console.log('❌ Failed to get device token');
       return null;
     }
 
-    console.log('📱 Expo Push Token:', expoPushToken.data);
+    console.log(`📱 ${Platform.OS === 'android' ? 'FCM' : 'Expo'} Token obtained:`, deviceToken.substring(0, 50) + '...');
 
     // Register token with backend
-    if (token && expoPushToken.data) {
+    if (token && deviceToken) {
       let registered = false;
       
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -98,8 +236,8 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
           const response = await axios.post(
             `${API_URL}/notifications/register-device`,
             {
-              deviceToken: expoPushToken.data,
-              platform: Platform.OS,
+              deviceToken: deviceToken,
+              platform: platform,
             },
             {
               headers: { Authorization: `Bearer ${token}` },
@@ -109,6 +247,7 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
           
           if (response.data?.success) {
             console.log('✅ Device token registered with backend successfully');
+            console.log(`   Platform: ${platform}`);
             console.log(`   Token count: ${response.data.tokenCount || 1}`);
             registered = true;
             break;
@@ -142,7 +281,7 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
       }
     }
 
-    return expoPushToken.data;
+    return deviceToken;
   } catch (error) {
     console.error('❌ Error registering for push notifications:', error);
     
@@ -160,6 +299,7 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
 export function setupNotificationListeners(navigation) {
   console.log('🔔 Setting up notification listeners...');
 
+  // Setup Expo notification listeners (for iOS and fallback Android)
   const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
     console.log('📬 Notification received in foreground:', notification);
     const data = notification.request.content.data;
@@ -200,6 +340,86 @@ export function setupNotificationListeners(navigation) {
       }
     }, 500);
   });
+
+  // Setup Firebase Messaging listeners for Android
+  if (Platform.OS === 'android' && messaging) {
+    try {
+      // Handle foreground messages
+      const unsubscribeForeground = messaging().onMessage(async remoteMessage => {
+        console.log('📬 FCM notification received in foreground:', remoteMessage);
+        const data = remoteMessage.data;
+        
+        // Show local notification when app is in foreground
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: remoteMessage.notification?.title || 'New Notification',
+            body: remoteMessage.notification?.body || '',
+            data: data || {},
+            sound: true,
+          },
+          trigger: null,
+        });
+      });
+
+      // Handle notification taps (when app is in background or closed)
+      messaging().onNotificationOpenedApp(remoteMessage => {
+        console.log('👆 FCM notification opened app:', remoteMessage);
+        const data = remoteMessage.data;
+        
+        setTimeout(() => {
+          try {
+            if (data?.type === 'message' && data?.fromUserId) {
+              navigation?.push(`/chat/${data.fromUserId}`);
+            } else if (data?.type === 'like' && data?.postId) {
+              navigation?.push(`/post-details/${data.postId}`);
+            } else if (data?.type === 'comment' && data?.postId) {
+              navigation?.push(`/post-details/${data.postId}`);
+            } else if (data?.type === 'new_post' && data?.postId) {
+              navigation?.push(`/post-details/${data.postId}`);
+            } else if (data?.type === 'follow' && data?.fromUserId) {
+              navigation?.push(`/profile?userId=${data.fromUserId}`);
+            } else if (data?.type === 'compliment' && data?.fromUserId) {
+              navigation?.push(`/profile?userId=${data.fromUserId}`);
+            } else {
+              navigation?.push('/feed');
+            }
+          } catch (error) {
+            console.error('❌ Error navigating from FCM notification:', error);
+          }
+        }, 500);
+      });
+
+      // Check if app was opened from a notification
+      messaging()
+        .getInitialNotification()
+        .then(remoteMessage => {
+          if (remoteMessage) {
+            console.log('📱 App opened from FCM notification:', remoteMessage);
+            const data = remoteMessage.data;
+            
+            setTimeout(() => {
+              if (data?.type === 'message' && data?.fromUserId) {
+                navigation?.push(`/chat/${data.fromUserId}`);
+              } else if (data?.type === 'like' && data?.postId) {
+                navigation?.push(`/post-details/${data.postId}`);
+              } else if (data?.type === 'comment' && data?.postId) {
+                navigation?.push(`/post-details/${data.postId}`);
+              } else if (data?.type === 'new_post' && data?.postId) {
+                navigation?.push(`/post-details/${data.postId}`);
+              } else if (data?.type === 'follow' && data?.fromUserId) {
+                navigation?.push(`/profile?userId=${data.fromUserId}`);
+              } else if (data?.type === 'compliment' && data?.fromUserId) {
+                navigation?.push(`/profile?userId=${data.fromUserId}`);
+              }
+            }, 1000);
+          }
+        });
+
+      console.log('✅ FCM notification listeners set up for Android');
+    } catch (error) {
+      console.error('❌ Error setting up FCM listeners:', error);
+    }
+  }
 
   Notifications.getLastNotificationResponseAsync().then((response) => {
     if (response) {

@@ -74,3 +74,4 @@ apscheduler==3.10.4
 Pillow==11.0.0
 thefuzz==0.22.1
 python-Levenshtein==0.25.1
+firebase-admin==6.5.0
