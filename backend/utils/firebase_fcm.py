@@ -5,11 +5,20 @@ iOS devices continue to use Expo Push Notifications.
 """
 import os
 from typing import List, Optional, Dict
-import firebase_admin
-from firebase_admin import credentials, messaging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Optional Firebase import - server can start even if firebase-admin is not installed
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+    FIREBASE_AVAILABLE = True
+except ImportError:
+    FIREBASE_AVAILABLE = False
+    firebase_admin = None
+    credentials = None
+    messaging = None
 
 # Initialize Firebase Admin SDK (only once)
 _firebase_app = None
@@ -20,12 +29,12 @@ def initialize_firebase():
     Initialize Firebase Admin SDK.
     This should be called once when the application starts.
     
-    The Firebase credentials can be provided via:
-    1. FIREBASE_CREDENTIALS_PATH environment variable (path to service account JSON)
-    2. GOOGLE_APPLICATION_CREDENTIALS environment variable (path to service account JSON)
-    3. FIREBASE_CREDENTIALS_JSON environment variable (JSON string of credentials)
+    Uses hardcoded path: /root/backend/backend/secrets/cofau-23116-firebase-adminsdk-fbsvc-ed3d669985.json
     """
     global _firebase_app
+    
+    if not FIREBASE_AVAILABLE:
+        raise ImportError("firebase-admin package is not installed. Install with: pip install firebase-admin")
     
     if _firebase_app is not None:
         # Already initialized
@@ -41,20 +50,13 @@ def initialize_firebase():
         pass
     
     # Hardcoded path - no environment variable needed
-    # Try multiple possible locations
-    possible_paths = [
-        "/root/backend/backend/secrets/cofau-23116-firebase-adminsdk-fbsvc-ed3d669985.json",  # Current location
-        "/root/cofau/backend/credentials/firebase-credentials.json",  # ChatGPT suggested path
-        "/root/backend/backend/credentials/firebase-credentials.json",  # Alternative
-        os.getenv("FIREBASE_CREDENTIALS_PATH"),  # Env variable (optional fallback)
-        os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),  # Standard env variable (optional fallback)
-    ]
+    cred_path = "/root/backend/backend/secrets/cofau-23116-firebase-adminsdk-fbsvc-ed3d669985.json"
     
-    cred_path = None
-    for path in possible_paths:
-        if path and os.path.exists(path):
-            cred_path = path
-            break
+    # Verify file exists
+    if not os.path.exists(cred_path):
+        error_msg = f"❌ Firebase credentials file not found at: {cred_path}"
+        print(error_msg)
+        raise FileNotFoundError(error_msg)
     
     cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
     

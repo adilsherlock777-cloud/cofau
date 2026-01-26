@@ -2,7 +2,16 @@ import httpx
 from typing import List, Optional, Dict, Tuple
 from database import get_database
 from bson import ObjectId
-from utils.firebase_fcm import send_fcm_notification, is_fcm_token, initialize_firebase
+
+# Optional Firebase import - server can start even if firebase-admin is not installed
+try:
+    from utils.firebase_fcm import send_fcm_notification, is_fcm_token, initialize_firebase
+    FIREBASE_FCM_AVAILABLE = True
+except ImportError:
+    FIREBASE_FCM_AVAILABLE = False
+    send_fcm_notification = None
+    is_fcm_token = None
+    initialize_firebase = None
 
 EXPO_PUSH_API_URL = "https://exp.host/--/api/v2/push/send"
 
@@ -130,7 +139,7 @@ def separate_tokens_by_platform(device_tokens: List[str], user_platforms: Option
         # Expo tokens start with "ExponentPushToken["
         if token_str.startswith("ExponentPushToken["):
             ios_tokens.append(token_str)
-        elif is_fcm_token(token_str):
+        elif FIREBASE_FCM_AVAILABLE and is_fcm_token and is_fcm_token(token_str):
             android_tokens.append(token_str)
         else:
             # Default to iOS (Expo) for backward compatibility
