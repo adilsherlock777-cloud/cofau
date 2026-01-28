@@ -49,14 +49,25 @@ normalizeProfilePicture,
 GRADIENT HEART ICON (COFAU)
 -----------------------------------------------------------*/
 const GradientHeart = ({ size = 24 }) => (
-<MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
-<LinearGradient
-colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 1 }}
-style={{ width: size, height: size }}
-/>
-</MaskedView>
+  <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
+    <LinearGradient
+      colors={["#FF2E2E", "#FF7A18"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size }}
+    />
+  </MaskedView>
+);
+
+const GradientBookmark = ({ size = 24 }) => (
+  <MaskedView maskElement={<Ionicons name="bookmark" size={size} color="#000" />}>
+    <LinearGradient
+      colors={["#FF2E2E", "#FF7A18"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size }}
+    />
+  </MaskedView>
 );
 function FeedCard({
   post,
@@ -810,8 +821,8 @@ postId={post.id}
   >
     <LinearGradient
       colors={[
-        "rgba(27,124,130,0.12)",
-        "rgba(27,124,130,0.06)"
+        "rgba(255,46,46,0.12)",
+        "rgba(255,122,24,0.06)"
       ]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
@@ -820,7 +831,7 @@ postId={post.id}
       <Text style={styles.detailLabel}>LOCATION</Text>
 
       <View style={styles.locationRow}>
-  <Ionicons name="location" size={18} color="#1B7C82" />
+  <Ionicons name="location" size={18} color="#FF2E2E" />
   <Text style={styles.locationText} numberOfLines={1}>{post.location_name}</Text>
   <View style={{ flex: 1 }} />
   <View style={styles.locationArrowButton}>
@@ -836,9 +847,9 @@ postId={post.id}
 {/* LIKE */}
 <TouchableOpacity onPress={handleLike} style={styles.actionButton}>
 {isLiked ? (
-<GradientHeart size={18} /> // ✅ COFAU GRADIENT RESTORED
+<GradientHeart size={22} /> // ✅ COFAU GRADIENT RESTORED
 ) : (
-<Ionicons name="heart-outline" size={18} color="#666" />
+<Ionicons name="heart-outline" size={22} color="#666" />
 )}
 <Text style={[styles.actionCount, isLiked && styles.likedCount]}>
 {likesCount}
@@ -850,7 +861,7 @@ postId={post.id}
   style={styles.actionButton}
   onPress={() => setShowCommentsModal(true)}
 >
-  <Ionicons name="chatbubble-outline" size={18} color="#666" />
+  <Ionicons name="chatbubble-outline" size={22} color="#666" />
   <Text style={styles.actionCount}>{post.comments || 0}</Text>
 </TouchableOpacity>
 
@@ -889,17 +900,17 @@ Alert.alert(
 );
 }}
 >
-<Ionicons name="share-outline" size={18} color="#666" />
+<Ionicons name="share-outline" size={22} color="#666" />
 <Text style={styles.actionCount}>{post.shares || 0}</Text>
 </TouchableOpacity>
 
 {/* SAVE */}
 <TouchableOpacity style={styles.actionButton} onPress={handleSave}>
-<Ionicons
-name={isSaved ? "bookmark" : "bookmark-outline"}
-size={18}
-color={isSaved ? "#1B7C82" : "#666"}
-/>
+  {isSaved ? (
+    <GradientBookmark size={22} />
+  ) : (
+    <Ionicons name="bookmark-outline" size={22} color="#666" />
+  )}
 </TouchableOpacity>
 </View>
 
@@ -1200,13 +1211,14 @@ gap: 6,
 
 ratingText: {
 fontSize: 15,
-fontWeight: "400",
-color: "#202124",
+fontWeight: "500",
+color: "#000",
 },
 
 ratingNumber: {
-fontWeight: "400",
+fontWeight: "500",
 fontSize: 15,
+color: "#000",
 },
 
 reviewRow: {
@@ -1216,8 +1228,8 @@ gap: 8,
 
 reviewText: {
 fontSize: 16,
-fontWeight: "400",
-color: "#202124",
+fontWeight: "500",
+color: "#000",
 flex: 1,
 },
 
@@ -1226,7 +1238,7 @@ locationBox: {
   paddingVertical: 14,
   paddingHorizontal: 14,
   borderWidth: 1,
-  borderColor: 'rgba(27, 124, 130, 0.15)',
+  borderColor: 'rgba(255, 46, 46, 0.15)',
 },
 
 locationButton: {
@@ -1245,7 +1257,7 @@ locationArrowButton: {
   width: 24,
   height: 24,
   borderRadius: 12,
-  backgroundColor: '#1B7C82',
+  backgroundColor: '#FF2E2E',
   justifyContent: 'center',
   alignItems: 'center',
 },
@@ -1304,8 +1316,8 @@ heartAnimationContainer: {
 
 locationText: {
 fontSize: 15,
-fontWeight: "600",
-color: "#202124",
+fontWeight: "500",
+color: "#000",
 },
 
 actions: {

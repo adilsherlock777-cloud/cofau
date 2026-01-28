@@ -34,6 +34,7 @@ import FeedCard from "../components/FeedCard";
 import UserAvatar from "../components/UserAvatar";
 import StoriesBar from "../components/StoriesBar";
 import { BlurView } from 'expo-blur';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { fetchUnreadCount } from "../utils/notifications";
 import { useNotifications } from "../context/NotificationContext";
 import SuggestedUsersBar from "../components/SuggestedUsersBar";
@@ -454,56 +455,85 @@ const renderPost = useCallback(
   // List Header Component
   const ListHeader = useCallback(() => (
     <>
-      {/* ================= HEADER WITH GRADIENT ================= */}
       <View style={styles.headerContainer}>
-        <LinearGradient
-          colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gradientHeader}
+  <View style={styles.whiteHeader}>
+    <View style={styles.headerRow}>
+      {/* Chat Icon with Gradient */}
+      <TouchableOpacity
+        style={styles.leftIcon}
+        onPress={() => router.push("/chat")}
+        activeOpacity={0.7}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <MaskedView
+          maskElement={
+            <Ionicons name="chatbox-ellipses" size={22} color="#000" />
+          }
         >
-          <View style={styles.headerRow}>
-            <TouchableOpacity
-  style={styles.leftIcon}
-  onPress={() => router.push("/chat")}
-  activeOpacity={0.7}
-  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
->
-  <Ionicons name="chatbox-ellipses" size={20} color="#fff" />
-  {unreadMessagesCount > 0 && (
-   <View style={styles.chatBadge}>
-  <Text style={styles.chatBadgeText}>
-    {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
-  </Text>
-</View>
-
-  )}
-</TouchableOpacity>
-
-            <Text style={styles.cofauTitle} pointerEvents="none">
-              Cofau
+          <LinearGradient
+            colors={["#FF2E2E", "#FF7A18"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons name="chatbox-ellipses" size={22} color="transparent" />
+          </LinearGradient>
+        </MaskedView>
+        {unreadMessagesCount > 0 && (
+          <View style={styles.chatBadge}>
+            <Text style={styles.chatBadgeText}>
+              {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
             </Text>
-
-            <TouchableOpacity
-              style={styles.leftIcon} 
-              onPress={() => router.push("/notifications")}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="notifications" size={20} color="#fff" />
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-  <Text style={styles.notificationBadgeText}>
-    {unreadCount > 99 ? "99+" : unreadCount}
-  </Text>
-</View>
-
-              )}
-            </TouchableOpacity>
           </View>
+        )}
+      </TouchableOpacity>
 
+      {/* Cofau Title with Gradient */}
+      <MaskedView
+        style={styles.cofauTitleContainer}
+        maskElement={
+          <Text style={styles.cofauTitleMask}>Cofau</Text>
+        }
+      >
+        <LinearGradient
+          colors={["#FF2E2E", "#FF7A18"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cofauGradient}
+        >
+          <Text style={styles.cofauTitleTransparent}>Cofau</Text>
         </LinearGradient>
+      </MaskedView>
+
+      {/* Notifications Icon with Gradient */}
+      <TouchableOpacity
+        style={styles.leftIcon}
+        onPress={() => router.push("/notifications")}
+        activeOpacity={0.7}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <MaskedView
+          maskElement={
+            <Ionicons name="notifications" size={22} color="#000" />
+          }
+        >
+          <LinearGradient
+            colors={["#FF2E2E", "#FF7A18"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons name="notifications" size={22} color="transparent" />
+          </LinearGradient>
+        </MaskedView>
+        {unreadCount > 0 && (
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationBadgeText}>
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  </View>
 
         {/* ===== LEVEL CARD ===== */}
         {/* ===== RESTAURANT CARD (for restaurant accounts) ===== */}
@@ -531,7 +561,7 @@ const renderPost = useCallback(
         >
           {ownStoryData ? (
             <LinearGradient
-              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+              colors={["#FF9A4D", "#FF9A4D"]}
               locations={[0, 0.35, 0.9]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -581,16 +611,13 @@ const renderPost = useCallback(
         let gradientColors;
         let gradientLocations;
 
-        if (progressPercent <= 33) {
-          gradientColors = ["#E94A37", "#E94A37"];
-          gradientLocations = [0, 1];
-        } else if (progressPercent <= 66) {
-          gradientColors = ["#E94A37", "#F2CF68"];
-          gradientLocations = [0, 1];
-        } else {
-          gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
-          gradientLocations = [0, 0.5, 1];
-        }
+        if (progressPercent <= 50) {
+  gradientColors = ["#FF9A4D", "#FF9A4D"];
+  gradientLocations = [0, 1];
+} else {
+  gradientColors = ["#FF9A4D", "#FF5C5C"];
+  gradientLocations = [0, 1];
+}
 
         return (
           <LinearGradient
@@ -638,7 +665,7 @@ const renderPost = useCallback(
                   >
                     {ownStoryData ? (
                       <LinearGradient
-                        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                        colors={["#FF9A4D", "#FF9A4D"]}
                         locations={[0, 0.35, 0.9]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -704,16 +731,13 @@ const renderPost = useCallback(
                         let gradientColors;
                         let gradientLocations;
 
-                        if (progressPercent <= 33) {
-                          gradientColors = ["#E94A37", "#E94A37"];
-                          gradientLocations = [0, 1];
-                        } else if (progressPercent <= 66) {
-                          gradientColors = ["#E94A37", "#F2CF68"];
-                          gradientLocations = [0, 1];
-                        } else {
-                          gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
-                          gradientLocations = [0, 0.5, 1];
-                        }
+                        if (progressPercent <= 50) {
+  gradientColors = ["#FF9A4D", "#FF9A4D"];
+  gradientLocations = [0, 1];
+} else {
+  gradientColors = ["#FF9A4D", "#FF5C5C"];
+  gradientLocations = [0, 1];
+}
 
                         return (
                           <LinearGradient
@@ -764,7 +788,7 @@ const renderPost = useCallback(
                   >
                     {ownStoryData ? (
                       <LinearGradient
-                        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+                        colors={["#FF9A4D", "#FF9A4D"]}
                         locations={[0, 0.35, 0.9]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -1065,18 +1089,19 @@ const styles = StyleSheet.create({
     position: "relative",
     marginBottom: 4,
   },
-  gradientHeader: {
-    paddingTop: 60,
-    paddingBottom: 60,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
+  whiteHeader: {
+  paddingTop: 60,
+  paddingBottom: 60,
+  paddingHorizontal: 20,
+  borderBottomLeftRadius: 30,
+  borderBottomRightRadius: 30,
+  backgroundColor: "#FFFFFF",
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 6,
+},
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1148,21 +1173,33 @@ restaurantLogo: {
   height: 60,
   borderRadius: 30,
 },
-  cofauTitle: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    fontFamily: "Lobster",
-    fontSize: 32,
-    color: "#fff",
-    letterSpacing: 1,
-    zIndex: 3,
-    textShadowColor: "rgba(0, 0, 0, 0.15)",
-    textShadowOffset: { width: 6, height: 4 },
-    textShadowRadius: 4,
-    pointerEvents: "none",
-  },
+ cofauTitleContainer: {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 3,
+},
+
+cofauTitleMask: {
+  fontFamily: "Lobster",
+  fontSize: 32,
+  letterSpacing: 1,
+  textAlign: "center",
+},
+
+cofauTitleTransparent: {
+  fontFamily: "Lobster",
+  fontSize: 32,
+  letterSpacing: 1,
+  opacity: 0,
+},
+
+cofauGradient: {
+  alignItems: "center",
+  justifyContent: "center",
+},
   headerIcons: {
     flexDirection: "row",
     gap: 20,

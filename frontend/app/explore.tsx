@@ -70,6 +70,7 @@ const getTileHeight = (post: any) => {
   return SQUARE_HEIGHT;
 };
 
+
 const GradientHeart = ({ size = 18 }) => (
   <MaskedView maskElement={<View style={{ backgroundColor: "transparent" }}><Ionicons name="heart" size={size} color="#000" /></View>}>
     <LinearGradient colors={["#E94A37", "#F2CF68", "#1B7C82"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size }} />
@@ -221,8 +222,11 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
   );
 });
 
-const PostMarker = memo(({ post, onPress, clusterCount = 1 }: any) => {
+// Single Post Marker (for locations with 1 post)
+const PostMarker = memo(({ post, onPress }: any) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  
+  if (!post.latitude || !post.longitude) return null;
   
   return (
     <Marker
@@ -249,18 +253,92 @@ const PostMarker = memo(({ post, onPress, clusterCount = 1 }: any) => {
             </View>
           )}
         </View>
-        {/* Show cluster count if more than 1, otherwise show rating */}
-        {clusterCount > 1 ? (
-          <View style={styles.clusterBadge}>
-            <Text style={styles.clusterBadgeText}>{clusterCount}</Text>
-          </View>
-        ) : post.rating ? (
+        {post.rating && (
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={10} color="#FFD700" />
             <Text style={styles.ratingBadgeText}>{post.rating}</Text>
           </View>
-        ) : null}
+        )}
         <View style={styles.postMarkerArrow} />
+      </View>
+    </Marker>
+  );
+});
+
+// Cluster Marker (for locations with multiple posts)
+const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
+  const [imagesLoaded, setImagesLoaded] = useState(0);
+  const { posts, latitude, longitude, count } = cluster;
+  
+  // Get latest 3 posts
+  const latestPosts = posts
+    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 3);
+  
+  // Force re-render when categoryEmoji changes
+  const needsUpdate = imagesLoaded < latestPosts.length || categoryEmoji !== undefined;
+  
+  return (
+    <Marker
+      coordinate={{ latitude, longitude }}
+      onPress={() => onPress(cluster)}
+      tracksViewChanges={needsUpdate}
+    >
+      <View style={styles.clusterMarkerContainer}>
+        {/* Preview Images */}
+        <View style={styles.clusterPreviewContainer}>
+          {latestPosts.map((post: any, index: number) => (
+            <View 
+              key={post.id} 
+              style={[
+                styles.clusterPreviewImage,
+                { 
+                  zIndex: 3 - index,
+                  marginLeft: index > 0 ? -15 : 0,
+                }
+              ]}
+            >
+              {post.thumbnail_url || post.media_url ? (
+                <Image
+                  source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+                  style={styles.clusterImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  onLoad={() => setImagesLoaded(prev => prev + 1)}
+                />
+              ) : (
+                <View style={styles.clusterImagePlaceholder}>
+                  <Ionicons name="image" size={16} color="#fff" />
+                </View>
+              )}
+              {/* Rating badge on each preview */}
+              {post.rating && (
+                <View style={styles.clusterRatingBadge}>
+                  <Ionicons name="star" size={8} color="#FFD700" />
+                  <Text style={styles.clusterRatingText}>{post.rating}</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+        
+        {/* Pin with count */}
+        <View style={styles.clusterPinContainer}>
+          <View style={[
+            styles.clusterPin,
+            categoryEmoji && styles.clusterPinWithEmoji
+          ]}>
+            {categoryEmoji ? (
+              <Text style={styles.clusterPinEmoji}>{categoryEmoji}</Text>
+            ) : (
+              <Ionicons name="location" size={18} color="#fff" />
+            )}
+          </View>
+          <View style={styles.clusterCountBadge}>
+            <Text style={styles.clusterCountText}>{count}</Text>
+          </View>
+          <View style={styles.clusterPinArrow} />
+        </View>
       </View>
     </Marker>
   );
@@ -280,22 +358,22 @@ const MapViewComponent = memo(({
   posts, 
   onRestaurantPress, 
   onPostPress,
-  searchQuery,
-  onSearch,
+  onClusterPress,
   isLoading,
   mapRef,
   filterType,
   onFilterChange,
   onCenterLocation,
+  selectedCategory,
 }: any) => {
 
-  // Group posts by location to get accurate marker count
-  const groupedPosts = React.useMemo(() => {
+  // Group posts by location
+  const { singlePosts, clusters } = React.useMemo(() => {
     const groups = new Map<string, any[]>();
     
     posts.forEach((post: any) => {
       if (post.latitude && post.longitude) {
-        const key = `${post.latitude.toFixed(6)},${post.longitude.toFixed(6)}`;
+        const key = `${post.latitude.toFixed(5)},${post.longitude.toFixed(5)}`;
         if (!groups.has(key)) {
           groups.set(key, []);
         }
@@ -303,17 +381,83 @@ const MapViewComponent = memo(({
       }
     });
     
-    // Return first post of each group with cluster count
-    return Array.from(groups.values()).map(group => ({
-      ...group[0],
-      clusterCount: group.length,
-      allPosts: group,
-    }));
+    const singlePosts: any[] = [];
+    const clusters: any[] = [];
+    
+    groups.forEach((groupPosts, key) => {
+      const [lat, lng] = key.split(',').map(Number);
+      
+      if (groupPosts.length === 1) {
+        singlePosts.push(groupPosts[0]);
+      } else {
+        clusters.push({
+          id: key,
+          latitude: lat,
+          longitude: lng,
+          count: groupPosts.length,
+          posts: groupPosts,
+          locationName: groupPosts[0].location_name || 'This location',
+        });
+      }
+    });
+    
+    return { singlePosts, clusters };
   }, [posts]);
+
+ // Get category emoji
+const getCategoryEmoji = (categoryName: string | null) => {
+  if (!categoryName) return null;
+  
+  
+  // Fallback mapping
+  const CATEGORY_EMOJIS: { [key: string]: string } = {
+    'Vegetarian/Vegan': '🥬',
+    'Non vegetarian': '🍖',
+    'Biryani': '🍛',
+    'Desserts': '🍰',
+    'SeaFood': '🦐',
+    'Chinese': '🍜',
+    'Chaats': '🥘',
+    'Arabic': '🧆',
+    'BBQ/Tandoor': '🍗',
+    'Fast Food': '🍔',
+    'Tea/Coffee': '☕',
+    'Salad': '🥗',
+    'Karnataka': '🍃',
+    'Hyderabadi': '🌶️',
+    'Kerala': '🥥',
+    'Andhra': '🔥',
+    'North Indian': '🫓',
+    'South Indian': '🥞',
+    'Punjabi': '🧈',
+    'Bengali': '🐟',
+    'Odia': '🍚',
+    'Gujurati': '🥣',
+    'Rajasthani': '🏜️',
+    'Mangaluru': '🦀',
+    'Goan': '🏖️',
+    'Kashmiri': '🏔️',
+    'Continental': '🌍',
+    'Asian': '🥢',
+    'Italian': '🍝',
+    'Japanese': '🍣',
+    'Korean': '🍱',
+    'Mexican': '🌮',
+    'Persian': '🫖',
+    'Drinks / sodas': '🥤',
+    'Pizza': '🍕',
+    'Dosa': '🫕',
+    'Cafe': '🧁',
+  };
+  return CATEGORY_EMOJIS[categoryName] || null;
+};
+
+  const categoryEmoji = getCategoryEmoji(selectedCategory);
+  console.log('Selected Category:', selectedCategory, 'Emoji:', categoryEmoji);
+  
 
   return (
     <View style={styles.mapContainer}>
-      {/* Map */}
       {userLocation ? (
         <MapView
           ref={mapRef}
@@ -326,10 +470,10 @@ const MapViewComponent = memo(({
             longitudeDelta: 0.05,
           }}
           showsUserLocation={true}
-          showsMyLocationButton={true}
+          showsMyLocationButton={false}
           showsCompass={true}
         >
-          {/* Restaurant Markers - only show when filterType is 'restaurants' */}
+          {/* Restaurant Markers */}
           {filterType === 'restaurants' && restaurants.map((restaurant: any) => (
             <RestaurantMarker
               key={`restaurant-${restaurant.id}`}
@@ -338,13 +482,22 @@ const MapViewComponent = memo(({
             />
           ))}
 
-          {/* Post Markers - use groupedPosts to avoid stacking */}
-          {filterType === 'posts' && groupedPosts.map((post: any) => (
+          {/* Single Post Markers */}
+          {filterType === 'posts' && singlePosts.map((post: any) => (
             <PostMarker
               key={`post-${post.id}`}
               post={post}
               onPress={onPostPress}
-              clusterCount={post.clusterCount}
+            />
+          ))}
+
+          {/* Cluster Markers */}
+          {filterType === 'posts' && clusters.map((cluster: any) => (
+            <ClusterMarker
+              key={`cluster-${cluster.id}`}
+              cluster={cluster}
+              onPress={onClusterPress}
+              categoryEmoji={categoryEmoji}
             />
           ))}
         </MapView>
@@ -355,49 +508,27 @@ const MapViewComponent = memo(({
         </View>
       )}
 
-      {/* FLOATING TOGGLE - Top Right Inside Map */}
+      {/* Floating Toggle */}
       <View style={styles.mapFloatingToggle}>
         <TouchableOpacity
-          style={[
-            styles.mapToggleOption,
-            filterType === 'posts' && styles.mapToggleOptionActive
-          ]}
+          style={[styles.mapToggleOption, filterType === 'posts' && styles.mapToggleOptionActive]}
           onPress={() => onFilterChange('posts')}
         >
-          <Text style={[
-            styles.mapToggleText,
-            filterType === 'posts' && styles.mapToggleTextActive
-          ]}>Posts</Text>
+          <Text style={[styles.mapToggleText, filterType === 'posts' && styles.mapToggleTextActive]}>Posts</Text>
         </TouchableOpacity>
-
         <View style={styles.mapToggleDivider} />
-
         <TouchableOpacity
-          style={[
-            styles.mapToggleOption,
-            filterType === 'restaurants' && styles.mapToggleOptionActive
-          ]}
+          style={[styles.mapToggleOption, filterType === 'restaurants' && styles.mapToggleOptionActive]}
           onPress={() => onFilterChange('restaurants')}
         >
-          <Text style={[
-            styles.mapToggleText,
-            filterType === 'restaurants' && styles.mapToggleTextActive
-          ]}>Restaurants</Text>
+          <Text style={[styles.mapToggleText, filterType === 'restaurants' && styles.mapToggleTextActive]}>Restaurants</Text>
         </TouchableOpacity>
-
         <View style={styles.mapToggleDivider} />
-
         <TouchableOpacity
-          style={[
-            styles.mapToggleOption,
-            filterType === 'squad' && styles.mapToggleOptionActive
-          ]}
+          style={[styles.mapToggleOption, filterType === 'squad' && styles.mapToggleOptionActive]}
           onPress={() => onFilterChange('squad')}
         >
-          <Text style={[
-            styles.mapToggleText,
-            filterType === 'squad' && styles.mapToggleTextActive
-          ]}>Squad</Text>
+          <Text style={[styles.mapToggleText, filterType === 'squad' && styles.mapToggleTextActive]}>Squad</Text>
         </TouchableOpacity>
       </View>
 
@@ -408,12 +539,12 @@ const MapViewComponent = memo(({
         </View>
       )}
 
-      {/* Results Count - UPDATED to show both counts */}
+      {/* Results Count */}
       {filterType !== 'squad' && (
         <View style={styles.resultsCountContainer}>
           <Text style={styles.resultsCountText}>
             {filterType === 'posts' 
-              ? `${posts.length} posts at ${groupedPosts.length} locations`
+              ? `${posts.length} posts at ${singlePosts.length + clusters.length} locations`
               : `${restaurants.length} restaurants nearby`
             }
           </Text>
@@ -423,7 +554,7 @@ const MapViewComponent = memo(({
       {/* Location Button */}
       <LocationButton onPress={onCenterLocation} />
 
-      {/* Squad Coming Soon Overlay */}
+      {/* Squad Coming Soon */}
       {filterType === 'squad' && (
         <View style={styles.squadOverlay}>
           <Ionicons name="people" size={48} color="#E94A37" />
@@ -434,6 +565,8 @@ const MapViewComponent = memo(({
     </View>
   );
 });
+
+
 
 
 // ======================================================
@@ -624,6 +757,8 @@ export default function ExploreScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const mapRef = useRef<MapView>(null);
   const videoPositions = useRef<Map<string, { top: number; height: number }>>(new Map());
+  const cachedMapPosts = useRef<any[]>([]);
+  const cachedUserLocation = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
@@ -651,6 +786,7 @@ export default function ExploreScreen() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedQuickCategory, setSelectedQuickCategory] = useState<string | null>(null);
   const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'squad'>('posts');
+  
 
   const POSTS_PER_PAGE = 30;
   const CATEGORIES = [
@@ -763,35 +899,70 @@ const centerOnUserLocation = useCallback(async () => {
     }
   };
 
-  const getCurrentLocation = async () => {
-    try {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) return null;
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const coords = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-
-      setUserLocation(coords);
-      return coords;
-    } catch (error) {
-      console.log("Get location error:", error);
-      Alert.alert("Location Error", "Could not get your current location. Please try again.");
-      return null;
+ const getCurrentLocation = async () => {
+  try {
+    // Return cached location if available (instant!)
+    if (cachedUserLocation.current) {
+      console.log('Using cached location - instant!');
+      setUserLocation(cachedUserLocation.current);
+      return cachedUserLocation.current;
     }
-  };
+    
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) return null;
 
+    // Try to get last known location first (instant)
+    try {
+      const lastKnown = await Location.getLastKnownPositionAsync();
+      if (lastKnown) {
+        const coords = {
+          latitude: lastKnown.coords.latitude,
+          longitude: lastKnown.coords.longitude,
+        };
+        cachedUserLocation.current = coords;
+        setUserLocation(coords);
+        console.log('Using last known location - fast!');
+        return coords;
+      }
+    } catch (e) {
+      console.log('Last known location not available');
+    }
+
+    // Fallback to current position (slower but accurate)
+    console.log('Getting fresh GPS location...');
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+
+    const coords = {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
+
+    // Cache the location
+    cachedUserLocation.current = coords;
+    setUserLocation(coords);
+    return coords;
+  } catch (error) {
+    console.log("Get location error:", error);
+    Alert.alert("Location Error", "Could not get your current location. Please try again.");
+    return null;
+  }
+};
   // ======================================================
   // MAP DATA FETCHING
   // ======================================================
 
-  const fetchMapPins = async (searchTerm?: string) => {
+
+const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
   if (!userLocation) return;
+
+  // If we have cached posts and not forcing refresh, use cache
+  if (!forceRefresh && !searchTerm && cachedMapPosts.current.length > 0) {
+    console.log('Using cached posts:', cachedMapPosts.current.length);
+    setMapPosts(cachedMapPosts.current);
+    return;
+  }
 
   setMapLoading(true);
   try {
@@ -799,8 +970,6 @@ const centerOnUserLocation = useCallback(async () => {
     
     if (searchTerm && searchTerm.trim()) {
       url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
-      console.log('=== CATEGORY SEARCH DEBUG ===');
-      console.log('Search term:', searchTerm);
     } else {
       url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
     }
@@ -812,25 +981,23 @@ const centerOnUserLocation = useCallback(async () => {
     });
 
     if (searchTerm && searchTerm.trim()) {
-      // Search results
-      console.log('=== SEARCH RESULTS DEBUG ===');
-      console.log('Total results from search:', response.data.results?.length);
-      console.log('Total count from API:', response.data.total);
-      response.data.results?.forEach((p: any, i: number) => {
-        console.log(`Result ${i}: ${p.id} | category: ${p.category} | lat: ${p.latitude}, lng: ${p.longitude}`);
-      });
-
-  
-      
-      setMapPosts(response.data.results || []);
+      // Search results - don't cache these
+      const results = response.data.results || [];
+      console.log('Search results:', results.length);
+      setMapPosts(results);
       setMapRestaurants([]);
     } else {
-      // All pins
-      setMapRestaurants(response.data.restaurants || []);
-      console.log('=== MAP DEBUG ===');
-      console.log('Total posts from API:', response.data.posts?.length);
-      console.log('Total restaurants from API:', response.data.restaurants?.length);
-      setMapPosts(response.data.posts || []);
+      // All pins - cache these
+      const posts = response.data.posts || [];
+      const restaurants = response.data.restaurants || [];
+      console.log('All posts:', posts.length);
+      console.log('All restaurants:', restaurants.length);
+      
+      // Cache the posts
+      cachedMapPosts.current = posts;
+      
+      setMapPosts(posts);
+      setMapRestaurants(restaurants);
     }
   } catch (error) {
     console.log("Fetch map pins error:", error);
@@ -839,31 +1006,33 @@ const centerOnUserLocation = useCallback(async () => {
   }
 };
 
-  const handleMapSearch = (query: string) => {
-    setMapSearchQuery(query);
-    if (query.trim()) {
-      fetchMapPins(query);
-    } else {
-      fetchMapPins();
-    }
-  };
-
- const handleQuickCategoryPress = (category: any) => {
+const handleQuickCategoryPress = (category: any) => {
   if (selectedQuickCategory === category.id) {
-    // Deselect if already selected
+    // Deselect - show all cached posts (NO API CALL)
     setSelectedQuickCategory(null);
     if (activeTab === 'map') {
-      fetchMapPins();
+      // Use cached posts instead of fetching
+      console.log('Deselecting category, using cache:', cachedMapPosts.current.length);
+      setMapPosts(cachedMapPosts.current);
     } else {
       setAppliedCategories([]);
       setSelectedCategories([]);
       fetchPosts(true, []);
     }
   } else {
-    // Select and search
+    // Select - filter from cached posts (NO API CALL)
     setSelectedQuickCategory(category.id);
     if (activeTab === 'map') {
-      fetchMapPins(category.name);
+      // Filter cached posts by category name
+      const filteredPosts = cachedMapPosts.current.filter((post: any) => {
+        const postCategory = post.category?.toLowerCase().trim();
+        const selectedCategoryName = category.name.toLowerCase().trim();
+        return postCategory === selectedCategoryName || 
+               postCategory?.includes(selectedCategoryName) ||
+               selectedCategoryName.includes(postCategory || '');
+      });
+      console.log(`Filtered ${filteredPosts.length} posts for category: ${category.name} (from cache)`);
+      setMapPosts(filteredPosts);
     } else {
       setAppliedCategories([category.name]);
       setSelectedCategories([category.name]);
@@ -881,6 +1050,16 @@ const centerOnUserLocation = useCallback(async () => {
     setSelectedPost(post);
     setShowPostModal(true);
   };
+
+  const handleClusterPress = (cluster: any) => {
+  router.push({
+    pathname: "/location-posts",
+    params: {
+      posts: JSON.stringify(cluster.posts),
+      locationName: cluster.locationName,
+    },
+  });
+};
 
   const handleViewRestaurantProfile = async (restaurant: any) => {
   setShowRestaurantModal(false);
@@ -934,22 +1113,80 @@ const centerOnUserLocation = useCallback(async () => {
   // ======================================================
   // INITIALIZE MAP WHEN TAB CHANGES
   // ======================================================
+// Remove initialMapLoadDone state, we don't need it
+useEffect(() => {
+  const loadMapData = async () => {
+    // Only proceed if we're on map tab
+    if (activeTab !== 'map') return;
+    
+    // If we don't have location, get it first
+    if (!userLocation) {
+      const coords = await getCurrentLocation();
+      // fetchMapPins will be called by the next useEffect run when userLocation updates
+      return;
+    }
+    
+    // We have location - check if we need to fetch posts
+    // Only fetch if cache is empty (first time load)
+    if (cachedMapPosts.current.length === 0 && mapPosts.length === 0) {
+      console.log('Cache empty, fetching posts...');
+      await fetchMapPins(undefined, true); // Force refresh
+    }
+    // Otherwise, data is already in mapPosts or will be restored from cache
+  };
+  
+  loadMapData();
+}, [activeTab, userLocation]);
 
-  useEffect(() => {
-    if (activeTab === 'map' && !userLocation) {
-      getCurrentLocation().then((coords) => {
-        if (coords) {
-          fetchMapPins();
+
+useFocusEffect(
+  useCallback(() => {
+    console.log('=== FOCUS EFFECT ===');
+    console.log('activeTab:', activeTab);
+    console.log('mapPosts.length:', mapPosts.length);
+    console.log('cachedMapPosts.length:', cachedMapPosts.current.length);
+    console.log('userLocation:', userLocation ? 'yes' : 'no');
+    
+    // When returning to this screen and map tab is active
+    if (activeTab === 'map' && userLocation) {
+      if (mapPosts.length === 0 && cachedMapPosts.current.length > 0) {
+        // Cache exists but mapPosts is empty (returned from navigation)
+        console.log('Restoring from cache on focus...');
+        if (selectedQuickCategory) {
+          // Re-apply category filter from cache
+          const category = QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory);
+          if (category) {
+            const filteredPosts = cachedMapPosts.current.filter((post: any) => {
+              const postCategory = post.category?.toLowerCase().trim();
+              const selectedCategoryName = category.name.toLowerCase().trim();
+              return postCategory === selectedCategoryName || 
+                     postCategory?.includes(selectedCategoryName) ||
+                     selectedCategoryName.includes(postCategory || '');
+            });
+            setMapPosts(filteredPosts);
+          } else {
+            setMapPosts(cachedMapPosts.current);
+          }
+        } else {
+          setMapPosts(cachedMapPosts.current);
         }
-      });
+      } else if (cachedMapPosts.current.length === 0) {
+        // No cache exists, need to fetch
+        console.log('No cache, fetching...');
+        fetchMapPins(undefined, true);
+      }
+      // If mapPosts.length > 0, do nothing - data already there
     }
-  }, [activeTab]);
+    
+    // Users tab logic
+    if (activeTab === 'users' && posts.length === 0) {
+      fetchPosts(true);
+    }
+    
+    return () => setPlayingVideos([]);
+  }, [activeTab, userLocation, selectedQuickCategory])
+);
 
-  useEffect(() => {
-    if (userLocation && activeTab === 'map') {
-      fetchMapPins();
-    }
-  }, [userLocation]);
 
   // ======================================================
   // EXISTING FEED LOGIC (for USERS tab)
@@ -991,13 +1228,14 @@ const centerOnUserLocation = useCallback(async () => {
     }
   }, [posts, calculateVisibleVideos, scrollY]);
 
-  useFocusEffect(useCallback(() => {
-  // Only fetch if no posts AND on users tab
+ useFocusEffect(useCallback(() => {
+  // Only fetch posts for users tab if no posts cached
   if (user && token && activeTab === 'users' && posts.length === 0) {
     fetchPosts(true);
   }
+  // DON'T refetch map data on focus - preserve existing data
   return () => setPlayingVideos([]);
-}, [user, token, activeTab]));
+}, [user, token, activeTab, posts.length]));
 
 // Initial load - fetch posts once when component mounts
 useEffect(() => {
@@ -1101,40 +1339,48 @@ useEffect(() => {
 
   const columns = distributePosts(posts);
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <LinearGradient colors={["#E94A37", "#F2CF68", "#1B7C82"]} locations={[0, 0.5, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientHeader}>
-          <Text style={styles.headerTitle}>Cofau</Text>
-        </LinearGradient>
-        
-        {/* Only show search box for USERS tab */}
-          <View style={styles.searchBoxWrapper}>
-            <View style={styles.searchBox}>
-              <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
-              <TextInput style={styles.searchInput} placeholder="Search" placeholderTextColor="#999" value={searchQuery} onChangeText={setSearchQuery} returnKeyType="search" onSubmitEditing={() => {
-  if (activeTab === 'map') {
-    handleMapSearch(searchQuery);
-  } else {
-    performSearch();
-  }
-}} />
-              <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
-  <LinearGradient 
-    colors={["#E94A37", "#F2CF68", "#1B7C82"]} 
-    start={{ x: 0, y: 0 }} 
-    end={{ x: 1, y: 0 }} 
-    style={styles.categoryButtonGradient}
-  >
-    <Ionicons name="options-outline" size={18} color="#FFF" />
-    <Text style={styles.categoryButtonText}>
-      {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
-    </Text>
-  </LinearGradient>
-</TouchableOpacity>
-            </View>
-          </View>
+return (
+  <View style={styles.container}>
+    <View style={styles.headerContainer}>
+      {/* GRADIENT HEADER REMOVED - START DIRECTLY WITH SEARCH */}
+      
+      {/* Search Box - Now at the top */}
+      <View style={styles.searchBoxWrapper}>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+          <TextInput 
+            style={styles.searchInput} 
+            placeholder="Search" 
+            placeholderTextColor="#999" 
+            value={searchQuery} 
+            onChangeText={setSearchQuery} 
+            returnKeyType="search" 
+            onSubmitEditing={() => {
+              if (activeTab === 'map') {
+                handleMapSearch(searchQuery);
+              } else {
+                performSearch();
+              }
+            }} 
+          />
+          
+          {/* UPDATED CATEGORY BUTTON - NEW BRAND COLORS */}
+          <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
+            <LinearGradient 
+              colors={["#FF2E2E", "#FF7A18"]}  // NEW BRAND COLORS
+              start={{ x: 0, y: 0 }} 
+              end={{ x: 1, y: 0 }} 
+              style={styles.categoryButtonGradient}
+            >
+              <Ionicons name="options-outline" size={18} color="#FFF" />
+              <Text style={styles.categoryButtonText}>
+                {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </View>
+    </View>
 
 
 {/* QUICK CATEGORY CHIPS */}
@@ -1226,15 +1472,16 @@ useEffect(() => {
             <TouchableOpacity 
   style={styles.clearAllButton} 
   onPress={() => { 
-    setSelectedCategories([]); 
-    setAppliedCategories([]); 
-    setSelectedQuickCategory(null); // Add this line
-    if (activeTab === 'map') {
-      fetchMapPins();
-    } else {
-      fetchPostsWithCategories([]); 
-    }
-  }}
+  setSelectedCategories([]); 
+  setAppliedCategories([]); 
+  setSelectedQuickCategory(null);
+  if (activeTab === 'map') {
+    // Use cached posts instead of fetching
+    setMapPosts(cachedMapPosts.current);
+  } else {
+    fetchPostsWithCategories([]); 
+  }
+}}
 >
   <Text style={styles.clearAllText}>Clear All</Text>
 </TouchableOpacity>
@@ -1253,13 +1500,13 @@ useEffect(() => {
     posts={mapPosts}
     onRestaurantPress={handleRestaurantPress}
     onPostPress={handlePostPress}
-    searchQuery={mapSearchQuery}
-    onSearch={handleMapSearch}
+    onClusterPress={handleClusterPress}
     isLoading={mapLoading}
     mapRef={mapRef}
     filterType={mapFilterType}
     onFilterChange={setMapFilterType}
     onCenterLocation={centerOnUserLocation}
+    selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
   />
 ) : (
         // USERS GRID VIEW
@@ -1424,7 +1671,13 @@ useEffect(() => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
-  headerContainer: { position: "relative", marginBottom: 30, zIndex: 10 },
+  headerContainer: { 
+    position: "relative", 
+    marginBottom: 16,  // Reduced from 30 since no gradient
+    zIndex: 10,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,  // Add safe area padding
+  },
+  
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -1454,12 +1707,34 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#000',
   },
-  gradientHeader: { paddingTop: 65, paddingBottom: 55, alignItems: "center", justifyContent: "center", borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
-  headerTitle: { fontFamily: "Lobster", fontSize: 32, color: "#fff", textAlign: "center", letterSpacing: 1 },
-  searchBoxWrapper: { position: "absolute", bottom: -25, left: 16, right: 16, zIndex: 10 },
-  searchBox: { backgroundColor: "#fff", borderRadius: 25, paddingHorizontal: 16, paddingVertical: 8, flexDirection: "row", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 12 },
-  searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, fontSize: 14, color: "#333" },
+ 
+  searchBoxWrapper: { 
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  searchBox: { 
+    backgroundColor: "#fff", 
+    borderRadius: 25, 
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
+    flexDirection: "row", 
+    alignItems: "center", 
+    shadowColor: "#000", 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.5, 
+    shadowRadius: 12, 
+    elevation: 12 
+  },
+  
+  searchIcon: { 
+    marginRight: 10 
+  },
+  
+  searchInput: { 
+    flex: 1, 
+    fontSize: 14, 
+    color: "#333" 
+  },
   inlineFilterButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#1B7C82", borderRadius: 18, paddingVertical: 5, paddingHorizontal: 12, gap: 4 },
   gradientBorder: { borderRadius: 20, padding: 2 },
   inlineFilterText: { fontSize: 12, color: "#FFF", fontWeight: "600", maxWidth: 70 },
@@ -1599,6 +1874,114 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+
+  // Cluster Marker Styles
+clusterMarkerContainer: {
+  alignItems: 'center',
+},
+clusterPreviewContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: -10,
+},
+clusterPreviewImage: {
+  width: 60,
+  height: 60,
+  borderRadius: 10,
+  borderWidth: 3,
+  borderColor: '#fff',
+  overflow: 'hidden',
+  backgroundColor: '#f0f0f0',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  elevation: 4,
+},
+clusterImage: {
+  width: '100%',
+  height: '100%',
+},
+clusterImagePlaceholder: {
+  width: '100%',
+  height: '100%',
+  backgroundColor: '#ccc',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+clusterRatingBadge: {
+  position: 'absolute',
+  bottom: 2,
+  left: 2,
+  right: 2,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#E94A37',
+  borderRadius: 8,
+  paddingVertical: 2,
+  paddingHorizontal: 4,
+  gap: 2,
+},
+clusterRatingText: {
+  color: '#fff',
+  fontSize: 9,
+  fontWeight: 'bold',
+},
+clusterPinContainer: {
+  alignItems: 'center',
+},
+clusterPin: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: '#E94A37',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 5,
+},
+clusterPinEmoji: {
+  fontSize: 18,
+},
+clusterPinWithEmoji: {
+  backgroundColor: '#4ECDC4', // Different color when showing emoji
+},
+clusterCountBadge: {
+  position: 'absolute',
+  top: -5,
+  right: -10,
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  minWidth: 24,
+  height: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#E94A37',
+  paddingHorizontal: 6,
+},
+clusterCountText: {
+  color: '#E94A37',
+  fontSize: 12,
+  fontWeight: 'bold',
+},
+clusterPinArrow: {
+  width: 0,
+  height: 0,
+  borderLeftWidth: 8,
+  borderRightWidth: 8,
+  borderTopWidth: 10,
+  borderLeftColor: 'transparent',
+  borderRightColor: 'transparent',
+  borderTopColor: '#fff',
+  marginTop: -3,
+},
 
  // ======================================================
 // RESTAURANT MARKER STYLES - UPDATED

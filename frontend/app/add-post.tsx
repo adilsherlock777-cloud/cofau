@@ -232,6 +232,7 @@ const handleCropCancel = () => {
     }
   };
 
+
   // ------------------------------ GOOGLE MAPS (FREE) ------------------------------
 
   const generateMapsLink = () => {
@@ -941,88 +942,90 @@ return (
     )}
   </View>
 )}
+{/* LOCATION SECTION */}
+{!(accountType === 'restaurant' && postMode === 'menu') && (
+  <View style={styles.section}>
+    <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
 
-        {/* FREE GOOGLE MAPS LOCATION */}
-        {!(accountType === 'restaurant' && postMode === 'menu') && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
+    <View style={styles.locationInputContainer}>
+      <TextInput
+        style={styles.linkInput}
+        placeholder="Type place name (e.g., Starbucks MG Road)"
+        placeholderTextColor="#999"
+        value={locationName}
+        onChangeText={handleLocationNameChange}
+        onFocus={() => {
+          if (locationSuggestions.length > 0) {
+            setShowSuggestions(true);
+          }
+        }}
+      />
+      
+      {loadingSuggestions && (
+        <ActivityIndicator 
+          size="small" 
+          color="#4ECDC4" 
+          style={styles.suggestionLoader} 
+        />
+      )}
 
-          <View style={styles.locationInputContainer}>
-            <TextInput
-              style={styles.linkInput}
-              placeholder="Type place name (e.g., Starbucks MG Road)"
-              placeholderTextColor="#999"
-              value={locationName}
-              onChangeText={handleLocationNameChange}
-              onFocus={() => {
-                if (locationSuggestions.length > 0) {
-                  setShowSuggestions(true);
-                }
-              }}
-            />
-            
-            {loadingSuggestions && (
-              <ActivityIndicator 
-                size="small" 
-                color="#4ECDC4" 
-                style={styles.suggestionLoader} 
-              />
-            )}
-
-            {/* Location Suggestions Dropdown */}
-            {showSuggestions && locationSuggestions.length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                <Text style={styles.suggestionsTitle}>Did you mean?</Text>
-                {locationSuggestions.map((suggestion, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.suggestionItem}
-                    onPress={() => selectLocationSuggestion(suggestion)}
-                  >
-                    <View style={styles.suggestionContent}>
-                      <Ionicons name="location" size={18} color="#4ECDC4" />
-                      <View style={styles.suggestionTextContainer}>
-                        <Text style={styles.suggestionName}>{suggestion.location_name}</Text>
-                        <Text style={styles.suggestionMeta}>
-                          {suggestion.post_count} post{suggestion.post_count !== 1 ? 's' : ''} • {suggestion.similarity_score}% match
-                        </Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#CCC" />
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={styles.suggestionItemNew}
-                  onPress={() => {
-                    setShowSuggestions(false);
-                    setLocationSuggestions([]);
-                  }}
-                >
-                  <Ionicons name="add-circle-outline" size={18} color="#666" />
-                  <Text style={styles.suggestionNewText}>Add "{locationName}" as new location</Text>
-                </TouchableOpacity>
+      {/* Location Suggestions Dropdown - FROM YOUR DATABASE (FREE!) */}
+      {showSuggestions && locationSuggestions.length > 0 && (
+        <View style={styles.suggestionsContainer}>
+          <Text style={styles.suggestionsTitle}>Did you mean?</Text>
+          {locationSuggestions.map((suggestion, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.suggestionItem}
+              onPress={() => selectLocationSuggestion(suggestion)}
+            >
+              <View style={styles.suggestionContent}>
+                <Ionicons name="location" size={18} color="#4ECDC4" />
+                <View style={styles.suggestionTextContainer}>
+                  <Text style={styles.suggestionName}>{suggestion.location_name}</Text>
+                  <Text style={styles.suggestionMeta}>
+                    {suggestion.post_count} post{suggestion.post_count !== 1 ? 's' : ''} • {suggestion.similarity_score}% match
+                  </Text>
+                </View>
               </View>
-            )}
-          </View>
-
-          <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
-            <Ionicons name="map" size={20} color="#4ECDC4" />
-            <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.mapsButton, !mapsLink && styles.mapsButtonDisabled]} 
-            onPress={openMaps}
-            disabled={!mapsLink}
+              <Ionicons name="chevron-forward" size={18} color="#CCC" />
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={styles.suggestionItemNew}
+            onPress={() => {
+              setShowSuggestions(false);
+              setLocationSuggestions([]);
+            }}
           >
-            <Ionicons name="location" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
-            <Text style={[styles.mapsButtonText, !mapsLink && styles.mapsButtonTextDisabled]}>
-              Verify Location
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+            <Ionicons name="add-circle-outline" size={18} color="#666" />
+            <Text style={styles.suggestionNewText}>Add "{locationName}" as new location</Text>
           </TouchableOpacity>
         </View>
-        )}
+      )}
+    </View>
+
+    {/* Generate Google Maps Link */}
+    <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
+      <Ionicons name="map" size={20} color="#4ECDC4" />
+      <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
+    </TouchableOpacity>
+
+    {/* Verify Location */}
+    <TouchableOpacity 
+      style={[styles.mapsButton, !mapsLink && styles.mapsButtonDisabled]} 
+      onPress={openMaps}
+      disabled={!mapsLink}
+    >
+      <Ionicons name="location" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+      <Text style={[styles.mapsButtonText, !mapsLink && styles.mapsButtonTextDisabled]}>
+        Verify Location
+      </Text>
+      <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+    </TouchableOpacity>
+  </View>
+)}
+  
 
         {/* POST BUTTON */}
         <TouchableOpacity
@@ -1145,6 +1148,7 @@ return (
     />
   </Modal>
 )}
+
   </View>
 );
 }
@@ -1472,6 +1476,7 @@ locationInputContainer: {
   position: 'relative',
   zIndex: 1000,
 },
+
 
 suggestionLoader: {
   position: 'absolute',

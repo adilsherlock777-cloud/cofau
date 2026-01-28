@@ -233,7 +233,8 @@ async def get_map_pins(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get all map pins (restaurants + user posts + restaurant posts) within radius of user's location.
+    Get all map pins (restaurants + user posts + restaurant posts) within radius.
+    OPTIMIZED: Only fetches posts with pre-stored coordinates.
     """
     db = get_database()
     
@@ -242,148 +243,111 @@ async def get_map_pins(
     
     # ==================== RESTAURANTS ====================
     restaurants = await db.restaurants.find({
-        "$or": [
-            {"latitude": {"$exists": True, "$ne": None}},
-            {"map_link": {"$exists": True, "$ne": None, "$ne": ""}}
-        ]
+        "latitude": {"$exists": True, "$ne": None},
+        "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
     
     for restaurant in restaurants:
-        # Use stored coordinates first, otherwise geocode
-        if restaurant.get("latitude") and restaurant.get("longitude"):
-            coords = {
-                "latitude": restaurant["latitude"],
-                "longitude": restaurant["longitude"]
-            }
-        else:
-            coords = await get_coordinates_for_map_link(restaurant.get("map_link"))
-            # Store coordinates for next time
-            if coords and coords.get("latitude"):
-                await db.restaurants.update_one(
-                    {"_id": restaurant["_id"]},
-                    {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
-                )
+        distance = calculate_distance_km(
+            lat, lng, 
+            restaurant["latitude"], 
+            restaurant["longitude"]
+        )
         
-        if coords and coords.get("latitude") and coords.get("longitude"):
-            distance = calculate_distance_km(lat, lng, coords["latitude"], coords["longitude"])
+        if distance <= radius_km:
+            review_count = await db.posts.count_documents({
+                "tagged_restaurant_id": str(restaurant["_id"])
+            })
             
-            if distance <= radius_km:
-                review_count = await db.posts.count_documents({
-                    "tagged_restaurant_id": str(restaurant["_id"])
-                })
-                
-                restaurants_pins.append({
-                    "id": str(restaurant["_id"]),
-                    "type": "restaurant",
-                    "name": restaurant.get("restaurant_name", "Unknown"),
-                    "profile_picture": restaurant.get("profile_picture"),
-                    "latitude": coords["latitude"],
-                    "longitude": coords["longitude"],
-                    "review_count": review_count,
-                    "distance_km": round(distance, 2),
-                    "map_link": restaurant.get("map_link"),
-                    "bio": restaurant.get("bio", ""),
-                    "is_verified": restaurant.get("is_verified", False)
-                })
+            restaurants_pins.append({
+                "id": str(restaurant["_id"]),
+                "type": "restaurant",
+                "name": restaurant.get("restaurant_name", "Unknown"),
+                "profile_picture": restaurant.get("profile_picture"),
+                "latitude": restaurant["latitude"],
+                "longitude": restaurant["longitude"],
+                "review_count": review_count,
+                "distance_km": round(distance, 2),
+                "map_link": restaurant.get("map_link"),
+                "bio": restaurant.get("bio", ""),
+                "is_verified": restaurant.get("is_verified", False)
+            })
     
     # ==================== USER POSTS ====================
     posts = await db.posts.find({
-        "map_link": {"$exists": True, "$ne": None, "$ne": ""}
+        "latitude": {"$exists": True, "$ne": None},
+        "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
     
     for post in posts:
-        # Use stored coordinates first, otherwise geocode
-        if post.get("latitude") and post.get("longitude"):
-            coords = {
-                "latitude": post["latitude"],
-                "longitude": post["longitude"]
-            }
-        else:
-            coords = await get_coordinates_for_map_link(post.get("map_link"))
-            # Store coordinates for next time
-            if coords and coords.get("latitude"):
-                await db.posts.update_one(
-                    {"_id": post["_id"]},
-                    {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
-                )
+        distance = calculate_distance_km(
+            lat, lng,
+            post["latitude"],
+            post["longitude"]
+        )
         
-        if coords and coords.get("latitude") and coords.get("longitude"):
-            distance = calculate_distance_km(lat, lng, coords["latitude"], coords["longitude"])
-            
-            if distance <= radius_km:
-                user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-                posts_pins.append({
-                    "id": str(post["_id"]),
-                    "type": "post",
-                    "user_id": post["user_id"],
-                    "username": user.get("full_name", "Unknown") if user else "Unknown",
-                    "user_profile_picture": user.get("profile_picture") if user else None,
-                    "latitude": coords["latitude"],
-                    "longitude": coords["longitude"],
-                    "distance_km": round(distance, 2),
-                    "media_url": post.get("media_url") or post.get("image_url"),
-                    "thumbnail_url": post.get("thumbnail_url"),
-                    "media_type": post.get("media_type", "image"),
-                    "rating": post.get("rating"),
-                    "location_name": post.get("location_name"),
-                    "category": post.get("category"),
-                    "review_text": post.get("review_text", "")[:100],
-                    "likes_count": post.get("likes_count", 0),
-                    "map_link": post.get("map_link"),
-                    "account_type": "user"
-                })
+        if distance <= radius_km:
+            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+            posts_pins.append({
+                "id": str(post["_id"]),
+                "type": "post",
+                "user_id": post["user_id"],
+                "username": user.get("full_name", "Unknown") if user else "Unknown",
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "latitude": post["latitude"],
+                "longitude": post["longitude"],
+                "distance_km": round(distance, 2),
+                "media_url": post.get("media_url") or post.get("image_url"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": post.get("media_type", "image"),
+                "rating": post.get("rating"),
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "review_text": post.get("review_text", "")[:100],
+                "likes_count": post.get("likes_count", 0),
+                "map_link": post.get("map_link"),
+                "account_type": "user"
+            })
     
     # ==================== RESTAURANT POSTS ====================
     restaurant_posts = await db.restaurant_posts.find({
-        "map_link": {"$exists": True, "$ne": None, "$ne": ""}
+        "latitude": {"$exists": True, "$ne": None},
+        "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
     
     for post in restaurant_posts:
-        # Use stored coordinates first, otherwise geocode
-        if post.get("latitude") and post.get("longitude"):
-            coords = {
-                "latitude": post["latitude"],
-                "longitude": post["longitude"]
-            }
-        else:
-            coords = await get_coordinates_for_map_link(post.get("map_link"))
-            # Store coordinates for next time
-            if coords and coords.get("latitude"):
-                await db.restaurant_posts.update_one(
-                    {"_id": post["_id"]},
-                    {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
-                )
+        distance = calculate_distance_km(
+            lat, lng,
+            post["latitude"],
+            post["longitude"]
+        )
         
-        if coords and coords.get("latitude") and coords.get("longitude"):
-            distance = calculate_distance_km(lat, lng, coords["latitude"], coords["longitude"])
+        if distance <= radius_km:
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
             
-            if distance <= radius_km:
-                # Get restaurant info
-                restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
-                
-                posts_pins.append({
-                    "id": str(post["_id"]),
-                    "type": "post",
-                    "user_id": post["restaurant_id"],
-                    "username": post.get("restaurant_name") or (restaurant.get("restaurant_name") if restaurant else "Unknown"),
-                    "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
-                    "latitude": coords["latitude"],
-                    "longitude": coords["longitude"],
-                    "distance_km": round(distance, 2),
-                    "media_url": post.get("media_url") or post.get("image_url"),
-                    "thumbnail_url": post.get("thumbnail_url"),
-                    "media_type": post.get("media_type", "image"),
-                    "rating": None,  # Restaurant posts don't have rating
-                    "location_name": post.get("location_name"),
-                    "category": post.get("category"),
-                    "review_text": post.get("about", "")[:100],  # Restaurant posts use "about" instead of "review_text"
-                    "likes_count": post.get("likes_count", 0),
-                    "map_link": post.get("map_link"),
-                    "price": post.get("price"),  # Include price for restaurant posts
-                    "account_type": "restaurant"
-                })
+            posts_pins.append({
+                "id": str(post["_id"]),
+                "type": "post",
+                "user_id": post["restaurant_id"],
+                "username": post.get("restaurant_name") or (restaurant.get("restaurant_name") if restaurant else "Unknown"),
+                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "latitude": post["latitude"],
+                "longitude": post["longitude"],
+                "distance_km": round(distance, 2),
+                "media_url": post.get("media_url") or post.get("image_url"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": post.get("media_type", "image"),
+                "rating": None,
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "review_text": post.get("about", "")[:100],
+                "likes_count": post.get("likes_count", 0),
+                "map_link": post.get("map_link"),
+                "price": post.get("price"),
+                "account_type": "restaurant"
+            })
     
-    # Sort by distance (nearest first)
+    # Sort by distance
     restaurants_pins.sort(key=lambda x: x["distance_km"])
     posts_pins.sort(key=lambda x: x["distance_km"])
     

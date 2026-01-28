@@ -11,7 +11,7 @@ export default function LevelBadge({ level, size = 'small' }) {
 
   // Determine badge color based on level band
   const getBadgeColor = (level) => {
-    if (level >= 1 && level <= 4) return '#1B7C82'; // Green for Reviewer
+    if (level >= 1 && level <= 4) return '#FF5C5C'; // Green for Reviewer
     if (level >= 5 && level <= 8) return '#F2CF68'; // Orange for Top Reviewer
     if (level >= 9 && level <= 12) return '#E94A37'; // Pink for Influencer
     return '#FF4444'; // Default
@@ -20,19 +20,19 @@ export default function LevelBadge({ level, size = 'small' }) {
   // Size configurations
   const sizeConfig = {
     small: {
-      container: 16,
+      container: 14,
       fontSize: 8,
       borderWidth: 1,
     },
     medium: {
-      container: 22,
-      fontSize: 12,
+      container: 18,
+      fontSize: 10,
       borderWidth: 2,
     },
     large: {
-      container: 30,
-      fontSize: 14,
-      borderWidth: 2.5,
+      container: 24,
+      fontSize: 12,
+      borderWidth: 2,
     },
   };
 
