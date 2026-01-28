@@ -29,6 +29,7 @@ from routers import restaurant_auth
 from routers import restaurant_posts
 from routers.restaurant_analytics import router as restaurant_analytics_router
 from routers.map import router as map_router
+from routers.grammar import router as grammar_router
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
@@ -427,6 +428,7 @@ app.include_router(leaderboard_router)
 app.include_router(restaurant_posts.router)
 app.include_router(map_router)
 app.include_router(restaurant_analytics_router)
+app.include_router(grammar_router)
 
 
 

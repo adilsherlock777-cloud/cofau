@@ -186,6 +186,14 @@ const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos }: any) 
 
 const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [tracksChanges, setTracksChanges] = useState(true);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTracksChanges(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
   
   return (
     <Marker
@@ -194,7 +202,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
         longitude: restaurant.longitude,
       }}
       onPress={() => onPress(restaurant)}
-      tracksViewChanges={!imageLoaded}
+      tracksViewChanges={tracksChanges && !imageLoaded}
     >
       <View style={styles.restaurantMarkerContainer}>
         <View style={styles.restaurantMarkerBubble}>
@@ -228,6 +236,16 @@ const PostMarker = memo(({ post, onPress }: any) => {
   
   if (!post.latitude || !post.longitude) return null;
   
+  // Stop tracking after 2 seconds regardless of image load
+  const [tracksChanges, setTracksChanges] = useState(true);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTracksChanges(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+  
   return (
     <Marker
       coordinate={{
@@ -235,7 +253,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
         longitude: post.longitude,
       }}
       onPress={() => onPress(post)}
-      tracksViewChanges={!imageLoaded}
+      tracksViewChanges={tracksChanges && !imageLoaded}
     >
       <View style={styles.postMarkerContainer}>
         <View style={styles.postMarkerBubble}>
@@ -268,6 +286,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
 // Cluster Marker (for locations with multiple posts)
 const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
   const [imagesLoaded, setImagesLoaded] = useState(0);
+  const [tracksChanges, setTracksChanges] = useState(true);
   const { posts, latitude, longitude, count } = cluster;
   
   // Get latest 3 posts
@@ -275,14 +294,19 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 3);
   
-  // Force re-render when categoryEmoji changes
-  const needsUpdate = imagesLoaded < latestPosts.length || categoryEmoji !== undefined;
+  // Stop tracking after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTracksChanges(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
   
   return (
     <Marker
       coordinate={{ latitude, longitude }}
       onPress={() => onPress(cluster)}
-      tracksViewChanges={needsUpdate}
+      tracksViewChanges={tracksChanges}
     >
       <View style={styles.clusterMarkerContainer}>
         {/* Preview Images */}
@@ -1025,12 +1049,11 @@ const handleQuickCategoryPress = (category: any) => {
     if (activeTab === 'map') {
       // Filter cached posts by category name
       const filteredPosts = cachedMapPosts.current.filter((post: any) => {
-        const postCategory = post.category?.toLowerCase().trim();
-        const selectedCategoryName = category.name.toLowerCase().trim();
-        return postCategory === selectedCategoryName || 
-               postCategory?.includes(selectedCategoryName) ||
-               selectedCategoryName.includes(postCategory || '');
-      });
+  const postCategory = post.category?.toLowerCase().trim();
+  const selectedCategoryName = category.name.toLowerCase().trim();
+  // Strict match only - exact category or exact substring
+  return postCategory === selectedCategoryName;
+});
       console.log(`Filtered ${filteredPosts.length} posts for category: ${category.name} (from cache)`);
       setMapPosts(filteredPosts);
     } else {
@@ -1157,12 +1180,10 @@ useFocusEffect(
           const category = QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory);
           if (category) {
             const filteredPosts = cachedMapPosts.current.filter((post: any) => {
-              const postCategory = post.category?.toLowerCase().trim();
-              const selectedCategoryName = category.name.toLowerCase().trim();
-              return postCategory === selectedCategoryName || 
-                     postCategory?.includes(selectedCategoryName) ||
-                     selectedCategoryName.includes(postCategory || '');
-            });
+  const postCategory = post.category?.toLowerCase().trim();
+  const selectedCategoryName = category.name.toLowerCase().trim();
+  return postCategory === selectedCategoryName;
+});
             setMapPosts(filteredPosts);
           } else {
             setMapPosts(cachedMapPosts.current);
@@ -1380,9 +1401,7 @@ return (
           </TouchableOpacity>
         </View>
       </View>
-    </View>
-
-
+    
 {/* QUICK CATEGORY CHIPS */}
 <ScrollView 
   horizontal 
@@ -1458,6 +1477,7 @@ return (
       </Text>
     </TouchableOpacity>
   </View>
+</View>
 </View>
 
       {/* USERS TAB: Category Tags */}
@@ -1673,9 +1693,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
   headerContainer: { 
     position: "relative", 
-    marginBottom: 16,  // Reduced from 30 since no gradient
+    marginBottom: 0,  // Reduced from 30 since no gradient
     zIndex: 10,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,  // Add safe area padding
+    paddingTop: Platform.OS === 'ios' ? 50 : 35,  // Add safe area padding
   },
   
   tabContainer: {
@@ -1710,7 +1730,7 @@ const styles = StyleSheet.create({
  
   searchBoxWrapper: { 
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   searchBox: { 
     backgroundColor: "#fff", 
@@ -2271,8 +2291,9 @@ searchBarBtnText: {
 // QUICK CATEGORY CHIPS STYLES
 // ======================================================
 quickCategoryScroll: {
-  maxHeight: 50,
-  marginBottom: 12,
+  maxHeight: 44,
+  marginBottom: 8,
+  marginTop: 4,
 },
 quickCategoryContainer: {
   paddingHorizontal: 16,
@@ -2312,7 +2333,7 @@ quickCategoryTextActive: {
 // ======================================================
 toggleContainer: {
   alignItems: 'center',
-  marginBottom: 12,
+  marginBottom: 8,
   paddingHorizontal: 16,
 },
 toggleBackground: {

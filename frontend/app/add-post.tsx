@@ -71,6 +71,12 @@ export default function AddPostScreen() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
+  // Grammar correction states
+  const [showGrammarModal, setShowGrammarModal] = useState(false);
+  const [originalReview, setOriginalReview] = useState('');
+  const [correctedReview, setCorrectedReview] = useState('');
+  const [grammarLoading, setGrammarLoading] = useState(false);
+
 
 // Categories list with emojis
 const CATEGORIES = [
@@ -268,6 +274,32 @@ const toggleCategory = (itemName: string) => {
   );
 };
 
+const checkGrammar = async (text: string) => {
+  try {
+    setGrammarLoading(true);
+    const response = await axios.post(
+      `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/utils/correct-grammar`,
+      { text },
+      { headers: { Authorization: `Bearer ${auth?.token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    console.log('Grammar check failed:', error);
+    return { original: text, corrected: text, was_changed: false };
+  } finally {
+    setGrammarLoading(false);
+  }
+};
+
+const handleGrammarConfirm = (useCorrected: boolean) => {
+  if (useCorrected) {
+    setReview(correctedReview);
+  }
+  setShowGrammarModal(false);
+  // Continue with posting - call handlePost again but skip grammar check
+  submitPost(useCorrected ? correctedReview : originalReview);
+};
+
   // ------------------------------ POST SUBMISSION ------------------------------
 
 const handlePost = async () => {
@@ -357,6 +389,18 @@ const handlePost = async () => {
     Alert.alert('Review Required', 'Please write a review.');
     return;
   }
+
+  // Grammar check - only for regular users (not restaurants, not menu items)
+if (accountType !== 'restaurant') {
+  const grammarResult = await checkGrammar(review.trim());
+  
+  if (grammarResult.was_changed) {
+    setOriginalReview(review.trim());
+    setCorrectedReview(grammarResult.corrected);
+    setShowGrammarModal(true);
+    return; // Stop here, wait for user confirmation
+  }
+}
 
   if (!mapsLink.trim()) {
     Alert.alert('Location Required', 'Please generate or paste a Google Maps link.');
@@ -1149,6 +1193,42 @@ return (
   </Modal>
 )}
 
+{/* Grammar Correction Modal */}
+<Modal
+  visible={showGrammarModal}
+  transparent={true}
+  animationType="fade"
+  onRequestClose={() => setShowGrammarModal(false)}
+>
+  <View style={styles.grammarModalOverlay}>
+    <View style={styles.grammarModal}>
+      <Text style={styles.grammarModalTitle}>✨ We cleaned up some typos</Text>
+      
+      <Text style={styles.grammarLabel}>Original:</Text>
+      <Text style={styles.grammarOriginal}>{originalReview}</Text>
+      
+      <Text style={styles.grammarLabel}>Corrected:</Text>
+      <Text style={styles.grammarCorrected}>{correctedReview}</Text>
+      
+      <View style={styles.grammarButtonRow}>
+        <TouchableOpacity
+          style={styles.grammarButtonSecondary}
+          onPress={() => handleGrammarConfirm(false)}
+        >
+          <Text style={styles.grammarButtonSecondaryText}>Keep Original</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.grammarButtonPrimary}
+          onPress={() => handleGrammarConfirm(true)}
+        >
+          <Text style={styles.grammarButtonPrimaryText}>Use Corrected</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
   </View>
 );
 }
@@ -1381,6 +1461,78 @@ taggedRestaurantContainer: {
   padding: 14,
   borderWidth: 1,
   borderColor: '#1B7C82',
+},
+// Grammar Modal Styles
+grammarModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 20,
+},
+grammarModal: {
+  backgroundColor: '#FFF',
+  borderRadius: 16,
+  padding: 20,
+  width: '100%',
+  maxWidth: 400,
+},
+grammarModalTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#333',
+  marginBottom: 16,
+  textAlign: 'center',
+},
+grammarLabel: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#666',
+  marginBottom: 4,
+},
+grammarOriginal: {
+  fontSize: 15,
+  color: '#999',
+  backgroundColor: '#F5F5F5',
+  padding: 12,
+  borderRadius: 8,
+  marginBottom: 12,
+  textDecorationLine: 'line-through',
+},
+grammarCorrected: {
+  fontSize: 15,
+  color: '#1B7C82',
+  backgroundColor: '#F0F9F9',
+  padding: 12,
+  borderRadius: 8,
+  marginBottom: 20,
+},
+grammarButtonRow: {
+  flexDirection: 'row',
+  gap: 12,
+},
+grammarButtonSecondary: {
+  flex: 1,
+  paddingVertical: 12,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#DDD',
+  alignItems: 'center',
+},
+grammarButtonSecondaryText: {
+  color: '#666',
+  fontWeight: '600',
+},
+grammarButtonPrimary: {
+  flex: 1,
+  paddingVertical: 12,
+  borderRadius: 8,
+  backgroundColor: '#1B7C82',
+  alignItems: 'center',
+},
+grammarButtonPrimaryText: {
+  color: '#FFF',
+  fontWeight: '600',
 },
 taggedRestaurantInfo: {
   flexDirection: 'row',
