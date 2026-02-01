@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import { getStoredPin } from './api/orders';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
