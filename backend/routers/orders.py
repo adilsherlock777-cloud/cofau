@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from datetime import datetime
 from bson import ObjectId
 from database import get_database
@@ -7,6 +7,20 @@ from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
+
+# Partner PIN (hardcoded for now - can be moved to env later)
+PARTNER_PIN = "1234"
+
+
+def verify_partner_pin(pin: str):
+    """Verify partner PIN"""
+    if pin != PARTNER_PIN:
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+    return True
+
+
+class PartnerLogin(BaseModel):
+    pin: str
 
 
 class OrderCreate(BaseModel):
@@ -235,4 +249,141 @@ async def cancel_order(
         "success": True,
         "message": "Order cancelled successfully",
         "order_id": order_id
+    }
+
+
+# ==================== PARTNER DASHBOARD ENDPOINTS ====================
+
+@router.post("/partner/login")
+async def partner_login(login_data: PartnerLogin):
+    """Partner login with PIN"""
+    try:
+        verify_partner_pin(login_data.pin)
+        return {
+            "success": True,
+            "message": "Login successful"
+        }
+    except HTTPException:
+        return {
+            "success": False,
+            "message": "Invalid PIN"
+        }
+
+
+@router.get("/partner/all")
+async def get_all_orders_for_partner(
+    pin: Optional[str] = Header(None, alias="X-Partner-PIN")
+):
+    """Get all orders grouped by status for partner dashboard"""
+    # Verify PIN from header
+    if not pin:
+        raise HTTPException(status_code=401, detail="PIN required in X-Partner-PIN header")
+
+    verify_partner_pin(pin)
+
+    db = get_database()
+
+    # Get all orders
+    all_orders = await db.orders.find().sort("created_at", -1).to_list(None)
+
+    # Group orders by status
+    orders_by_status = {
+        "pending": [],
+        "confirmed": [],
+        "preparing": [],
+        "ready": [],
+        "completed": [],
+        "cancelled": []
+    }
+
+    for order in all_orders:
+        order_id = str(order["_id"])
+        user_id = order.get("user_id")
+
+        # Get customer info
+        customer = None
+        if user_id:
+            try:
+                customer = await db.users.find_one({"_id": ObjectId(user_id)})
+            except:
+                pass
+
+        customer_name = "Unknown Customer"
+        delivery_address = "No address provided"
+
+        if customer:
+            customer_name = customer.get("full_name", "Unknown Customer")
+            # Get delivery address from user profile or order
+            delivery_address = customer.get("address", "No address provided")
+
+        order_data = {
+            "order_id": order_id,
+            "customer_name": customer_name,
+            "delivery_address": delivery_address,
+            "dish_name": order.get("dish_name", "Unknown Dish"),
+            "suggestions": order.get("suggestions", ""),
+            "post_media_url": order.get("post_media_url", ""),
+            "restaurant_name": order.get("restaurant_name", "Unknown Restaurant"),
+            "post_location": order.get("post_location", ""),
+            "status": order.get("status", "pending"),
+            "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
+            "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", "")
+        }
+
+        status = order.get("status", "pending")
+        if status in orders_by_status:
+            orders_by_status[status].append(order_data)
+
+    return orders_by_status
+
+
+@router.patch("/partner/{order_id}/status")
+async def update_order_status_partner(
+    order_id: str,
+    status: str,
+    pin: Optional[str] = Header(None, alias="X-Partner-PIN")
+):
+    """Update order status for partner (no user auth required, just PIN)"""
+    # Verify PIN from header
+    if not pin:
+        raise HTTPException(status_code=401, detail="PIN required in X-Partner-PIN header")
+
+    verify_partner_pin(pin)
+
+    db = get_database()
+
+    valid_statuses = ["pending", "confirmed", "preparing", "ready", "completed", "cancelled"]
+
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+    try:
+        order = await db.orders.find_one({"_id": ObjectId(order_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Update the order status
+    result = await db.orders.update_one(
+        {"_id": ObjectId(order_id)},
+        {
+            "$set": {
+                "status": status,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to update order status")
+
+    print(f"✅ Partner updated order {order_id} to {status}")
+
+    return {
+        "success": True,
+        "message": f"Order status updated to {status}",
+        "order_id": order_id,
+        "status": status
     }

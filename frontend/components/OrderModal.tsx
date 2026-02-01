@@ -10,6 +10,9 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -52,6 +55,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [showMenuSuggestions, setShowMenuSuggestions] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(false);
+  const [isGoogleMapsRestaurant, setIsGoogleMapsRestaurant] = useState(false);
 
   useEffect(() => {
     if (visible && post) {
@@ -61,6 +65,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
 
   const fetchRestaurantDetails = async () => {
     setLoading(true);
+    setIsGoogleMapsRestaurant(false);
     try {
       // Check if post has tagged restaurant
       if (post.tagged_restaurant_id) {
@@ -69,6 +74,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
           `${BACKEND_URL}/api/restaurant/posts/public/profile/${post.tagged_restaurant_id}`
         );
         setRestaurantDetails(response.data);
+        setIsGoogleMapsRestaurant(false);
 
         // Fetch menu items for suggestions
         fetchMenuItems(post.tagged_restaurant_id);
@@ -95,6 +101,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
             formatted_address: place.formatted_address || place.vicinity,
             place_id: place.place_id,
           });
+          setIsGoogleMapsRestaurant(true);
         }
       }
     } catch (error) {
@@ -175,6 +182,26 @@ export const OrderModal: React.FC<OrderModalProps> = ({
     setShowMenuSuggestions(false);
   };
 
+  const openInGoogleMaps = () => {
+    if (!restaurantDetails) return;
+
+    let url = "";
+    if (restaurantDetails.place_id) {
+      // Open using place_id (most accurate)
+      url = `https://www.google.com/maps/search/?api=1&query=Google&query_place_id=${restaurantDetails.place_id}`;
+    } else if (post.latitude && post.longitude) {
+      // Fallback to coordinates
+      url = `https://www.google.com/maps/search/?api=1&query=${post.latitude},${post.longitude}`;
+    }
+
+    if (url) {
+      Linking.openURL(url).catch((err) => {
+        console.error("Error opening Google Maps:", err);
+        Alert.alert("Error", "Could not open Google Maps");
+      });
+    }
+  };
+
   const filteredMenuItems = menuItems.filter(item =>
     item.item_name.toLowerCase().includes(dishName.toLowerCase())
   );
@@ -186,17 +213,21 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Place Order</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={28} color="#333" />
-            </TouchableOpacity>
-          </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Place Order</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={28} color="#333" />
+              </TouchableOpacity>
+            </View>
 
-          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#FF8C00" />
@@ -254,6 +285,19 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                       </View>
                     )}
                   </View>
+
+                  {/* View on Google Maps Button */}
+                  {isGoogleMapsRestaurant && (
+                    <TouchableOpacity
+                      style={styles.viewOnMapsButton}
+                      onPress={openInGoogleMaps}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="map" size={18} color="#4285F4" />
+                      <Text style={styles.viewOnMapsText}>View on Google Maps</Text>
+                      <Ionicons name="open-outline" size={16} color="#4285F4" />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Dish Name Input */}
@@ -347,11 +391,15 @@ export const OrderModal: React.FC<OrderModalProps> = ({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -533,5 +581,25 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: "#666",
+  },
+  viewOnMapsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F0FE",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#4285F4",
+  },
+  viewOnMapsText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4285F4",
+    flex: 1,
+    textAlign: "center",
   },
 });

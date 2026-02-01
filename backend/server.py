@@ -347,6 +347,48 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs("static/uploads/restaurants", exist_ok=True)
 
 # ======================================================
+# PARTNER DASHBOARD - Serve at /orders
+# ======================================================
+PARTNER_DASHBOARD_DIR = os.path.join(BASE_DIR, "static", "partner-dashboard")
+os.makedirs(PARTNER_DASHBOARD_DIR, exist_ok=True)
+
+# Serve partner dashboard SPA at /orders
+@app.get("/orders/{full_path:path}", response_class=HTMLResponse)
+async def serve_partner_dashboard(full_path: str):
+    """Serve the partner dashboard SPA"""
+    # For the root /orders route or any sub-routes, serve index.html
+    # This allows React Router to handle client-side routing
+    dashboard_index = os.path.join(PARTNER_DASHBOARD_DIR, "index.html")
+
+    if os.path.exists(dashboard_index):
+        return FileResponse(dashboard_index)
+    else:
+        return HTMLResponse(
+            content="<h1>Partner Dashboard Not Found</h1><p>Please build the dashboard first.</p>",
+            status_code=404
+        )
+
+@app.get("/orders", response_class=HTMLResponse)
+async def serve_partner_dashboard_root():
+    """Serve the partner dashboard SPA at root /orders"""
+    dashboard_index = os.path.join(PARTNER_DASHBOARD_DIR, "index.html")
+
+    if os.path.exists(dashboard_index):
+        return FileResponse(dashboard_index)
+    else:
+        return HTMLResponse(
+            content="<h1>Partner Dashboard Not Found</h1><p>Please build the dashboard first.</p>",
+            status_code=404
+        )
+
+# Mount static assets for partner dashboard (CSS, JS, etc.)
+# This must be done AFTER the HTML route above to avoid conflicts
+try:
+    app.mount("/orders/assets", StaticFiles(directory=os.path.join(PARTNER_DASHBOARD_DIR, "assets")), name="partner-assets")
+except Exception as e:
+    print(f"⚠️ Could not mount partner dashboard assets: {e}")
+
+# ======================================================
 # OPEN GRAPH (WhatsApp Preview) CONFIGURATION
 # ======================================================
 # Configure the templates directory (must match your folder name)
