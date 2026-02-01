@@ -46,6 +46,8 @@ import {
 
 // ⭐ ADD THIS IMPORT - adjust path based on where you place the file
 import { FeedSkeleton } from "../components/FeedSkeleton";
+import MysteryBoxIcon from "../components/MysteryBoxIcon";
+import CofauWalletModal from "../components/CofauWalletModal";
 
 const BACKEND = BACKEND_URL;
 let globalMuteState = true;
@@ -98,6 +100,7 @@ export default function FeedScreen() {
   const [isMuted, setIsMuted] = useState(globalMuteState);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [ownStoryData, setOwnStoryData] = useState<any>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
   const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
@@ -510,34 +513,43 @@ const renderPost = useCallback(
         </LinearGradient>
       </MaskedView>
 
-      {/* Notifications Icon with Gradient */}
-      <TouchableOpacity
-        style={styles.leftIcon}
-        onPress={() => router.push("/notifications")}
-        activeOpacity={0.7}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <MaskedView
-          maskElement={
-            <Ionicons name="notifications" size={22} color="#000" />
-          }
+      {/* Right Icons Container */}
+      <View style={styles.headerIcons}>
+        {/* Mystery Box Icon */}
+        <MysteryBoxIcon
+          onPress={() => setShowWalletModal(true)}
+          badgeCount={1}
+        />
+
+        {/* Notifications Icon with Gradient */}
+        <TouchableOpacity
+          style={styles.leftIcon}
+          onPress={() => router.push("/notifications")}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <LinearGradient
-            colors={["#FF2E2E", "#FF7A18"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <MaskedView
+            maskElement={
+              <Ionicons name="notifications" size={22} color="#000" />
+            }
           >
-            <Ionicons name="notifications" size={22} color="transparent" />
-          </LinearGradient>
-        </MaskedView>
-        {unreadCount > 0 && (
-          <View style={styles.notificationBadge}>
-            <Text style={styles.notificationBadgeText}>
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
+            <LinearGradient
+              colors={["#FF2E2E", "#FF7A18"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="notifications" size={22} color="transparent" />
+            </LinearGradient>
+          </MaskedView>
+          {unreadCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
           </View>
         </LinearGradient>
       </View>
@@ -1065,6 +1077,12 @@ const renderPost = useCallback(
     </View>
   </TouchableOpacity>
 </Modal>
+
+      {/* Cofau Wallet Modal */}
+      <CofauWalletModal
+        visible={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+      />
     </View>
   );
 }

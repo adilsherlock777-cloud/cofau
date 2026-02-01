@@ -19,12 +19,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Video, ResizeMode } from 'expo-av';
 import { createPost, createRestaurantPost, createMenuItem } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
 import ImageCropper from '../components/ImageCropper';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
+import PostRewardModal from '../components/PostRewardModal';
 import axios from 'axios';
 
 export default function AddPostScreen() {
@@ -56,9 +58,14 @@ export default function AddPostScreen() {
   const [loading, setLoading] = useState(false);
   const [showPointsAnimation, setShowPointsAnimation] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardData, setRewardData] = useState(null);
   // Crop states
   const [showCropper, setShowCropper] = useState(false);
   const [tempImageUri, setTempImageUri] = useState<string | null>(null);
+
+  // User location state
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Tag Restaurant - Only for regular users
   const [taggedRestaurant, setTaggedRestaurant] = useState<any>(null);
@@ -296,8 +303,30 @@ const handleGrammarConfirm = (useCorrected: boolean) => {
     setReview(correctedReview);
   }
   setShowGrammarModal(false);
-  
+
 };
+
+// ------------------------------ GET USER LOCATION ------------------------------
+
+React.useEffect(() => {
+  (async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+        console.log('📍 User location:', location.coords);
+      }
+    } catch (error) {
+      console.log('Location error:', error);
+    }
+  })();
+}, []);
 
   // ------------------------------ POST SUBMISSION ------------------------------
 
@@ -459,9 +488,12 @@ if (accountType !== 'restaurant') {
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
         category: categories.length > 0 ? categories.join(', ') : undefined,
-        tagged_restaurant_id: taggedRestaurant?.id || undefined, 
+        tagged_restaurant_id: taggedRestaurant?.id || undefined,
         file: fileToUpload,
         media_type: mediaType,
+        // User's current location for wallet validation
+        user_latitude: userLocation?.latitude || null,
+        user_longitude: userLocation?.longitude || null,
       };
 
       console.log('📤 Sending user post with categories:', categories);
@@ -481,19 +513,29 @@ if (accountType !== 'restaurant') {
     const updatedUser = userResponse.data;
     const newLevel = updatedUser?.level || oldLevel;
 
+    const leveledUp = newLevel > oldLevel;
+
+    // Check if wallet reward exists in response
+    if (result?.wallet_reward) {
+      // Show wallet reward modal
+      setRewardData(result.wallet_reward);
+      setShowRewardModal(true);
+      // Navigation happens when modal closes (see PostRewardModal onClose)
+      return;
+    }
+
+    // Fallback to old behavior if no wallet_reward in response
+    if (leveledUp) {
+      showLevelUpAnimation(newLevel);
+      setTimeout(() => router.replace('/feed'), 3000);
+      return;
+    }
+
     let earnedPoints = 25;
     if (oldLevel >= 5 && oldLevel <= 8) {
       earnedPoints = 15;
     } else if (oldLevel >= 9 && oldLevel <= 12) {
       earnedPoints = 5;
-    }
-
-    const leveledUp = newLevel > oldLevel;
-
-    if (leveledUp) {
-      showLevelUpAnimation(newLevel);
-      setTimeout(() => router.replace('/feed'), 3000);
-      return;
     }
 
     if (earnedPoints > 0) {
@@ -1202,13 +1244,13 @@ return (
   <View style={styles.grammarModalOverlay}>
     <View style={styles.grammarModal}>
       <Text style={styles.grammarModalTitle}>✨ We cleaned up some typos</Text>
-      
+
       <Text style={styles.grammarLabel}>Original:</Text>
       <Text style={styles.grammarOriginal}>{originalReview}</Text>
-      
+
       <Text style={styles.grammarLabel}>Corrected:</Text>
       <Text style={styles.grammarCorrected}>{correctedReview}</Text>
-      
+
       <View style={styles.grammarButtonRow}>
         <TouchableOpacity
           style={styles.grammarButtonSecondary}
@@ -1216,7 +1258,7 @@ return (
         >
           <Text style={styles.grammarButtonSecondaryText}>Keep Original</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.grammarButtonPrimary}
           onPress={() => handleGrammarConfirm(true)}
@@ -1227,6 +1269,17 @@ return (
     </View>
   </View>
 </Modal>
+
+{/* Post Reward Modal */}
+<PostRewardModal
+  visible={showRewardModal}
+  onClose={() => {
+    setShowRewardModal(false);
+    setRewardData(null);
+    router.replace('/feed');
+  }}
+  rewardData={rewardData}
+/>
 
   </View>
 );

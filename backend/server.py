@@ -30,6 +30,8 @@ from routers import restaurant_posts
 from routers.restaurant_analytics import router as restaurant_analytics_router
 from routers.map import router as map_router
 from routers.grammar import router as grammar_router
+from routers.wallet import router as wallet_router
+from utils.wallet_system import calculate_wallet_reward, process_wallet_reward, WalletRewardResult
 
 # Import utils
 from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
@@ -429,6 +431,7 @@ app.include_router(restaurant_posts.router)
 app.include_router(map_router)
 app.include_router(restaurant_analytics_router)
 app.include_router(grammar_router)
+app.include_router(wallet_router)
 
 
 
@@ -596,6 +599,8 @@ async def create_post(
     location_name: str = Form(None),
     category: str = Form(None),
     tagged_restaurant_id: str = Form(None),
+    user_latitude: float = Form(None),
+    user_longitude: float = Form(None),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -653,6 +658,8 @@ async def create_post(
             except:
                 pass
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+    
 
     # ======================================================
     # HEIC/HEIF CONVERSION - Convert iOS photos to JPEG
@@ -918,7 +925,48 @@ async def create_post(
             post_id=post_id
         )
 
-    # Level update: recalculate based on total post count × 25 points per post
+    # ======================================================
+    # WALLET REWARD CALCULATION
+    # ======================================================
+    wallet_result = None
+    wallet_info = None
+
+    # Only for regular users (not restaurants)
+    if current_user.get("account_type") != "restaurant":
+        # Prepare post data for wallet check (include coordinates)
+        post_data_for_wallet = {
+            "review_text": review_text,
+            "location_name": final_location_name,
+            "tagged_restaurant_id": tagged_restaurant_id,
+            "has_media": True,  # Media is required
+            "latitude": latitude,      # Post location (from map link)
+            "longitude": longitude     # Post location (from map link)
+        }
+
+        # Calculate wallet reward with user's current location
+        wallet_result = await calculate_wallet_reward(
+            db=db,
+            user=current_user,
+            post_data=post_data_for_wallet,
+            user_latitude=user_latitude,    # User's GPS location
+            user_longitude=user_longitude   # User's GPS location
+        )
+        
+        # Process wallet reward (update balance, create transaction)
+        wallet_info = await process_wallet_reward(
+            db=db,
+            user_id=str(current_user["_id"]),
+            reward_result=wallet_result,
+            post_id=post_id,
+            location_name=final_location_name,
+            restaurant_id=tagged_restaurant_id
+        )
+        
+        print(f"💰 Wallet reward: ₹{wallet_result.wallet_earned} for user {current_user['_id']} - Reason: {wallet_result.reason}")
+
+    # ======================================================
+    # LEVEL UPDATE
+    # ======================================================
     user_id = str(current_user["_id"])
     total_posts_count = await db.posts.count_documents({"user_id": user_id})
     level_update = recalculate_points_from_post_count(total_posts_count)
@@ -948,11 +996,27 @@ async def create_post(
             post_id=post_id,
         )
 
-    return {
+    # ======================================================
+    # BUILD RESPONSE WITH WALLET INFO
+    # ======================================================
+    response = {
         "message": "Post created successfully",
         "post_id": post_id,
         "level_update": level_update,
     }
+
+    # Add wallet reward info to response (only for regular users)
+    if wallet_result:
+        response["wallet_reward"] = {
+            "wallet_earned": wallet_result.wallet_earned,
+            "points_earned": wallet_result.points_earned,
+            "reason": wallet_result.reason,
+            "message": wallet_result.message,
+            "tip": wallet_result.tip,
+            "new_balance": wallet_info.get("wallet_balance", 0) if wallet_info else 0
+        }
+
+    return response
 
 
 # ======================================================
