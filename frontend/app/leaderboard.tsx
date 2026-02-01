@@ -693,13 +693,14 @@ export default function LeaderboardScreen() {
         showsHorizontalScrollIndicator={false}
         style={styles.tabsScrollView}
         contentContainerStyle={styles.tabsContainer}
+        bounces={false}
       >
-        {TABS.map((tab) => (
+        {TABS.map((tab, index) => (
           <TouchableOpacity
             key={tab}
             style={[
               styles.tab,
-              activeTab === tab && styles.activeTab,
+              index === TABS.length - 1 && styles.lastTab,
             ]}
             onPress={() => setActiveTab(tab)}
           >
@@ -708,12 +709,14 @@ export default function LeaderboardScreen() {
                 colors={["#FF6B35", "#FF8C00"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.activeTabGradient}
+                style={styles.tabInner}
               >
                 <Text style={styles.activeTabText}>{tab}</Text>
               </LinearGradient>
             ) : (
-              <Text style={styles.tabText}>{tab}</Text>
+              <View style={styles.tabInner}>
+                <Text style={styles.tabText}>{tab}</Text>
+              </View>
             )}
           </TouchableOpacity>
         ))}
@@ -726,26 +729,34 @@ export default function LeaderboardScreen() {
           showsHorizontalScrollIndicator={false}
           style={styles.categoryScrollView}
           contentContainerStyle={styles.categoryContainer}
+          bounces={false}
         >
-          {CATEGORIES.map((category) => (
+          {CATEGORIES.map((category, index) => (
             <TouchableOpacity
               key={category.id}
               style={[
-                styles.categoryChip,
-                selectedCategory === category.id && styles.categoryChipActive,
+                styles.categoryChipOuter,
+                index === CATEGORIES.length - 1 && styles.lastCategory,
               ]}
               onPress={() => handleCategoryChange(category.id)}
               activeOpacity={0.7}
             >
-              <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-              <Text
+              <View
                 style={[
-                  styles.categoryName,
-                  selectedCategory === category.id && styles.categoryNameActive,
+                  styles.categoryChipInner,
+                  selectedCategory === category.id && styles.categoryChipInnerActive,
                 ]}
               >
-                {category.name}
-              </Text>
+                <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+                <Text
+                  style={[
+                    styles.categoryName,
+                    selectedCategory === category.id && styles.categoryNameActive,
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -859,17 +870,18 @@ export default function LeaderboardScreen() {
                           {post.username || "Anonymous"}
                         </Text>
                       </View>
-                      {post.rating && (
-                        <View style={styles.postRatingContainer}>
-                          <Ionicons name="star" size={10} color="#FFD700" />
-                          <Text style={styles.ratingText}>{post.rating}/10</Text>
-                        </View>
-                      )}
                     </View>
+
+                    {post.rating && (
+                      <View style={styles.postRatingContainer}>
+                        <Ionicons name="star" size={14} color="#FFD700" />
+                        <Text style={styles.postRatingText}>{post.rating}/10</Text>
+                      </View>
+                    )}
 
                     {userLocation && post.latitude && post.longitude && (
                       <View style={styles.distanceRow}>
-                        <Ionicons name="location" size={14} color="#4CAF50" />
+                        <Ionicons name="location" size={14} color="#FF3B30" />
                         <Text style={styles.distanceText}>
                           {calculateDistance(
                             userLocation.latitude,
@@ -950,7 +962,7 @@ export default function LeaderboardScreen() {
 
                     {order.post_location && (
                       <View style={styles.orderLocationRow}>
-                        <Ionicons name="location" size={14} color="#4CAF50" />
+                        <Ionicons name="location" size={14} color="#FF3B30" />
                         <Text style={styles.orderLocationText}>{order.post_location}</Text>
                       </View>
                     )}
@@ -1024,7 +1036,7 @@ export default function LeaderboardScreen() {
 
                     {order.post_location && (
                       <View style={styles.orderLocationRow}>
-                        <Ionicons name="location" size={14} color="#4CAF50" />
+                        <Ionicons name="location" size={14} color="#FF3B30" />
                         <Text style={styles.orderLocationText}>{order.post_location}</Text>
                       </View>
                     )}
@@ -1348,41 +1360,37 @@ const styles = StyleSheet.create({
   tabsScrollView: {
     maxHeight: 50,
     backgroundColor: "#FFFFFF",
+    flexGrow: 0, // Prevent unnecessary growth
   },
   tabsContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    gap: 10,
+    flexDirection: 'row', // Ensure horizontal layout
+    alignItems: 'center',
   },
   tab: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    borderRadius: 20,
     marginRight: 8,
     flexShrink: 0,
   },
-  activeTab: {
-    overflow: "hidden",
-  },
-  activeTabGradient: {
+  tabInner: {
     paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    flexShrink: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tabText: {
     fontSize: 14,
     fontWeight: "500",
     color: "#666",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    flexShrink: 0,
   },
   activeTabText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
-    flexShrink: 0,
+  },
+  lastTab: {
+    marginRight: 16, // Extra padding for the last item
   },
   scrollView: {
     flex: 1,
@@ -1457,9 +1465,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 6,
+    gap: 4,
   },
   distanceText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     color: "#333",
   },
@@ -1606,42 +1615,49 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
+    flexGrow: 0, // Prevent unnecessary growth
   },
   categoryContainer: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    gap: 8,
+    flexDirection: 'row', // Ensure horizontal layout
+    alignItems: 'center',
   },
-  categoryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+  categoryChipOuter: {
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
     flexShrink: 0,
   },
-  categoryChipActive: {
+  categoryChipInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    minHeight: 40,
+  },
+  categoryChipInnerActive: {
     backgroundColor: "#FF8C00",
     borderColor: "#FF8C00",
   },
   categoryEmoji: {
     fontSize: 16,
     marginRight: 6,
-    flexShrink: 0,
   },
   categoryName: {
     fontSize: 13,
     fontWeight: "500",
     color: "#333",
-    flexShrink: 0,
   },
   categoryNameActive: {
     color: "#FFFFFF",
     fontWeight: "600",
+  },
+  lastCategory: {
+    marginRight: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -1726,11 +1742,13 @@ const styles = StyleSheet.create({
   postRatingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FF3B30",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 2,
+    gap: 4,
+    marginTop: 4,
+  },
+  postRatingText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#000",
   },
   reviewText: {
     fontSize: 13,
