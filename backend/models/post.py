@@ -4,7 +4,7 @@ from datetime import datetime
 
 class PostCreate(BaseModel):
     media_type: str  # "image" or "video"
-    rating: int = Field(..., ge=0, le=10)
+    rating: float = Field(..., ge=0, le=10)
     review_text: str
     map_link: Optional[str] = None
 
@@ -16,7 +16,7 @@ class PostResponse(BaseModel):
     user_badge: Optional[str] = None
     media_url: str
     media_type: str
-    rating: int
+    rating: float
     review_text: str
     map_link: Optional[str] = None
     likes_count: int = 0

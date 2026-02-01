@@ -98,12 +98,13 @@ async def calculate_wallet_reward(
     # =========================================
     # Check this FIRST so new users always get their ₹50 bonus
     total_posts = await db.posts.count_documents({"user_id": user_id})
+    print(f"🔍 First post check: user {user_id} has {total_posts} posts")
 
-    # total_posts = 0 means this is their first post (post not yet inserted)
-    # OR total_posts = 1 and we're checking after insert
-    is_first_post = total_posts == 0
+    # total_posts = 1 means this is their first post (post already inserted in DB before wallet calc)
+    is_first_post = total_posts == 1
 
     if is_first_post:
+        print(f"🎉 First post detected! Giving ₹{WALLET_FIRST_POST_BONUS} bonus")
         # First post bonus - no other checks required!
         return WalletRewardResult(
             wallet_earned=WALLET_FIRST_POST_BONUS,

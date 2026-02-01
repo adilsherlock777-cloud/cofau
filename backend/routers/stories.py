@@ -307,7 +307,7 @@ async def create_story_from_post(
     post_id: str = Body(...),
     media_url: str = Body(...),
     review: str = Body(""),
-    rating: int = Body(0),
+    rating: float = Body(0),
     location: str = Body(None),
     current_user: dict = Depends(get_current_user),
 ):

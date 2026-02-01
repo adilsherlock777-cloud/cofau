@@ -593,7 +593,7 @@ async def check_location_duplicate(
 # ======================================================
 @app.post("/api/posts/create")
 async def create_post(
-    rating: int = Form(...),
+    rating: float = Form(...),
     review_text: str = Form(...),
     map_link: str = Form(None),
     location_name: str = Form(None),
