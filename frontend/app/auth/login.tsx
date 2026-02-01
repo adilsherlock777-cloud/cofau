@@ -151,7 +151,7 @@ const handleLogin = async () => {
             <Switch
               value={isRestaurant}
               onValueChange={setIsRestaurant}
-              trackColor={{ false: '#E0E0E0', true: '#1B7C82' }}
+              trackColor={{ false: '#E0E0E0', true: '#FF2E2E' }}
               thumbColor={isRestaurant ? '#FFF' : '#FFF'}
               ios_backgroundColor="#E0E0E0"
             />
@@ -256,9 +256,9 @@ const handleLogin = async () => {
             disabled={loading}
           >
             <LinearGradient
-              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              colors={['#FF2E2E', '#FF7A18']}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.button}
             >
               {loading ? (
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 14,
-    color: '#1B7C82',
+    color: '#FF2E2E',
     fontWeight: '600',
   },
   buttonContainer: {
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   signupLink: {
     fontSize: 14,
-    color: '#1B7C82',
+    color: '#FF2E2E',
     fontWeight: '600',
   },
   restaurantSignupContainer: {
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   },
   restaurantSignupLink: {
     fontSize: 14,
-    color: '#1B7C82',
+    color: '#FF2E2E',
     fontWeight: '600',
   },
 });

@@ -1008,7 +1008,7 @@ const handlePrevious = () => {
     onPress={handleOpenLocation}
     activeOpacity={0.8}
   >
-    <Ionicons name="location" size={16} color="#333" />
+    <Ionicons name="location" size={16} color="#FF2E2E" />
     <Text style={styles.locationButtonText} numberOfLines={1}>
       {locationName}
     </Text>
@@ -1109,7 +1109,7 @@ const handlePrevious = () => {
           <View style={styles.postCardLocation}>
             <Text style={styles.postCardLabel}>LOCATION</Text>
             <View style={styles.postCardRow}>
-              <Ionicons name="location" size={18} color="#1B7C82" />
+              <Ionicons name="location" size={18} color="#FF2E2E" />
               <Text style={styles.postCardLocationText} numberOfLines={1}>
                 {currentStory.from_post.location}
               </Text>

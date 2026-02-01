@@ -5,8 +5,12 @@ import {
   Image,
   StyleSheet,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { normalizeMediaUrl } from '../utils/imageUrlFix';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -57,8 +61,30 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
                     
                     {/* Cofau Watermark on Image */}
                     <View style={storyCardStyles.watermarkContainer}>
-                        <Text style={storyCardStyles.watermarkText}>Cofau</Text>
+                        <MaskedView
+                            maskElement={
+                                <Text style={storyCardStyles.watermarkText}>Cofau</Text>
+                            }
+                        >
+                            <LinearGradient
+                                colors={["#FF2E2E", "#FF7A18"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                            >
+                                <Text style={[storyCardStyles.watermarkText, { opacity: 0 }]}>Cofau</Text>
+                            </LinearGradient>
+                        </MaskedView>
                     </View>
+
+                    {/* Restaurant Tag - Bottom Left */}
+                    {post?.tagged_restaurant && post.tagged_restaurant.restaurant_name && (
+                        <View style={storyCardStyles.restaurantTagContainer}>
+                            <Ionicons name="restaurant" size={14} color="#FFF" />
+                            <Text style={storyCardStyles.restaurantTagText} numberOfLines={1}>
+                                {post.tagged_restaurant.restaurant_name}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Three Info Boxes */}
@@ -77,7 +103,20 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
 
                     {/* Review Box */}
                     <View style={[storyCardStyles.infoBox, storyCardStyles.reviewBox]}>
-                        <Ionicons name="chatbubble-ellipses" size={20} color="#4CAF50" />
+                        <MaskedView
+                            maskElement={
+                                <Ionicons name="chatbubble-ellipses" size={20} color="#000" />
+                            }
+                        >
+                            <LinearGradient
+                                colors={["#FF2E2E", "#FF7A18"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={{ width: 20, height: 20 }}
+                            >
+                                <View style={{ width: 20, height: 20 }} />
+                            </LinearGradient>
+                        </MaskedView>
                         <Text style={storyCardStyles.infoBoxLabel}>Review</Text>
                         <Text style={storyCardStyles.infoBoxValue} numberOfLines={2}>
                             {post?.review_text || post?.description || '-'}
@@ -167,7 +206,6 @@ const storyCardStyles = StyleSheet.create({
     watermarkText: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#FFFFFF',
         fontFamily: Platform.OS === 'ios' ? 'Lobster-Regular' : 'Lobster-Regular',
         // If Lobster font is not loaded, use a fallback
         // You may need to load the font separately
@@ -205,6 +243,24 @@ const storyCardStyles = StyleSheet.create({
         width: 1,
         backgroundColor: '#E0E0E0',
         marginVertical: 4,
+    },
+    restaurantTagContainer: {
+        position: 'absolute',
+        bottom: 12,
+        left: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        maxWidth: '50%',
+        gap: 4,
+    },
+    restaurantTagText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
     },
 });
 

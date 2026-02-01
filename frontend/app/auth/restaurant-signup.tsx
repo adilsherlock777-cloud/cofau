@@ -370,7 +370,7 @@ const handleVerifyOtp = async () => {
               autoCorrect={false}
             />
             {checkingName && (
-              <ActivityIndicator size="small" color="#1B7C82" style={styles.checkingIndicator} />
+              <ActivityIndicator size="small" color="#FF2E2E" style={styles.checkingIndicator} />
             )}
             {nameAvailable === true && !checkingName && (
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.statusIcon} />
@@ -397,7 +397,7 @@ const handleVerifyOtp = async () => {
                   style={styles.suggestionItem}
                   onPress={() => handleSelectSuggestion(suggestion)}
                 >
-                  <Ionicons name="arrow-forward-circle-outline" size={16} color="#1B7C82" />
+                  <Ionicons name="arrow-forward-circle-outline" size={16} color="#FF2E2E" />
                   <Text style={styles.suggestionText}>{suggestion}</Text>
                 </TouchableOpacity>
               ))}
@@ -422,7 +422,7 @@ const handleVerifyOtp = async () => {
           {/* Location Picker */}
 <View style={styles.locationSection}>
   <Text style={styles.locationLabel}>
-    <Ionicons name="location-outline" size={16} color="#1B7C82" /> Restaurant Location
+    <Ionicons name="location-outline" size={16} color="#FF2E2E" /> Restaurant Location
   </Text>
   <Text style={styles.locationHelper}>
     Tap on the map to set your restaurant's exact location
@@ -577,9 +577,9 @@ const handleVerifyOtp = async () => {
             disabled={loading}
           >
             <LinearGradient
-              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              colors={['#FF2E2E', '#FF7A18']}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.button}
             >
               {loading ? (
@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   otpButton: {
-    backgroundColor: '#1B7C82',
+    backgroundColor: '#FF2E2E',
     paddingHorizontal: 16,
     height: 56,
     borderRadius: 12,
@@ -839,7 +839,7 @@ coordsText: {
   },
   loginLink: {
     fontSize: 14,
-    color: '#1B7C82',
+    color: '#FF2E2E',
     fontWeight: '600',
   },
   userSignupContainer: {
@@ -853,7 +853,7 @@ coordsText: {
   },
   userSignupLink: {
     fontSize: 14,
-    color: '#1B7C82',
+    color: '#FF2E2E',
     fontWeight: '600',
   },
 });

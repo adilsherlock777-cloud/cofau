@@ -418,13 +418,11 @@ export default function HappeningPlaces() {
             {/* Header */}
             <View style={styles.headerContainer}>
               <LinearGradient
-                colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                locations={[0, 0.5, 1]}
+                colors={["#FFF5F0", "#FFE5D9"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.gradientHeader}
               >
-                <Text style={styles.headerTitle}>Cofau</Text>
               </LinearGradient>
             </View>
             
@@ -497,13 +495,11 @@ export default function HappeningPlaces() {
           {/* Header Container - Gradient with Premium Finish */}
           <View style={styles.headerContainer}>
             <LinearGradient
-              colors={['#E94A37', '#F2CF68', '#1B7C82']}
-              locations={[0, 0.5, 1]}
+              colors={["#FFF5F0", "#FFE5D9"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientHeader}
             >
-              <Text style={styles.headerTitle}>Cofau</Text>
             </LinearGradient>
           </View>
 
@@ -553,7 +549,7 @@ export default function HappeningPlaces() {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['rgba(27, 124, 130, 0.35)', 'rgba(27, 124, 130, 0.15)', 'rgba(255, 255, 255, 1)']}
+                  colors={['rgba(255, 122, 24, 0.35)', 'rgba(255, 122, 24, 0.15)', 'rgba(255, 255, 255, 1)']}
                   locations={[0, 0.3, 1]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0, y: 1 }}
@@ -562,9 +558,9 @@ export default function HappeningPlaces() {
                   <View style={styles.cardHeader}>
                     <View style={styles.rankNumber}>
                       <LinearGradient
-                        colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                        start={{ x: 3, y: 3 }}
-                        end={{ x: 0, y: 3 }}
+                        colors={['#FF2E2E', '#FF7A18']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
                         style={styles.rankGradient}
                       >
                         <Text style={styles.rankNumberText}>{index + 1}</Text>
@@ -634,16 +630,14 @@ export default function HappeningPlaces() {
                               })()}
                               <View style={styles.countButtonOverlay}>
                                 <LinearGradient
-                                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
-                                  start={{ x: 3, y: 3 }}
-                                  end={{ x: 0, y: 3 }}
+                                  colors={['#FF2E2E', '#FF7A18']}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 1 }}
                                   style={styles.countButtonGradientBorder}
                                 >
-                                  <View style={styles.countButtonInner}>
-                                    <Text style={styles.countButtonText}>
-                                      +{location.uploads || images.length}
-                                    </Text>
-                                  </View>
+                                  <Text style={styles.countButtonText}>
+                                    +{location.uploads || images.length}
+                                  </Text>
                                 </LinearGradient>
                               </View>
                             </View>
@@ -751,15 +745,15 @@ const styles = StyleSheet.create({
 
   /* Gradient Header - PREMIUM FINISH */
   gradientHeader: {
-    paddingTop: 45,
-    paddingBottom: 45,
+    paddingTop: 60,
+    paddingBottom: 60,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 6,
   },
@@ -787,6 +781,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 30,
     overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: '#FF8C00',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

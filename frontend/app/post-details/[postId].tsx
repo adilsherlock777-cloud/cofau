@@ -17,6 +17,7 @@ import {
   SafeAreaView,
   PanResponder,
   Pressable,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -63,7 +64,7 @@ const GradientHeart = ({ size = 18 }) => (
     }
   >
     <LinearGradient
-      colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+      colors={["#FF2E2E", "#FF7A18"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ width: size, height: size }}
@@ -80,7 +81,7 @@ const GradientBookmark = ({ size = 18 }) => (
     }
   >
     <LinearGradient
-      colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+      colors={["#FF2E2E", "#FF7A18"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ width: size, height: size }}
@@ -114,25 +115,111 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const videoRef = useRef(null);
   const [lastTap, setLastTap] = useState(0);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-  
+
+  // Animation values for Instagram-style bottom sheet
+  const bottomSheetAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const mediaScaleAnim = useRef(new Animated.Value(1)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
   // Update isFollowing state when post data changes
   useEffect(() => {
     setIsFollowing(post.is_following || false);
   }, [post.is_following]);
-  
+
   // Check if this is the current user's own post
   const isOwnPost = user?.id === post.user_id;
+
+  // Animate bottom sheet when showDetails changes
+  useEffect(() => {
+    if (showDetails) {
+      // Show bottom sheet - slide up from bottom
+      Animated.parallel([
+        Animated.spring(bottomSheetAnim, {
+          toValue: SCREEN_HEIGHT * 0.5, // Half screen height
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }),
+        Animated.timing(mediaScaleAnim, {
+          toValue: 0.65, // Shrink to 65%
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 0.3,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Hide bottom sheet - slide down
+      Animated.parallel([
+        Animated.spring(bottomSheetAnim, {
+          toValue: SCREEN_HEIGHT,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }),
+        Animated.timing(mediaScaleAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showDetails]);
 
   // Pan responder for swipe down gesture
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return gestureState.dy > 5;
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Only allow dragging down
+        if (gestureState.dy > 0) {
+          const newValue = SCREEN_HEIGHT * 0.5 + gestureState.dy;
+          bottomSheetAnim.setValue(newValue);
+
+          // Scale media proportionally as sheet is dragged
+          const dragProgress = gestureState.dy / (SCREEN_HEIGHT * 0.5);
+          const scale = 0.65 + (0.35 * dragProgress);
+          mediaScaleAnim.setValue(Math.min(1, scale));
+
+          const opacity = 0.3 * (1 - dragProgress);
+          backdropOpacity.setValue(Math.max(0, opacity));
+        }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dy > 10) {
+        // If dragged down more than 100px, close the sheet
+        if (gestureState.dy > 100) {
           setShowDetails(false);
+        } else {
+          // Otherwise, snap back to half screen
+          Animated.parallel([
+            Animated.spring(bottomSheetAnim, {
+              toValue: SCREEN_HEIGHT * 0.5,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 8,
+            }),
+            Animated.timing(mediaScaleAnim, {
+              toValue: 0.65,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(backdropOpacity, {
+              toValue: 0.3,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
         }
       },
     })
@@ -384,11 +471,15 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
 };
   return (
     <View style={styles.postItem}>
-      {/* MEDIA CONTAINER */}
-      <View style={[
-        styles.responsiveMediaContainer,
-        showDetails && styles.mediaContainerShrunk
-      ]}>
+      {/* MEDIA CONTAINER - Animated for Instagram-style scaling */}
+      <Animated.View
+        style={[
+          styles.responsiveMediaContainer,
+          {
+            transform: [{ scale: mediaScaleAnim }],
+          },
+        ]}
+      >
         {/* BLURRED BACKGROUND LAYER */}
         {!isVideo ? (
           // For images - blurred background
@@ -796,27 +887,44 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   </TouchableOpacity>
 )}
 
-      {/* GLASS OVERLAY DETAILS - Full screen with transparent bottom sheet */}
-      {showDetails && (
-        <View style={styles.detailsGlassOverlay}>
-          {/* Semi-transparent backdrop - tap to close */}
-          <TouchableOpacity 
-            style={styles.overlayBackdrop}
+      {/* GLASS OVERLAY DETAILS - Instagram-style bottom sheet */}
+      <>
+        {/* Semi-transparent backdrop - tap to close */}
+        <Animated.View
+          style={[
+            styles.overlayBackdrop,
+            {
+              opacity: backdropOpacity,
+              pointerEvents: showDetails ? 'auto' : 'none',
+            }
+          ]}
+          pointerEvents={showDetails ? 'auto' : 'none'}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
             activeOpacity={1}
             onPress={() => setShowDetails(false)}
           />
-          
-          {/* Bottom sheet with glass effect */}
-          <View style={styles.bottomSheetDetails}>
-            <View style={styles.glassDetailsBackground} />
-            
-            {/* Drag Handle - swipeable */}
-            <View 
-              style={styles.dragHandleContainer}
-              {...panResponder.panHandlers}
-            >
-              <View style={styles.dragHandle} />
-            </View>
+        </Animated.View>
+
+        {/* Bottom sheet with glass effect */}
+        <Animated.View
+          style={[
+            styles.bottomSheetDetails,
+            {
+              transform: [{ translateY: bottomSheetAnim }],
+            },
+          ]}
+        >
+          <View style={styles.glassDetailsBackground} />
+
+          {/* Drag Handle - swipeable */}
+          <View
+            style={styles.dragHandleContainer}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.dragHandle} />
+          </View>
             
             {/* Scrollable Details Content */}
             <ScrollView 
@@ -1028,10 +1136,9 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
 
               <View style={{ height: 100 }} />
             </ScrollView>
-          </View>
-        </View>
-      )}
-       </View>
+          </Animated.View>
+        </>
+       </Animated.View>
 
       {/* Report Modal */}
       <ReportModal
@@ -1109,9 +1216,11 @@ export default function PostDetailsScreen() {
       setCurrentVisiblePost(singlePost);
       setVisiblePostId(singlePost.id);
       setLoading(false);  // Stop loading immediately
-      
-      // ✅ Load more posts in the BACKGROUND for scrolling
-      loadMorePostsInBackground();
+
+      // ✅ Load more posts in the BACKGROUND for scrolling (delayed to not interfere with rendering)
+      setTimeout(() => {
+        loadMorePostsInBackground();
+      }, 800);
       
     } catch (e) {
       console.log("❌ Post fetch error", e);
@@ -1124,9 +1233,11 @@ export default function PostDetailsScreen() {
   // Background loading for smooth scrolling experience
   const loadMorePostsInBackground = async () => {
     try {
-      const endpoint = profileUserId 
-  ? `${API_URL}/users/${profileUserId}/posts?limit=${LIMIT}&skip=0`
-  : `${API_URL}/feed?limit=${LIMIT}&skip=0`;
+      // Fetch only 5 posts initially for faster background load
+      const backgroundLimit = 5;
+      const endpoint = profileUserId
+  ? `${API_URL}/users/${profileUserId}/posts?limit=${backgroundLimit}&skip=0`
+  : `${API_URL}/feed?limit=${backgroundLimit}&skip=0`;
 const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1145,14 +1256,15 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
 
       // Add posts that aren't the current one
       const otherPosts = normalized.filter((p: any) => p.id !== postId);
-      
+
       setPosts(prev => {
         const existingIds = new Set(prev.map(p => p.id));
         const newPosts = otherPosts.filter((p: any) => !existingIds.has(p.id));
         return [...prev, ...newPosts];
       });
-      
-      setSkip(LIMIT);
+
+      // Update skip to match the number of posts actually loaded
+      setSkip(5);
     } catch (e) {
       console.log("Background load error", e);
     }
@@ -1551,34 +1663,27 @@ heartAnimationContainer: {
     justifyContent: "center",
   },
 
-  /* Glass Overlay Details - Full screen with bottom sheet */
-  detailsGlassOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 70,
-  },
-
+  /* Glass Overlay Details - Instagram-style bottom sheet */
   overlayBackdrop: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    backgroundColor: "rgba(0, 0, 0, 1)",
+    zIndex: 50,
   },
 
   bottomSheetDetails: {
     position: "absolute",
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    maxHeight: SCREEN_HEIGHT * 0.6,
+    height: SCREEN_HEIGHT * 0.5,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     overflow: "hidden",
+    zIndex: 100,
   },
 
   glassDetailsBackground: {
@@ -1804,15 +1909,6 @@ heartAnimationContainer: {
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  mediaContainerShrunk: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.6,
-    zIndex: 5,
   },
 
   footerLoader: {

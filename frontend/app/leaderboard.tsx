@@ -266,13 +266,11 @@ refreshControl={
 >
 <View style={styles.headerContainer}>
 <LinearGradient
-colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+colors={["#FFF5F0", "#FFE5D9"]}
 start={{ x: 0, y: 0 }}
 end={{ x: 1, y: 0 }}
 style={styles.gradientHeader}
->
-<Text style={styles.cofauTitle}>Cofau</Text>
-</LinearGradient>
+/>
 </View>
 
 <View style={styles.titleBoxWrapper}>
@@ -298,16 +296,38 @@ style={styles.gradientHeader}
 {/* Tab Toggle */}
 <View style={styles.tabContainer}>
 <TouchableOpacity
-style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+style={[styles.tab, activeTab === 'users' && styles.tabActive]}
 onPress={() => setActiveTab('users')}
 >
-<Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>Users</Text>
+{activeTab === 'users' ? (
+<LinearGradient
+colors={['#FF2E2E', '#FF7A18']}
+start={{ x: 0, y: 0 }}
+end={{ x: 1, y: 1 }}
+style={styles.tabGradientBackground}
+>
+<Text style={[styles.tabText, styles.tabTextActive]}>Users</Text>
+</LinearGradient>
+) : (
+<Text style={styles.tabText}>Users</Text>
+)}
 </TouchableOpacity>
 <TouchableOpacity
-style={[styles.tab, activeTab === 'restaurants' && styles.activeTab]}
+style={[styles.tab, activeTab === 'restaurants' && styles.tabActive]}
 onPress={() => setActiveTab('restaurants')}
 >
-<Text style={[styles.tabText, activeTab === 'restaurants' && styles.activeTabText]}>Restaurants</Text>
+{activeTab === 'restaurants' ? (
+<LinearGradient
+colors={['#FF2E2E', '#FF7A18']}
+start={{ x: 0, y: 0 }}
+end={{ x: 1, y: 1 }}
+style={styles.tabGradientBackground}
+>
+<Text style={[styles.tabText, styles.tabTextActive]}>Restaurants</Text>
+</LinearGradient>
+) : (
+<Text style={styles.tabText}>Restaurants</Text>
+)}
 </TouchableOpacity>
 </View>
 
@@ -716,7 +736,7 @@ retryButton: {
 marginTop: 20,
 backgroundColor: "#FF6B6B",
 paddingVertical: 12,
-paddingHorizontal: 24,
+paddingHorizontal: 14,
 borderRadius: 8,
 },
 retryButtonText: {
@@ -733,15 +753,15 @@ paddingHorizontal: 16,
 paddingBottom: 100,
 },
 gradientHeader: {
-paddingTop: 65,
-paddingBottom: 55,
+paddingTop: 60,
+paddingBottom: 60,
 alignItems: "center",
 justifyContent: "center",
 borderBottomLeftRadius: 30,
 borderBottomRightRadius: 30,
 shadowColor: "#000",
 shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.15,
+shadowOpacity: 0.1,
 shadowRadius: 8,
 elevation: 6,
 },
@@ -754,8 +774,8 @@ marginHorizontal: 20,
 marginBottom: 20,
 borderRadius: 30,
 overflow: 'hidden',
-borderWidth: 1,
-borderColor: 'rgba(255, 255, 255, 0.45)',
+borderWidth: 0.5,
+borderColor: '#FF8C00',
 shadowColor: '#000',
 shadowOffset: { width: 0, height: 4 },
 shadowOpacity: 0.1,
@@ -793,26 +813,46 @@ flexDirection: 'row',
 backgroundColor: '#F5F5F5',
 borderRadius: 25,
 padding: 4,
-marginHorizontal: 20,
+marginHorizontal: 40,
 marginBottom: 16,
+marginTop: 8,
+borderWidth: 0.5,
+borderColor: '#FF8C00',
+height: 50,
 },
 tab: {
 flex: 1,
-paddingVertical: 10,
 alignItems: 'center',
-borderRadius: 20,
+justifyContent: 'center',
+borderRadius: 22,
+height: 42,
 },
-activeTab: {
-backgroundColor: '#F2CF68',
+tabActive: {
+backgroundColor: 'transparent',
+shadowColor: '#FF7A18',
+shadowOffset: { width: 0, height: 2 },
+shadowOpacity: 0.3,
+shadowRadius: 4,
+elevation: 3,
+overflow: 'hidden',
 },
 tabText: {
-fontSize: 14,
-fontWeight: '500',
-color: '#666',
-},
-activeTabText: {
-color: '#000',
+fontSize: 16,
 fontWeight: '600',
+color: '#999',
+},
+tabTextActive: {
+fontWeight: '700',
+color: '#fff',
+},
+tabGradientBackground: {
+width: '100%',
+height: '100%',
+paddingVertical: 10,
+paddingHorizontal: 20,
+alignItems: 'center',
+justifyContent: 'center',
+borderRadius: 22,
 },
 titleBox: {
 paddingVertical: 18,

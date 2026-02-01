@@ -34,75 +34,60 @@ export default function LocationPostsScreen() {
     router.push(`/post-details/${postId}`);
   };
 
-  const renderPost = ({ item }: any) => (
-    <TouchableOpacity 
-      style={styles.postCard} 
-      onPress={() => handlePostPress(item.id)}
-      activeOpacity={0.9}
-    >
-      <Image
-        source={{ uri: fixUrl(item.thumbnail_url || item.media_url) }}
-        style={styles.postImage}
-        contentFit="cover"
-      />
-      <View style={styles.postInfo}>
-        <View style={styles.postHeader}>
-          <View style={styles.userInfo}>
-            {item.user_profile_picture ? (
-              <Image
-                source={{ uri: fixUrl(item.user_profile_picture) }}
-                style={styles.userAvatar}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={styles.userAvatarPlaceholder}>
-                <Ionicons name="person" size={14} color="#fff" />
-              </View>
-            )}
-            <Text style={styles.username}>{item.username}</Text>
-          </View>
-          {item.rating && (
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={12} color="#FFD700" />
-              <Text style={styles.ratingText}>{item.rating}</Text>
-            </View>
-          )}
-        </View>
-        
-        {item.review_text && (
-          <Text style={styles.reviewText} numberOfLines={2}>
-            {item.review_text}
-          </Text>
+  const renderPost = ({ item }: any) => {
+    const mediaUrl = fixUrl(item.thumbnail_url || item.media_url);
+    const isVideo = item.media_type === 'video' ||
+                    mediaUrl?.toLowerCase().endsWith('.mp4') ||
+                    mediaUrl?.toLowerCase().endsWith('.mov');
+
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        onPress={() => handlePostPress(item.id)}
+        activeOpacity={0.8}
+      >
+        {mediaUrl && (
+          <Image
+            source={{ uri: mediaUrl }}
+            style={styles.gridImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={item.id}
+          />
         )}
-        
-        <View style={styles.postStats}>
-          <View style={styles.statItem}>
-            <Ionicons name="heart" size={14} color="#E94A37" />
-            <Text style={styles.statText}>{item.likes_count || 0}</Text>
+
+        {/* Video indicator */}
+        {isVideo && (
+          <View style={styles.videoIndicator}>
+            <Ionicons name="play-circle" size={24} color="#fff" />
           </View>
-          <View style={styles.statItem}>
-            <Ionicons name="chatbubble" size={14} color="#1B7C82" />
-            <Text style={styles.statText}>{item.comments_count || 0}</Text>
+        )}
+
+        {/* Rating badge */}
+        {item.rating && (
+          <View style={styles.ratingBadgeGrid}>
+            <Ionicons name="star" size={10} color="#FFD700" />
+            <Text style={styles.ratingTextGrid}>{item.rating}</Text>
           </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+        colors={["#FFF5F0", "#FFE5D9"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Ionicons name="location" size={20} color="#fff" />
+          <Ionicons name="location" size={20} color="#FF2E2E" />
           <Text style={styles.headerTitle} numberOfLines={1}>
             {locationName}
           </Text>
@@ -112,14 +97,15 @@ export default function LocationPostsScreen() {
         </View>
       </LinearGradient>
 
-      {/* Posts List */}
+      {/* Posts Grid */}
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={renderPost}
+        numColumns={3}
+        columnWrapperStyle={styles.columnWrapper}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       />
     </View>
   );
@@ -150,100 +136,60 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#333",
     flex: 1,
   },
   postCount: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255, 46, 46, 0.15)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   postCountText: {
-    color: "#fff",
+    color: "#FF2E2E",
     fontSize: 12,
     fontWeight: "600",
   },
   listContainer: {
-    padding: 16,
+    paddingTop: 8,
   },
-  postCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  columnWrapper: {
+    gap: 1,
   },
-  postImage: {
+  gridItem: {
+    width: (SCREEN_WIDTH - 2) / 3,
+    height: (SCREEN_WIDTH - 2) / 3,
+    margin: 0.5,
+    position: "relative",
+    backgroundColor: "#f0f0f0",
+  },
+  gridImage: {
     width: "100%",
-    height: 200,
+    height: "100%",
   },
-  postInfo: {
-    padding: 12,
-  },
-  postHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  userAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#1B7C82",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  username: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-  },
-  ratingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E94A37",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  videoIndicator: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     borderRadius: 12,
-    gap: 4,
+    padding: 4,
   },
-  ratingText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  reviewText: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 8,
-    lineHeight: 18,
-  },
-  postStats: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 10,
-  },
-  statItem: {
+  ratingBadgeGrid: {
+    position: "absolute",
+    top: 6,
+    right: 6,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    backgroundColor: "rgba(233, 74, 55, 0.9)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 2,
   },
-  statText: {
-    fontSize: 12,
-    color: "#666",
+  ratingTextGrid: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });

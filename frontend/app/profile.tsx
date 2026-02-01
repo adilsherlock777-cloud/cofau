@@ -186,6 +186,7 @@ const ProfileSkeleton = () => {
     outputRange: ['#E0E0E0', '#F5F5F5'],
   });
 
+
   const SkeletonBox = ({ width, height, borderRadius = 4, style = {} }) => (
     <Animated.View
       style={[
@@ -204,12 +205,11 @@ const ProfileSkeleton = () => {
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <LinearGradient
-          colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gradientHeader}
-        >
+  colors={["#FF2E2E", "#FF7A18"]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0 }}
+  style={styles.gradientHeader}
+>
           <View style={styles.headerRow}>
             <View style={styles.leftSpacer} />
             <Text style={styles.cofauTitle}>Cofau</Text>
@@ -415,6 +415,10 @@ export default function ProfileScreen() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [replyModalVisible, setReplyModalVisible] = useState(false);
+  const [selectedReviewForReply, setSelectedReviewForReply] = useState<any>(null);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
   //const [confirm, setConfirm] = useState<any>(null);
   const [updatingPhone, setUpdatingPhone] = useState(false);
   const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false);
@@ -642,12 +646,45 @@ const getFilteredPostsByCategory = (posts: any[], isVideo: boolean) => {
   const GradientHeart = ({ size = 24 }) => (
   <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
     <LinearGradient
-      colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+      colors={["#FF2E2E", "#FF7A18"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ width: size, height: size }}
     />
   </MaskedView>
+);
+
+const GradientCofauText = () => (
+  <View style={{
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}>
+    <MaskedView
+      maskElement={
+        <Text
+          style={{
+            fontFamily: 'Lobster',
+            fontSize: 36,
+            textAlign: 'center',
+          }}
+        >
+          Cofau
+        </Text>
+      }
+    >
+      <LinearGradient
+        colors={["#FF2E2E", "#FF7A18"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ width: 120, height: 50 }}
+      />
+    </MaskedView>
+  </View>
 );
 
   const fetchProfileData = async () => {
@@ -1660,7 +1697,7 @@ const removeBannerImage = async () => {
               activeOpacity={0.7}
             >
               <View style={styles.locationHeaderLeft}>
-                <Ionicons name="location" size={20} color="#F2CF68" />
+                <Ionicons name="location" size={20} color="#FF2E2E" />
                 <Text style={styles.locationName}>{location}</Text>
               </View>
               <View style={styles.locationHeaderRight}>
@@ -1959,44 +1996,75 @@ const renderRestaurantProfile = () => {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* ================= GRADIENT HEADER ================= */}
-        <View style={styles.headerContainer}>
+     {/* ================= HEADER - WITH VISIBLE WHITE BACKGROUND ================= */}
+<View style={styles.headerContainer}>
+  <LinearGradient
+    colors={["#FFF5F0", "#FFE5D9"]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 0 }}
+    style={[styles.gradientHeader, restaurantStyles.whiteHeaderVisible]}
+  >
+    <View style={styles.headerRow}>
+      {!isOwnProfile ? (
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#FF2E2E" />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.leftSpacer} />
+      )}
+
+      {/* Gradient Cofau Text */}
+      <View style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1,
+        pointerEvents: 'none',
+      }}>
+        <MaskedView
+          maskElement={
+            <Text
+              style={{
+                fontFamily: 'Lobster',
+                fontSize: 32,
+                letterSpacing: 1,
+                textAlign: 'center',
+              }}
+            >
+              Cofau
+            </Text>
+          }
+        >
           <LinearGradient
-            colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-            locations={[0, 0.5, 1]}
+            colors={["#FF2E2E", "#FF7A18"]}
             start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientHeader}
+            end={{ x: 1, y: 1 }}
+            style={{ width: 120, height: 50 }}
+          />
+        </MaskedView>
+      </View>
+
+      <View style={styles.headerIcons} pointerEvents="box-none">
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => setSettingsModalVisible(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <View style={styles.headerRow}>
-              {!isOwnProfile ? (
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => router.back()}
-                >
-                  <Ionicons name="arrow-back" size={24} color="#fff" />
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.leftSpacer} />
-              )}
-
-              <Text style={styles.cofauTitle}>Cofau</Text>
-
-              <View style={styles.headerIcons} pointerEvents="box-none">
-                {isOwnProfile && (
-                  <TouchableOpacity
-                    style={styles.headerIconButton}
-                    onPress={() => setSettingsModalVisible(true)}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Ionicons name="menu" size={24} color="#fff" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
+            <Ionicons name="menu" size={24} color="#FF2E2E" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  </LinearGradient>
+</View>
 
         {/* ================= BANNER + WHITE BOX WRAPPER ================= */}
         <View style={restaurantStyles.bannerWrapper}>
@@ -2042,6 +2110,24 @@ const renderRestaurantProfile = () => {
 
           {/* ================= WHITE INFO BOX ================= */}
 <View style={restaurantStyles.whiteInfoBox}>
+  {/* Corner Decorations */}
+  <View style={restaurantStyles.cornerTopRightWrapper}>
+    <LinearGradient
+      colors={['#FF2E2E', '#FF7A18']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={restaurantStyles.cornerGradientTopRight}
+    />
+  </View>
+
+  <View style={restaurantStyles.cornerBottomLeftWrapper}>
+    <LinearGradient
+      colors={['#FF7A18', '#FF2E2E']}
+      start={{ x: 1, y: 1 }}
+      end={{ x: 0, y: 0 }}
+      style={restaurantStyles.cornerGradientBottomLeft}
+    />
+  </View>
   {/* Row container for DP space + Name */}
   <View style={restaurantStyles.nameRow}>
     {/* Empty space for DP */}
@@ -2071,13 +2157,13 @@ const renderRestaurantProfile = () => {
     activeOpacity={0.8}
   >
     <LinearGradient
-      colors={['#E94A37', '#F2CF68', '#1B7C82']}
+      colors={['#D62828', '#FF6B00']}
       start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
+      end={{ x: 1, y: 1 }}
       style={restaurantStyles.dashboardButtonGradient}
     >
       <Ionicons name="bar-chart" size={20} color="#fff" />
-      <Text style={restaurantStyles.dashboardButtonText}>Restaurant Dashboard</Text>
+      <Text style={restaurantStyles.dashboardButtonTextGradient}>Restaurant Dashboard</Text>
       <Ionicons name="chevron-forward" size={20} color="#fff" />
     </LinearGradient>
   </TouchableOpacity>
@@ -2144,40 +2230,39 @@ const renderRestaurantProfile = () => {
         </View>
       
 
-        {/* ================= ACTION BUTTONS ================= */}
+        {/* ================= ACTION BUTTONS - GRADIENT ================= */}
         <View style={styles.actionButtonsContainer}>
           {isOwnProfile ? (
             <>
-              {/* Own Restaurant Profile - 2 Buttons */}
+              {/* Edit Profile - Gradient */}
               <TouchableOpacity
-                style={styles.actionButtonWrapper}
+                style={restaurantStyles.actionButtonWrapperLight}
                 onPress={() => setEditModalVisible(true)}
               >
                 <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={['#D62828', '#FF6B00']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  locations={[0, 0.35, 0.9]}
-                  style={styles.actionButton}
+                  style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name="create" size={18} color="#fff" />
-                  <Text style={styles.actionButtonText}>Edit Profile</Text>
+                  <Ionicons name="create-outline" size={18} color="#fff" />
+                  <Text style={restaurantStyles.actionButtonTextGradient}>Edit Profile</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
+              {/* Messages - Gradient */}
               <TouchableOpacity
-                style={styles.actionButtonWrapper}
+                style={restaurantStyles.actionButtonWrapperLight}
                 onPress={() => router.push('/chat')}
               >
                 <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={['#D62828', '#FF6B00']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  locations={[0, 0.35, 0.9]}
-                  style={styles.actionButton}
+                  style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name="chatbubble" size={18} color="#fff" />
-                  <Text style={styles.actionButtonText}>Messages</Text>
+                  <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+                  <Text style={restaurantStyles.actionButtonTextGradient}>Messages</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </>
@@ -2190,7 +2275,7 @@ const renderRestaurantProfile = () => {
                 disabled={followLoading}
               >
                 <LinearGradient
-                  colors={isFollowing ? ['#1B7C82', '#1B7C82'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={isFollowing ? ['#FFD700', '#FFD700'] : ['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
@@ -2200,10 +2285,10 @@ const renderRestaurantProfile = () => {
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <>
-                      <Ionicons 
-                        name={isFollowing ? 'checkmark-circle' : 'person-add'} 
-                        size={15} 
-                        color="#fff" 
+                      <Ionicons
+                        name={isFollowing ? 'checkmark-circle' : 'person-add'}
+                        size={15}
+                        color="#fff"
                       />
                       <Text style={styles.actionButtonText}>
                         {isFollowing ? 'Following' : 'Follow'}
@@ -2218,7 +2303,7 @@ const renderRestaurantProfile = () => {
                 onPress={() => router.push('/chat')}
               >
                 <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
@@ -2244,7 +2329,7 @@ const renderRestaurantProfile = () => {
                 }}
               >
                 <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
@@ -2261,28 +2346,52 @@ const renderRestaurantProfile = () => {
         {/* ================= RESTAURANT TABS ================= */}
         <View style={styles.tabBar}>
           <TouchableOpacity
-            style={[styles.tab, restaurantActiveTab === 'posts' && styles.activeTab]}
+            style={styles.tab}
             onPress={() => setRestaurantActiveTab('posts')}
           >
             <Text style={[styles.tabText, restaurantActiveTab === 'posts' && styles.activeTabText]}>
               Posts
             </Text>
+            {restaurantActiveTab === 'posts' && (
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.activeTabIndicator}
+              />
+            )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, restaurantActiveTab === 'reviews' && styles.activeTab]}
+            style={styles.tab}
             onPress={() => setRestaurantActiveTab('reviews')}
           >
             <Text style={[styles.tabText, restaurantActiveTab === 'reviews' && styles.activeTabText]}>
               Customer Reviews
             </Text>
+            {restaurantActiveTab === 'reviews' && (
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.activeTabIndicator}
+              />
+            )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, restaurantActiveTab === 'menu' && styles.activeTab]}
+            style={styles.tab}
             onPress={() => setRestaurantActiveTab('menu')}
           >
             <Text style={[styles.tabText, restaurantActiveTab === 'menu' && styles.activeTabText]}>
               Menu
             </Text>
+            {restaurantActiveTab === 'menu' && (
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.activeTabIndicator}
+              />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -2361,77 +2470,109 @@ const renderRestaurantProfile = () => {
         <ActivityIndicator size="large" color="#4dd0e1" />
       </View>
     ) : getFilteredReviews().length > 0 ? (
-      <FlatList
+<FlatList
   data={getFilteredReviews()}
   renderItem={({ item }) => (
-  <TouchableOpacity
-    style={restaurantStyles.reviewItem}
-    onPress={() => router.push(`/post-details/${item.id}`)}
-    activeOpacity={0.8}
-  >
-    {/* Left Side - Image with Likes Badge */}
-    <View style={restaurantStyles.reviewImageWrapper}>
-      <View style={restaurantStyles.reviewImageContainer}>
-        {item.media_url ? (
-          <Image
-            source={{ uri: fixUrl(item.media_url) }}
-            style={restaurantStyles.reviewImage}
-            resizeMode="cover"
+    <TouchableOpacity
+      style={restaurantStyles.reviewItem}
+      onPress={() => router.push(`/post-details/${item.id}`)}
+      activeOpacity={0.8}
+    >
+      {/* Left Side - Image with Likes Badge */}
+      <View style={restaurantStyles.reviewImageWrapper}>
+        <View style={restaurantStyles.reviewImageContainer}>
+          {item.media_url ? (
+            <Image
+              source={{ uri: fixUrl(item.media_url) }}
+              style={restaurantStyles.reviewImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={restaurantStyles.reviewImagePlaceholder}>
+              <Ionicons name="image-outline" size={40} color="#ccc" />
+            </View>
+          )}
+        </View>
+        
+        {/* Likes Badge */}
+        <View style={restaurantStyles.reviewLikesBadge}>
+          {(item.likes_count || 0) > 0 ? (
+            <GradientHeart size={14} />
+          ) : (
+            <Ionicons name="heart-outline" size={14} color="#fff" />
+          )}
+          <Text style={restaurantStyles.reviewLikesText}>
+            {item.likes_count || 0}
+          </Text>
+        </View>
+      </View>
+
+      {/* Right Side - Details */}
+      <View style={restaurantStyles.reviewDetails}>
+        {/* User Info */}
+        <View style={restaurantStyles.reviewUserRow}>
+          <UserAvatar
+            profilePicture={item.user_profile_picture}
+            username={item.username}
+            size={40}
+            level={item.user_level || 1}
+            showLevelBadge={true}
           />
-        ) : (
-          <View style={restaurantStyles.reviewImagePlaceholder}>
-            <Ionicons name="image-outline" size={40} color="#ccc" />
+          <Text style={restaurantStyles.reviewUsername} numberOfLines={1}>
+            {item.username || 'User'}
+          </Text>
+        </View>
+
+        {/* Rating */}
+        <View style={restaurantStyles.reviewDetailRow}>
+          <Ionicons name="star" size={18} color="#F2CF68" />
+          <Text style={restaurantStyles.reviewDetailText}>{item.rating}/10</Text>
+        </View>
+
+        {/* Review Text - Icon stays at top */}
+        {item.review_text && (
+          <View style={restaurantStyles.reviewTextRow}>
+            <Ionicons 
+              name="chatbubble" 
+              size={18} 
+              color="#F2CF68" 
+              style={{ marginTop: 2 }}  // Keep icon at top
+            />
+            <Text style={restaurantStyles.reviewFullText}>
+              {item.review_text}
+            </Text>
+          </View>
+        )}
+
+        {/* Reply Section - Only for Restaurant Owner */}
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={restaurantStyles.replyButton}
+            onPress={() => {
+              // Handle reply - you can open a modal or navigate
+              setSelectedReviewForReply(item);
+              setReplyModalVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="return-down-forward" size={16} color="#FF2E2E" />
+            <Text style={restaurantStyles.replyButtonText}>Reply</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Show existing reply if any */}
+        {item.restaurant_reply && (
+          <View style={restaurantStyles.replyContainer}>
+            <View style={restaurantStyles.replyHeader}>
+              <Ionicons name="business" size={14} color="#FF2E2E" />
+              <Text style={restaurantStyles.replyLabel}>Restaurant Reply</Text>
+            </View>
+            <Text style={restaurantStyles.replyText}>{item.restaurant_reply}</Text>
           </View>
         )}
       </View>
-      
-      {/* Likes Badge - Top Right of Image */}
-      <View style={restaurantStyles.reviewLikesBadge}>
-        {(item.likes_count || 0) > 0 ? (
-          <GradientHeart size={14} />
-        ) : (
-          <Ionicons name="heart-outline" size={14} color="#fff" />
-        )}
-        <Text style={restaurantStyles.reviewLikesText}>
-          {item.likes_count || 0}
-        </Text>
-      </View>
-    </View>
-
-    {/* Right Side - Details */}
-    <View style={restaurantStyles.reviewDetails}>
-      {/* User Info with Level Badge */}
-      <View style={restaurantStyles.reviewUserRow}>
-        <UserAvatar
-          profilePicture={item.user_profile_picture}
-          username={item.username}
-          size={40}
-          level={item.user_level || 1}
-          showLevelBadge={true}
-        />
-        <Text style={restaurantStyles.reviewUsername} numberOfLines={1}>
-          {item.username || 'User'}
-        </Text>
-      </View>
-
-      {/* Rating */}
-      <View style={restaurantStyles.reviewDetailRow}>
-        <Ionicons name="star" size={18} color="#F2CF68" />
-        <Text style={restaurantStyles.reviewDetailText}>{item.rating}/10</Text>
-      </View>
-
-      {/* Review Text - Full text */}
-      {item.review_text && (
-        <View style={restaurantStyles.reviewDetailRow}>
-          <Ionicons name="chatbubble" size={18} color="#F2CF68" />
-          <Text style={restaurantStyles.reviewFullText}>
-            {item.review_text}
-          </Text>
-        </View>
-      )}
-    </View>
-  </TouchableOpacity>
-)}
+    </TouchableOpacity>
+  )}
   keyExtractor={(item) => item.id}
   scrollEnabled={false}
 />
@@ -3071,6 +3212,105 @@ const renderRestaurantProfile = () => {
     </View>
   </View>
 </Modal>
+
+{/* ================= REPLY TO REVIEW MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={replyModalVisible}
+  onRequestClose={() => {
+    setReplyModalVisible(false);
+    setSelectedReviewForReply(null);
+    setReplyText('');
+  }}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalContainer}
+  >
+    <View style={styles.modalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Reply to Review</Text>
+        <TouchableOpacity onPress={() => {
+          setReplyModalVisible(false);
+          setSelectedReviewForReply(null);
+          setReplyText('');
+        }}>
+          <Ionicons name="close" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Original Review */}
+      {selectedReviewForReply && (
+        <View style={{ backgroundColor: '#f5f5f5', padding: 12, borderRadius: 10, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <UserAvatar
+              profilePicture={selectedReviewForReply.user_profile_picture}
+              username={selectedReviewForReply.username}
+              size={32}
+            />
+            <Text style={{ fontWeight: '600', color: '#333' }}>
+              {selectedReviewForReply.username}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="star" size={14} color="#F2CF68" />
+              <Text style={{ fontSize: 12, color: '#666' }}>
+                {selectedReviewForReply.rating}/10
+              </Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 14, color: '#666' }}>
+            {selectedReviewForReply.review_text || 'No review text'}
+          </Text>
+        </View>
+      )}
+
+      <Text style={styles.inputLabel}>Your Reply</Text>
+      <TextInput
+        style={[styles.input, styles.bioInput]}
+        value={replyText}
+        onChangeText={setReplyText}
+        placeholder="Write your reply to this review..."
+        multiline
+        numberOfLines={4}
+      />
+
+      <TouchableOpacity
+        style={[styles.saveButton, { backgroundColor: '#FF2E2E' }]}
+        onPress={async () => {
+          if (!replyText.trim() || !selectedReviewForReply) return;
+
+          setSendingReply(true);
+          try {
+            await axios.post(
+              `${API_URL}/restaurant/posts/reviews/${selectedReviewForReply.id}/reply`,
+              { reply_text: replyText },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            Alert.alert('Success', 'Reply sent successfully!');
+            setReplyModalVisible(false);
+            setSelectedReviewForReply(null);
+            setReplyText('');
+            fetchRestaurantReviews(); // Refresh reviews
+          } catch (error: any) {
+            console.error('Error sending reply:', error);
+            Alert.alert('Error', 'Failed to send reply. Please try again.');
+          } finally {
+            setSendingReply(false);
+          }
+        }}
+        disabled={sendingReply || !replyText.trim()}
+      >
+        {sendingReply ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.saveButtonText}>Send Reply</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
     </View>
   );
 };
@@ -3482,8 +3722,7 @@ if (isRestaurantProfile) {
         {/* ================= GRADIENT HEADER ================= */}
         <View style={styles.headerContainer}>
           <LinearGradient
-            colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-            locations={[0, 0.5, 1]}
+            colors={["#FFF5F0", "#FFE5D9"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.gradientHeader}
@@ -3495,13 +3734,45 @@ if (isRestaurantProfile) {
                   style={styles.backButton}
                   onPress={() => router.back()}
                 >
-                  <Ionicons name="arrow-back" size={24} color="#fff" />
+                  <Ionicons name="arrow-back" size={24} color="#FF2E2E" />
                 </TouchableOpacity>
               ) : (
                 <View style={styles.leftSpacer} />
               )}
 
-              <Text style={styles.cofauTitle}>Cofau</Text>
+              {/* Gradient Cofau Text */}
+              <View style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                height: 50,
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                pointerEvents: 'none',
+              }}>
+                <MaskedView
+                  maskElement={
+                    <Text
+                      style={{
+                        fontFamily: 'Lobster',
+                        fontSize: 32,
+                        letterSpacing: 1,
+                        textAlign: 'center',
+                      }}
+                    >
+                      Cofau
+                    </Text>
+                  }
+                >
+                  <LinearGradient
+                    colors={["#FF2E2E", "#FF7A18"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ width: 120, height: 50 }}
+                  />
+                </MaskedView>
+              </View>
 
               <View style={styles.headerIcons} pointerEvents="box-none">
                 {isOwnProfile ? (
@@ -3517,7 +3788,7 @@ if (isRestaurantProfile) {
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="menu" size={24} color="#fff" />
+                    <Ionicons name="menu" size={24} color="#FF2E2E" />
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -3635,7 +3906,7 @@ if (isRestaurantProfile) {
       onPress={() => setEditModalVisible(true)}
     >
       <LinearGradient
-        colors={['#E94A37', '#F2CF68', '#1B7C82']}
+        colors={['#FF2E2E', '#FF7A18']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         locations={[0, 0.35, 0.9]}
@@ -3652,7 +3923,7 @@ if (isRestaurantProfile) {
       onPress={() => router.push('/chat')}
     >
       <LinearGradient
-        colors={['#E94A37', '#F2CF68', '#1B7C82']}
+        colors={['#FF2E2E', '#FF7A18']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         locations={[0, 0.35, 0.9]}
@@ -3672,7 +3943,7 @@ if (isRestaurantProfile) {
                 disabled={followLoading}
               >
                 <LinearGradient
-                  colors={isFollowing ? ['#1B7C82', '#1B7C82', '#1B7C82'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={isFollowing ? ['#FFD700', '#FFD700', '#FFD700'] : ['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
@@ -3701,7 +3972,7 @@ if (isRestaurantProfile) {
                 onPress={() => router.push('/chat')}
               >
                 <LinearGradient
-                  colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
@@ -3723,7 +3994,7 @@ if (isRestaurantProfile) {
                 disabled={hasComplimented}
               >
                 <LinearGradient
-                  colors={hasComplimented ? ['#1B7C82', '#1B7C82', '#1B7C82'] : ['#E94A37', '#F2CF68', '#1B7C82']}
+                  colors={hasComplimented ? ['#1B7C82', '#1B7C82', '#1B7C82'] : ['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
@@ -3754,7 +4025,7 @@ if (isRestaurantProfile) {
        {/* Tab Navigation */}
 <View style={styles.tabBar}>
   <TouchableOpacity
-    style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
+    style={styles.tab}
     onPress={() => setActiveTab('posts')}
   >
     <Text
@@ -3765,9 +4036,17 @@ if (isRestaurantProfile) {
     >
       Photos
     </Text>
+    {activeTab === 'posts' && (
+      <LinearGradient
+        colors={['#FF2E2E', '#FF7A18']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.activeTabIndicator}
+      />
+    )}
   </TouchableOpacity>
   <TouchableOpacity
-    style={[styles.tab, activeTab === 'videos' && styles.activeTab]}
+    style={styles.tab}
     onPress={() => setActiveTab('videos')}
   >
     <Text
@@ -3778,9 +4057,17 @@ if (isRestaurantProfile) {
     >
       Videos
     </Text>
+    {activeTab === 'videos' && (
+      <LinearGradient
+        colors={['#FF2E2E', '#FF7A18']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.activeTabIndicator}
+      />
+    )}
   </TouchableOpacity>
   <TouchableOpacity
-    style={[styles.tab, activeTab === 'favourite' && styles.activeTab]}
+    style={styles.tab}
     onPress={() => setActiveTab('favourite')}
   >
     <Text
@@ -3791,6 +4078,14 @@ if (isRestaurantProfile) {
     >
       Favourite
     </Text>
+    {activeTab === 'favourite' && (
+      <LinearGradient
+        colors={['#FF2E2E', '#FF7A18']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.activeTabIndicator}
+      />
+    )}
   </TouchableOpacity>
 </View>
 
@@ -4358,7 +4653,7 @@ if (isRestaurantProfile) {
                         
                         return (
                           <LinearGradient
-                            colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                            colors={['#FF2E2E', '#FF7A18']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={[
@@ -4616,6 +4911,57 @@ const restaurantStyles = StyleSheet.create({
     position: 'relative',           // ✅ ADD THIS
     zIndex: 0,             // ✅ Changed from 20 to 0
   },
+  cornerTopRight: {
+  position: 'absolute',
+  top: -2,
+  right: -2,
+  width: 40,
+  height: 40,
+  overflow: 'hidden',
+},
+cornerBottomLeft: {
+  position: 'absolute',
+  bottom: -2,
+  left: -2,
+  width: 40,
+  height: 40,
+  overflow: 'hidden',
+},
+actionButtonWrapperLight: {
+  flex: 1,
+  borderRadius: 20,
+},
+actionButtonLight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  borderRadius: 20,
+  backgroundColor: '#FFF5EE',  // Very light orange
+  borderWidth: 1.5,
+  borderColor: '#FFB380',  // Light orange border
+  gap: 6,
+},
+actionButtonTextLight: {
+  color: '#FF7A18',  // Orange text
+  fontSize: 14,
+  fontWeight: '600',
+},
+actionButtonGradient: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  borderRadius: 20,
+  gap: 6,
+},
+actionButtonTextGradient: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '600',
+},
  bannerContainer: {
   height: 200,
   borderRadius: 20,
@@ -4641,15 +4987,91 @@ reviewImageContainer: {
   borderRadius: 12,
   overflow: 'hidden',
 },
+whiteHeaderVisible: {
+  paddingTop: 75,
+  paddingBottom: 65,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.2,
+  shadowRadius: 10,
+  elevation: 8,
+},
+// Add to restaurantStyles
+reviewTextRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',  // Keep icon at top
+  gap: 8,
+},
+reviewFullText: {
+  fontSize: 14,
+  color: '#666',
+  flex: 1,
+  lineHeight: 20,
+},
+replyButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  marginTop: 8,
+  paddingVertical: 6,
+  paddingHorizontal: 12,
+  backgroundColor: '#FFF5F5',
+  borderRadius: 16,
+  alignSelf: 'flex-start',
+},
+replyButtonText: {
+  fontSize: 13,
+  color: '#FF2E2E',
+  fontWeight: '600',
+},
+replyContainer: {
+  marginTop: 10,
+  backgroundColor: '#FFF9F0',
+  borderRadius: 8,
+  padding: 10,
+  borderLeftWidth: 3,
+  borderLeftColor: '#FF2E2E',
+},
+replyHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  marginBottom: 4,
+},
+replyLabel: {
+  fontSize: 12,
+  color: '#FF2E2E',
+  fontWeight: '600',
+},
+replyText: {
+  fontSize: 13,
+  color: '#666',
+  lineHeight: 18,
+},
+
 dashboardButton: {
   marginTop: 16,
   borderRadius: 12,
   overflow: 'hidden',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.15,
-  shadowRadius: 4,
-  elevation: 4,
+},
+dashboardButtonLight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 14,
+  paddingHorizontal: 20,
+  gap: 10,
+  backgroundColor: '#FFF5EE',  // Very light orange/peach
+  borderWidth: 1.5,
+  borderColor: '#FFB380',  // Light orange border
+  borderRadius: 12,
+},
+dashboardButtonTextLight: {
+  color: '#FF7A18',  // Orange text
+  fontSize: 16,
+  fontWeight: '600',
+  flex: 1,
+  textAlign: 'center',
 },
 dashboardButtonGradient: {
   flexDirection: 'row',
@@ -4658,11 +5080,12 @@ dashboardButtonGradient: {
   paddingVertical: 14,
   paddingHorizontal: 20,
   gap: 10,
+  borderRadius: 12,
 },
-dashboardButtonText: {
+dashboardButtonTextGradient: {
   color: '#fff',
   fontSize: 16,
-  fontWeight: '700',
+  fontWeight: '600',
   flex: 1,
   textAlign: 'center',
 },
@@ -5017,6 +5440,8 @@ whiteInfoBox: {
   shadowRadius: 8,
   elevation: 4,
   zIndex: 1,
+  borderWidth: 1,
+  borderColor: '#FF5C5C',
 },
  restaurantInfoContainer: {
   flexDirection: 'column',
@@ -5079,7 +5504,7 @@ whiteInfoBox: {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FAFAFA',
   },
   scrollContent: {
     paddingBottom: 100,
@@ -5498,7 +5923,37 @@ reviewFullText: {
 
   headerContainer: {
     position: 'relative',
-    marginBottom: 8,
+    marginBottom: 0,
+  },
+  // Add to styles
+whiteHeader: {
+  backgroundColor: '#fff',
+  paddingTop: 65,
+  paddingBottom: 20,
+  paddingHorizontal: 20,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 4,
+  elevation: 3,
+  borderBottomWidth: 3,
+  borderBottomColor: '#f0f0f0',
+},
+header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',  // White background
+    borderBottomWidth: 3,
+    borderBottomColor: '#FF7A18',  // Orange accent border
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   gradientHeader: {
     paddingTop: 65,
@@ -5532,7 +5987,7 @@ reviewFullText: {
     right: 0,
     textAlign: 'center',
     fontFamily: 'Lobster',
-    fontSize: 36,
+    fontSize: 32,
     color: '#fff',
     letterSpacing: 1,
     zIndex: 1,
@@ -5717,9 +6172,12 @@ statDivider: {
     paddingVertical: 14,
     alignItems: 'center',
   },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#F2CF68',
+  activeTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
   },
   tabText: {
     fontSize: 15,
@@ -6004,7 +6462,7 @@ statDivider: {
     borderRadius: 20,
   },
   followerFollowingButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#FFD700',
   },
   followerFollowButtonText: {
     color: '#fff',

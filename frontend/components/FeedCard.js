@@ -81,18 +81,17 @@ function FeedCard({
 }) {
   // Add debug log HERE - inside the function
 
-  // Add this at the top of your FeedCard function to see what's coming through
-console.log('🏷️ Tagged restaurant:', post.id, post.tagged_restaurant);
+  // Debug: Check if tagged_restaurant data is coming through
+  console.log('🏷️ FeedCard - Post ID:', post.id, '| Tagged Restaurant:', post.tagged_restaurant);
 
-console.log('🔍 FeedCard post data:', {
-    id: post.id,
-    username: post.username,
-    price: post.price,
-    about: post.about,
-    rating: post.rating,
-    description: post.description,
-    account_type: post.account_type
-  });
+  if (post.tagged_restaurant) {
+    console.log('✅ Has tagged_restaurant:', {
+      id: post.tagged_restaurant.id,
+      name: post.tagged_restaurant.restaurant_name
+    });
+  } else {
+    console.log('❌ No tagged_restaurant data for post', post.id);
+  }
 
   const router = useRouter();
   const { user } = useAuth();
@@ -441,7 +440,7 @@ showLevelBadge
 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
   <Text style={styles.username}>{post.username}</Text>
   {post.account_type === 'restaurant' && (
-    <Ionicons name="storefront" size={14} color="#1B7C82" />
+    <Ionicons name="storefront" size={14} color="#FF2E2E" />
   )}
 </View>
 </TouchableOpacity>
@@ -450,13 +449,19 @@ showLevelBadge
 {/* Follow Button - Only show if not following and not own post */}
 {!isOwnPost && !isFollowing && (
 <TouchableOpacity
-style={styles.followButton}
 onPress={handleFollowToggle}
 disabled={followLoading}
+>
+<LinearGradient
+colors={["#FF2E2E", "#FF7A18"]}
+start={{ x: 0, y: 0 }}
+end={{ x: 1, y: 1 }}
+style={styles.followButton}
 >
 <Text style={styles.followButtonText}>
 {followLoading ? "..." : "Follow"}
 </Text>
+</LinearGradient>
 </TouchableOpacity>
 )}
 
@@ -555,16 +560,22 @@ postId={post.id}
 
             {!isOwnPost && !isFollowing && (
               <TouchableOpacity
-                style={styles.videoFollowButton}
                 onPress={(e) => {
                   e.stopPropagation();
                   handleFollowToggle();
                 }}
                 disabled={followLoading}
               >
-                <Text style={styles.videoFollowButtonText}>
-                  {followLoading ? "..." : "Follow"}
-                </Text>
+                <LinearGradient
+                  colors={["#FF2E2E", "#FF7A18"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.videoFollowButton}
+                >
+                  <Text style={styles.videoFollowButtonText}>
+                    {followLoading ? "..." : "Follow"}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </TouchableOpacity>
@@ -750,22 +761,22 @@ postId={post.id}
         <GradientHeart size={120} />
       </View>
     )}
+
+    {/* Restaurant Tag Overlay - Must be inside Pressable to show on image */}
+    {post.tagged_restaurant && post.tagged_restaurant.restaurant_name ? (
+      <TouchableOpacity
+        style={styles.restaurantTagOverlay}
+        onPress={() => router.push(`/profile?userId=${post.tagged_restaurant.id}`)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="storefront" size={12} color="#FFF" />
+        <Text style={styles.restaurantTagText} numberOfLines={1}>
+          {post.tagged_restaurant.restaurant_name}
+        </Text>
+      </TouchableOpacity>
+    ) : null}
   </Pressable>
 )}
-
-{/* Restaurant Tag Overlay */}
-{post.tagged_restaurant && post.tagged_restaurant.restaurant_name ? (
-  <TouchableOpacity
-    style={styles.restaurantTagOverlay}
-    onPress={() => router.push(`/restaurant/${post.tagged_restaurant.id}`)}
-    activeOpacity={0.8}
-  >
-    <Ionicons name="restaurant" size={12} color="#FFF" />
-    <Text style={styles.restaurantTagText} numberOfLines={1}>
-      {post.tagged_restaurant.restaurant_name}
-    </Text>
-  </TouchableOpacity>
-) : null}
 
 {/* RATING (Users) or PRICE (Restaurants) */}
 {post.rating != null && !post.price && (
@@ -877,7 +888,38 @@ Alert.alert(
     {
       text: "Add to Story",
       onPress: async () => {
-        // ... your existing Cofau story code
+        try {
+          await addPostToStory(
+            post.id,
+            mediaUrl,
+            post.description || post.review_text || "",
+            post.rating || 0,
+            post.location_name || ""
+          );
+
+          // Show success message
+          Alert.alert(
+            "✓ Successfully Added!",
+            "Post has been added to your story",
+            [
+              {
+                text: "OK",
+                onPress: () => {
+                  // Trigger story update if callback exists
+                  if (onStoryCreated) {
+                    onStoryCreated();
+                  }
+                }
+              }
+            ]
+          );
+        } catch (error) {
+          console.error("Error adding post to story:", error);
+          Alert.alert(
+            "Error",
+            error.response?.data?.detail || "Failed to add post to story. Please try again."
+          );
+        }
       },
     },
     {
@@ -986,7 +1028,6 @@ gap: 0,
 },
 
 followButton: {
-backgroundColor: "#1B7C82",
 paddingHorizontal: 10,
 paddingVertical: 4,
 borderRadius: 12,
@@ -1160,12 +1201,9 @@ textShadowRadius: 3,
 },
 
 videoFollowButton: {
-backgroundColor: 'rgba(255, 255, 255, 0.3)',
 paddingHorizontal: 12,
 paddingVertical: 2.5,
 borderRadius: 6,
-borderWidth: 1,
-borderColor: '#fff',
 marginLeft: 180,
 },
 
@@ -1246,7 +1284,7 @@ locationButton: {
   paddingVertical: 14,
   paddingHorizontal: 20,
   marginBottom: 10,
-  shadowColor: '#1B7C82',
+  shadowColor: '#FF2E2E',
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.3,
   shadowRadius: 8,

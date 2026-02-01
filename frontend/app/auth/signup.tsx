@@ -401,7 +401,7 @@ const handleVerifyOtp = async () => {
               autoCorrect={false}
             />
             {checkingUsername && (
-              <ActivityIndicator size="small" color="#4dd0e1" style={styles.checkingIndicator} />
+              <ActivityIndicator size="small" color="#FF2E2E" style={styles.checkingIndicator} />
             )}
             {usernameAvailable === true && !checkingUsername && (
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.statusIcon} />
@@ -428,7 +428,7 @@ const handleVerifyOtp = async () => {
                   style={styles.suggestionItem}
                   onPress={() => handleSelectSuggestion(suggestion)}
                 >
-                  <Ionicons name="arrow-forward-circle-outline" size={16} color="#4dd0e1" />
+                  <Ionicons name="arrow-forward-circle-outline" size={16} color="#FF2E2E" />
                   <Text style={styles.suggestionText}>{suggestion}</Text>
                 </TouchableOpacity>
               ))}
@@ -617,9 +617,9 @@ const handleVerifyOtp = async () => {
             disabled={loading || !termsAccepted}
           >
             <LinearGradient
-              colors={!termsAccepted ? ['#ccc', '#ccc', '#ccc'] : ['#4dd0e1', '#ba68c8', '#ff80ab']}
+              colors={!termsAccepted ? ['#ccc', '#ccc', '#ccc'] : ['#FF2E2E', '#FF7A18']}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.button}
             >
               {loading ? (
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
   },
   loginLink: {
     fontSize: 14,
-    color: '#4dd0e1',
+    color: '#FF2E2E',
     fontWeight: '600',
   },
   inputSuccess: {
@@ -770,8 +770,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#4dd0e1',
-    borderColor: '#4dd0e1',
+    backgroundColor: '#FF2E2E',
+    borderColor: '#FF2E2E',
   },
   termsText: {
     flex: 1,
@@ -790,7 +790,7 @@ phoneInput: {
   marginBottom: 0,
 },
 otpButton: {
-  backgroundColor: '#4dd0e1',
+  backgroundColor: '#FF2E2E',
   paddingHorizontal: 16,
   height: 56,
   borderRadius: 12,
@@ -823,7 +823,7 @@ verifiedText: {
   fontWeight: '500',
 },
   termsLink: {
-    color: '#4dd0e1',
+    color: '#FF2E2E',
     fontWeight: '600',
     textDecorationLine: 'underline',
   },

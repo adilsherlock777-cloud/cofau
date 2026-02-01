@@ -173,24 +173,30 @@ const handlePostPress = (userId) => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[
-                styles.followButton,
-                isFollowing && styles.followingButton,
-              ]}
               onPress={() => handleFollow(item.id)}
               disabled={isLoadingThis}
             >
-              {isLoadingThis ? (
-                <ActivityIndicator size="small" color={isFollowing ? "#333" : "#fff"} />
+              {isFollowing ? (
+                <View style={styles.followingButton}>
+                  {isLoadingThis ? (
+                    <ActivityIndicator size="small" color="#333" />
+                  ) : (
+                    <Text style={styles.followingButtonText}>Following</Text>
+                  )}
+                </View>
               ) : (
-                <Text
-                  style={[
-                    styles.followButtonText,
-                    isFollowing && styles.followingButtonText,
-                  ]}
+                <LinearGradient
+                  colors={["#FF2E2E", "#FF7A18"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.followButton}
                 >
-                  {isFollowing ? "Following" : "Follow"}
-                </Text>
+                  {isLoadingThis ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.followButtonText}>Follow</Text>
+                  )}
+                </LinearGradient>
               )}
             </TouchableOpacity>
           </View>
@@ -371,7 +377,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   followButton: {
-    backgroundColor: "#1B7C82",
     paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 4,

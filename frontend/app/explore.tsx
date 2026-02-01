@@ -72,8 +72,8 @@ const getTileHeight = (post: any) => {
 
 
 const GradientHeart = ({ size = 18 }) => (
-  <MaskedView maskElement={<View style={{ backgroundColor: "transparent" }}><Ionicons name="heart" size={size} color="#000" /></View>}>
-    <LinearGradient colors={["#E94A37", "#F2CF68", "#1B7C82"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size }} />
+  <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
+    <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size }} />
   </MaskedView>
 );
 
@@ -1639,20 +1639,21 @@ return (
     setShowCategoryModal(false); 
     
     if (activeTab === 'map') {
-      // For map tab - search with selected categories
-      if (selectedCategories.length > 0) {
-        fetchMapPins(selectedCategories.join(' '));
-      } else {
-        fetchMapPins();
-      }
-    } else {
-      // For users tab - existing logic
-      setPosts([]); 
-      setPage(1); 
-      setHasMore(true); 
-      setPlayingVideos([]); 
-      fetchPostsWithCategories(selectedCategories); 
-    }
+  // For map tab - filter from cache (fast!)
+  if (selectedCategories.length > 0) {
+    const filteredPosts = cachedMapPosts.current.filter((post: any) => {
+      const postCategory = post.category?.toLowerCase().trim();
+      return selectedCategories.some(cat => 
+        postCategory === cat.toLowerCase().trim()
+      );
+    });
+    console.log(`Modal filter: ${filteredPosts.length} posts for categories: ${selectedCategories.join(', ')}`);
+    setMapPosts(filteredPosts);
+  } else {
+    // No filter - show all cached posts
+    setMapPosts(cachedMapPosts.current);
+  }
+}
     
     // Clear quick category selection when using modal
     setSelectedQuickCategory(null);

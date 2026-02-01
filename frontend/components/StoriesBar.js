@@ -113,8 +113,8 @@ setStories(filtered);
           >
             <View style={styles.avatarWrapper}>
               <LinearGradient
-                colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-                locations={[0, 0.35, 0.9]}
+                colors={["#FF2E2E", "#F2CF68", "#FF9A4D"]}
+                locations={[0, 0.5, 1]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.gradientRing}

@@ -296,8 +296,7 @@ const handleGrammarConfirm = (useCorrected: boolean) => {
     setReview(correctedReview);
   }
   setShowGrammarModal(false);
-  // Continue with posting - call handlePost again but skip grammar check
-  submitPost(useCorrected ? correctedReview : originalReview);
+  
 };
 
   // ------------------------------ POST SUBMISSION ------------------------------
@@ -1006,10 +1005,10 @@ return (
       />
       
       {loadingSuggestions && (
-        <ActivityIndicator 
-          size="small" 
-          color="#4ECDC4" 
-          style={styles.suggestionLoader} 
+        <ActivityIndicator
+          size="small"
+          color="#FF9A4D"
+          style={styles.suggestionLoader}
         />
       )}
 
@@ -1024,7 +1023,7 @@ return (
               onPress={() => selectLocationSuggestion(suggestion)}
             >
               <View style={styles.suggestionContent}>
-                <Ionicons name="location" size={18} color="#4ECDC4" />
+                <Ionicons name="location" size={18} color="#FF9A4D" />
                 <View style={styles.suggestionTextContainer}>
                   <Text style={styles.suggestionName}>{suggestion.location_name}</Text>
                   <Text style={styles.suggestionMeta}>
@@ -1051,21 +1050,21 @@ return (
 
     {/* Generate Google Maps Link */}
     <TouchableOpacity style={styles.mapsButton} onPress={generateMapsLink}>
-      <Ionicons name="map" size={20} color="#4ECDC4" />
+      <Ionicons name="map" size={20} color="#FF9A4D" />
       <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
     </TouchableOpacity>
 
     {/* Verify Location */}
-    <TouchableOpacity 
-      style={[styles.mapsButton, !mapsLink && styles.mapsButtonDisabled]} 
+    <TouchableOpacity
+      style={[styles.mapsButton, !mapsLink && styles.mapsButtonDisabled]}
       onPress={openMaps}
       disabled={!mapsLink}
     >
-      <Ionicons name="location" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+      <Ionicons name="location" size={20} color={mapsLink ? "#FF9A4D" : "#CCC"} />
       <Text style={[styles.mapsButtonText, !mapsLink && styles.mapsButtonTextDisabled]}>
         Verify Location
       </Text>
-      <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#4ECDC4" : "#CCC"} />
+      <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#FF9A4D" : "#CCC"} />
     </TouchableOpacity>
   </View>
 )}
@@ -1078,7 +1077,7 @@ return (
           disabled={loading}
         >
           <LinearGradient
-            colors={['#E94A37', '#F2CF68', '#1B7C82']}
+            colors={['#FF2E2E', '#F2CF68', '#FF9A4D']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.postButton}
@@ -1373,7 +1372,7 @@ postTypeTextActive: {
   mapsButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1B7C82',
+    color: '#FF9A4D',
   },
 
   postButtonContainer: { marginTop: 10 },

@@ -11,6 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import MaskedView from "@react-native-masked-view/masked-view";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
@@ -179,23 +180,34 @@ useEffect(() => {
     <View style={styles.container}>
       {/* Cofau Gradient Header */}
       <LinearGradient
-        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-        locations={[0, 0.5, 1]}
+        colors={["#FFF5F0", "#FFE5D9"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.gradientHeader}
       >
         <View style={styles.headerContent}>
           {/* Back Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={20} color="#fff" />
+            <Ionicons name="arrow-back" size={20} color="#333" />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Messages</Text>
-          
+          <MaskedView
+            maskElement={
+              <Text style={styles.headerTitle}>Messages</Text>
+            }
+          >
+            <LinearGradient
+              colors={["#FF2E2E", "#FF7A18"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={[styles.headerTitle, { opacity: 0 }]}>Messages</Text>
+            </LinearGradient>
+          </MaskedView>
+
           {/* Spacer for centering */}
           <View style={styles.headerSpacer} />
         </View>
@@ -281,18 +293,14 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
     fontFamily: "Lobster",
     fontSize: 36,
-    color: "#fff",
     letterSpacing: 1,
-    textShadowColor: "rgba(0, 0, 0, 0.15)",
-    textShadowOffset: { width: 6, height: 4 },
-    textShadowRadius: 4,
   },
   headerSpacer: {
     width: 40,

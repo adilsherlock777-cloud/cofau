@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import MaskedView from '@react-native-masked-view/masked-view';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
@@ -80,61 +81,61 @@ export default function RestaurantDashboard() {
   }
 };
 
-  const StatCard = ({ 
-    icon, 
-    label, 
-    value, 
-    color, 
-    subtitle 
-  }: { 
-    icon: string; 
-    label: string; 
-    value: number; 
-    color: string;
-    subtitle?: string;
-  }) => (
-    <View style={styles.statCard}>
-      <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon as any} size={24} color={color} />
-      </View>
-      <Text style={styles.statValue}>{value.toLocaleString()}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+ const StatCard = ({ 
+  icon, 
+  label, 
+  value, 
+  color, 
+  subtitle 
+}: { 
+  icon: string; 
+  label: string; 
+  value: number; 
+  color: string;
+  subtitle?: string;
+}) => (
+  <View style={styles.statCard}>
+    <View style={[styles.statIconContainer, { backgroundColor: color + '15' }]}>
+      <Ionicons name={icon as any} size={24} color={color} />
     </View>
-  );
+    <Text style={styles.statValue}>{value.toLocaleString()}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+    {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+  </View>
+);
 
 
-  const LargeStatCard = ({ 
-    icon, 
-    label, 
-    value, 
-    color,
-    trend,
-  }: { 
-    icon: string; 
-    label: string; 
-    value: number; 
-    color: string;
-    trend?: string;
-  }) => (
-    <View style={styles.largeStatCard}>
-      <View style={styles.largeStatLeft}>
-        <View style={[styles.largeStatIconContainer, { backgroundColor: color + '20' }]}>
-          <Ionicons name={icon as any} size={28} color={color} />
-        </View>
-        <View style={styles.largeStatInfo}>
-          <Text style={styles.largeStatLabel}>{label}</Text>
-          {trend && (
-            <View style={styles.trendContainer}>
-              <Ionicons name="trending-up" size={14} color="#4CAF50" />
-              <Text style={styles.trendText}>{trend}</Text>
-            </View>
-          )}
-        </View>
+const LargeStatCard = ({ 
+  icon, 
+  label, 
+  value, 
+  color,
+  trend,
+}: { 
+  icon: string; 
+  label: string; 
+  value: number; 
+  color: string;
+  trend?: string;
+}) => (
+  <View style={styles.largeStatCard}>
+    <View style={styles.largeStatLeft}>
+      <View style={[styles.largeStatIconContainer, { backgroundColor: color + '15' }]}>
+        <Ionicons name={icon as any} size={26} color={color} />
       </View>
-      <Text style={styles.largeStatValue}>{value.toLocaleString()}</Text>
+      <View style={styles.largeStatInfo}>
+        <Text style={styles.largeStatLabel}>{label}</Text>
+        {trend && (
+          <View style={styles.trendContainer}>
+            <Ionicons name="trending-up" size={14} color="#4CAF50" />
+            <Text style={styles.trendText}>{trend}</Text>
+          </View>
+        )}
+      </View>
     </View>
-  );
+    <Text style={[styles.largeStatValue, { color: color }]}>{value.toLocaleString()}</Text>
+  </View>
+);
 
   if (loading) {
     return (
@@ -147,27 +148,24 @@ export default function RestaurantDashboard() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#E94A37', '#F2CF68', '#1B7C82']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Restaurant Dashboard</Text>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={fetchAnalytics}
-        >
-          <Ionicons name="refresh" size={24} color="#fff" />
-        </TouchableOpacity>
-      </LinearGradient>
+      {/* Header - Lighter Version */}
+<View style={styles.header}>
+  <TouchableOpacity
+    style={styles.backButton}
+    onPress={() => router.back()}
+  >
+    <Ionicons name="arrow-back" size={24} color="#FF2E2E" />
+  </TouchableOpacity>
+  
+  <Text style={styles.headerTitle}>Restaurant Dashboard</Text>
+  
+  <TouchableOpacity
+    style={styles.refreshButton}
+    onPress={fetchAnalytics}
+  >
+    <Ionicons name="refresh" size={24} color="#FF7A18" />
+  </TouchableOpacity>
+</View>
 
       <ScrollView 
         style={styles.scrollContent}
@@ -307,26 +305,31 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 20,
-    paddingHorizontal: 16,
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingTop: Platform.OS === 'ios' ? 60 : 40,
+  paddingBottom: 20,
+  paddingHorizontal: 16,
+  backgroundColor: '#fff',  // White background instead of gradient
+  borderBottomWidth: 3,
+  borderBottomColor: '#FF7A18',  // Orange accent line
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 4,
+  elevation: 2,
+},
+headerTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#FF2E2E',  // Red/Orange color instead of white
+},
   backButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
   },
   refreshButton: {
     width: 40,

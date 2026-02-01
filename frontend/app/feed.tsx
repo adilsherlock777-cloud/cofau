@@ -277,7 +277,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         user_profile_picture: getPostDP(post),
         description: post.review_text || post.description || post.about,
         rating: post.rating,
-        price: post.price, 
+        price: post.price,
         about: post.about,
         account_type: post.account_type,
         media_url: normalizeMediaUrl(post.image_url || post.media_url),
@@ -295,6 +295,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         is_liked: post.is_liked || false,
         is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
         is_following: post.is_following || false,
+        tagged_restaurant: post.tagged_restaurant || null,
       }));
 
       if (forceRefresh) {
@@ -456,8 +457,13 @@ const renderPost = useCallback(
   const ListHeader = useCallback(() => (
     <>
       <View style={styles.headerContainer}>
-  <View style={styles.whiteHeader}>
-    <View style={styles.headerRow}>
+        <LinearGradient
+          colors={["#FFF5F0", "#FFE5D9"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.whiteHeader}
+        >
+          <View style={styles.headerRow}>
       {/* Chat Icon with Gradient */}
       <TouchableOpacity
         style={styles.leftIcon}
@@ -532,115 +538,116 @@ const renderPost = useCallback(
           </View>
         )}
       </TouchableOpacity>
-    </View>
-  </View>
-
-        {/* ===== LEVEL CARD ===== */}
-        {/* ===== RESTAURANT CARD (for restaurant accounts) ===== */}
-{user && accountType === 'restaurant' && (
-  <View style={styles.levelCardWrapper}>
-    <View style={[styles.levelCard, styles.levelCardAndroid]}>
-      {/* Restaurant DP Container - Same as User with Story Ring */}
-      <View style={styles.dpContainer}>
-        <TouchableOpacity
-          onPress={() => {
-            if (ownStoryData) {
-              router.push({
-                pathname: "/story-viewer",
-                params: {
-                  userId: user.id,
-                  stories: JSON.stringify(ownStoryData.stories),
-                  user: JSON.stringify(ownStoryData.user),
-                },
-              });
-            } else {
-              setShowAddMenu(true);
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          {ownStoryData ? (
-            <LinearGradient
-              colors={["#FF9A4D", "#FF9A4D"]}
-              locations={[0, 0.35, 0.9]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.dpGradientRing}
-            >
-              <View style={styles.dpWhiteRing}>
-                <UserAvatar
-                  profilePicture={user.profile_picture}
-                  username={user.restaurant_name || user.username}
-                  size={66}
-                  showLevelBadge={false}
-                  style={{}}
-                />
-              </View>
-            </LinearGradient>
-          ) : (
-            <UserAvatar
-              profilePicture={user.profile_picture}
-              username={user.restaurant_name || user.username}
-              size={70}
-              showLevelBadge={false}
-              style={{}}
-            />
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.dpAddButton}
-          onPress={() => setShowAddMenu(true)}
-        >
-          <Ionicons name="add" size={19} color="#0f0303ff" />
-        </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </View>
 
-      {/* Total Reviews Content */}
-<View style={styles.levelContent}>
-  <Text style={styles.levelLabel}>Total Reviews</Text>
-  <View style={styles.progressContainer}>
-    <View style={styles.progressBar}>
-      {(() => {
-        const reviewsCount = restaurantReviewsCount || 0;
-        const maxReviews = 25000;
-        const progressPercent = maxReviews > 0
-          ? Math.min((reviewsCount / maxReviews) * 100, 100)
-          : 0;
+      {/* ===== LEVEL CARD ===== */}
+      {/* ===== RESTAURANT CARD (for restaurant accounts) ===== */}
+      {user && accountType === 'restaurant' && (
+        <View style={styles.levelCardWrapper}>
+          <View style={[styles.levelCard, styles.levelCardAndroid]}>
+            {/* Restaurant DP Container - Same as User with Story Ring */}
+            <View style={styles.dpContainer}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (ownStoryData) {
+                    router.push({
+                      pathname: "/story-viewer",
+                      params: {
+                        userId: user.id,
+                        stories: JSON.stringify(ownStoryData.stories),
+                        user: JSON.stringify(ownStoryData.user),
+                      },
+                    });
+                  } else {
+                    setShowAddMenu(true);
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                {ownStoryData ? (
+                  <LinearGradient
+                    colors={["#FF9A4D", "#FF9A4D"]}
+                    locations={[0, 0.35, 0.9]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.dpGradientRing}
+                  >
+                    <View style={styles.dpWhiteRing}>
+                      <UserAvatar
+                        profilePicture={user.profile_picture}
+                        username={user.restaurant_name || user.username}
+                        size={66}
+                        showLevelBadge={false}
+                        style={{}}
+                      />
+                    </View>
+                  </LinearGradient>
+                ) : (
+                  <UserAvatar
+                    profilePicture={user.profile_picture}
+                    username={user.restaurant_name || user.username}
+                    size={70}
+                    showLevelBadge={false}
+                    style={{}}
+                  />
+                )}
+              </TouchableOpacity>
 
-        let gradientColors;
-        let gradientLocations;
+              <TouchableOpacity
+                style={styles.dpAddButton}
+                onPress={() => setShowAddMenu(true)}
+              >
+                <Ionicons name="add" size={19} color="#0f0303ff" />
+              </TouchableOpacity>
+            </View>
 
-        if (progressPercent <= 50) {
-  gradientColors = ["#FF9A4D", "#FF9A4D"];
-  gradientLocations = [0, 1];
-} else {
-  gradientColors = ["#FF9A4D", "#FF5C5C"];
-  gradientLocations = [0, 1];
-}
+            {/* Total Reviews Content */}
+            <View style={styles.levelContent}>
+              <Text style={styles.levelLabel}>Total Reviews</Text>
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  {(() => {
+                    const reviewsCount = restaurantReviewsCount || 0;
+                    const maxReviews = 25000;
+                    const progressPercent = maxReviews > 0
+                      ? Math.min((reviewsCount / maxReviews) * 100, 100)
+                      : 0;
 
-        return (
-          <LinearGradient
-            colors={gradientColors}
-            locations={gradientLocations}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[
-              styles.progressFill,
-              { width: `${Math.max(progressPercent, 0.5)}%` },
-            ]}
-          />
-        );
-      })()}
-    </View>
-    <Text style={styles.progressText}>
-      {restaurantReviewsCount || 0}/25000
-    </Text>
-  </View>
-</View>
-    </View>
-  </View>
-)}
+                    let gradientColors;
+                    let gradientLocations;
+
+                    if (progressPercent <= 50) {
+                      gradientColors = ["#FF9A4D", "#FF9A4D"];
+                      gradientLocations = [0, 1];
+                    } else {
+                      gradientColors = ["#FF9A4D", "#FF5C5C"];
+                      gradientLocations = [0, 1];
+                    }
+
+                    return (
+                      <LinearGradient
+                        colors={gradientColors}
+                        locations={gradientLocations}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[
+                          styles.progressFill,
+                          { width: `${Math.max(progressPercent, 0.5)}%` },
+                        ]}
+                      />
+                    );
+                  })()}
+                </View>
+                <Text style={styles.progressText}>
+                  {restaurantReviewsCount || 0}/25000
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
         {user && accountType !== 'restaurant' && (
            <View style={styles.levelCardWrapper}>
             {Platform.OS === "ios" ? (
@@ -665,8 +672,8 @@ const renderPost = useCallback(
                   >
                     {ownStoryData ? (
                       <LinearGradient
-                        colors={["#FF9A4D", "#FF9A4D"]}
-                        locations={[0, 0.35, 0.9]}
+                        colors={["#FF2E2E", "#F2CF68", "#FF9A4D"]}
+                        locations={[0, 0.5, 1]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.dpGradientRing}
@@ -788,8 +795,8 @@ const renderPost = useCallback(
                   >
                     {ownStoryData ? (
                       <LinearGradient
-                        colors={["#FF9A4D", "#FF9A4D"]}
-                        locations={[0, 0.35, 0.9]}
+                        colors={["#FF2E2E", "#F2CF68", "#FF9A4D"]}
+                        locations={[0, 0.5, 1]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.dpGradientRing}
@@ -855,13 +862,13 @@ const renderPost = useCallback(
                         let gradientLocations;
 
                         if (progressPercent <= 33) {
-                          gradientColors = ["#E94A37", "#E94A37"];
+                          gradientColors = ["#FF2E2E", "#FF2E2E"];
                           gradientLocations = [0, 1];
                         } else if (progressPercent <= 66) {
-                          gradientColors = ["#E94A37", "#F2CF68"];
+                          gradientColors = ["#FF2E2E", "#F2CF68"];
                           gradientLocations = [0, 1];
                         } else {
-                          gradientColors = ["#E94A37", "#F2CF68", "#1B7C82"];
+                          gradientColors = ["#FF2E2E", "#F2CF68", "#FF9A4D"];
                           gradientLocations = [0, 0.5, 1];
                         }
 
@@ -895,7 +902,6 @@ const renderPost = useCallback(
             )}
           </View>
         )}
-      </View>
 
       {/* ================= STORIES ================= */}
       <StoriesBar refreshTrigger={refreshing} />
@@ -912,7 +918,7 @@ const renderPost = useCallback(
   const ListFooter = useCallback(() => (
     loadingMore ? (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#4dd0e1" />
+        <ActivityIndicator size="small" color="#FF2E2E" />
       </View>
     ) : null
   ), [loadingMore]);
@@ -1095,7 +1101,6 @@ const styles = StyleSheet.create({
   paddingHorizontal: 20,
   borderBottomLeftRadius: 30,
   borderBottomRightRadius: 30,
-  backgroundColor: "#FFFFFF",
   shadowColor: "#000",
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.1,

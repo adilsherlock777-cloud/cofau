@@ -1006,6 +1006,9 @@ async def get_restaurant_reviews(
             "location_name": post.get("location_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            # ADD THESE NEW FIELDS FOR RESTAURANT REPLY
+            "restaurant_reply": post.get("restaurant_reply"),
+            "restaurant_reply_at": post.get("restaurant_reply_at").isoformat() if post.get("restaurant_reply_at") else None,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
     
@@ -1017,6 +1020,138 @@ async def get_restaurant_reviews(
     )
     
     return result
+
+# ==================== RESTAURANT REPLY TO REVIEWS ====================
+
+@router.post("/reviews/{review_id}/reply")
+async def reply_to_review(
+    review_id: str,
+    reply_data: dict,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Restaurant owner replies to a customer review (tagged post)"""
+    db = get_database()
+    
+    reply_text = reply_data.get("reply_text")
+    
+    if not reply_text or not reply_text.strip():
+        raise HTTPException(status_code=400, detail="Reply text is required")
+    
+    # Find the review (which is a post tagged with this restaurant)
+    try:
+        post = await db.posts.find_one({"_id": ObjectId(review_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid review ID")
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    # Verify this review is for the current restaurant
+    if post.get("tagged_restaurant_id") != str(current_restaurant["_id"]):
+        raise HTTPException(
+            status_code=403, 
+            detail="You can only reply to reviews for your restaurant"
+        )
+    
+    # Update the post with the restaurant's reply
+    result = await db.posts.update_one(
+        {"_id": ObjectId(review_id)},
+        {
+            "$set": {
+                "restaurant_reply": reply_text.strip(),
+                "restaurant_reply_at": datetime.utcnow(),
+                "restaurant_reply_by": str(current_restaurant["_id"])
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to save reply")
+    
+    print(f"✅ Restaurant {current_restaurant['_id']} replied to review {review_id}")
+    
+    return {
+        "success": True,
+        "message": "Reply sent successfully"
+    }
+
+
+@router.put("/reviews/{review_id}/reply")
+async def update_review_reply(
+    review_id: str,
+    reply_data: dict,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Update restaurant's reply to a review"""
+    db = get_database()
+    
+    reply_text = reply_data.get("reply_text")
+    
+    if not reply_text or not reply_text.strip():
+        raise HTTPException(status_code=400, detail="Reply text is required")
+    
+    # Find the review
+    try:
+        post = await db.posts.find_one({"_id": ObjectId(review_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid review ID")
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    # Verify ownership
+    if post.get("tagged_restaurant_id") != str(current_restaurant["_id"]):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Update the reply
+    await db.posts.update_one(
+        {"_id": ObjectId(review_id)},
+        {
+            "$set": {
+                "restaurant_reply": reply_text.strip(),
+                "restaurant_reply_updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    return {"success": True, "message": "Reply updated successfully"}
+
+
+@router.delete("/reviews/{review_id}/reply")
+async def delete_review_reply(
+    review_id: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Delete restaurant's reply to a review"""
+    db = get_database()
+    
+    # Find the review
+    try:
+        post = await db.posts.find_one({"_id": ObjectId(review_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid review ID")
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    # Verify ownership
+    if post.get("tagged_restaurant_id") != str(current_restaurant["_id"]):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Remove the reply
+    await db.posts.update_one(
+        {"_id": ObjectId(review_id)},
+        {
+            "$unset": {
+                "restaurant_reply": "",
+                "restaurant_reply_at": "",
+                "restaurant_reply_by": "",
+                "restaurant_reply_updated_at": ""
+            }
+        }
+    )
+    
+    return {"success": True, "message": "Reply deleted successfully"}
 
 # ==================== FOLLOW/UNFOLLOW RESTAURANT ====================
 

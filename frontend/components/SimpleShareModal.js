@@ -435,10 +435,10 @@ export default function SimpleShareModal({ visible, onClose, post }) {
                             disabled={loading}
                         >
                             {loading && sharingPlatform === 'instagram-story' ? (
-                                <ActivityIndicator color="#C13584" size="small" />
+                                <ActivityIndicator color="#E1306C" size="small" />
                             ) : (
                                 <>
-                                    <View style={[styles.shareIconCircle, { backgroundColor: '#C13584' }]}>
+                                    <View style={[styles.shareIconCircle, { backgroundColor: '#E1306C' }]}>
                                         <Ionicons name="add-circle" size={32} color="#FFF" />
                                     </View>
                                     <Text style={styles.shareLabel}>Instagram{'\n'}Story</Text>
