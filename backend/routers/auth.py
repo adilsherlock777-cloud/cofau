@@ -102,6 +102,8 @@ async def signup(user: UserCreate):
         "badge": None,
         "followers_count": 0,
         "following_count": 0,
+        "wallet_enabled": True,  # Enable wallet for new users
+        "wallet_balance": 0.0,   # Initialize wallet balance
         "created_at": datetime.utcnow()
     }
     

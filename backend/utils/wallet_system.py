@@ -94,23 +94,9 @@ async def calculate_wallet_reward(
     user_id = str(user["_id"])
 
     # =========================================
-    # CHECK 0: Is wallet enabled for this user?
-    # =========================================
-    wallet_enabled = user.get("wallet_enabled", False)
-
-    if not wallet_enabled:
-        return WalletRewardResult(
-            wallet_earned=0.0,
-            points_earned=POINTS_PER_POST,
-            reason="wallet_not_enabled",
-            checks_passed={},
-            message="Post Uploaded!",
-            tip=""
-        )
-
-    # =========================================
     # CHECK 1: Is this user's FIRST POST EVER?
     # =========================================
+    # Check this FIRST so new users always get their ₹50 bonus
     total_posts = await db.posts.count_documents({"user_id": user_id})
 
     # total_posts = 0 means this is their first post (post not yet inserted)
@@ -125,6 +111,22 @@ async def calculate_wallet_reward(
             reason="first_post_bonus",
             checks_passed={"first_post": True},
             message="Welcome to Cofau! 🎉",
+            tip=""
+        )
+
+    # =========================================
+    # CHECK 0: Is wallet enabled for this user?
+    # =========================================
+    # For subsequent posts, check if wallet is enabled
+    wallet_enabled = user.get("wallet_enabled", False)
+
+    if not wallet_enabled:
+        return WalletRewardResult(
+            wallet_earned=0.0,
+            points_earned=POINTS_PER_POST,
+            reason="wallet_not_enabled",
+            checks_passed={},
+            message="Post Uploaded!",
             tip=""
         )
 
