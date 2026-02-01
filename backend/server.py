@@ -352,6 +352,15 @@ os.makedirs("static/uploads/restaurants", exist_ok=True)
 PARTNER_DASHBOARD_DIR = os.path.join(BASE_DIR, "static", "partner-dashboard")
 os.makedirs(PARTNER_DASHBOARD_DIR, exist_ok=True)
 
+# ✅ CRITICAL: Mount static assets BEFORE catch-all route
+# This ensures /orders/assets/* requests are served by StaticFiles before
+# the catch-all route can intercept them
+try:
+    app.mount("/orders/assets", StaticFiles(directory=os.path.join(PARTNER_DASHBOARD_DIR, "assets")), name="partner-assets")
+    print(f"✅ Mounted partner dashboard assets at /orders/assets")
+except Exception as e:
+    print(f"⚠️ Could not mount partner dashboard assets: {e}")
+
 # Serve partner dashboard SPA at /orders
 @app.get("/orders/{full_path:path}", response_class=HTMLResponse)
 async def serve_partner_dashboard(full_path: str):
@@ -380,13 +389,6 @@ async def serve_partner_dashboard_root():
             content="<h1>Partner Dashboard Not Found</h1><p>Please build the dashboard first.</p>",
             status_code=404
         )
-
-# Mount static assets for partner dashboard (CSS, JS, etc.)
-# This must be done AFTER the HTML route above to avoid conflicts
-try:
-    app.mount("/orders/assets", StaticFiles(directory=os.path.join(PARTNER_DASHBOARD_DIR, "assets")), name="partner-assets")
-except Exception as e:
-    print(f"⚠️ Could not mount partner dashboard assets: {e}")
 
 # ======================================================
 # OPEN GRAPH (WhatsApp Preview) CONFIGURATION
