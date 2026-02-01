@@ -101,6 +101,7 @@ export default function FeedScreen() {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [ownStoryData, setOwnStoryData] = useState<any>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [walletUnreadCount, setWalletUnreadCount] = useState(0);
 
   const flatListRef = useRef<FlatList>(null);
   const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
@@ -128,10 +129,11 @@ useEffect(() => {
     setHasInitiallyLoaded(true);
   }
   refreshUnreadCount();
-  loadUnreadMessagesCount(); 
+  loadUnreadMessagesCount();
+  fetchWalletUnreadCount();
   if (accountType === 'restaurant') {
     fetchRestaurantReviewsCount();  // ⬅️ ADD THIS
-  } 
+  }
 }, []);
 
 
@@ -150,11 +152,29 @@ const fetchRestaurantReviewsCount = async () => {
   }
 };
 
+const fetchWalletUnreadCount = async () => {
+  if (!token || accountType === 'restaurant') {
+    setWalletUnreadCount(0);
+    return;
+  }
+  try {
+    const response = await axios.get(
+      `${BACKEND}/api/wallet/unread-count`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setWalletUnreadCount(response.data?.unread_count || 0);
+  } catch (err) {
+    console.log('Error fetching wallet unread count:', err);
+    setWalletUnreadCount(0);
+  }
+};
+
 
 useFocusEffect(
   React.useCallback(() => {
     refreshUnreadCount();
     loadUnreadMessagesCount();  // ⬅️ ADD THIS
+    fetchWalletUnreadCount();
     refreshUser();
     fetchOwnStory();
     if (accountType === 'restaurant') {
@@ -517,8 +537,21 @@ const renderPost = useCallback(
       <View style={styles.headerIcons}>
         {/* Mystery Box Icon */}
         <MysteryBoxIcon
-          onPress={() => setShowWalletModal(true)}
-          badgeCount={1}
+          onPress={async () => {
+            setShowWalletModal(true);
+            // Mark wallet as viewed
+            try {
+              await axios.post(
+                `${BACKEND}/api/wallet/mark-viewed`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              setWalletUnreadCount(0);
+            } catch (err) {
+              console.log('Error marking wallet as viewed:', err);
+            }
+          }}
+          badgeCount={walletUnreadCount}
         />
 
         {/* Notifications Icon with Gradient */}

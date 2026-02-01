@@ -9,6 +9,12 @@ from typing import Optional, Dict, Any
 from bson import ObjectId
 import math
 
+# Import create_notification - imported here to avoid circular imports
+# This is safe because we only use it at runtime, not at module load time
+def get_create_notification():
+    from routers.notifications import create_notification
+    return create_notification
+
 
 # Wallet reward amounts
 WALLET_REWARD_FULL = 10.0
@@ -316,10 +322,30 @@ async def process_wallet_reward(
             "created_at": datetime.utcnow()
         }
         await db.user_restaurant_posts.insert_one(user_restaurant_doc)
-    
-    # 4. Get updated wallet balance
+
+    # 4. Send wallet reward notification to user
+    try:
+        create_notification = get_create_notification()
+        # Format amount with rupee symbol
+        amount_str = f"₹{int(reward_result.wallet_earned)}" if reward_result.wallet_earned == int(reward_result.wallet_earned) else f"₹{reward_result.wallet_earned:.1f}"
+        notification_message = f"Congratulations! {amount_str} added to your wallet"
+
+        await create_notification(
+            db=db,
+            notification_type="wallet_reward",
+            from_user_id=user_id,  # User notifies themselves
+            to_user_id=user_id,
+            post_id=post_id,
+            message=notification_message,
+            send_push=True
+        )
+        print(f"🔔 Wallet reward notification sent: {notification_message}")
+    except Exception as e:
+        print(f"⚠️ Failed to send wallet reward notification: {e}")
+
+    # 5. Get updated wallet balance
     updated_user = await db.users.find_one({"_id": ObjectId(user_id)})
-    
+
     return {
         "wallet_balance": updated_user.get("wallet_balance", 0.0),
         "amount_earned": reward_result.wallet_earned,

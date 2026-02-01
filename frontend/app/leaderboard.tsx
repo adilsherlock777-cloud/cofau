@@ -1,1611 +1,1132 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-View,
-Text,
-StyleSheet,
-ScrollView,
-TouchableOpacity,
-Image,
-ActivityIndicator,
-RefreshControl,
-Alert,
-Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  RefreshControl,
+  Platform,
+  StatusBar,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import axios from "axios";
+import { LocationSelector } from "../components/LocationSelector";
+import { WalletBalanceModal } from "../components/WalletBalanceModal";
 import { useAuth } from "../context/AuthContext";
-import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
-import { followUser, unfollowUser } from "../utils/api";
-import UserAvatar from "../components/UserAvatar";
-import { BlurView } from 'expo-blur';
+import axios from "axios";
+import * as Location from "expo-location";
+
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
+const API_URL = BACKEND_URL;
+
+// Dummy data for UI preview
+const DUMMY_RESTAURANTS = [
+  {
+    id: "1",
+    name: "Italian Bistro",
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400",
+    rating: 4.8,
+    reviews: 120,
+    distance: "0.4 km",
+    deliveries: "1,220+",
+    cuisine: "Italian, Pasta, Pizza",
+    deliveryTime: "25-35 mins",
+    isFavorite: true,
+    isAcceptingOrders: true,
+  },
+  {
+    id: "2",
+    name: "Spice Junction",
+    image: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400",
+    rating: 4.7,
+    reviews: 800,
+    distance: "0.5 km",
+    deliveries: "1,100+",
+    cuisine: "North Indian, Biryani",
+    deliveryTime: "30-40 mins",
+    isFavorite: false,
+    isAcceptingOrders: false,
+  },
+  {
+    id: "3",
+    name: "Burger Factory",
+    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400",
+    rating: 4.6,
+    reviews: 950,
+    distance: "0.3 km",
+    deliveries: "980+",
+    cuisine: "Burgers, American",
+    deliveryTime: "20-30 mins",
+    isFavorite: false,
+    isAcceptingOrders: false,
+  },
+  {
+    id: "4",
+    name: "Sunrise Cafe",
+    image: "https://images.unsplash.com/photo-1567521464027-f127ff144326?w=400",
+    rating: 4.7,
+    reviews: 890,
+    distance: "0.6 km",
+    deliveries: "880+",
+    cuisine: "Cafe, Breakfast, Desserts",
+    deliveryTime: "25-35 mins",
+    isFavorite: false,
+    isAcceptingOrders: false,
+  },
+  {
+    id: "5",
+    name: "Dragon Palace",
+    image: "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400",
+    rating: 4.5,
+    reviews: 650,
+    distance: "0.8 km",
+    deliveries: "750+",
+    cuisine: "Chinese, Asian",
+    deliveryTime: "35-45 mins",
+    isFavorite: false,
+    isAcceptingOrders: false,
+  },
+];
+
+const TABS = ["Near Me", "Your Orders", "In Progress", "Rewards"];
+
+const CATEGORIES = [
+  { id: 'all', name: 'Nearby Food', emoji: '🍽️' },
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
+  { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'desserts', name: 'Desserts', emoji: '🍰' },
+  { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
+  { id: 'chinese', name: 'Chinese', emoji: '🍜' },
+  { id: 'chaats', name: 'Chaats', emoji: '🥘' },
+  { id: 'arabic', name: 'Arabic', emoji: '🧆' },
+  { id: 'bbq-tandoor', name: 'BBQ/Tandoor', emoji: '🍗' },
+  { id: 'fast-food', name: 'Fast Food', emoji: '🍔' },
+  { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
+  { id: 'salad', name: 'Salad', emoji: '🥗' },
+  { id: 'karnataka-style', name: 'Karnataka', emoji: '🍃' },
+  { id: 'hyderabadi-style', name: 'Hyderabadi', emoji: '🌶️' },
+  { id: 'kerala-style', name: 'Kerala', emoji: '🥥' },
+  { id: 'andhra-style', name: 'Andhra', emoji: '🔥' },
+  { id: 'north-indian-style', name: 'North Indian', emoji: '🫓' },
+  { id: 'south-indian-style', name: 'South Indian', emoji: '🥞' },
+  { id: 'punjabi-style', name: 'Punjabi', emoji: '🧈' },
+  { id: 'bengali-style', name: 'Bengali', emoji: '🐟' },
+  { id: 'odia-style', name: 'Odia', emoji: '🍚' },
+  { id: 'gujarati-style', name: 'Gujurati', emoji: '🥣' },
+  { id: 'rajasthani-style', name: 'Rajasthani', emoji: '🏜️' },
+  { id: 'mangaluru-style', name: 'Mangaluru', emoji: '🦀' },
+  { id: 'goan', name: 'Goan', emoji: '🏖️' },
+  { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
+  { id: 'continental', name: 'Continental', emoji: '🌍' },
+  { id: 'asian', name: 'Asian', emoji: '🥢' },
+  { id: 'italian', name: 'Italian', emoji: '🍝' },
+  { id: 'japanese', name: 'Japanese', emoji: '🍣' },
+  { id: 'korean', name: 'Korean', emoji: '🍱' },
+  { id: 'mexican', name: 'Mexican', emoji: '🌮' },
+  { id: 'persian', name: 'Persian', emoji: '🫖' },
+  { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
+  { id: 'pizza', name: 'Pizza', emoji: '🍕' },
+  { id: 'dosa', name: 'Dosa', emoji: '🫕' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
+];
 
 export default function LeaderboardScreen() {
-const router = useRouter();
-const { token } = useAuth() as any;
+  const router = useRouter();
+  const { token, user } = useAuth();
+  const [activeTab, setActiveTab] = useState("Near Me");
+  const [refreshing, setRefreshing] = useState(false);
+  const [favorites, setFavorites] = useState<{ [key: string]: boolean }>({
+    "1": true,
+  });
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [userAddress, setUserAddress] = useState<any>(null);
+  const [loadingAddress, setLoadingAddress] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [nearbyPosts, setNearbyPosts] = useState<any[]>([]);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const cachedNearbyPosts = useRef<any[]>([]);
 
-const [loading, setLoading] = useState(true);
-const [activeTab, setActiveTab] = useState<'users' | 'restaurants'>('users');
-const [restaurantData, setRestaurantData] = useState<any>(null);
-const [refreshing, setRefreshing] = useState(false);
-const [leaderboardData, setLeaderboardData] = useState<any>(null);
-const [error, setError] = useState<string | null>(null);
-const [followingStates, setFollowingStates] = useState<{ [key: string]: boolean }>({});
-const [followLoading, setFollowLoading] = useState<{ [key: string]: boolean }>({});
-const { user } = useAuth() as any;
+  useEffect(() => {
+    if (token) {
+      fetchUserAddress();
+      if (activeTab === "Near Me") {
+        getCurrentLocation();
+      }
+    }
+  }, [token, activeTab]);
 
-useEffect(() => {
-if (activeTab === 'users') {
-fetchLeaderboard();
-} else {
-fetchRestaurantLeaderboard();
-}
-}, [activeTab]);
+  const fetchUserAddress = async () => {
+    try {
+      setLoadingAddress(true);
+      const response = await axios.get(`${BACKEND_URL}/api/user/address`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.data) {
+        setUserAddress(response.data);
+      }
+    } catch (error: any) {
+      if (error.response?.status !== 404) {
+        console.error("Error fetching address:", error);
+      }
+    } finally {
+      setLoadingAddress(false);
+    }
+  };
 
-const fetchLeaderboard = async () => {
-try {
-setError(null);
-setLoading(true);
+  const saveUserAddress = async (locationData: any) => {
+    try {
+      const response = await axios.post(
+        `${BACKEND_URL}/api/user/address`,
+        {
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          address: locationData.address,
+          house_number: locationData.house_number,
+          street_address: locationData.street_address,
+          pincode: locationData.pincode,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setUserAddress(response.data);
+      Alert.alert("Success", "Address saved successfully!");
+    } catch (error) {
+      console.error("Error saving address:", error);
+      Alert.alert("Error", "Failed to save address. Please try again.");
+    }
+  };
 
-if (!token) {
-setError("Please log in to view the leaderboard");
-setLoading(false);
-return;
-}
+  const getDisplayAddress = () => {
+    if (loadingAddress) {
+      return "Loading...";
+    }
+    if (!userAddress) {
+      return "Add location";
+    }
+    return `${userAddress.house_number}, ${userAddress.street_address}`;
+  };
 
-const response = await axios.get(`${BACKEND_URL}/api/leaderboard/current`, {
-headers: {
-Authorization: `Bearer ${token}`,
-},
-timeout: 10000,
-});
+  const getCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Location Permission Required",
+          "Please enable location access to see nearby food posts.",
+          [{ text: "OK" }]
+        );
+        return null;
+      }
 
-const data = response.data || {};
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
 
-const now = new Date();
-const threeDaysAgo = new Date(now);
-threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
 
-const fromDate = data.from_date || threeDaysAgo.toISOString();
-const toDate = data.to_date || now.toISOString();
+      setUserLocation(coords);
+      fetchNearbyPosts(coords);
+      return coords;
+    } catch (error) {
+      console.log("Get location error:", error);
+      Alert.alert("Location Error", "Could not get your current location. Please try again.");
+      return null;
+    }
+  };
 
-setLeaderboardData({
-from_date: fromDate,
-to_date: toDate,
-generated_at: data.generated_at || now.toISOString(),
-window_days: data.window_days || 3,
-entries: data.entries || [],
-total_posts_analyzed: data.total_posts_analyzed || 0,
-config: data.config || {},
-});
+  const fetchNearbyPosts = async (location?: { latitude: number; longitude: number }) => {
+    const coords = location || userLocation;
+    if (!coords) return;
 
-console.log("✅ Leaderboard data loaded:", {
-from_date: fromDate,
-to_date: toDate,
-entries_count: data.entries?.length || 0,
-});
+    setLoadingPosts(true);
+    try {
+      const url = `${API_URL}/map/pins?lat=${coords.latitude}&lng=${coords.longitude}&radius_km=10`;
 
-if (data.entries && data.entries.length > 0) {
-console.log("🔍 First entry sample:", {
-rank: data.entries[0].rank,
-username: data.entries[0].username,
-full_name: data.entries[0].full_name,
-followers_count: data.entries[0].followers_count,
-posts_count: data.entries[0].posts_count,
-user_id: data.entries[0].user_id,
-});
-}
-} catch (err: any) {
-console.error("❌ Error fetching leaderboard:", err);
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token || ""}` },
+      });
 
-let errorMessage = "Failed to load leaderboard";
-if (err.response) {
-errorMessage = err.response.data?.detail || err.response.data?.message || `Server error: ${err.response.status}`;
-} else if (err.request) {
-errorMessage = "Network error. Please check your connection.";
-} else {
-errorMessage = err.message || "An unexpected error occurred";
-}
+      const posts = response.data.posts || [];
+      cachedNearbyPosts.current = posts;
+      setNearbyPosts(posts);
+    } catch (error) {
+      console.log("Fetch nearby posts error:", error);
+      Alert.alert("Error", "Failed to load nearby posts. Please try again.");
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
 
-setError(errorMessage);
-} finally {
-setLoading(false);
-setRefreshing(false);
-}
-};
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategory(categoryId);
 
-const fetchRestaurantLeaderboard = async () => {
-try {
-setError(null);
-setLoading(true);
+    if (categoryId === "all") {
+      setNearbyPosts(cachedNearbyPosts.current);
+    } else {
+      const category = CATEGORIES.find(c => c.id === categoryId);
+      if (category) {
+        const filteredPosts = cachedNearbyPosts.current.filter((post: any) => {
+          const postCategory = post.category?.toLowerCase().trim();
+          const selectedCategoryName = category.name.toLowerCase().trim();
+          return postCategory === selectedCategoryName;
+        });
+        setNearbyPosts(filteredPosts);
+      }
+    }
+  };
 
-if (!token) {
-setError("Please log in to view the leaderboard");
-setLoading(false);
-return;
-}
+  const onRefresh = () => {
+    setRefreshing(true);
+    if (activeTab === "Near Me" && userLocation) {
+      fetchNearbyPosts();
+    }
+    setTimeout(() => setRefreshing(false), 1000);
+  };
 
-const response = await axios.get(`${BACKEND_URL}/api/leaderboard/restaurants/current`, {
-headers: { Authorization: `Bearer ${token}` },
-timeout: 10000,
-});
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`;
+  };
 
-setRestaurantData(response.data);
-} catch (err: any) {
-console.error("❌ Error fetching restaurant leaderboard:", err);
-setError("Failed to load restaurant leaderboard");
-} finally {
-setLoading(false);
-setRefreshing(false);
-}
-};
+  const toggleFavorite = (id: string) => {
+    setFavorites((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
 
-const onRefresh = () => {
-setRefreshing(true);
-fetchLeaderboard();
-};
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
 
-const formatDate = (dateString: string) => {
-try {
-if (!dateString) return '';
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(
+          <Ionicons key={i} name="star" size={14} color="#FF8C00" />
+        );
+      } else if (i === fullStars && hasHalfStar) {
+        stars.push(
+          <Ionicons key={i} name="star-half" size={14} color="#FF8C00" />
+        );
+      } else {
+        stars.push(
+          <Ionicons key={i} name="star-outline" size={14} color="#FF8C00" />
+        );
+      }
+    }
+    return stars;
+  };
 
-let date: Date;
+  const renderDeliveryDots = () => {
+    return (
+      <View style={styles.deliveryDots}>
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={styles.deliveryDot} />
+        ))}
+      </View>
+    );
+  };
 
-if (dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+')) {
-date = new Date(dateString + 'Z');
-} else {
-date = new Date(dateString);
-}
+  const renderRestaurantCard = (restaurant: typeof DUMMY_RESTAURANTS[0]) => {
+    const isFav = favorites[restaurant.id];
 
-if (isNaN(date.getTime())) {
-console.error("Invalid date:", dateString);
-return '';
-}
+    return (
+      <View key={restaurant.id} style={styles.restaurantCard}>
+        <Image
+          source={{ uri: restaurant.image }}
+          style={styles.restaurantImage}
+          resizeMode="cover"
+        />
 
-const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const month = monthNames[date.getUTCMonth()];
-const day = date.getUTCDate();
+        <View style={styles.restaurantInfo}>
+          <View style={styles.restaurantHeader}>
+            <Text style={styles.restaurantName}>{restaurant.name}</Text>
+            <TouchableOpacity
+              onPress={() => toggleFavorite(restaurant.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={isFav ? "heart" : "heart-outline"}
+                size={22}
+                color={isFav ? "#FF6B6B" : "#CCCCCC"}
+              />
+            </TouchableOpacity>
+          </View>
 
-return `${month} ${day}`;
-} catch (error) {
-console.error("Error formatting date:", error, dateString);
-return '';
-}
-};
+          <View style={styles.ratingRow}>
+            <View style={styles.starsContainer}>{renderStars(restaurant.rating)}</View>
+            <Text style={styles.ratingText}>{restaurant.rating}</Text>
+            <Text style={styles.reviewsText}>| {restaurant.reviews}+ Reviews</Text>
+          </View>
 
-if (loading) {
-return (
-<View style={styles.loadingContainer}>
-<ActivityIndicator size="large" color="#FF6B6B" />
-<Text style={styles.loadingText}>Loading leaderboard...</Text>
-</View>
-);
-}
+          <View style={styles.distanceRow}>
+            <Text style={styles.distanceText}>{restaurant.distance}</Text>
+            <Text style={styles.dotSeparator}>·</Text>
+            <Text style={styles.deliveriesText}>{restaurant.deliveries} Deliveries</Text>
+          </View>
 
-if (error) {
-return (
-<View style={styles.errorContainer}>
-<Ionicons name="alert-circle-outline" size={64} color="#FF6B6B" />
-<Text style={styles.errorText}>{error}</Text>
-<TouchableOpacity style={styles.retryButton} onPress={fetchLeaderboard}>
-<Text style={styles.retryButtonText}>Retry</Text>
-</TouchableOpacity>
-</View>
-);
-}
+          <View style={styles.cuisineRow}>
+            <Ionicons name="location" size={14} color="#4CAF50" />
+            <Text style={styles.cuisineText}>{restaurant.cuisine}</Text>
+          </View>
 
-const entries = activeTab === 'users'
-? (leaderboardData?.entries || [])
-: (restaurantData?.entries || []);
+          <View style={styles.deliveryRow}>
+            <View style={styles.deliveryTimeLeft}>
+              <Ionicons name="time-outline" size={16} color="#4CAF50" />
+              <Text style={styles.deliveryLabel}>Delivery Time:</Text>
+              {renderDeliveryDots()}
+            </View>
 
-console.log("entries", entries);
+            {restaurant.isAcceptingOrders ? (
+              <TouchableOpacity style={styles.acceptOrderButton}>
+                <Text style={styles.acceptOrderText}>ACCEPT ORDER</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.deliveryTimeButton}>
+                <Text style={styles.deliveryTimeText}>{restaurant.deliveryTime}</Text>
+                <Ionicons name="chevron-forward" size={16} color="#666" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
-const handlePostPress = (postId: string) => {
-router.push(`/post-details/${postId}`);
-};
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-const handleFollowToggle = async (userId: string, entry: any) => {
-if (!userId || userId === user?.id || followLoading[userId]) return;
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.locationContainer}
+          onPress={() => setShowLocationModal(true)}
+        >
+          <Ionicons
+            name={userAddress ? "location" : "add-circle-outline"}
+            size={20}
+            color={userAddress ? "#4CAF50" : "#FF7A18"}
+          />
+          <View style={styles.locationTextContainer}>
+            <Text
+              style={[
+                styles.locationText,
+                !userAddress && styles.addLocationText,
+              ]}
+              numberOfLines={1}
+            >
+              {getDisplayAddress()}
+            </Text>
+            {userAddress && userAddress.address && (
+              <Text style={styles.locationSubtext} numberOfLines={1}>
+                {userAddress.address}
+              </Text>
+            )}
+          </View>
+          <Ionicons name="chevron-down" size={18} color="#333" />
+        </TouchableOpacity>
 
-setFollowLoading((prev) => ({ ...prev, [userId]: true }));
-const previousState = followingStates[userId] || false;
-setFollowingStates((prev) => ({ ...prev, [userId]: !previousState }));
+        <TouchableOpacity
+          style={styles.walletButton}
+          onPress={() => setShowWalletModal(true)}
+        >
+          <Ionicons name="wallet-outline" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
 
-try {
-if (previousState) {
-await unfollowUser(userId);
-} else {
-await followUser(userId);
-}
-} catch (error) {
-console.error("Error toggling follow:", error);
-setFollowingStates((prev) => ({ ...prev, [userId]: previousState }));
-Alert.alert("Error", "Failed to update follow status. Please try again.");
-} finally {
-setFollowLoading((prev) => ({ ...prev, [userId]: false }));
-}
-};
+      {/* Location Selector Modal */}
+      <LocationSelector
+        visible={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        onSave={saveUserAddress}
+        initialLocation={userAddress}
+      />
 
-const handleRegenerateLeaderboard = async () => {
-try {
-setLoading(true);
-const response = await axios.post(
-`${BACKEND_URL}/api/leaderboard/regenerate`,
-{},
-{
-headers: {
-Authorization: `Bearer ${token}`,
-},
-}
-);
-Alert.alert("Success", "Leaderboard regenerated! Refreshing...");
-setTimeout(() => {
-fetchLeaderboard();
-}, 1000);
-} catch (error: any) {
-console.error("Error regenerating leaderboard:", error);
-Alert.alert(
-"Error",
-error.response?.data?.detail || "Failed to regenerate leaderboard"
-);
-} finally {
-setLoading(false);
-}
-};
+      {/* Wallet Balance Modal */}
+      <WalletBalanceModal
+        visible={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        token={token || ""}
+      />
 
-return (
-<View style={styles.container}>
-<ScrollView
-style={styles.scrollView}
-showsVerticalScrollIndicator={false}
-contentContainerStyle={styles.scrollContent}
-refreshControl={
-<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-}
->
-<View style={styles.headerContainer}>
-<LinearGradient
-colors={["#FFF5F0", "#FFE5D9"]}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 0 }}
-style={styles.gradientHeader}
-/>
-</View>
+      {/* Tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsScrollView}
+        contentContainerStyle={styles.tabsContainer}
+      >
+        {TABS.map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[
+              styles.tab,
+              activeTab === tab && styles.activeTab,
+            ]}
+            onPress={() => setActiveTab(tab)}
+          >
+            {activeTab === tab ? (
+              <LinearGradient
+                colors={["#FF6B35", "#FF8C00"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.activeTabGradient}
+              >
+                <Text style={styles.activeTabText}>{tab}</Text>
+              </LinearGradient>
+            ) : (
+              <Text style={styles.tabText}>{tab}</Text>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-<View style={styles.titleBoxWrapper}>
-{Platform.OS === 'ios' ? (
-<BlurView intensity={60} tint="light" style={styles.titleBox}>
-<Text style={styles.titleMain}>Top Posts</Text>
-<View style={styles.subtitleRow}>
-<Ionicons name="trophy" size={16} color="#E94A37" />
-<Text style={styles.titleSub}>Best Posts This Week</Text>
-</View>
-</BlurView>
-) : (
-<View style={[styles.titleBox, styles.titleBoxAndroid]}>
-<Text style={styles.titleMain}>Top Posts</Text>
-<View style={styles.subtitleRow}>
-<Ionicons name="trophy" size={16} color="#E94A37" />
-<Text style={styles.titleSub}>Best Posts This Week</Text>
-</View>
-</View>
-)}
-</View>
+      {/* Categories - Only show when Near Me is selected */}
+      {activeTab === "Near Me" && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScrollView}
+          contentContainerStyle={styles.categoryContainer}
+        >
+          {CATEGORIES.map((category) => (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.categoryChip,
+                selectedCategory === category.id && styles.categoryChipActive,
+              ]}
+              onPress={() => handleCategoryChange(category.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+              <Text
+                style={[
+                  styles.categoryName,
+                  selectedCategory === category.id && styles.categoryNameActive,
+                ]}
+              >
+                {category.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
-{/* Tab Toggle */}
-<View style={styles.tabContainer}>
-<TouchableOpacity
-style={[styles.tab, activeTab === 'users' && styles.tabActive]}
-onPress={() => setActiveTab('users')}
->
-{activeTab === 'users' ? (
-<LinearGradient
-colors={['#FF2E2E', '#FF7A18']}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 1 }}
-style={styles.tabGradientBackground}
->
-<Text style={[styles.tabText, styles.tabTextActive]}>Users</Text>
-</LinearGradient>
-) : (
-<Text style={styles.tabText}>Users</Text>
-)}
-</TouchableOpacity>
-<TouchableOpacity
-style={[styles.tab, activeTab === 'restaurants' && styles.tabActive]}
-onPress={() => setActiveTab('restaurants')}
->
-{activeTab === 'restaurants' ? (
-<LinearGradient
-colors={['#FF2E2E', '#FF7A18']}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 1 }}
-style={styles.tabGradientBackground}
->
-<Text style={[styles.tabText, styles.tabTextActive]}>Restaurants</Text>
-</LinearGradient>
-) : (
-<Text style={styles.tabText}>Restaurants</Text>
-)}
-</TouchableOpacity>
-</View>
+      {/* Content */}
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {activeTab === "Near Me" ? (
+          <>
+            <Text style={styles.sectionTitle}>
+              {selectedCategory === "all" ? "Nearby Food Posts" : CATEGORIES.find(c => c.id === selectedCategory)?.name}
+            </Text>
 
-{leaderboardData && leaderboardData.from_date && leaderboardData.to_date && (
-<View>
-<Text style={styles.lastDaysText}>Last 3 Days</Text>
-<Text style={styles.dateRange}>
-{formatDate(leaderboardData.from_date)} - {formatDate(leaderboardData.to_date)}
-</Text>
+            {loadingPosts ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF8C00" />
+                <Text style={styles.loadingText}>Finding nearby food...</Text>
+              </View>
+            ) : nearbyPosts.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="location-outline" size={64} color="#CCC" />
+                <Text style={styles.emptyText}>No posts found nearby</Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={getCurrentLocation}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              nearbyPosts.map((post) => (
+                <TouchableOpacity
+                  key={post.id}
+                  style={styles.postCard}
+                  onPress={() => router.push(`/post/${post.id}`)}
+                >
+                  <Image
+                    source={{ uri: post.thumbnail_url || post.media_url }}
+                    style={styles.postImage}
+                    resizeMode="cover"
+                  />
 
-{entries.length > 0 && entries[0] &&
-(entries[0].followers_count === undefined ||
-entries[0].posts_count === undefined ||
-entries[0].full_name === undefined) ? (
-<TouchableOpacity
-style={styles.regenerateButton}
-onPress={handleRegenerateLeaderboard}
->
-<Text style={styles.regenerateButtonText}>
-🔄 Regenerate Leaderboard (Update Required)
-</Text>
-</TouchableOpacity>
-) : null}
-</View>
-)}
+                  <View style={styles.postInfo}>
+                    <View style={styles.postHeader}>
+                      <Text style={styles.username} numberOfLines={1}>
+                        {post.username || "Anonymous"}
+                      </Text>
+                      {post.rating && (
+                        <View style={styles.postRatingContainer}>
+                          <Ionicons name="star" size={14} color="#FFD700" />
+                          <Text style={styles.ratingText}>{post.rating}/10</Text>
+                        </View>
+                      )}
+                    </View>
 
-{entries.length === 0 && (
-<View style={styles.emptyContainer}>
-<Ionicons name="trophy-outline" size={64} color="#ccc" />
-<Text style={styles.emptyText}>No leaderboard data yet</Text>
-<Text style={styles.emptySubtext}>
-Start posting to see the leaderboard!
-</Text>
-<TouchableOpacity
-style={styles.regenerateButton}
-onPress={handleRegenerateLeaderboard}
->
-<Text style={styles.regenerateButtonText}>Regenerate Leaderboard</Text>
-</TouchableOpacity>
-</View>
-)}
+                    {userLocation && post.latitude && post.longitude && (
+                      <View style={styles.distanceRow}>
+                        <Ionicons name="location" size={14} color="#4CAF50" />
+                        <Text style={styles.distanceText}>
+                          {calculateDistance(
+                            userLocation.latitude,
+                            userLocation.longitude,
+                            post.latitude,
+                            post.longitude
+                          )}
+                        </Text>
+                      </View>
+                    )}
 
-{entries.length > 0 && (
-<View style={styles.section}>
-<Text style={styles.sectionTitle}></Text>
-{entries.map((entry: any, index: number) => {
-const isOwnPost = entry.user_id === user?.id;
-const isFollowing = followingStates[entry.user_id] || false;
+                    {post.review_text && (
+                      <Text style={styles.reviewText} numberOfLines={2}>
+                        {post.review_text}
+                      </Text>
+                    )}
 
-if (index === 0) {
-console.log("🔍 Rendering entry:", {
-rank: entry.rank,
-username: entry.username,
-full_name: entry.full_name,
-followers_count: entry.followers_count,
-posts_count: entry.posts_count,
-user_id: entry.user_id,
-});
-}
+                    <TouchableOpacity
+                      style={styles.orderButton}
+                      onPress={() => {
+                        if (post.restaurant_name) {
+                          Alert.alert("Order", `Order from ${post.restaurant_name}?`);
+                        }
+                      }}
+                    >
+                      <Text style={styles.orderButtonText}>Order</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Popular nearby restaurants</Text>
+            {DUMMY_RESTAURANTS.map((restaurant) => renderRestaurantCard(restaurant))}
+          </>
+        )}
 
-return index === 0 ? (
-<View key={entry.post_id} style={styles.rankOneWrapper}>
-<LinearGradient
-colors={["#E94A37", "#F2CF68", "#1B7C82", "#E94A37"]}
-start={{ x: 0, y: 0 }}
-end={{ x: 1, y: 1 }}
-style={styles.rankOneGradientBorder}
->
-<TouchableOpacity
-style={[styles.leaderboardCard, styles.rankOneCard]}
-onPress={() => handlePostPress(entry.post_id)}
-activeOpacity={0.7}
->
-<Image
-source={require('../assets/badges/top1.png')}
-style={styles.rankBadgeImage}
-resizeMode="contain"
-/>
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
 
-<View style={styles.rankOneContainer}>
-<View style={styles.confettiContainer}>
-<Text style={[styles.confettiStar, { top: 8, right: 50 }]}>✦</Text>
-<Text style={[styles.confettiStar, { top: 15, right: 80 }]}>★</Text>
-<Text style={[styles.confettiStar, { top: 25, right: 40 }]}>✧</Text>
-<Text style={[styles.confettiSparkle, { top: 12, right: 65 }]}>✨</Text>
-<Text style={[styles.confettiSparkle, { top: 30, right: 90 }]}>✨</Text>
+      {/* Bottom Navigation */}
+      <View style={styles.navBar}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/feed")}
+        >
+          <Ionicons name="home-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Home</Text>
+        </TouchableOpacity>
 
-<View style={[styles.confettiDot, { top: 10, right: 55, backgroundColor: '#FFD700' }]} />
-<View style={[styles.confettiDotSmall, { top: 20, right: 75, backgroundColor: '#F2CF68' }]} />
-<View style={[styles.confettiDotLarge, { top: 35, right: 45, backgroundColor: '#E94A37' }]} />
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/explore")}
+        >
+          <Ionicons name="compass-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Explore</Text>
+        </TouchableOpacity>
 
-<View style={[styles.confettiDiamond, { top: 15, right: 100, backgroundColor: '#1B7C82' }]} />
-<View style={[styles.confettiStrip, { top: 25, right: 60, backgroundColor: '#FFD700', transform: [{ rotate: '45deg' }] }]} />
+        <TouchableOpacity
+          style={styles.centerNavItem}
+          onPress={() => router.push("/leaderboard")}
+        >
+          <View style={styles.centerIconCircle}>
+            <Ionicons name="camera" size={20} color="#000" />
+          </View>
+          <Text style={styles.navLabelActive}>Top Posts</Text>
+        </TouchableOpacity>
 
-<Text style={[styles.confettiStar, { bottom: 15, left: 30 }]}>✦</Text>
-<Text style={[styles.confettiStar, { bottom: 25, left: 60 }]}>★</Text>
-<Text style={[styles.confettiStar, { bottom: 15, right: 70 }]}>✧</Text>
-<Text style={[styles.confettiSparkle, { bottom: 20, left: 45 }]}>✨</Text>
-<Text style={[styles.confettiSparkle, { bottom: 30, right: 50 }]}>✨</Text>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/happening")}
+        >
+          <Ionicons name="location-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Happening</Text>
+        </TouchableOpacity>
 
-<View style={[styles.confettiDot, { bottom: 18, left: 80, backgroundColor: '#F2CF68' }]} />
-<View style={[styles.confettiDotSmall, { bottom: 28, left: 50, backgroundColor: '#1B7C82' }]} />
-<View style={[styles.confettiDotLarge, { bottom: 22, right: 90, backgroundColor: '#E94A37' }]} />
-
-<View style={[styles.confettiDiamond, { bottom: 25, left: 100, backgroundColor: '#FFD700' }]} />
-<View style={[styles.confettiStrip, { bottom: 20, right: 80, backgroundColor: '#F2CF68', transform: [{ rotate: '-45deg' }] }]} />
-<View style={[styles.confettiRing, { bottom: 30, left: 70, borderColor: '#1B7C82' }]} />
-
-<Text style={[styles.confettiStar, { top: '40%', left: 20 }]}>✦</Text>
-<Text style={[styles.confettiStar, { top: '50%', right: 25 }]}>★</Text>
-<View style={[styles.confettiDotSmall, { top: '45%', left: 15, backgroundColor: '#FFD700' }]} />
-<View style={[styles.confettiDotSmall, { top: '55%', right: 20, backgroundColor: '#F2CF68' }]} />
-</View>
-
-<View style={styles.rankOneProfileSection}>
-<View style={{ position: 'relative' }}>
-<UserAvatar
-profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
-username={entry.username}
-size={60}
-showLevelBadge={activeTab === 'users'}
-level={entry.user_level || entry.level || 1}
-style={{}}
-/>
-{activeTab === 'restaurants' && (
-<View style={styles.restaurantBadge}>
-<Ionicons name="storefront" size={12} color="#fff" />
-</View>
-)}
-</View>
-<View style={styles.rankOneInfo}>
-<Text style={styles.rankOneName} numberOfLines={1}>
-{entry.full_name || entry.username || "Unknown User"}
-</Text>
-{activeTab === 'users' && (
-<Text style={styles.levelText}>
-Level {entry.user_level || entry.level || 1}
-</Text>
-)}
-<View style={styles.rankOneStats}>
-<View style={styles.statItem}>
-<Ionicons name="people" size={18} color="#666" />
-<Text style={styles.statText}>
-{entry.followers_count !== undefined && entry.followers_count !== null ? entry.followers_count : 0}
-</Text>
-</View>
-<View style={styles.statItem}>
-<Ionicons name="images" size={18} color="#666" />
-<Text style={styles.statText}>
-{entry.posts_count !== undefined && entry.posts_count !== null ? entry.posts_count : 0}
-</Text>
-</View>
-{!isOwnPost && (
-<TouchableOpacity
-style={[
-styles.followButtonLeaderboard,
-isFollowing && styles.followingButtonLeaderboard
-]}
-onPress={(e) => {
-e.stopPropagation();
-handleFollowToggle(entry.user_id, entry);
-}}
-disabled={followLoading[entry.user_id]}
->
-<Text style={[
-styles.followButtonTextLeaderboard,
-isFollowing && styles.followingButtonTextLeaderboard
-]}>
-{followLoading[entry.user_id] ? "..." : (isFollowing ? "Following" : "Follow")}
-</Text>
-</TouchableOpacity>
-)}
-</View>
-</View>
-</View>
-
-<Image
-source={{
-uri: normalizeMediaUrl(entry.thumbnail_url || entry.media_url) || ''
-}}
-style={styles.rankOneFullImage}
-resizeMode="cover"
-onError={(error) => {
-console.log("Error loading thumbnail:", error);
-}}
-/>
-
-<View style={styles.scoresContainerRankOne}>
-<View style={styles.scoreItemRankOne}>
-<Ionicons name="star" size={18} color="#FFD700" />
-<Text style={styles.scoreLabelRankOne}>Quality</Text>
-<Text style={styles.scoreValueRankOne}>
-{(entry.quality_score || 0).toFixed(1)}
-</Text>
-</View>
-<View style={styles.scoreDivider} />
-<View style={styles.scoreItemRankOne}>
-<Ionicons name="heart" size={18} color="#FF6B6B" />
-<Text style={styles.scoreLabelRankOne}>Likes</Text>
-<Text style={styles.scoreValueRankOne}>{entry.likes_count || 0}</Text>
-</View>
-<View style={styles.scoreDivider} />
-<View style={styles.scoreItemRankOne}>
-<Ionicons name="trophy" size={18} color="#4dd0e1" />
-<Text style={styles.scoreLabelRankOne}>Score</Text>
-<Text style={styles.scoreValueRankOne}>
-{(entry.combined_score || 0).toFixed(0)}
-</Text>
-</View>
-</View>
-</View>
-</TouchableOpacity>
-</LinearGradient>
-</View>
-) : (
-<TouchableOpacity
-key={entry.post_id}
-style={[
-styles.leaderboardCard,
-index === 1 && { borderColor: "#C0C0C0" },
-index === 2 && { borderColor: "#C0C0C0" },
-index > 2 && { borderColor: "#1B7C82" },
-]}
-onPress={() => handlePostPress(entry.post_id)}
-activeOpacity={0.7}
->
-{index === 0 ? (
-<Image
-source={require('../assets/badges/top1.png')}
-style={styles.rankBadgeImage}
-resizeMode="contain"
-/>
-) : (
-<View style={styles.rankBadge}>
-<Text style={styles.rankText}>
-#{entry.rank}
-</Text>
-</View>
-)}
-
-<View style={styles.otherRanksContainer}>
-<View style={{ position: 'relative' }}>
-<UserAvatar
-profilePicture={normalizeProfilePicture(entry.user_profile_picture)}
-username={entry.username}
-size={50}
-showLevelBadge={activeTab === 'users'}
-level={entry.user_level || entry.level || 1}
-style={{}}
-/>
-{activeTab === 'restaurants' && (
-<View style={styles.restaurantBadgeSmall}>
-<Ionicons name="storefront" size={10} color="#fff" />
-</View>
-)}
-</View>
-<View style={styles.otherRanksInfo}>
-<Text style={styles.otherRanksName} numberOfLines={1}>
-{entry.full_name || entry.username || "Unknown User"}
-</Text>
-{activeTab === 'users' && (
-<Text style={styles.levelTextSmall}>
-Level {entry.user_level || entry.level || 1}
-</Text>
-)}
-</View>
-</View>
-
-<View style={styles.cardContent}>
-<Image
-source={{
-uri: normalizeMediaUrl(entry.thumbnail_url || entry.media_url) || ''
-}}
-style={styles.mediaThumbnail}
-resizeMode="cover"
-onError={(error) => {
-console.log("Error loading thumbnail:", error);
-}}
-/>
-
-<View style={styles.entryInfo}>
-{entry.caption && (
-<Text style={styles.captionText} numberOfLines={2}>
-{entry.caption}
-</Text>
-)}
-
-{entry.location_name && (
-<View style={styles.locationRow}>
-<Ionicons name="location-outline" size={12} color="#666" />
-<Text style={styles.locationText} numberOfLines={1}>
-{entry.location_name}
-</Text>
-</View>
-)}
-</View>
-</View>
-
-<View style={styles.scoresContainer}>
-<View style={styles.scoreItem}>
-<Ionicons name="star" size={16} color="#FFD700" />
-<Text style={styles.scoreLabel}>Quality</Text>
-<Text style={styles.scoreValue}>
-{(entry.quality_score || 0).toFixed(0)}
-</Text>
-</View>
-<View style={styles.scoreItem}>
-<Ionicons name="heart" size={16} color="#FF6B6B" />
-<Text style={styles.scoreLabel}>Likes</Text>
-<Text style={styles.scoreValue}>{entry.likes_count || 0}</Text>
-</View>
-<View style={styles.scoreItem}>
-<Ionicons name="trophy" size={16} color="#4dd0e1" />
-<Text style={styles.scoreLabel}>Score</Text>
-<Text style={styles.scoreValue}>
-{(entry.combined_score || 0).toFixed(1)}
-</Text>
-</View>
-</View>
-</TouchableOpacity>
-);
-})}
-</View>
-)}
-
-<View style={styles.bottomSpacer} />
-</ScrollView>
-
-<View style={styles.navBar}>
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/feed")}
->
-<Ionicons name="home-outline" size={20} color="#000" />
-<Text style={styles.navLabel}>Home</Text>
-</TouchableOpacity>
-
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/explore")}
->
-<Ionicons name="compass-outline" size={20} color="#000" />
-<Text style={styles.navLabel}>Explore</Text>
-</TouchableOpacity>
-
-<TouchableOpacity
-style={styles.centerNavItem}
-onPress={() => router.push("/leaderboard")}
->
-<View style={styles.centerIconCircle}>
-<Ionicons name="camera" size={20} color="#000" />
-</View>
-<Text style={styles.navLabelActive}>Top Posts</Text>
-</TouchableOpacity>
-
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/happening")}
->
-<Ionicons name="location-outline" size={20} color="#000" />
-<Text style={styles.navLabel}>Happening</Text>
-</TouchableOpacity>
-
-<TouchableOpacity
-style={styles.navItem}
-onPress={() => router.push("/profile")}
->
-<Ionicons name="person-outline" size={20} color="#000" />
-<Text style={styles.navLabel}>Profile</Text>
-</TouchableOpacity>
-</View>
-</View>
-);
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => router.push("/profile")}
+        >
+          <Ionicons name="person-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-container: {
-flex: 1,
-backgroundColor: "#ffff",
-},
-loadingContainer: {
-flex: 1,
-justifyContent: "center",
-alignItems: "center",
-backgroundColor: "#FFFFFF",
-},
-loadingText: {
-marginTop: 16,
-fontSize: 16,
-color: "#666",
-},
-errorContainer: {
-flex: 1,
-justifyContent: "center",
-alignItems: "center",
-backgroundColor: "#FFFFFF",
-padding: 20,
-},
-errorText: {
-marginTop: 16,
-fontSize: 16,
-color: "#FF6B6B",
-textAlign: "center",
-},
-retryButton: {
-marginTop: 20,
-backgroundColor: "#FF6B6B",
-paddingVertical: 12,
-paddingHorizontal: 14,
-borderRadius: 8,
-},
-retryButtonText: {
-color: "#fff",
-fontSize: 16,
-fontWeight: "600",
-},
-scrollView: {
-flex: 1,
-},
-scrollContent: {
-paddingTop: 0,
-paddingHorizontal: 16,
-paddingBottom: 100,
-},
-gradientHeader: {
-paddingTop: 60,
-paddingBottom: 60,
-alignItems: "center",
-justifyContent: "center",
-borderBottomLeftRadius: 30,
-borderBottomRightRadius: 30,
-shadowColor: "#000",
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.1,
-shadowRadius: 8,
-elevation: 6,
-},
-headerContainer: {
-marginHorizontal: -16,
-marginBottom: -40,
-},
-titleBoxWrapper: {
-marginHorizontal: 20,
-marginBottom: 20,
-borderRadius: 30,
-overflow: 'hidden',
-borderWidth: 0.5,
-borderColor: '#FF8C00',
-shadowColor: '#000',
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.1,
-shadowRadius: 8,
-elevation: 4,
-},
-restaurantBadge: {
-position: 'absolute',
-bottom: -2,
-left: 40,
-backgroundColor: '#1B7C82',
-borderRadius: 10,
-width: 20,
-height: 20,
-alignItems: 'center',
-justifyContent: 'center',
-borderWidth: 2,
-borderColor: '#fff',
-},
-restaurantBadgeSmall: {
-position: 'absolute',
-bottom: -2,
-left: 34,
-backgroundColor: '#1B7C82',
-borderRadius: 8,
-width: 16,
-height: 16,
-alignItems: 'center',
-justifyContent: 'center',
-borderWidth: 1.5,
-borderColor: '#fff',
-},
-tabContainer: {
-flexDirection: 'row',
-backgroundColor: '#F5F5F5',
-borderRadius: 25,
-padding: 4,
-marginHorizontal: 40,
-marginBottom: 16,
-marginTop: 8,
-borderWidth: 0.5,
-borderColor: '#FF8C00',
-height: 50,
-},
-tab: {
-flex: 1,
-alignItems: 'center',
-justifyContent: 'center',
-borderRadius: 22,
-height: 42,
-},
-tabActive: {
-backgroundColor: 'transparent',
-shadowColor: '#FF7A18',
-shadowOffset: { width: 0, height: 2 },
-shadowOpacity: 0.3,
-shadowRadius: 4,
-elevation: 3,
-overflow: 'hidden',
-},
-tabText: {
-fontSize: 16,
-fontWeight: '600',
-color: '#999',
-},
-tabTextActive: {
-fontWeight: '700',
-color: '#fff',
-},
-tabGradientBackground: {
-width: '100%',
-height: '100%',
-paddingVertical: 10,
-paddingHorizontal: 20,
-alignItems: 'center',
-justifyContent: 'center',
-borderRadius: 22,
-},
-titleBox: {
-paddingVertical: 18,
-paddingHorizontal: 30,
-alignItems: 'center',
-justifyContent: 'center',
-backgroundColor: 'rgba(255, 255, 255, 0.95)',
-},
-titleBoxAndroid: {
-backgroundColor: 'rgba(255, 255, 255, 0.95)',
-},
-titleMain: {
-fontSize: 18,
-fontWeight: '600',
-color: '#000',
-textAlign: 'center',
-},
-rankOneWrapper: {
-marginBottom: 12,
-borderRadius: 20,
-padding: 3,
-shadowColor: "#F2CF68",
-shadowOffset: { width: 0, height: 0 },
-shadowOpacity: 1,
-shadowRadius: 20,
-elevation: 15,
-},
-
-rankBadgeImage: {
-position: "absolute",
-top: -20,
-right: -70,
-width: 200,
-height: 110,
-zIndex: 10,
-},
-rankOneGradientBorder: {
-borderRadius: 20,
-padding: 2,
-paddingVertical: 1.5, // Even thinner on top/bottom
-},
-subtitleRow: {
-flexDirection: 'row',
-alignItems: 'center',
-justifyContent: 'center',
-marginTop: 6,
-},
-titleSub: {
-fontSize: 14,
-color: '#555',
-marginLeft: 6,
-textAlign: 'center',
-},
-rankBadgeGradient: {
-position: "absolute",
-top: 4,
-right: 12,
-borderRadius: 20,
-paddingHorizontal: 8,
-paddingVertical: 4,
-elevation: 4,
-shadowColor: "#000",
-shadowOffset: { width: 0, height: 2 },
-shadowOpacity: 0.3,
-shadowRadius: 4,
-zIndex: 10,
-},
-cofauTitle: {
-fontFamily: "Lobster",
-fontSize: 36,
-color: "#fff",
-textAlign: "center",
-letterSpacing: 1,
-textShadowColor: "rgba(0, 0, 0, 0.15)",
-textShadowOffset: { width: 4, height: 6 },
-textShadowRadius: 4,
-},
-mainTitle: {
-fontSize: 24,
-fontWeight: "bold",
-color: "#fff",
-marginBottom: 8,
-textAlign: "left",
-letterSpacing: 0.5,
-},
-dateRange: {
-fontSize: 10,
-color: "#888",
-marginBottom: 1,
-opacity: 0.7,
-textAlign: "center",
-},
-postsCountText: {
-fontSize: 10,
-color: "#888",
-marginBottom: -20,
-opacity: 0.7,
-textAlign: "center",
-},
-emptyContainer: {
-alignItems: "center",
-justifyContent: "center",
-paddingVertical: 60,
-},
-emptyText: {
-marginTop: 16,
-fontSize: 18,
-fontWeight: "600",
-color: "#666",
-},
-rankOneBadge: {
-position: "absolute",
-top: 12,
-right: 12,
-width: 50,
-height: 50,
-borderRadius: 25,
-backgroundColor: "#FFD700",
-alignItems: "center",
-justifyContent: "center",
-borderWidth: 3,
-borderColor: "#FFA500",
-elevation: 8,
-shadowColor: "#FFD700",
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.6,
-shadowRadius: 8,
-zIndex: 10,
-},
-
-rankOneBadgeText: {
-color: "#fff",
-fontSize: 18,
-fontWeight: "bold",
-textShadowColor: "rgba(0, 0, 0, 0.3)",
-textShadowOffset: { width: 1, height: 1 },
-textShadowRadius: 2,
-},
-emptySubtext: {
-marginTop: 8,
-fontSize: 14,
-color: "#999",
-},
-section: {
-marginBottom: 16,
-},
-sectionTitle: {
-fontSize: 18,
-fontFamily: "Georgia",
-color: "#333",
-marginBottom: 16,
-textAlign: "center",
-letterSpacing: 10,
-},
-leaderboardCard: {
-borderRadius: 20,
-padding: 12,
-marginBottom: 12,
-backgroundColor: "#FFFFFF",
-borderWidth: 3,
-borderColor: "#1B7C82",
-elevation: 8,
-shadowColor: "#000",
-shadowOffset: { width: 3, height: 6 },
-shadowOpacity: 0.25,
-shadowRadius: 8,
-},
-rankBadge: {
-position: "absolute",
-top: 4,
-right: 12,
-backgroundColor: "#fff",
-borderRadius: 20,
-paddingHorizontal: 12,
-paddingVertical: 6,
-elevation: 4,
-shadowColor: "#000",
-shadowOffset: { width: 0, height: 2 },
-shadowOpacity: 0.3,
-shadowRadius: 4,
-zIndex: 10,
-},
-rankText: {
-fontSize: 14,
-fontWeight: "bold",
-color: "#333",
-},
-topThreeRankText: {
-color: "#fff",
-fontSize: 12,
-fontWeight: "bold",
-},
-cardContent: {
-flexDirection: "row",
-marginBottom: 8,
-},
-mediaThumbnail: {
-width: 140,
-height: 140,
-borderRadius: 8,
-backgroundColor: "#f0f0f0ff",
-marginRight: 12,
-overflow: "hidden",
-},
-mediaThumbnailLarge: {
-width: 160,
-height: 180,
-borderRadius: 12,
-backgroundColor: "#f0f0f0",
-marginRight: 12,
-overflow: "hidden",
-},
-entryInfo: {
-flex: 1,
-justifyContent: "center",
-},
-usernameText: {
-fontSize: 16,
-fontWeight: "600",
-color: "#333",
-marginBottom: 4,
-},
-captionText: {
-fontSize: 14,
-color: "#666",
-marginBottom: 4,
-},
-locationRow: {
-flexDirection: "row",
-alignItems: "center",
-marginTop: 4,
-},
-locationText: {
-fontSize: 12,
-color: "#666",
-marginLeft: 4,
-},
-scoresContainer: {
-flexDirection: "row",
-justifyContent: "space-around",
-paddingTop: 12,
-borderTopWidth: 1,
-borderTopColor: "rgba(0,0,0,0.1)",
-flexWrap: "wrap",
-},
-scoreItem: {
-alignItems: "center",
-},
-scoreLabel: {
-fontSize: 11,
-color: "#666",
-marginTop: 4,
-},
-scoreValue: {
-fontSize: 16,
-fontWeight: "bold",
-color: "#333",
-marginTop: 2,
-},
-topPhotographersContainer: {
-flexDirection: "row",
-gap: 12,
-},
-photographerCard: {
-flex: 1,
-borderRadius: 12,
-padding: 16,
-minHeight: 180,
-},
-firstCard: {
-flexDirection: "column",
-alignItems: "flex-start",
-},
-profileImageContainer: {
-marginBottom: 12,
-},
-profileImage: {
-width: 60,
-height: 60,
-borderRadius: 30,
-backgroundColor: "#fff",
-justifyContent: "center",
-alignItems: "center",
-borderWidth: 3,
-borderColor: "#FFD700",
-},
-photographerInfo: {
-marginBottom: 12,
-},
-photographerName: {
-fontSize: 16,
-fontWeight: "600",
-color: "#333",
-marginBottom: 4,
-},
-photographerPosts: {
-fontSize: 14,
-color: "#666",
-},
-viewGalleryButton: {
-flexDirection: "row",
-alignItems: "center",
-backgroundColor: "#fff",
-paddingVertical: 8,
-paddingHorizontal: 12,
-borderRadius: 8,
-marginTop: "auto",
-},
-viewGalleryText: {
-marginLeft: 6,
-fontSize: 12,
-color: "#333",
-fontWeight: "500",
-},
-foodCard: {
-flex: 1,
-width: "100%",
-position: "relative",
-borderRadius: 8,
-overflow: "hidden",
-minHeight: 150,
-},
-foodImage: {
-flex: 1,
-width: "100%",
-borderRadius: 8,
-resizeMode: "cover",
-},
-foodImagePlaceholder: {
-flex: 1,
-backgroundColor: "#D0D0D0",
-justifyContent: "center",
-alignItems: "center",
-borderRadius: 8,
-},
-aiScoreBadge: {
-position: "absolute",
-top: 8,
-right: 8,
-flexDirection: "row",
-alignItems: "center",
-backgroundColor: "rgba(255, 255, 255, 0.9)",
-paddingVertical: 4,
-paddingHorizontal: 8,
-borderRadius: 6,
-},
-aiScoreText: {
-marginLeft: 4,
-fontSize: 12,
-fontWeight: "600",
-color: "#333",
-},
-viewButton: {
-position: "absolute",
-bottom: 8,
-alignSelf: "center",
-flexDirection: "row",
-alignItems: "center",
-backgroundColor: "rgba(0, 0, 0, 0.7)",
-paddingVertical: 8,
-paddingHorizontal: 12,
-borderRadius: 8,
-},
-viewButtonText: {
-marginLeft: 6,
-fontSize: 12,
-color: "#fff",
-fontWeight: "500",
-},
-risingStarCard: {
-borderRadius: 12,
-padding: 16,
-marginBottom: 12,
-},
-risingStarContent: {
-flexDirection: "row",
-alignItems: "center",
-},
-risingStarProfileImage: {
-width: 50,
-height: 50,
-borderRadius: 25,
-backgroundColor: "#fff",
-justifyContent: "center",
-alignItems: "center",
-marginRight: 12,
-borderWidth: 2,
-borderColor: "#000",
-},
-restaurantImageContainer: {
-width: 50,
-height: 50,
-borderRadius: 8,
-backgroundColor: "#fff",
-marginRight: 12,
-overflow: "hidden",
-},
-restaurantGalleryGrid: {
-flex: 1,
-flexDirection: "row",
-flexWrap: "wrap",
-},
-galleryThumbnail: {
-width: "50%",
-height: "50%",
-backgroundColor: "#f0f0f0",
-justifyContent: "center",
-alignItems: "center",
-borderWidth: 0.5,
-borderColor: "#ddd",
-resizeMode: "cover",
-},
-risingStarInfo: {
-flex: 1,
-},
-risingStarName: {
-fontSize: 16,
-fontWeight: "600",
-color: "#333",
-marginBottom: 4,
-},
-risingStarMeta: {
-fontSize: 14,
-color: "#666",
-marginBottom: 2,
-},
-aiScoreRow: {
-flexDirection: "row",
-alignItems: "center",
-marginTop: 4,
-},
-aiScoreTextInline: {
-marginLeft: 4,
-fontSize: 14,
-color: "#666",
-fontWeight: "500",
-},
-followButton: {
-flexDirection: "row",
-alignItems: "center",
-backgroundColor: "#fff",
-paddingVertical: 8,
-paddingHorizontal: 12,
-borderRadius: 8,
-},
-followButtonText: {
-marginLeft: 6,
-fontSize: 12,
-color: "#333",
-fontWeight: "500",
-},
-bottomSpacer: {
-height: 20,
-},
-lastDaysText: {
-fontSize: 10,
-color: "#888",
-textAlign: "center",
-marginTop: -5,
-marginBottom: 2,
-},
-navBar: {
-flexDirection: "row",
-justifyContent: "space-around",
-alignItems: "center",
-paddingVertical: 4,
-paddingTop: 6,
-borderTopWidth: 1,
-borderTopColor: "#E8E8E8",
-backgroundColor: "#FFFFFF",
-position: "absolute",
-bottom: 0,
-left: 0,
-right: 0,
-elevation: 8,
-shadowColor: "#000",
-shadowOffset: { width: 0, height: -2 },
-shadowOpacity: 0.08,
-shadowRadius: 4,
-},
-navItem: {
-alignItems: "center",
-justifyContent: "center",
-paddingVertical: 4,
-paddingHorizontal: 12,
-},
-centerNavItem: {
-alignItems: "center",
-justifyContent: "center",
-paddingVertical: 4,
-paddingHorizontal: 12,
-marginTop: -20,
-},
-centerIconCircle: {
-width: 48,
-height: 48,
-borderRadius: 24,
-backgroundColor: "#FFFFFF",
-borderWidth: 2,
-borderColor: "#000",
-justifyContent: "center",
-alignItems: "center",
-marginBottom: 2,
-elevation: 8,
-shadowColor: "#000",
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.3,
-shadowRadius: 6,
-},
-navLabel: {
-fontSize: 11,
-color: "#000",
-marginTop: 2,
-textAlign: "center",
-fontWeight: "500",
-},
-confettiContainer: {
-position: "absolute",
-top: 0,
-left: 0,
-right: 0,
-bottom: 0,
-zIndex: 0,
-overflow: "hidden",
-},
-confettiDot: {
-position: "absolute",
-width: 10,
-height: 10,
-borderRadius: 5,
-opacity: 0.6,
-},
-confettiDotSmall: {
-position: "absolute",
-width: 6,
-height: 6,
-borderRadius: 3,
-opacity: 0.5,
-},
-confettiDotLarge: {
-position: "absolute",
-width: 14,
-height: 14,
-borderRadius: 7,
-opacity: 0.7,
-},
-confettiStar: {
-position: "absolute",
-fontSize: 16,
-color: "#FFD700",
-opacity: 0.6,
-},
-confettiSparkle: {
-position: "absolute",
-fontSize: 14,
-opacity: 0.7,
-},
-confettiDiamond: {
-position: "absolute",
-width: 8,
-height: 8,
-transform: [{ rotate: '45deg' }],
-opacity: 0.3,
-},
-confettiStrip: {
-position: "absolute",
-width: 12,
-height: 4,
-borderRadius: 2,
-opacity: 0.3,
-},
-confettiRing: {
-position: "absolute",
-width: 12,
-height: 12,
-borderRadius: 6,
-borderWidth: 2,
-backgroundColor: "transparent",
-opacity: 0.3,
-},
-navLabelActive: {
-fontSize: 11,
-color: "#000",
-marginTop: 2,
-textAlign: "center",
-fontWeight: "700",
-},
-rankOneContainer: {
-marginBottom: 0,
-paddingBottom: 0,
-position: "relative",
-},
-rankOneCard: {
-borderWidth: 3,
-borderColor: "transparent",
-backgroundColor: "#FFFEF5",
-position: "relative",
-shadowColor: "#F2CF68",
-shadowOffset: { width: 0, height: 0 },
-shadowOpacity: 0.8,
-shadowRadius: 15,
-elevation: 12,
-},
-rankOneProfileSection: {
-flexDirection: "row",
-alignItems: "center",
-gap: 16,
-marginBottom: 12,
-zIndex: 1,
-},
-rankOneInfo: {
-flex: 1,
-},
-rankOneName: {
-fontSize: 16,
-fontWeight: "600",
-color: "#333",
-marginBottom: 4,
-},
-levelText: {
-fontSize: 14,
-fontWeight: "500",
-color: "#1B7C82",
-marginBottom: 8,
-},
-rankOneStats: {
-flexDirection: "row",
-alignItems: "center",
-gap: 12,
-marginBottom: 12,
-},
-statItem: {
-flexDirection: "row",
-alignItems: "center",
-gap: 4,
-},
-statText: {
-fontSize: 14,
-fontWeight: "600",
-color: "#666",
-},
-followButtonLeaderboard: {
-backgroundColor: "#1B7C82",
-paddingHorizontal: 12,
-paddingVertical: 4,
-borderRadius: 18,
-alignSelf: "flex-start",
-shadowColor: "#0d4a4f",
-shadowOffset: { width: 0, height: 4 },
-shadowOpacity: 0.8,
-shadowRadius: 0,
-elevation: 6,
-borderBottomWidth: 4,
-borderBottomColor: "#0d4a4f",
-},
-followingButtonLeaderboard: {
-backgroundColor: "#E8E8E8",
-borderBottomColor: "#b0b0b0",
-},
-followButtonTextLeaderboard: {
-color: "#fff",
-fontSize: 8,
-fontWeight: "600",
-},
-followingButtonTextLeaderboard: {
-color: "#666",
-},
-followButtonSmall: {
-flexDirection: "row",
-alignItems: "center",
-gap: 4,
-backgroundColor: "#f5f5f5",
-paddingHorizontal: 10,
-paddingVertical: 4,
-borderRadius: 15,
-borderWidth: 1,
-borderColor: "#ddd",
-},
-followButtonSmallText: {
-fontSize: 12,
-color: "#666",
-fontWeight: "500",
-},
-rankOneFullImage: {
-width: "100%",
-height: 300,
-borderRadius: 16,
-marginTop: 8,
-marginBottom: 12,
-backgroundColor: "#f0f0f0",
-},
-scoresContainerRankOne: {
-flexDirection: "row",
-justifyContent: "space-around",
-alignItems: "center",
-paddingTop: 12,
-paddingBottom: 4,
-borderTopWidth: 1,
-borderTopColor: "rgba(0,0,0,0.1)",
-},
-scoreItemRankOne: {
-alignItems: "center",
-flex: 1,
-},
-scoreLabelRankOne: {
-fontSize: 12,
-color: "#666",
-marginTop: 4,
-},
-scoreValueRankOne: {
-fontSize: 18,
-fontWeight: "bold",
-color: "#333",
-marginTop: 2,
-},
-scoreDivider: {
-width: 1,
-height: 40,
-backgroundColor: "rgba(0,0,0,0.1)",
-},
-otherRanksContainer: {
-flexDirection: "row",
-alignItems: "center",
-gap: 12,
-marginBottom: 12,
-paddingBottom: 12,
-borderBottomWidth: 1,
-borderBottomColor: "rgba(0,0,0,0.05)",
-},
-otherRanksInfo: {
-flex: 1,
-},
-otherRanksName: {
-fontSize: 16,
-fontWeight: "600",
-color: "#333",
-marginBottom: 2,
-},
-levelTextSmall: {
-fontSize: 12,
-fontWeight: "500",
-color: "#1B7C82",
-},
-regenerateButton: {
-marginTop: 20,
-backgroundColor: "#1B7C82",
-paddingVertical: 12,
-paddingHorizontal: 24,
-borderRadius: 8,
-},
-regenerateButtonText: {
-color: "#fff",
-fontSize: 14,
-fontWeight: "600",
-},
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight! + 10,
+    paddingBottom: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  locationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 25,
+    flex: 1,
+    marginRight: 12,
+    maxWidth: "80%",
+  },
+  locationTextContainer: {
+    flex: 1,
+    marginLeft: 8,
+    marginRight: 4,
+  },
+  locationText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+  },
+  addLocationText: {
+    color: "#FF7A18",
+    fontWeight: "600",
+  },
+  locationSubtext: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  walletButton: {
+    padding: 8,
+  },
+  tabsScrollView: {
+    maxHeight: 50,
+    backgroundColor: "#FFFFFF",
+  },
+  tabsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  tab: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  activeTab: {
+    overflow: "hidden",
+  },
+  activeTabGradient: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  activeTabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  restaurantCard: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  restaurantImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+    backgroundColor: "#F0F0F0",
+  },
+  restaurantInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  restaurantHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  restaurantName: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    flex: 1,
+    marginRight: 8,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  starsContainer: {
+    flexDirection: "row",
+    marginRight: 6,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FF8C00",
+    marginRight: 4,
+  },
+  reviewsText: {
+    fontSize: 13,
+    color: "#888",
+  },
+  distanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  distanceText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  dotSeparator: {
+    fontSize: 14,
+    color: "#999",
+    marginHorizontal: 6,
+  },
+  deliveriesText: {
+    fontSize: 13,
+    color: "#666",
+  },
+  cuisineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  cuisineText: {
+    fontSize: 13,
+    color: "#666",
+    marginLeft: 4,
+  },
+  deliveryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  deliveryTimeLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  deliveryLabel: {
+    fontSize: 13,
+    color: "#666",
+    marginLeft: 6,
+    marginRight: 8,
+  },
+  deliveryDots: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  deliveryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E0E0E0",
+  },
+  acceptOrderButton: {
+    backgroundColor: "#2E7D32",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  acceptOrderText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  deliveryTimeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  deliveryTimeText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#333",
+    marginRight: 4,
+  },
+  bottomSpacer: {
+    height: 100,
+  },
+  navBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#E8E8E8",
+    backgroundColor: "#FFFFFF",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  navItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  centerNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginTop: -20,
+  },
+  centerIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  navLabel: {
+    fontSize: 11,
+    color: "#000",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  navLabelActive: {
+    fontSize: 11,
+    color: "#000",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  categoryScrollView: {
+    maxHeight: 50,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  categoryContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  categoryChipActive: {
+    backgroundColor: "#FF8C00",
+    borderColor: "#FF8C00",
+  },
+  categoryEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  categoryName: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#333",
+  },
+  categoryNameActive: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#666",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: "#FF8C00",
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  postCard: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  postImage: {
+    width: 100,
+    height: 120,
+    borderRadius: 10,
+    backgroundColor: "#F0F0F0",
+  },
+  postInfo: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: "space-between",
+  },
+  postHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  username: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    flex: 1,
+    marginRight: 8,
+  },
+  postRatingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF9E6",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  reviewText: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  orderButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF8C00",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignSelf: "flex-end",
+    gap: 4,
+  },
+  orderButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
 });

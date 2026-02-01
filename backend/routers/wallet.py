@@ -4,7 +4,7 @@ Wallet API endpoints
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 from database import get_database
 from routers.auth import get_current_user
@@ -124,3 +124,50 @@ async def redeem_for_delivery(current_user: dict = Depends(get_current_user)):
         "current_balance": wallet_balance,
         "discount_available": min(wallet_balance, 25)
     }
+
+
+@router.get("/unread-count")
+async def get_unread_wallet_count(current_user: dict = Depends(get_current_user)):
+    """
+    Get count of unread wallet notifications (new transactions since last viewed).
+    """
+
+    if current_user.get("account_type") == "restaurant":
+        return {"unread_count": 0}
+
+    db = get_database()
+    user_id = str(current_user["_id"])
+
+    # Get last viewed timestamp (default to 7 days ago if never viewed)
+    last_viewed = current_user.get("last_wallet_viewed")
+    if not last_viewed:
+        # Show transactions from last 7 days for first time users
+        last_viewed = datetime.utcnow() - timedelta(days=7)
+
+    # Count transactions since last viewed
+    unread_count = await db.wallet_transactions.count_documents({
+        "user_id": user_id,
+        "created_at": {"$gt": last_viewed}
+    })
+
+    return {"unread_count": unread_count}
+
+
+@router.post("/mark-viewed")
+async def mark_wallet_viewed(current_user: dict = Depends(get_current_user)):
+    """
+    Mark wallet as viewed (updates last_wallet_viewed timestamp).
+    Call this when user opens the wallet modal.
+    """
+
+    if current_user.get("account_type") == "restaurant":
+        return {"success": True}
+
+    db = get_database()
+
+    await db.users.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"last_wallet_viewed": datetime.utcnow()}}
+    )
+
+    return {"success": True}

@@ -31,6 +31,7 @@ from routers.restaurant_analytics import router as restaurant_analytics_router
 from routers.map import router as map_router
 from routers.grammar import router as grammar_router
 from routers.wallet import router as wallet_router
+from routers.user_profile import router as user_profile_router
 from utils.wallet_system import calculate_wallet_reward, process_wallet_reward, WalletRewardResult
 
 # Import utils
@@ -432,6 +433,7 @@ app.include_router(map_router)
 app.include_router(restaurant_analytics_router)
 app.include_router(grammar_router)
 app.include_router(wallet_router)
+app.include_router(user_profile_router)
 
 
 

@@ -34,10 +34,10 @@ async def create_notification(
 ):
     """
     Helper function to create a notification and optionally send push notification.
-    Types: "like", "comment", "follow", "new_post", "message", "compliment"
+    Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward"
     """
-    # Don't notify yourself
-    if from_user_id == to_user_id:
+    # Don't notify yourself (except for wallet rewards)
+    if from_user_id == to_user_id and notification_type != "wallet_reward":
         return None
     
     # Get from_user details
@@ -79,6 +79,8 @@ async def create_notification(
             message = f"{from_user['full_name']} sent you a compliment"
         elif notification_type == "story_like":
             message = f"{from_user['full_name']} liked your story"
+        elif notification_type == "wallet_reward":
+            message = "Congratulations! Wallet reward earned"
     
     notification_doc = {
         "type": notification_type,
@@ -137,6 +139,8 @@ async def create_notification(
                     title = "New Compliment"
                 elif notification_type == "story_like":
                     title = "Story Like"
+                elif notification_type == "wallet_reward":
+                    title = "Wallet Reward"
                 
                 await send_push_notification(
                     device_tokens=device_tokens,
