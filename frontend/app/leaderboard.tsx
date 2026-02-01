@@ -11,18 +11,43 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { LocationSelector } from "../components/LocationSelector";
 import { WalletBalanceModal } from "../components/WalletBalanceModal";
+import { OrderModal } from "../components/OrderModal";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import * as Location from "expo-location";
+import UserAvatar from "../components/UserAvatar";
+import { normalizeProfilePicture } from "../utils/imageUrlFix";
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = BACKEND_URL;
+
+// Fix URL helper function
+const fixUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  let cleaned = url.trim().replace(/([^:]\/)\/+/g, "$1");
+  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
+  return `${BACKEND_URL}${cleaned}`;
+};
+
+// Get profile picture from post with various field names
+const getPostDP = (post: any) =>
+  normalizeProfilePicture(
+    post.user_profile_picture ||
+    post.profile_picture ||
+    post.profile_picture_url ||
+    post.profile_pic ||
+    post.user_profile_pic ||
+    post.userProfilePicture ||
+    post.profilePicture
+  );
 
 // Dummy data for UI preview
 const DUMMY_RESTAURANTS = [
@@ -153,15 +178,59 @@ export default function LeaderboardScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const cachedNearbyPosts = useRef<any[]>([]);
+  const [postFilter, setPostFilter] = useState<string | null>(null);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filterCounts, setFilterCounts] = useState({
+    topRated: 0,
+    mostLoved: 0,
+    newest: 0,
+    disliked: 0,
+  });
+  const [fullImageModal, setFullImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   useEffect(() => {
     if (token) {
       fetchUserAddress();
       if (activeTab === "Near Me") {
         getCurrentLocation();
+      } else if (activeTab === "In Progress") {
+        fetchOrders();
       }
     }
   }, [token, activeTab]);
+
+  const fetchOrders = async () => {
+    if (!token) return;
+
+    setLoadingOrders(true);
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/orders/my-orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOrders(response.data || []);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const handleOrderClick = (post: any) => {
+    setSelectedPost(post);
+    setShowOrderModal(true);
+  };
+
+  const handleOrderPlaced = () => {
+    // Refresh orders when a new order is placed
+    if (activeTab === "In Progress") {
+      fetchOrders();
+    }
+  };
 
   const fetchUserAddress = async () => {
     try {
@@ -252,7 +321,7 @@ export default function LeaderboardScreen() {
 
     setLoadingPosts(true);
     try {
-      const url = `${API_URL}/map/pins?lat=${coords.latitude}&lng=${coords.longitude}&radius_km=10`;
+      const url = `${API_URL}/api/map/pins?lat=${coords.latitude}&lng=${coords.longitude}&radius_km=10`;
 
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token || ""}` },
@@ -261,11 +330,64 @@ export default function LeaderboardScreen() {
       const posts = response.data.posts || [];
       cachedNearbyPosts.current = posts;
       setNearbyPosts(posts);
+      calculateFilterCounts(posts);
     } catch (error) {
       console.log("Fetch nearby posts error:", error);
       Alert.alert("Error", "Failed to load nearby posts. Please try again.");
     } finally {
       setLoadingPosts(false);
+    }
+  };
+
+  const calculateFilterCounts = (posts: any[]) => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const counts = {
+      topRated: posts.filter((p) => p.rating && p.rating >= 9).length,
+      mostLoved: posts.filter((p) => (p.likes_count || 0) > 0).length,
+      newest: posts.filter((p) => {
+        const createdAt = p.created_at ? new Date(p.created_at) : null;
+        return createdAt && createdAt >= oneWeekAgo;
+      }).length,
+      disliked: posts.filter((p) => p.rating && p.rating < 6).length,
+    };
+
+    setFilterCounts(counts);
+  };
+
+  const getFilteredPosts = () => {
+    if (!postFilter) return nearbyPosts;
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    switch (postFilter) {
+      case 'topRated':
+        return nearbyPosts
+          .filter((p) => p.rating && p.rating >= 9)
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      case 'mostLoved':
+        return nearbyPosts
+          .filter((p) => (p.likes_count || 0) > 0)
+          .sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
+      case 'newest':
+        return nearbyPosts
+          .filter((p) => {
+            const createdAt = p.created_at ? new Date(p.created_at) : null;
+            return createdAt && createdAt >= oneWeekAgo;
+          })
+          .sort((a, b) => {
+            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return bDate - aDate;
+          });
+      case 'disliked':
+        return nearbyPosts
+          .filter((p) => p.rating && p.rating < 6)
+          .sort((a, b) => (a.rating || 0) - (b.rating || 0));
+      default:
+        return nearbyPosts;
     }
   };
 
@@ -546,9 +668,50 @@ export default function LeaderboardScreen() {
       >
         {activeTab === "Near Me" ? (
           <>
-            <Text style={styles.sectionTitle}>
-              {selectedCategory === "all" ? "Nearby Food Posts" : CATEGORIES.find(c => c.id === selectedCategory)?.name}
-            </Text>
+            {/* Filter Row */}
+            <View style={styles.filterRow}>
+              <Text style={styles.sectionTitle}>
+                {selectedCategory === "all" ? "Nearby Food Posts" : CATEGORIES.find(c => c.id === selectedCategory)?.name}
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.filterButton,
+                  postFilter && styles.filterButtonActive,
+                ]}
+                onPress={() => setFilterModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="filter"
+                  size={16}
+                  color={postFilter ? '#fff' : '#666'}
+                />
+                <Text
+                  style={[
+                    styles.filterButtonText,
+                    postFilter && styles.filterButtonTextActive,
+                  ]}
+                >
+                  {postFilter ?
+                    postFilter === 'topRated' ? 'Top Rated' :
+                    postFilter === 'mostLoved' ? 'Most Loved' :
+                    postFilter === 'newest' ? 'Newest' :
+                    postFilter === 'disliked' ? 'Disliked' : 'Filter'
+                    : 'Filter'}
+                </Text>
+                {postFilter && (
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setPostFilter(null);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close-circle" size={16} color="#fff" />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            </View>
 
             {loadingPosts ? (
               <View style={styles.loadingContainer}>
@@ -567,26 +730,44 @@ export default function LeaderboardScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              nearbyPosts.map((post) => (
-                <TouchableOpacity
-                  key={post.id}
-                  style={styles.postCard}
-                  onPress={() => router.push(`/post/${post.id}`)}
-                >
-                  <Image
-                    source={{ uri: post.thumbnail_url || post.media_url }}
-                    style={styles.postImage}
-                    resizeMode="cover"
-                  />
+              getFilteredPosts().map((post) => (
+                <View key={post.id} style={styles.postCard}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedImage(fixUrl(post.thumbnail_url || post.media_url));
+                      setFullImageModal(true);
+                    }}
+                    activeOpacity={0.9}
+                  >
+                    <Image
+                      source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+                      style={styles.postImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
 
-                  <View style={styles.postInfo}>
+                  <TouchableOpacity
+                    style={styles.postInfo}
+                    onPress={() => router.push(`/post/${post.id}`)}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.postHeader}>
-                      <Text style={styles.username} numberOfLines={1}>
-                        {post.username || "Anonymous"}
-                      </Text>
+                      <View style={styles.userInfoContainer}>
+                        <UserAvatar
+                          profilePicture={getPostDP(post)}
+                          username={post.username || "Anonymous"}
+                          size={40}
+                          showLevelBadge={true}
+                          level={post.user_level || post.level || 1}
+                          style={{}}
+                        />
+                        <Text style={styles.username} numberOfLines={1}>
+                          {post.username || "Anonymous"}
+                        </Text>
+                      </View>
                       {post.rating && (
                         <View style={styles.postRatingContainer}>
-                          <Ionicons name="star" size={14} color="#FFD700" />
+                          <Ionicons name="star" size={10} color="#FFD700" />
                           <Text style={styles.ratingText}>{post.rating}/10</Text>
                         </View>
                       )}
@@ -614,17 +795,87 @@ export default function LeaderboardScreen() {
 
                     <TouchableOpacity
                       style={styles.orderButton}
-                      onPress={() => {
-                        if (post.restaurant_name) {
-                          Alert.alert("Order", `Order from ${post.restaurant_name}?`);
-                        }
-                      }}
+                      onPress={() => handleOrderClick(post)}
                     >
                       <Text style={styles.orderButtonText}>Order</Text>
                       <Ionicons name="chevron-forward" size={16} color="#FFF" />
                     </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </>
+        ) : activeTab === "In Progress" ? (
+          <>
+            <Text style={styles.sectionTitle}>Your Orders</Text>
+            {loadingOrders ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF8C00" />
+                <Text style={styles.loadingText}>Loading your orders...</Text>
+              </View>
+            ) : orders.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="receipt-outline" size={64} color="#CCC" />
+                <Text style={styles.emptyText}>No orders yet</Text>
+                <Text style={styles.emptySubtext}>
+                  Order from nearby posts to see them here
+                </Text>
+              </View>
+            ) : (
+              orders.map((order) => (
+                <View key={order.id} style={styles.orderCard}>
+                  {order.post_media_url && (
+                    <Image
+                      source={{ uri: fixUrl(order.post_media_url) }}
+                      style={styles.orderImage}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <View style={styles.orderInfo}>
+                    <View style={styles.orderHeader}>
+                      <Text style={styles.orderDishName}>{order.dish_name}</Text>
+                      <View style={[
+                        styles.orderStatusBadge,
+                        order.status === "completed" && styles.orderStatusCompleted,
+                        order.status === "cancelled" && styles.orderStatusCancelled,
+                      ]}>
+                        <Text style={styles.orderStatusText}>
+                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {order.restaurant_name && (
+                      <View style={styles.orderRestaurantRow}>
+                        <Ionicons name="restaurant" size={14} color="#666" />
+                        <Text style={styles.orderRestaurantName}>
+                          {order.restaurant_name}
+                        </Text>
+                      </View>
+                    )}
+
+                    {order.post_location && (
+                      <View style={styles.orderLocationRow}>
+                        <Ionicons name="location" size={14} color="#4CAF50" />
+                        <Text style={styles.orderLocationText}>{order.post_location}</Text>
+                      </View>
+                    )}
+
+                    {order.suggestions && (
+                      <Text style={styles.orderSuggestions} numberOfLines={2}>
+                        Note: {order.suggestions}
+                      </Text>
+                    )}
+
+                    <Text style={styles.orderTime}>
+                      {new Date(order.created_at).toLocaleDateString()} at{" "}
+                      {new Date(order.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
                   </View>
-                </TouchableOpacity>
+                </View>
               ))
             )}
           </>
@@ -637,6 +888,199 @@ export default function LeaderboardScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Full Image Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={fullImageModal}
+        onRequestClose={() => setFullImageModal(false)}
+      >
+        <View style={styles.fullImageModalOverlay}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setFullImageModal(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close-circle" size={36} color="#FFF" />
+          </TouchableOpacity>
+          <Image
+            source={{ uri: selectedImage || "" }}
+            style={styles.fullImage}
+            resizeMode="contain"
+          />
+        </View>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={filterModalVisible}
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.filterModalOverlay}
+          activeOpacity={1}
+          onPress={() => setFilterModalVisible(false)}
+        >
+          <View style={styles.filterModalContent}>
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Filter Posts</Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Top Rated */}
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                postFilter === 'topRated' && styles.filterOptionSelected,
+              ]}
+              onPress={() => {
+                setPostFilter('topRated');
+                setFilterModalVisible(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionIcon, { backgroundColor: '#FFF9E6' }]}>
+                  <Ionicons name="star" size={20} color="#F2CF68" />
+                </View>
+                <View>
+                  <Text style={styles.filterOptionText}>Top Rated</Text>
+                  <Text style={styles.filterOptionSubtext}>9+ stars</Text>
+                </View>
+              </View>
+              <Text
+                style={[
+                  styles.filterOptionCount,
+                  postFilter === 'topRated' && styles.filterOptionCountSelected,
+                ]}
+              >
+                {filterCounts.topRated}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Most Loved */}
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                postFilter === 'mostLoved' && styles.filterOptionSelected,
+              ]}
+              onPress={() => {
+                setPostFilter('mostLoved');
+                setFilterModalVisible(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionIcon, { backgroundColor: '#FFEEEE' }]}>
+                  <Ionicons name="heart" size={20} color="#E94A37" />
+                </View>
+                <View>
+                  <Text style={styles.filterOptionText}>Most Loved</Text>
+                  <Text style={styles.filterOptionSubtext}>Highest likes</Text>
+                </View>
+              </View>
+              <Text
+                style={[
+                  styles.filterOptionCount,
+                  postFilter === 'mostLoved' && styles.filterOptionCountSelected,
+                ]}
+              >
+                {filterCounts.mostLoved}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Newest */}
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                postFilter === 'newest' && styles.filterOptionSelected,
+              ]}
+              onPress={() => {
+                setPostFilter('newest');
+                setFilterModalVisible(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionIcon, { backgroundColor: '#E8F5E9' }]}>
+                  <Ionicons name="time" size={20} color="#4CAF50" />
+                </View>
+                <View>
+                  <Text style={styles.filterOptionText}>Newest</Text>
+                  <Text style={styles.filterOptionSubtext}>Last 7 days</Text>
+                </View>
+              </View>
+              <Text
+                style={[
+                  styles.filterOptionCount,
+                  postFilter === 'newest' && styles.filterOptionCountSelected,
+                ]}
+              >
+                {filterCounts.newest}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Disliked */}
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                postFilter === 'disliked' && styles.filterOptionSelected,
+              ]}
+              onPress={() => {
+                setPostFilter('disliked');
+                setFilterModalVisible(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionIcon, { backgroundColor: '#FFF3E0' }]}>
+                  <Ionicons name="thumbs-down" size={20} color="#FF9800" />
+                </View>
+                <View>
+                  <Text style={styles.filterOptionText}>Disliked</Text>
+                  <Text style={styles.filterOptionSubtext}>Below 6 stars</Text>
+                </View>
+              </View>
+              <Text
+                style={[
+                  styles.filterOptionCount,
+                  postFilter === 'disliked' && styles.filterOptionCountSelected,
+                ]}
+              >
+                {filterCounts.disliked}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Clear Filter Button */}
+            {postFilter && (
+              <TouchableOpacity
+                style={styles.clearFilterButton}
+                onPress={() => {
+                  setPostFilter(null);
+                  setFilterModalVisible(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.clearFilterText}>Clear Filter</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Order Modal */}
+      <OrderModal
+        visible={showOrderModal}
+        onClose={() => setShowOrderModal(false)}
+        post={selectedPost}
+        token={token || ""}
+        onOrderPlaced={handleOrderPlaced}
+      />
 
       {/* Bottom Navigation */}
       <View style={styles.navBar}>
@@ -747,6 +1191,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 20,
     marginRight: 8,
+    flexShrink: 0,
   },
   activeTab: {
     overflow: "hidden",
@@ -755,6 +1200,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 20,
+    flexShrink: 0,
   },
   tabText: {
     fontSize: 14,
@@ -762,11 +1208,13 @@ const styles = StyleSheet.create({
     color: "#666",
     paddingHorizontal: 14,
     paddingVertical: 8,
+    flexShrink: 0,
   },
   activeTabText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
+    flexShrink: 0,
   },
   scrollView: {
     flex: 1,
@@ -828,10 +1276,10 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   ratingText: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "600",
-    color: "#FF8C00",
-    marginRight: 4,
+    color: "#FFFFFF",
+    marginRight: 2,
   },
   reviewsText: {
     fontSize: 13,
@@ -1006,6 +1454,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderWidth: 1,
     borderColor: "#E0E0E0",
+    flexShrink: 0,
   },
   categoryChipActive: {
     backgroundColor: "#FF8C00",
@@ -1014,11 +1463,13 @@ const styles = StyleSheet.create({
   categoryEmoji: {
     fontSize: 16,
     marginRight: 6,
+    flexShrink: 0,
   },
   categoryName: {
     fontSize: 13,
     fontWeight: "500",
     color: "#333",
+    flexShrink: 0,
   },
   categoryNameActive: {
     color: "#FFFFFF",
@@ -1091,21 +1542,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 6,
   },
+  userInfoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 8,
+    gap: 10,
+  },
   username: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
     color: "#1A1A1A",
     flex: 1,
-    marginRight: 8,
   },
   postRatingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF9E6",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    backgroundColor: "#FF3B30",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
   },
   reviewText: {
     fontSize: 13,
@@ -1128,5 +1585,227 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+  filterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  filterButtonActive: {
+    backgroundColor: "#FF8C00",
+    borderColor: "#FF8C00",
+  },
+  filterButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#666",
+  },
+  filterButtonTextActive: {
+    color: "#FFFFFF",
+  },
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  filterModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "70%",
+  },
+  filterModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  filterModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#222",
+  },
+  filterOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: "#F8F8F8",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  filterOptionSelected: {
+    backgroundColor: "#FFF9E6",
+    borderColor: "#FF8C00",
+  },
+  filterOptionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  filterOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterOptionText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#222",
+  },
+  filterOptionSubtext: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 2,
+  },
+  filterOptionCount: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#999",
+  },
+  filterOptionCountSelected: {
+    color: "#FF8C00",
+  },
+  clearFilterButton: {
+    backgroundColor: "#FF8C00",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  clearFilterText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
+  fullImageModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeButton: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 50 : StatusBar.currentHeight! + 10,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 18,
+  },
+  fullImage: {
+    width: "100%",
+    height: "100%",
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  orderCard: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  orderImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: "#F0F0F0",
+  },
+  orderInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  orderHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  orderDishName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    flex: 1,
+    marginRight: 8,
+  },
+  orderStatusBadge: {
+    backgroundColor: "#FF8C00",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  orderStatusCompleted: {
+    backgroundColor: "#4CAF50",
+  },
+  orderStatusCancelled: {
+    backgroundColor: "#999",
+  },
+  orderStatusText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  orderRestaurantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  orderRestaurantName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginLeft: 6,
+  },
+  orderLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  orderLocationText: {
+    fontSize: 13,
+    color: "#666",
+    marginLeft: 6,
+  },
+  orderSuggestions: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+    marginBottom: 6,
+  },
+  orderTime: {
+    fontSize: 11,
+    color: "#999",
+    marginTop: 4,
   },
 });
