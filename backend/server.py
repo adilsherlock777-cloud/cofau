@@ -352,34 +352,19 @@ os.makedirs("static/uploads/restaurants", exist_ok=True)
 PARTNER_DASHBOARD_DIR = os.path.join(BASE_DIR, "static", "partner-dashboard")
 os.makedirs(PARTNER_DASHBOARD_DIR, exist_ok=True)
 
-# ✅ CRITICAL: Mount static assets BEFORE catch-all route
-# This ensures /orders/assets/* requests are served by StaticFiles before
-# the catch-all route can intercept them
+# ✅ Mount static assets for partner dashboard (CSS, JS, images)
 try:
     app.mount("/orders/assets", StaticFiles(directory=os.path.join(PARTNER_DASHBOARD_DIR, "assets")), name="partner-assets")
     print(f"✅ Mounted partner dashboard assets at /orders/assets")
 except Exception as e:
     print(f"⚠️ Could not mount partner dashboard assets: {e}")
 
-# Serve partner dashboard SPA at /orders
-@app.get("/orders/{full_path:path}", response_class=HTMLResponse)
-async def serve_partner_dashboard(full_path: str):
-    """Serve the partner dashboard SPA"""
-    # For the root /orders route or any sub-routes, serve index.html
-    # This allows React Router to handle client-side routing
-    dashboard_index = os.path.join(PARTNER_DASHBOARD_DIR, "index.html")
-
-    if os.path.exists(dashboard_index):
-        return FileResponse(dashboard_index)
-    else:
-        return HTMLResponse(
-            content="<h1>Partner Dashboard Not Found</h1><p>Please build the dashboard first.</p>",
-            status_code=404
-        )
-
+# ✅ Serve partner dashboard SPA at /orders root only
+# NOTE: No catch-all route needed - React Router handles all client-side routing
+# The mount above will serve assets, and this route serves the HTML
 @app.get("/orders", response_class=HTMLResponse)
 async def serve_partner_dashboard_root():
-    """Serve the partner dashboard SPA at root /orders"""
+    """Serve the partner dashboard SPA at /orders (React Router handles client-side routing)"""
     dashboard_index = os.path.join(PARTNER_DASHBOARD_DIR, "index.html")
 
     if os.path.exists(dashboard_index):
