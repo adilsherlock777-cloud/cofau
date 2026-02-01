@@ -39,6 +39,9 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Export manager for use in other routers (e.g., orders)
+__all__ = ['router', 'manager']
+
 async def get_user_id_from_token(token: str) -> str:
     """Get user_id from JWT token by decoding and looking up user in database"""
     if not token:

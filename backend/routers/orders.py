@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect, status as http_status
 from datetime import datetime
 from bson import ObjectId
 from database import get_database
@@ -7,6 +7,10 @@ from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
+
+# Import WebSocket manager from chat router for real-time updates
+from routers.chat import manager as websocket_manager
+from utils.jwt import decode_access_token
 
 # Partner PIN (hardcoded for now - can be moved to env later)
 PARTNER_PIN = "1234"
@@ -366,12 +370,13 @@ async def update_order_status_partner(
         raise HTTPException(status_code=404, detail="Order not found")
 
     # Update the order status
+    now = datetime.utcnow()
     result = await db.orders.update_one(
         {"_id": ObjectId(order_id)},
         {
             "$set": {
                 "status": status,
-                "updated_at": datetime.utcnow()
+                "updated_at": now
             }
         }
     )
@@ -381,9 +386,112 @@ async def update_order_status_partner(
 
     print(f"✅ Partner updated order {order_id} to {status}")
 
+    # Send real-time WebSocket update to the customer
+    user_id = order.get("user_id")
+    if user_id:
+        try:
+            await websocket_manager.send_personal_message(user_id, {
+                "type": "order_status_update",
+                "order_id": order_id,
+                "status": status,
+                "updated_at": now.isoformat() + "Z"
+            })
+            print(f"📡 Sent WebSocket update to user {user_id} for order {order_id}")
+        except Exception as e:
+            print(f"⚠️ Failed to send WebSocket update: {str(e)}")
+
     return {
         "success": True,
         "message": f"Order status updated to {status}",
         "order_id": order_id,
         "status": status
     }
+
+
+async def get_user_id_from_token(token: str) -> str:
+    """Get user_id from JWT token by decoding and looking up user in database"""
+    if not token:
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+
+    try:
+        payload = decode_access_token(token)
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Invalid token: no email in payload")
+
+        db = get_database()
+        user = await db.users.find_one({"email": email})
+        if not user:
+            raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+        return str(user["_id"])
+    except ValueError as e:
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail=f"Token validation failed: {str(e)}")
+
+
+@router.websocket("/ws")
+async def orders_websocket(websocket: WebSocket):
+    """WebSocket endpoint for real-time order status updates"""
+    print(f"🔗 Order WebSocket connection attempt")
+
+    try:
+        await websocket.accept()
+        print(f"✅ Order WebSocket connection accepted")
+    except Exception as e:
+        print(f"❌ Failed to accept WebSocket: {str(e)}")
+        return
+
+    token = websocket.query_params.get("token")
+    if not token:
+        print(f"❌ No token provided")
+        await websocket.close(code=http_status.WS_1008_POLICY_VIOLATION, reason="Missing token")
+        return
+
+    try:
+        user_id = await get_user_id_from_token(token)
+        print(f"✅ Authenticated user for orders WebSocket: {user_id}")
+    except HTTPException as e:
+        print(f"❌ WebSocket auth error: {e.detail}")
+        await websocket.close(code=http_status.WS_1008_POLICY_VIOLATION, reason=e.detail)
+        return
+    except Exception as e:
+        print(f"❌ WebSocket error: {str(e)}")
+        await websocket.close(code=http_status.WS_1011_INTERNAL_ERROR, reason="Internal server error")
+        return
+
+    try:
+        await websocket_manager.connect(user_id, websocket)
+        print(f"✅ Order WebSocket connected for user {user_id}")
+
+        # Send initial connection success message
+        await websocket.send_json({
+            "type": "connected",
+            "message": "Connected to order updates"
+        })
+
+        # Keep connection alive and listen for messages
+        while True:
+            try:
+                # Receive any messages from client (e.g., ping/pong for keep-alive)
+                data = await websocket.receive_json()
+                # Echo back if it's a ping
+                if data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except WebSocketDisconnect:
+                raise
+            except Exception as e:
+                print(f"❌ Error processing WebSocket message: {str(e)}")
+                continue
+
+    except WebSocketDisconnect:
+        print(f"🔌 Order WebSocket disconnected: {user_id}")
+        websocket_manager.disconnect(user_id, websocket)
+    except Exception as e:
+        print(f"❌ Order WebSocket error: {str(e)}")
+        websocket_manager.disconnect(user_id, websocket)
+        try:
+            await websocket.close(code=http_status.WS_1011_INTERNAL_ERROR, reason=str(e))
+        except:
+            pass

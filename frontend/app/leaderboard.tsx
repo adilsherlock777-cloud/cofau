@@ -190,7 +190,8 @@ export default function LeaderboardScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any>(null);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [activeOrders, setActiveOrders] = useState<any[]>([]); // pending, confirmed, preparing, ready
+  const [completedOrders, setCompletedOrders] = useState<any[]>([]); // completed, cancelled
   const [loadingOrders, setLoadingOrders] = useState(false);
 
   useEffect(() => {
@@ -198,7 +199,7 @@ export default function LeaderboardScreen() {
       fetchUserAddress();
       if (activeTab === "Near Me") {
         getCurrentLocation();
-      } else if (activeTab === "In Progress") {
+      } else if (activeTab === "In Progress" || activeTab === "Your Orders") {
         fetchOrders();
       }
     }
@@ -212,7 +213,18 @@ export default function LeaderboardScreen() {
       const response = await axios.get(`${BACKEND_URL}/api/orders/my-orders`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setOrders(response.data || []);
+      const allOrders = response.data || [];
+
+      // Separate active and completed orders
+      const active = allOrders.filter((order: any) =>
+        ['pending', 'confirmed', 'preparing', 'ready'].includes(order.status)
+      );
+      const completed = allOrders.filter((order: any) =>
+        ['completed', 'cancelled'].includes(order.status)
+      );
+
+      setActiveOrders(active);
+      setCompletedOrders(completed);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {
@@ -227,10 +239,92 @@ export default function LeaderboardScreen() {
 
   const handleOrderPlaced = () => {
     // Refresh orders when a new order is placed
-    if (activeTab === "In Progress") {
-      fetchOrders();
-    }
+    fetchOrders();
   };
+
+  // WebSocket connection for real-time order updates
+  useEffect(() => {
+    if (!token) return;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connectWebSocket = () => {
+      try {
+        const wsUrl = BACKEND_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+        ws = new WebSocket(`${wsUrl}/api/orders/ws?token=${token}`);
+
+        ws.onopen = () => {
+          console.log('📡 Connected to order updates WebSocket');
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('📨 Received WebSocket message:', data);
+
+            if (data.type === 'order_status_update') {
+              const newStatus = data.status;
+              const isCompleted = ['completed', 'cancelled'].includes(newStatus);
+
+              if (isCompleted) {
+                // Move order from active to completed
+                setActiveOrders((prevActive: any[]) => {
+                  const orderToMove = prevActive.find((order: any) => order.id === data.order_id);
+                  if (orderToMove) {
+                    const updatedOrder = { ...orderToMove, status: newStatus, updated_at: data.updated_at };
+                    // Add to completed orders
+                    setCompletedOrders((prevCompleted: any[]) => [updatedOrder, ...prevCompleted]);
+                  }
+                  // Remove from active orders
+                  return prevActive.filter((order: any) => order.id !== data.order_id);
+                });
+              } else {
+                // Update status within active orders (pending → confirmed → preparing → ready)
+                setActiveOrders((prevOrders: any[]) =>
+                  prevOrders.map((order: any) =>
+                    order.id === data.order_id
+                      ? { ...order, status: newStatus, updated_at: data.updated_at }
+                      : order
+                  )
+                );
+              }
+
+              console.log(`✅ Updated order ${data.order_id} to status: ${newStatus}`);
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('❌ WebSocket error:', error);
+        };
+
+        ws.onclose = () => {
+          console.log('🔌 WebSocket disconnected, reconnecting in 5s...');
+          // Reconnect after 5 seconds
+          reconnectTimeout = setTimeout(() => {
+            connectWebSocket();
+          }, 5000);
+        };
+      } catch (error) {
+        console.error('Failed to connect WebSocket:', error);
+      }
+    };
+
+    connectWebSocket();
+
+    // Cleanup on unmount
+    return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [token]);
 
   const fetchUserAddress = async () => {
     try {
@@ -807,22 +901,96 @@ export default function LeaderboardScreen() {
           </>
         ) : activeTab === "In Progress" ? (
           <>
-            <Text style={styles.sectionTitle}>Your Orders</Text>
+            <Text style={styles.sectionTitle}>Orders In Progress</Text>
             {loadingOrders ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#FF8C00" />
                 <Text style={styles.loadingText}>Loading your orders...</Text>
               </View>
-            ) : orders.length === 0 ? (
+            ) : activeOrders.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="receipt-outline" size={64} color="#CCC" />
-                <Text style={styles.emptyText}>No orders yet</Text>
+                <Text style={styles.emptyText}>No active orders</Text>
                 <Text style={styles.emptySubtext}>
                   Order from nearby posts to see them here
                 </Text>
               </View>
             ) : (
-              orders.map((order) => (
+              activeOrders.map((order) => (
+                <View key={order.id} style={styles.orderCard}>
+                  {order.post_media_url && (
+                    <Image
+                      source={{ uri: fixUrl(order.post_media_url) }}
+                      style={styles.orderImage}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <View style={styles.orderInfo}>
+                    <View style={styles.orderHeader}>
+                      <Text style={styles.orderDishName}>{order.dish_name}</Text>
+                      <View style={[
+                        styles.orderStatusBadge,
+                        order.status === "completed" && styles.orderStatusCompleted,
+                        order.status === "cancelled" && styles.orderStatusCancelled,
+                      ]}>
+                        <Text style={styles.orderStatusText}>
+                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {order.restaurant_name && (
+                      <View style={styles.orderRestaurantRow}>
+                        <Ionicons name="restaurant" size={14} color="#666" />
+                        <Text style={styles.orderRestaurantName}>
+                          {order.restaurant_name}
+                        </Text>
+                      </View>
+                    )}
+
+                    {order.post_location && (
+                      <View style={styles.orderLocationRow}>
+                        <Ionicons name="location" size={14} color="#4CAF50" />
+                        <Text style={styles.orderLocationText}>{order.post_location}</Text>
+                      </View>
+                    )}
+
+                    {order.suggestions && (
+                      <Text style={styles.orderSuggestions} numberOfLines={2}>
+                        Note: {order.suggestions}
+                      </Text>
+                    )}
+
+                    <Text style={styles.orderTime}>
+                      {new Date(order.created_at).toLocaleDateString()} at{" "}
+                      {new Date(order.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </>
+        ) : activeTab === "Your Orders" ? (
+          <>
+            <Text style={styles.sectionTitle}>Order History</Text>
+            {loadingOrders ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF8C00" />
+                <Text style={styles.loadingText}>Loading your orders...</Text>
+              </View>
+            ) : completedOrders.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="checkmark-done-circle-outline" size={64} color="#CCC" />
+                <Text style={styles.emptyText}>No completed orders</Text>
+                <Text style={styles.emptySubtext}>
+                  Completed and cancelled orders will appear here
+                </Text>
+              </View>
+            ) : (
+              completedOrders.map((order) => (
                 <View key={order.id} style={styles.orderCard}>
                   {order.post_media_url && (
                     <Image
