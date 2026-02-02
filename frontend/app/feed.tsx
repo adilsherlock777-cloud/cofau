@@ -1077,25 +1077,6 @@ const renderPost = useCallback(
 
       <View style={styles.menuDivider} />
 
-      {/* Add Menu - Only for Restaurant Users */}
-      {accountType === 'restaurant' && (
-        <>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              setShowAddMenu(false);
-              router.push({ pathname: "/add-post", params: { mode: 'menu' } });
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="list-outline" size={24} color="#333" />
-            <Text style={styles.menuItemText}>Add Menu </Text>
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-        </>
-      )}
-
       <TouchableOpacity
         style={styles.menuItem}
         onPress={() => {

@@ -26,6 +26,7 @@ import LevelBadge from '../components/LevelBadge';
 import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
+import { MenuUploadModal } from '../components/MenuUploadModal';
 import { sendCompliment, getFollowers } from '../utils/api';
 //import auth from '@react-native-firebase/auth';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -404,6 +405,7 @@ export default function ProfileScreen() {
   const [expandedMenuCategories, setExpandedMenuCategories] = useState<{ [key: string]: boolean }>({});
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
+  const [menuUploadModalVisible, setMenuUploadModalVisible] = useState(false);
   const [isRestaurantProfile, setIsRestaurantProfile] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<string | null>(null);
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
@@ -538,18 +540,23 @@ useEffect(() => {
     });
   }, [isOwnProfile, settingsModalVisible, userData]);
 
+  // Fetch restaurant menu items from AI-extracted menu
   const fetchMenuItems = async () => {
-     if (!userData?.id) return;
-     try {
-       const response = await axios.get(
-         `${API_URL}/restaurant/posts/menu/${userData.id}`
-       );
-       setMenuItems(response.data || []);
-     } catch (err) {
-       console.error('Error fetching menu items:', err);
-       setMenuItems([]);
-     }
-   };
+    if (!userData?.id) return;
+    try {
+      const response = await axios.get(
+        `${BACKEND_URL}/api/restaurant/menu/${userData.id}/public`
+      );
+      console.log('✅ Menu items fetched:', response.data);
+      setMenuItems(response.data.items || []);
+    } catch (err: any) {
+      console.error('❌ Error fetching menu:', err.response?.data || err.message);
+      // Don't show error if menu is just empty (404)
+      if (err.response?.status !== 404) {
+        setMenuItems([]);
+      }
+    }
+  };
 
 const fetchRestaurantReviews = async () => {
   if (!userData?.id) return;
@@ -1776,7 +1783,7 @@ const removeBannerImage = async () => {
 const renderMenuByCategory = () => {
   // Group menu items by category
   const menuByCategory: { [key: string]: any[] } = {};
-  
+
   menuItems.forEach((item) => {
     const category = item.category || 'Other';
     if (!menuByCategory[category]) {
@@ -1803,69 +1810,55 @@ const renderMenuByCategory = () => {
     <View style={styles.favouriteContainer}>
       {sortedCategories.map(([category, items]) => {
         const isExpanded = expandedMenuCategories[category] || false;
-        
+
         return (
-          <View key={category} style={styles.locationSection}>
+          <View key={category} style={styles.menuCategorySection}>
             {/* Category Header */}
             <TouchableOpacity
-              style={styles.locationHeader}
+              style={styles.menuCategoryHeader}
               onPress={() => toggleMenuCategory(category)}
               activeOpacity={0.7}
             >
-              <View style={styles.locationHeaderLeft}>
-                <Ionicons name="restaurant" size={20} color="#F2CF68" />
-                <Text style={styles.locationName}>{category}</Text>
+              <View style={styles.menuCategoryHeaderLeft}>
+                <Ionicons name="restaurant" size={20} color="#FF8C00" />
+                <Text style={styles.menuCategoryName}>{category}</Text>
               </View>
-              <View style={styles.locationHeaderRight}>
-                <Text style={styles.locationCount}>({items.length})</Text>
-                <Ionicons 
-                  name={isExpanded ? "chevron-up" : "chevron-down"} 
-                  size={20} 
-                  color="#666" 
+              <View style={styles.menuCategoryHeaderRight}>
+                <Text style={styles.menuItemCount}>({items.length})</Text>
+                <Ionicons
+                  name={isExpanded ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color="#666"
                 />
               </View>
             </TouchableOpacity>
 
-            {/* Menu Items Grid - Show when expanded */}
+            {/* Menu Items List - Show when expanded */}
             {isExpanded && (
-              <View style={styles.locationPostsGrid}>
-                {items.map((item) => {
-  const mediaUrl = fixUrl(item.media_url);
-
-  return (
-    <TouchableOpacity
-      key={item.id}
-      style={styles.favouriteGridItem}
-      activeOpacity={0.8}
-    >
-      {mediaUrl ? (
-        <View style={styles.favouriteGridImageContainer}>
-          <Image 
-            source={{ uri: mediaUrl }} 
-            style={styles.favouriteGridImage} 
-            resizeMode="cover"
-          />
-          {/* Price Badge */}
-          {item.price && (
-            <View style={restaurantStyles.menuPriceBadge}>
-              <Text style={restaurantStyles.menuPriceText}>₹{item.price}</Text>
-            </View>
-          )}
-        </View>
-      ) : (
-        <View style={styles.gridPlaceholder}>
-          <Ionicons name="restaurant-outline" size={40} color="#ccc" />
-          {/* Price Badge on placeholder */}
-          {item.price && (
-            <View style={restaurantStyles.menuPriceBadge}>
-              <Text style={restaurantStyles.menuPriceText}>₹{item.price}</Text>
-            </View>
-          )}
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-})}
+              <View style={styles.menuItemsList}>
+                {items.map((item, index) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.menuItemRow,
+                      index === items.length - 1 && styles.menuItemRowLast
+                    ]}
+                  >
+                    <View style={styles.menuItemInfo}>
+                      <Text style={styles.menuItemName}>{item.name}</Text>
+                      {item.description && (
+                        <Text style={styles.menuItemDescription} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      )}
+                    </View>
+                    {item.price && (
+                      <View style={styles.menuItemPriceContainer}>
+                        <Text style={styles.menuItemPrice}>₹{item.price}</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
               </View>
             )}
           </View>
@@ -2596,17 +2589,38 @@ const renderRestaurantProfile = () => {
 )}
 
         {restaurantActiveTab === 'menu' && (
-  menuItems.length > 0 ? (
-    renderMenuByCategory()
-  ) : (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="restaurant-outline" size={64} color="#ccc" />
-      <Text style={styles.emptyText}>Menu coming soon</Text>
-      <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
-        Menu items will appear here
-      </Text>
-    </View>
-  )
+  <>
+    {menuItems.length > 0 ? (
+      renderMenuByCategory()
+    ) : (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="restaurant-outline" size={64} color="#ccc" />
+        <Text style={styles.emptyText}>Menu coming soon</Text>
+        <Text style={[styles.emptyText, { fontSize: 12, marginTop: 8 }]}>
+          Menu items will appear here
+        </Text>
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.uploadMenuButton}
+            onPress={() => setMenuUploadModalVisible(true)}
+          >
+            <Ionicons name="cloud-upload-outline" size={20} color="#FFF" />
+            <Text style={styles.uploadMenuButtonText}>Upload Menu</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )}
+
+    {/* Upload Button - Floating */}
+    {isOwnProfile && menuItems.length > 0 && (
+      <TouchableOpacity
+        style={styles.floatingUploadButton}
+        onPress={() => setMenuUploadModalVisible(true)}
+      >
+        <Ionicons name="add" size={28} color="#FFF" />
+      </TouchableOpacity>
+    )}
+  </>
 )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -4430,6 +4444,17 @@ if (isRestaurantProfile) {
         loading={sendingCompliment}
       />
 
+      {/* ================= MENU UPLOAD MODAL ================= */}
+      <MenuUploadModal
+        visible={menuUploadModalVisible}
+        onClose={() => setMenuUploadModalVisible(false)}
+        token={token || ''}
+        onSuccess={() => {
+          fetchMenuItems();
+          setMenuUploadModalVisible(false);
+        }}
+      />
+
       {/* ================= DELETE POST MODAL ================= */}
       <Modal
         animationType="slide"
@@ -5692,6 +5717,124 @@ favouriteGridImage: {
   width: '100%',
   height: '100%',
 },
+
+  // Menu Tab Styles
+  menuCategorySection: {
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  menuCategoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#FAFAFA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  menuCategoryHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuCategoryName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginLeft: 10,
+  },
+  menuCategoryHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  menuItemCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#999',
+  },
+  menuItemsList: {
+    paddingVertical: 8,
+  },
+  menuItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  menuItemRowLast: {
+    borderBottomWidth: 0,
+  },
+  menuItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  menuItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  menuItemDescription: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  menuItemPriceContainer: {
+    backgroundColor: '#FFF9E6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFE4A0',
+  },
+  menuItemPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FF8C00',
+  },
+  uploadMenuButton: {
+    marginTop: 20,
+    backgroundColor: '#FF8C00',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  uploadMenuButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  floatingUploadButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 80,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FF8C00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
 
   // Sidebar Styles
   sidebarOverlay: {

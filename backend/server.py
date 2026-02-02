@@ -34,6 +34,7 @@ from routers.wallet import router as wallet_router
 from routers.user_profile import router as user_profile_router
 from routers.places import router as places_router
 from routers.orders import router as orders_router
+from routers.menu import router as menu_router
 from utils.wallet_system import calculate_wallet_reward, process_wallet_reward, WalletRewardResult
 
 # Import utils
@@ -467,6 +468,7 @@ app.include_router(wallet_router)
 app.include_router(user_profile_router)
 app.include_router(places_router)
 app.include_router(orders_router)
+app.include_router(menu_router)
 
 
 
