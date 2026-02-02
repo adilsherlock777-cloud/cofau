@@ -13,7 +13,7 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
       PYTHONUNBUFFERED: '1',
-      GOOGLE_GEMINI_API_KEY: 'AIzaSyBpzW_w0s7BK0zfQb3KeP_uqgSUxBATh44',
+      GOOGLE_GEMINI_API_KEY: 'AIzaSyBo2pwhYdspCmkY_GrGnawl4bxMM9SplfI',
       MONGO_URL: 'mongodb+srv://moinmisba92:quickSell%40121@quicksellify.mdhrm.mongodb.net/quickSellify?retryWrites=true&w=majority&appName=quickSellify',
       SECRET_KEY: 'your-secret-key-change-in-production-12345678',
       SIGHTENGINE_API_USER: '144214407',
