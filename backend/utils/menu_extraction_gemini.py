@@ -24,7 +24,7 @@ class MenuExtractionService:
 
     def __init__(self):
         # Use Gemini 1.5 Flash - Fast, cheap, and excellent for vision tasks
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
     async def extract_menu_items(self, image_urls: List[str]) -> List[MenuItem]:
         """

@@ -44,7 +44,7 @@ except Exception as e:
 # Test 4: Test API with simple text prompt
 print("\n4. Testing API with simple prompt...")
 try:
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
     response = model.generate_content("Hello! Just testing the API. Reply with 'OK'.")
     print(f"   ✅ API test successful!")
     print(f"   Response: {response.text[:100]}")
