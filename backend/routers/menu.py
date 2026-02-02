@@ -18,7 +18,7 @@ from models.menu import (
 )
 from utils.menu_extraction_gemini import menu_extraction_service
 from routers.restaurant_auth import get_current_restaurant
-from database import db
+from database import get_database
 
 router = APIRouter(prefix="/api/restaurant/menu", tags=["Menu Management"])
 
@@ -40,6 +40,7 @@ async def upload_menu_images(
     - Returns extracted items with confidence scores
     - Flags items that need manual review
     """
+    db = get_database()
     restaurant_id = str(current_restaurant["_id"])
 
     # Generate extraction ID for this batch
@@ -120,6 +121,7 @@ async def get_pending_items(
     - Optionally filter by extraction_id (specific upload batch)
     - Includes confidence scores and flags for items needing review
     """
+    db = get_database()
     restaurant_id = str(current_restaurant["_id"])
 
     query = {
@@ -167,6 +169,7 @@ async def update_menu_item(
     - Update name, price, category, or description
     - Mark item as reviewed by setting needs_review to False
     """
+    db = get_database()
     restaurant_id = str(current_restaurant["_id"])
 
     # Find the item
@@ -230,6 +233,7 @@ async def delete_menu_item(
     - Remove incorrectly extracted items
     - Can only delete items belonging to the authenticated restaurant
     """
+    db = get_database()
     restaurant_id = str(current_restaurant["_id"])
 
     result = await db.menu_items.delete_one({
@@ -255,6 +259,7 @@ async def publish_menu(
     - Makes them visible on the restaurant's public menu
     - Can publish all or selected items
     """
+    db = get_database()
     restaurant_id = str(current_restaurant["_id"])
 
     # Update status of selected items
@@ -289,6 +294,7 @@ async def publish_all_pending(
     - Approves all items with status "pending"
     - Quick way to publish entire extracted menu
     """
+    db = get_database()
     restaurant_id = str(current_restaurant["_id"])
 
     result = await db.menu_items.update_many(
@@ -320,6 +326,7 @@ async def get_restaurant_menu(restaurant_id: str):
     - No authentication required
     - Grouped by categories
     """
+    db = get_database()
     # Get restaurant details - try both ObjectId and string format
     try:
         restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
@@ -395,6 +402,7 @@ async def get_menu_stats(
     - Items needing review
     - Categories breakdown
     """
+    db = get_database()
     restaurant_id = str(current_restaurant["_id"])
 
     # Count by status
