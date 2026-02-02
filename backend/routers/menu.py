@@ -78,6 +78,15 @@ async def upload_menu_images(
     # Save extracted items to database
     items_to_insert = []
     for idx, item in enumerate(extracted_items):
+        # Calculate which image this item came from
+        # Distribute items evenly across images
+        if image_paths and len(extracted_items) > 0:
+            items_per_image = len(extracted_items) / len(image_paths)
+            image_index = min(int(idx / items_per_image), len(image_paths) - 1)
+            image_url = image_paths[image_index]
+        else:
+            image_url = None
+
         item_doc = {
             "_id": ObjectId(),
             "restaurant_id": restaurant_id,
@@ -88,7 +97,7 @@ async def upload_menu_images(
             "confidence": item.confidence,
             "needs_review": item.needs_review,
             "status": "pending",  # pending, approved, rejected
-            "image_url": image_paths[idx // (len(extracted_items) // len(image_paths)) if len(extracted_items) > 0 else 0] if image_paths else None,
+            "image_url": image_url,
             "extraction_id": extraction_id,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
