@@ -320,8 +320,13 @@ async def get_restaurant_menu(restaurant_id: str):
     - No authentication required
     - Grouped by categories
     """
-    # Get restaurant details
-    restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+    # Get restaurant details - try both ObjectId and string format
+    try:
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+    except:
+        # If ObjectId conversion fails, try as string
+        restaurant = await db.restaurants.find_one({"_id": restaurant_id})
+
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 

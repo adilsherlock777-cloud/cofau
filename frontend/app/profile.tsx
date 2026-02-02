@@ -540,6 +540,12 @@ useEffect(() => {
     });
   }, [isOwnProfile, settingsModalVisible, userData]);
 
+  // Debug: Monitor menu upload modal visibility
+  useEffect(() => {
+    console.log('🔍 Menu Upload Modal Visible State Changed:', menuUploadModalVisible);
+    console.log('🔍 Token available:', !!token);
+  }, [menuUploadModalVisible, token]);
+
   // Fetch restaurant menu items from AI-extracted menu
   const fetchMenuItems = async () => {
     if (!userData?.id) return;
@@ -2602,7 +2608,11 @@ const renderRestaurantProfile = () => {
         {isOwnProfile && (
           <TouchableOpacity
             style={styles.uploadMenuButton}
-            onPress={() => setMenuUploadModalVisible(true)}
+            onPress={() => {
+              console.log('🔵 Upload Menu button pressed');
+              setMenuUploadModalVisible(true);
+              console.log('🔵 Modal state set to true');
+            }}
           >
             <Ionicons name="cloud-upload-outline" size={20} color="#FFF" />
             <Text style={styles.uploadMenuButtonText}>Upload Menu</Text>
@@ -2615,7 +2625,11 @@ const renderRestaurantProfile = () => {
     {isOwnProfile && menuItems.length > 0 && (
       <TouchableOpacity
         style={styles.floatingUploadButton}
-        onPress={() => setMenuUploadModalVisible(true)}
+        onPress={() => {
+          console.log('🔵 Floating Upload button pressed');
+          setMenuUploadModalVisible(true);
+          console.log('🔵 Modal state set to true (floating)');
+        }}
       >
         <Ionicons name="add" size={28} color="#FFF" />
       </TouchableOpacity>
@@ -2650,6 +2664,23 @@ const renderRestaurantProfile = () => {
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ================= MENU UPLOAD MODAL ================= */}
+      {console.log('🔍 Menu Upload Modal Visible State Changed:', menuUploadModalVisible)}
+      {console.log('🔍 Token available:', !!token)}
+      <MenuUploadModal
+        visible={menuUploadModalVisible}
+        onClose={() => {
+          console.log('🔵 MenuUploadModal onClose called');
+          setMenuUploadModalVisible(false);
+        }}
+        token={token || ''}
+        onSuccess={() => {
+          console.log('🔵 MenuUploadModal onSuccess called');
+          fetchMenuItems();
+          setMenuUploadModalVisible(false);
+        }}
+      />
 
       {/* ================= SIDEBAR MENU (at root level) ================= */}
       <Modal
@@ -4445,11 +4476,16 @@ if (isRestaurantProfile) {
       />
 
       {/* ================= MENU UPLOAD MODAL ================= */}
+      {console.log('🔍 Rendering MenuUploadModal with visible:', menuUploadModalVisible, 'token:', !!token)}
       <MenuUploadModal
         visible={menuUploadModalVisible}
-        onClose={() => setMenuUploadModalVisible(false)}
+        onClose={() => {
+          console.log('🔵 MenuUploadModal onClose called');
+          setMenuUploadModalVisible(false);
+        }}
         token={token || ''}
         onSuccess={() => {
+          console.log('🔵 MenuUploadModal onSuccess called');
           fetchMenuItems();
           setMenuUploadModalVisible(false);
         }}

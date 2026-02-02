@@ -47,6 +47,15 @@ export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
   const [showReview, setShowReview] = useState(false);
   const [editingItem, setEditingItem] = useState<ExtractedItem | null>(null);
 
+  // Debug: Monitor visibility changes
+  React.useEffect(() => {
+    console.log('📋 MenuUploadModal visibility changed:', visible);
+    console.log('📋 Token received:', token ? 'Yes' : 'No');
+  }, [visible, token]);
+
+  // Debug: Component render
+  console.log('📋 MenuUploadModal RENDERING - visible:', visible);
+
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {

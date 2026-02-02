@@ -10,6 +10,12 @@ import httpx
 # Get API key from environment
 GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY")
 
+# Log API key status
+if not GOOGLE_GEMINI_API_KEY:
+    print("⚠️ WARNING: GOOGLE_GEMINI_API_KEY not found in environment!")
+else:
+    print(f"✅ Google Gemini API Key loaded: {GOOGLE_GEMINI_API_KEY[:20]}...")
+
 # Configure Gemini
 genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
 
@@ -34,12 +40,17 @@ class MenuExtractionService:
 
         for image_url in image_urls:
             try:
+                print(f"📸 Processing image: {image_url}")
                 items = await self._process_single_image(image_url)
+                print(f"✅ Extracted {len(items)} items from image")
                 all_items.extend(items)
             except Exception as e:
-                print(f"Error processing image {image_url}: {e}")
+                print(f"❌ Error processing image {image_url}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
 
+        print(f"🎯 Total items extracted: {len(all_items)}")
         return all_items
 
     async def _process_single_image(self, image_url: str) -> List[MenuItem]:
