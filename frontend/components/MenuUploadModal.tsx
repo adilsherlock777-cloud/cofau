@@ -10,6 +10,8 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,13 +27,18 @@ interface MenuUploadModalProps {
 }
 
 interface ExtractedItem {
-  id?: string;
+  id: string;
   name: string;
   price: number | null;
   category: string | null;
   description: string | null;
   confidence: number;
   needs_review: boolean;
+  status?: string;
+  image_url?: string;
+  extraction_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
@@ -135,17 +142,8 @@ export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
   };
 
   const updateMenuItem = async (item: ExtractedItem) => {
-    if (!item.id) {
-      // Update locally for new items
-      setExtractedItems((prev) =>
-        prev.map((i) => (i === editingItem ? item : i))
-      );
-      setEditingItem(null);
-      return;
-    }
-
     try {
-      await axios.put(
+      const response = await axios.put(
         `${BACKEND_URL}/api/restaurant/menu/items/${item.id}`,
         {
           name: item.name,
@@ -159,8 +157,9 @@ export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
         }
       );
 
+      // Update local state with the response from backend
       setExtractedItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...item, needs_review: false } : i))
+        prev.map((i) => (i.id === item.id ? { ...response.data, needs_review: false } : i))
       );
       setEditingItem(null);
       Alert.alert('Success', 'Item updated successfully!');
@@ -393,59 +392,82 @@ export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
       {/* Edit Item Modal */}
       {editingItem && (
         <Modal visible={true} animationType="slide" transparent>
-          <View style={styles.editModalOverlay}>
-            <View style={styles.editModalContent}>
-              <Text style={styles.editModalTitle}>Edit Menu Item</Text>
-
-              <TextInput
-                style={styles.input}
-                value={editingItem.name}
-                onChangeText={(text) => setEditingItem({ ...editingItem, name: text })}
-                placeholder="Dish Name"
-              />
-
-              <TextInput
-                style={styles.input}
-                value={editingItem.price?.toString() || ''}
-                onChangeText={(text) =>
-                  setEditingItem({ ...editingItem, price: parseFloat(text) || null })
-                }
-                placeholder="Price (₹)"
-                keyboardType="numeric"
-              />
-
-              <TextInput
-                style={styles.input}
-                value={editingItem.category || ''}
-                onChangeText={(text) => setEditingItem({ ...editingItem, category: text })}
-                placeholder="Category"
-              />
-
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={editingItem.description || ''}
-                onChangeText={(text) => setEditingItem({ ...editingItem, description: text })}
-                placeholder="Description (optional)"
-                multiline
-                numberOfLines={3}
-              />
-
-              <View style={styles.editModalButtons}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setEditingItem(null)}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.editModalOverlay}
+          >
+            <TouchableOpacity
+              style={styles.editModalOverlay}
+              activeOpacity={1}
+              onPress={() => setEditingItem(null)}
+            >
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={(e) => e.stopPropagation()}
+                style={styles.editModalContent}
+              >
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.saveButton}
-                  onPress={() => updateMenuItem(editingItem)}
-                >
-                  <Text style={styles.saveButtonText}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+                  <Text style={styles.editModalTitle}>Edit Menu Item</Text>
+
+                  <TextInput
+                    style={styles.input}
+                    value={editingItem.name}
+                    onChangeText={(text) => setEditingItem({ ...editingItem, name: text })}
+                    placeholder="Dish Name"
+                    placeholderTextColor="#999"
+                  />
+
+                  <TextInput
+                    style={styles.input}
+                    value={editingItem.price?.toString() || ''}
+                    onChangeText={(text) =>
+                      setEditingItem({ ...editingItem, price: parseFloat(text) || null })
+                    }
+                    placeholder="Price (₹)"
+                    keyboardType="numeric"
+                    placeholderTextColor="#999"
+                  />
+
+                  <TextInput
+                    style={styles.input}
+                    value={editingItem.category || ''}
+                    onChangeText={(text) => setEditingItem({ ...editingItem, category: text })}
+                    placeholder="Category"
+                    placeholderTextColor="#999"
+                  />
+
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={editingItem.description || ''}
+                    onChangeText={(text) => setEditingItem({ ...editingItem, description: text })}
+                    placeholder="Description (optional)"
+                    multiline
+                    numberOfLines={3}
+                    placeholderTextColor="#999"
+                    textAlignVertical="top"
+                  />
+
+                  <View style={styles.editModalButtons}>
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      onPress={() => setEditingItem(null)}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.saveButton}
+                      onPress={() => updateMenuItem(editingItem)}
+                    >
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
         </Modal>
       )}
     </Modal>

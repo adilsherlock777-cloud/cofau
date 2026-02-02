@@ -98,12 +98,31 @@ async def upload_menu_images(
     if items_to_insert:
         await db.menu_items.insert_many(items_to_insert)
 
+    # Convert to MenuItemDB objects with IDs
+    db_items = []
+    for item_doc in items_to_insert:
+        db_items.append(MenuItemDB(
+            id=str(item_doc["_id"]),
+            restaurant_id=item_doc["restaurant_id"],
+            name=item_doc["name"],
+            price=item_doc.get("price"),
+            category=item_doc.get("category"),
+            description=item_doc.get("description"),
+            confidence=item_doc["confidence"],
+            needs_review=item_doc["needs_review"],
+            status=item_doc["status"],
+            image_url=item_doc.get("image_url"),
+            extraction_id=item_doc["extraction_id"],
+            created_at=item_doc["created_at"],
+            updated_at=item_doc["updated_at"]
+        ))
+
     # Count items that need review
-    needs_review_count = sum(1 for item in extracted_items if item.needs_review)
+    needs_review_count = sum(1 for item in db_items if item.needs_review)
 
     return MenuExtractionResponse(
-        items=extracted_items,
-        total_items=len(extracted_items),
+        items=db_items,
+        total_items=len(db_items),
         needs_review_count=needs_review_count,
         extraction_id=extraction_id
     )

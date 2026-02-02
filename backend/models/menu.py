@@ -17,7 +17,7 @@ class MenuExtractionRequest(BaseModel):
 
 class MenuExtractionResponse(BaseModel):
     """Response from AI menu extraction"""
-    items: List[MenuItem]
+    items: List['MenuItemDB']
     total_items: int
     needs_review_count: int
     extraction_id: str
