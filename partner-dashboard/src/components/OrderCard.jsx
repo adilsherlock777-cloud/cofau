@@ -7,18 +7,18 @@ export default function OrderCard({ order, onStatusUpdate }) {
     switch (order.status) {
       case 'pending':
         return [
-          { label: 'Accept Order', nextStatus: 'confirmed', color: 'bg-green-500' },
+          { label: 'Accept Order', nextStatus: 'accepted', color: 'bg-green-500' },
           { label: 'Reject', nextStatus: 'cancelled', color: 'bg-red-500' }
         ];
-      case 'confirmed':
+      case 'accepted':
         return [
           { label: 'Start Preparing', nextStatus: 'preparing', color: 'bg-blue-500' }
         ];
       case 'preparing':
         return [
-          { label: 'Mark Ready', nextStatus: 'ready', color: 'bg-purple-500' }
+          { label: 'Out for Delivery', nextStatus: 'out_for_delivery', color: 'bg-purple-500' }
         ];
-      case 'ready':
+      case 'out_for_delivery':
         return [
           { label: 'Complete', nextStatus: 'completed', color: 'bg-green-600' }
         ];

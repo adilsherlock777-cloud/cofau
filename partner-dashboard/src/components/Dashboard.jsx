@@ -8,9 +8,9 @@ export default function Dashboard({ onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [orders, setOrders] = useState({
     pending: [],
-    confirmed: [],
+    accepted: [],
     preparing: [],
-    ready: [],
+    out_for_delivery: [],
     completed: [],
     cancelled: []
   });
@@ -62,7 +62,7 @@ export default function Dashboard({ onLogout }) {
 
   // Group orders for tabs
   const newOrders = orders.pending || [];
-  const inProgressOrders = [...(orders.confirmed || []), ...(orders.preparing || []), ...(orders.ready || [])];
+  const inProgressOrders = [...(orders.accepted || []), ...(orders.preparing || []), ...(orders.out_for_delivery || [])];
   const completedOrders = [...(orders.completed || []), ...(orders.cancelled || [])];
 
   const getOrdersByTab = () => {
