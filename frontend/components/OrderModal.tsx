@@ -286,7 +286,17 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                     )}
                   </View>
 
-                  {/* View on Google Maps Button */}
+                  {/* Warning Box - Restaurant not on Cofau */}
+                  {isGoogleMapsRestaurant && (
+                    <View style={styles.warningBox}>
+                      <Ionicons name="warning" size={20} color="#FF9800" />
+                      <Text style={styles.warningText}>
+                        This restaurant isn't on Cofau yet. Check the menu below and tell us what you'd like to order!
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* View Menu on Google Maps Button */}
                   {isGoogleMapsRestaurant && (
                     <TouchableOpacity
                       style={styles.viewOnMapsButton}
@@ -294,7 +304,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                       activeOpacity={0.7}
                     >
                       <Ionicons name="map" size={18} color="#4285F4" />
-                      <Text style={styles.viewOnMapsText}>View on Google Maps</Text>
+                      <Text style={styles.viewOnMapsText}>View Menu on Google Maps</Text>
                       <Ionicons name="open-outline" size={16} color="#4285F4" />
                     </TouchableOpacity>
                   )}
@@ -601,5 +611,23 @@ const styles = StyleSheet.create({
     color: "#4285F4",
     flex: 1,
     textAlign: "center",
+  },
+  // Warning box style for non-Cofau restaurants
+  warningBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF3E0",
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#FFE0B2",
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#E65100",
+    lineHeight: 18,
   },
 });

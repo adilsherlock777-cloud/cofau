@@ -294,6 +294,7 @@ async def get_map_pins(
                 "user_id": post["user_id"],
                 "username": user.get("full_name", "Unknown") if user else "Unknown",
                 "user_profile_picture": user.get("profile_picture") if user else None,
+                "user_level": user.get("level", 1) if user else 1,
                 "latitude": post["latitude"],
                 "longitude": post["longitude"],
                 "distance_km": round(distance, 2),
@@ -306,6 +307,7 @@ async def get_map_pins(
                 "review_text": post.get("review_text", "")[:100],
                 "likes_count": post.get("likes_count", 0),
                 "map_link": post.get("map_link"),
+                "tagged_restaurant_id": post.get("tagged_restaurant_id"),
                 "account_type": "user"
             })
     

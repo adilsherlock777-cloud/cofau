@@ -535,24 +535,26 @@ const renderPost = useCallback(
 
       {/* Right Icons Container */}
       <View style={styles.headerIcons}>
-        {/* Mystery Box Icon */}
-        <MysteryBoxIcon
-          onPress={async () => {
-            setShowWalletModal(true);
-            // Mark wallet as viewed
-            try {
-              await axios.post(
-                `${BACKEND}/api/wallet/mark-viewed`,
-                {},
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-              setWalletUnreadCount(0);
-            } catch (err) {
-              console.log('Error marking wallet as viewed:', err);
-            }
-          }}
-          badgeCount={walletUnreadCount}
-        />
+        {/* Mystery Box Icon - Only show for non-restaurant accounts */}
+        {accountType !== 'restaurant' && (
+          <MysteryBoxIcon
+            onPress={async () => {
+              setShowWalletModal(true);
+              // Mark wallet as viewed
+              try {
+                await axios.post(
+                  `${BACKEND}/api/wallet/mark-viewed`,
+                  {},
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                setWalletUnreadCount(0);
+              } catch (err) {
+                console.log('Error marking wallet as viewed:', err);
+              }
+            }}
+            badgeCount={walletUnreadCount}
+          />
+        )}
 
         {/* Notifications Icon with Gradient */}
         <TouchableOpacity
@@ -1028,9 +1030,9 @@ const renderPost = useCallback(
           onPress={() => router.push("/leaderboard")}
         >
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={22} color="#000" />
+            <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabel}>Top Posts</Text>
+          <Text style={styles.navLabel}>Delivery</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

@@ -1826,7 +1826,7 @@ const renderMenuByCategory = () => {
               activeOpacity={0.7}
             >
               <View style={styles.menuCategoryHeaderLeft}>
-                <Ionicons name="restaurant" size={20} color="#FF8C00" />
+                <Ionicons name="menu" size={20} color="#FF8C00" />
                 <Text style={styles.menuCategoryName}>{category}</Text>
               </View>
               <View style={styles.menuCategoryHeaderRight}>
@@ -2161,9 +2161,9 @@ const renderRestaurantProfile = () => {
       end={{ x: 1, y: 1 }}
       style={restaurantStyles.dashboardButtonGradient}
     >
-      <Ionicons name="bar-chart" size={20} color="#fff" />
+      <Ionicons name="bar-chart" size={16} color="#fff" />
       <Text style={restaurantStyles.dashboardButtonTextGradient}>Restaurant Dashboard</Text>
-      <Ionicons name="chevron-forward" size={20} color="#fff" />
+      <Ionicons name="chevron-forward" size={16} color="#fff" />
     </LinearGradient>
   </TouchableOpacity>
 ) : (
@@ -2208,7 +2208,7 @@ const renderRestaurantProfile = () => {
               <UserAvatar
                 profilePicture={userData?.profile_picture}
                 username={userData?.restaurant_name || userData?.full_name}
-                size={100}
+                size={80}
                 showLevelBadge={false}
                 style={{
                   ...restaurantStyles.restaurantAvatar,
@@ -2220,7 +2220,7 @@ const renderRestaurantProfile = () => {
                   {uploadingImage ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Ionicons name="camera" size={16} color="#fff" />
+                    <Ionicons name="camera" size={14} color="#fff" />
                   )}
                 </View>
               )}
@@ -2651,9 +2651,9 @@ const renderRestaurantProfile = () => {
         </TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={22} color="#000" />
+            <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabel}>Top Posts</Text>
+          <Text style={styles.navLabel}>Delivery</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
           <Ionicons name="location-outline" size={20} color="#000" />
@@ -3739,9 +3739,9 @@ if (loading) {
           </TouchableOpacity>
           <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
             <View style={styles.centerIconCircle}>
-              <Ionicons name="camera" size={28} color="#000" />
+              <Ionicons name="fast-food" size={28} color="#000" />
             </View>
-            <Text style={styles.navLabel}>Top Posts</Text>
+            <Text style={styles.navLabel}>Delivery</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
             <Ionicons name="location-outline" size={28} color="#000" />
@@ -4223,9 +4223,9 @@ if (isRestaurantProfile) {
         </TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={22} color="#000" />
+            <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabel}>Top Posts</Text>
+          <Text style={styles.navLabel}>Delivery</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
           <Ionicons name="location-outline" size={20} color="#000" />
@@ -4966,9 +4966,9 @@ if (isRestaurantProfile) {
 
 const restaurantStyles = StyleSheet.create({
   bannerWrapper: {
-    marginHorizontal: 16,
+    marginHorizontal: 0,
     marginTop: -50,
-    marginBottom: 0,    
+    marginBottom: 0,
     position: 'relative',           // ✅ ADD THIS
     zIndex: 0,             // ✅ Changed from 20 to 0
   },
@@ -5025,7 +5025,7 @@ actionButtonTextGradient: {
 },
  bannerContainer: {
   height: 200,
-  borderRadius: 20,
+  borderRadius: 0,
   backgroundColor: '#E0E0E0',
   position: 'relative',
   overflow: 'hidden',
@@ -5034,8 +5034,6 @@ actionButtonTextGradient: {
   shadowOpacity: 0.15,
   shadowRadius: 8,
   elevation: 6,
-  borderWidth: 4,
-  borderColor: '#fff',
 },
 reviewImageWrapper: {
   position: 'relative',
@@ -5112,24 +5110,25 @@ replyText: {
 
 dashboardButton: {
   marginTop: 16,
-  borderRadius: 12,
+  marginBottom: 4,
+  borderRadius: 10,
   overflow: 'hidden',
 },
 dashboardButtonLight: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  paddingVertical: 14,
-  paddingHorizontal: 20,
-  gap: 10,
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  gap: 0,
   backgroundColor: '#FFF5EE',  // Very light orange/peach
   borderWidth: 1.5,
   borderColor: '#FFB380',  // Light orange border
-  borderRadius: 12,
+  borderRadius: 10,
 },
 dashboardButtonTextLight: {
   color: '#FF7A18',  // Orange text
-  fontSize: 16,
+  fontSize: 14,
   fontWeight: '600',
   flex: 1,
   textAlign: 'center',
@@ -5138,14 +5137,14 @@ dashboardButtonGradient: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  paddingVertical: 14,
-  paddingHorizontal: 20,
-  gap: 10,
-  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  gap: 8,
+  borderRadius: 10,
 },
 dashboardButtonTextGradient: {
   color: '#fff',
-  fontSize: 16,
+  fontSize: 14,
   fontWeight: '600',
   flex: 1,
   textAlign: 'center',
@@ -5358,15 +5357,15 @@ bannerUploadingOverlay: {
   },
 profileOnBanner: {
   position: 'absolute',
-  top: 145,
+  top: 140,
   left: 20,
   elevation: 100,
-  zIndex: 100, 
+  zIndex: 100,
   backgroundColor: '#fff',
-  borderRadius: 55,
+  borderRadius: 42,
   padding: 2,
-  borderWidth: 0.5,
-  borderColor: '#fff',
+  borderWidth: 0.2,
+  borderColor: '#FF5C5C',
 },
 nameRow: {
   flexDirection: 'row',
@@ -5374,7 +5373,7 @@ nameRow: {
   marginBottom: 8,
 },
 dpPlaceholder: {
-  width: 100,
+  width: 90,
   height: 50,
 },
   // Review Item Styles
@@ -5478,10 +5477,10 @@ reviewImagePlaceholder: {
     position: 'absolute',
     right: 0,
     bottom: 5,
-    backgroundColor: '#4dd0e1',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+    backgroundColor: '#FF8C00',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -5492,8 +5491,8 @@ whiteInfoBox: {
   borderRadius: 20,
   paddingTop: 15,
   paddingHorizontal: 20,
-  paddingBottom: 20,
-  marginTop: -25,  
+  paddingBottom: 12,
+  marginTop: -25,
   marginBottom: 16,
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 4 },
@@ -5508,18 +5507,18 @@ whiteInfoBox: {
   flexDirection: 'column',
   alignItems: 'flex-start',
   flex: 1,
-  marginLeft: 10,    
+  marginLeft: 0,
   marginTop: 0,
   marginBottom: 0,
 },
   restaurantName: {
-    fontSize: 24,
+    fontSize: 23,
     marginTop: -25, 
     fontWeight: 'bold',
     color: '#333',
   },
   restaurantLabel: {
-    fontSize: 12,
+    fontSize: 9,
     color: '#E94A37',
     fontWeight: '600',
     marginTop: 4,
@@ -5828,17 +5827,17 @@ favouriteGridImage: {
     lineHeight: 18,
   },
   menuItemPriceContainer: {
-    backgroundColor: '#FFF9E6',
+    backgroundColor: '#E94A37',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFE4A0',
+    borderColor: '#E94A37',
   },
   menuItemPrice: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FF8C00',
+    color: '#FFFFFF',
   },
   uploadMenuButton: {
     marginTop: 20,

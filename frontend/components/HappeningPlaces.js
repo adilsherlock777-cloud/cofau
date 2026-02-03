@@ -453,9 +453,9 @@ export default function HappeningPlaces() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
               <View style={styles.centerIconCircle}>
-                <Ionicons name="camera" size={22} color="#000" />
+                <Ionicons name="fast-food" size={22} color="#000" />
               </View>
-              <Text style={styles.navLabel}>Top Posts</Text>
+              <Text style={styles.navLabel}>Delivery</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
               <Ionicons name="location" size={20} color="#000" />
@@ -679,9 +679,9 @@ export default function HappeningPlaces() {
             onPress={() => router.push('/leaderboard')}
           >
             <View style={styles.centerIconCircle}>
-              <Ionicons name="camera" size={22} color="#000" />
+              <Ionicons name="fast-food" size={22} color="#000" />
             </View>
-            <Text style={styles.navLabel}>Top Posts</Text>
+            <Text style={styles.navLabel}>Delivery</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

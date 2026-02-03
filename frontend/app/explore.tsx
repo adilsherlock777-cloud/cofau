@@ -1575,7 +1575,7 @@ return (
       <View style={styles.navBar}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}><Ionicons name="home-outline" size={20} color="#000" /><Text style={styles.navLabel}>Home</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}><Ionicons name="compass" size={20} color="#000" /><Text style={styles.navLabelActive}>Explore</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push("/leaderboard")}><View style={styles.centerIconCircle}><Ionicons name="camera" size={22} color="#000" /></View><Text style={styles.navLabel}>Top Posts</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push("/leaderboard")}><View style={styles.centerIconCircle}><Ionicons name="fast-food" size={22} color="#000" /></View><Text style={styles.navLabel}>Delivery</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}><Ionicons name="location-outline" size={20} color="#000" /><Text style={styles.navLabel}>Happening</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}><Ionicons name="person-outline" size={20} color="#000" /><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
       </View>

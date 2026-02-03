@@ -242,14 +242,18 @@ export default function LeaderboardScreen() {
     fetchOrders();
   };
 
-  // WebSocket connection for real-time order updates
+  // WebSocket connection for real-time order updates - only when there are active orders
   useEffect(() => {
-    if (!token) return;
+    // Only connect WebSocket if there are active orders
+    if (!token || activeOrders.length === 0) return;
 
     let ws: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout | null = null;
+    let shouldReconnect = true;
 
     const connectWebSocket = () => {
+      if (!shouldReconnect) return;
+
       try {
         const wsUrl = BACKEND_URL.replace('https://', 'wss://').replace('http://', 'ws://');
         ws = new WebSocket(`${wsUrl}/api/orders/ws?token=${token}`);
@@ -299,14 +303,18 @@ export default function LeaderboardScreen() {
 
         ws.onerror = (error) => {
           console.error('❌ WebSocket error:', error);
+          // Stop reconnecting on error (likely auth failure)
+          shouldReconnect = false;
         };
 
-        ws.onclose = () => {
-          console.log('🔌 WebSocket disconnected, reconnecting in 5s...');
-          // Reconnect after 5 seconds
-          reconnectTimeout = setTimeout(() => {
-            connectWebSocket();
-          }, 5000);
+        ws.onclose = (event) => {
+          // Only reconnect if we still have active orders and no error occurred
+          if (shouldReconnect && activeOrders.length > 0) {
+            console.log('🔌 WebSocket disconnected, reconnecting in 30s...');
+            reconnectTimeout = setTimeout(() => {
+              connectWebSocket();
+            }, 30000); // Reconnect after 30 seconds instead of 5
+          }
         };
       } catch (error) {
         console.error('Failed to connect WebSocket:', error);
@@ -315,8 +323,9 @@ export default function LeaderboardScreen() {
 
     connectWebSocket();
 
-    // Cleanup on unmount
+    // Cleanup on unmount or when active orders become empty
     return () => {
+      shouldReconnect = false;
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
@@ -324,7 +333,7 @@ export default function LeaderboardScreen() {
         ws.close();
       }
     };
-  }, [token]);
+  }, [token, activeOrders.length]);
 
   const fetchUserAddress = async () => {
     try {
@@ -1285,9 +1294,9 @@ export default function LeaderboardScreen() {
           onPress={() => router.push("/leaderboard")}
         >
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={20} color="#000" />
+            <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabelActive}>Top Posts</Text>
+          <Text style={styles.navLabelActive}>Delivery</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
