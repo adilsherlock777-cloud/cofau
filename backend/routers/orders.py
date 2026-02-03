@@ -73,7 +73,7 @@ async def create_order(
         "post_media_url": order_data.post_media_url,
         "latitude": order_data.latitude,
         "longitude": order_data.longitude,
-        "status": "pending",  # pending, confirmed, preparing, ready, completed, cancelled
+        "status": "pending",  # pending, accepted, preparing, out_for_delivery, completed, cancelled
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
     }
@@ -178,7 +178,7 @@ async def update_order_status(
     """Update order status (for future use by restaurants)"""
     db = get_database()
 
-    valid_statuses = ["pending", "confirmed", "preparing", "ready", "completed", "cancelled"]
+    valid_statuses = ["pending", "accepted", "preparing", "out_for_delivery", "completed", "cancelled"]
 
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
@@ -293,9 +293,9 @@ async def get_all_orders_for_partner(
     # Group orders by status
     orders_by_status = {
         "pending": [],
-        "confirmed": [],
+        "accepted": [],
         "preparing": [],
-        "ready": [],
+        "out_for_delivery": [],
         "completed": [],
         "cancelled": []
     }
@@ -356,7 +356,7 @@ async def update_order_status_partner(
 
     db = get_database()
 
-    valid_statuses = ["pending", "confirmed", "preparing", "ready", "completed", "cancelled"]
+    valid_statuses = ["pending", "accepted", "preparing", "out_for_delivery", "completed", "cancelled"]
 
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")

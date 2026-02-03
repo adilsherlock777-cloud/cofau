@@ -22,8 +22,6 @@ import { OrderModal } from "../components/OrderModal";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import * as Location from "expo-location";
-import UserAvatar from "../components/UserAvatar";
-import { normalizeProfilePicture } from "../utils/imageUrlFix";
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = BACKEND_URL;
@@ -36,18 +34,6 @@ const fixUrl = (url: string | null | undefined): string => {
   if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
   return `${BACKEND_URL}${cleaned}`;
 };
-
-// Get profile picture from post with various field names
-const getPostDP = (post: any) =>
-  normalizeProfilePicture(
-    post.user_profile_picture ||
-    post.profile_picture ||
-    post.profile_picture_url ||
-    post.profile_pic ||
-    post.user_profile_pic ||
-    post.userProfilePicture ||
-    post.profilePicture
-  );
 
 // Dummy data for UI preview
 const DUMMY_RESTAURANTS = [
@@ -190,9 +176,10 @@ export default function LeaderboardScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any>(null);
-  const [activeOrders, setActiveOrders] = useState<any[]>([]); // pending, confirmed, preparing, ready
+  const [activeOrders, setActiveOrders] = useState<any[]>([]); // pending, accepted, preparing, out_for_delivery
   const [completedOrders, setCompletedOrders] = useState<any[]>([]); // completed, cancelled
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [restaurantProfiles, setRestaurantProfiles] = useState<{ [key: string]: any }>({});
 
   useEffect(() => {
     if (token) {
@@ -217,7 +204,7 @@ export default function LeaderboardScreen() {
 
       // Separate active and completed orders
       const active = allOrders.filter((order: any) =>
-        ['pending', 'confirmed', 'preparing', 'ready'].includes(order.status)
+        ['pending', 'accepted', 'preparing', 'out_for_delivery'].includes(order.status)
       );
       const completed = allOrders.filter((order: any) =>
         ['completed', 'cancelled'].includes(order.status)
@@ -225,6 +212,24 @@ export default function LeaderboardScreen() {
 
       setActiveOrders(active);
       setCompletedOrders(completed);
+
+      // Fetch restaurant profiles for orders with restaurant_id
+      const restaurantIds = [...new Set(allOrders
+        .filter((order: any) => order.restaurant_id)
+        .map((order: any) => order.restaurant_id))];
+
+      const profiles: { [key: string]: any } = {};
+      for (const restaurantId of restaurantIds) {
+        try {
+          const profileResponse = await axios.get(
+            `${BACKEND_URL}/api/restaurant/posts/public/profile/${restaurantId}`
+          );
+          profiles[restaurantId] = profileResponse.data;
+        } catch (error) {
+          console.log(`Failed to fetch profile for restaurant ${restaurantId}`);
+        }
+      }
+      setRestaurantProfiles(profiles);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {
@@ -494,6 +499,113 @@ export default function LeaderboardScreen() {
     }
   };
 
+  // Extract location name from post
+  const getLocationName = (post: any): string => {
+    // Try direct location fields first
+    if (post.location_name) return post.location_name;
+    if (post.location) return post.location;
+    if (post.place_name) return post.place_name;
+
+    // Try to extract from map_link
+    if (post.map_link) {
+      try {
+        const url = new URL(post.map_link);
+        const queryParam = url.searchParams.get('query');
+        if (queryParam) {
+          return decodeURIComponent(queryParam);
+        }
+      } catch (e) {
+        const match = post.map_link.match(/query=([^&]+)/);
+        if (match) {
+          return decodeURIComponent(match[1]);
+        }
+      }
+    }
+
+    return "Unknown Location";
+  };
+
+  // Group posts by location
+  const getGroupedLocations = () => {
+    const filteredPosts = getFilteredPosts();
+    const locationMap = new Map<string, any>();
+
+    filteredPosts.forEach((post) => {
+      const locationName = getLocationName(post);
+      const locationKey = locationName.toLowerCase().trim();
+
+      if (locationMap.has(locationKey)) {
+        const location = locationMap.get(locationKey);
+        location.posts.push(post);
+        // Update average rating
+        const ratings = location.posts.filter((p: any) => p.rating).map((p: any) => p.rating);
+        location.avgRating = ratings.length > 0
+          ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length
+          : 0;
+        location.reviewCount = location.posts.filter((p: any) => p.rating).length;
+        // Update closest distance
+        if (userLocation && post.latitude && post.longitude) {
+          const dist = calculateDistanceKm(
+            userLocation.latitude,
+            userLocation.longitude,
+            post.latitude,
+            post.longitude
+          );
+          if (dist < location.distanceKm) {
+            location.distanceKm = dist;
+            location.closestPost = post;
+          }
+        }
+        // Check if any post has restaurant tagged (tagged_restaurant_id means menu is available)
+        if (post.tagged_restaurant_id) {
+          location.hasMenu = true;
+        }
+      } else {
+        let distanceKm = Infinity;
+        if (userLocation && post.latitude && post.longitude) {
+          distanceKm = calculateDistanceKm(
+            userLocation.latitude,
+            userLocation.longitude,
+            post.latitude,
+            post.longitude
+          );
+        }
+        locationMap.set(locationKey, {
+          id: locationKey,
+          name: locationName,
+          posts: [post],
+          avgRating: post.rating || 0,
+          reviewCount: post.rating ? 1 : 0,
+          hasMenu: !!post.tagged_restaurant_id,
+          distanceKm: distanceKm,
+          closestPost: post,
+        });
+      }
+    });
+
+    // Convert to array and sort by distance
+    return Array.from(locationMap.values()).sort((a, b) => a.distanceKm - b.distanceKm);
+  };
+
+  // Calculate distance in km (raw number for sorting)
+  const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Format distance for display
+  const formatDistance = (distanceKm: number) => {
+    if (distanceKm === Infinity) return "";
+    return distanceKm < 1 ? `${(distanceKm * 1000).toFixed(0)}m` : `${distanceKm.toFixed(1)}km`;
+  };
+
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategory(categoryId);
 
@@ -520,24 +632,61 @@ export default function LeaderboardScreen() {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
-    return distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`;
-  };
-
   const toggleFavorite = (id: string) => {
     setFavorites((prev) => ({
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  // Get status step information
+  const getStatusStep = (status: string) => {
+    const steps = [
+      {
+        key: 'pending',
+        label: 'Checking',
+        message: 'Sit back and relax! We are checking your order with the restaurant.',
+        icon: 'hourglass-outline',
+        color: '#FF9800',
+      },
+      {
+        key: 'accepted',
+        label: 'Accepted',
+        message: 'Restaurant confirms your order. We are assigning a runner.',
+        icon: 'checkmark-circle-outline',
+        color: '#4CAF50',
+      },
+      {
+        key: 'preparing',
+        label: 'Preparing',
+        message: 'Restaurant is preparing your delicious meal.',
+        icon: 'restaurant-outline',
+        color: '#2196F3',
+      },
+      {
+        key: 'out_for_delivery',
+        label: 'Out for Delivery',
+        message: 'Our runner is on the way to your doorstep!',
+        icon: 'bicycle-outline',
+        color: '#9C27B0',
+      },
+    ];
+
+    const currentIndex = steps.findIndex((step) => step.key === status);
+    return { steps, currentIndex };
+  };
+
+  // Parse dish items from dish_name string (format: "Item1 x2, Item2 x1")
+  const parseDishItems = (dishName: string) => {
+    if (!dishName) return [];
+    const items = dishName.split(',').map((item) => item.trim());
+    return items.map((item) => {
+      const match = item.match(/^(.+?)\s+x(\d+)$/);
+      if (match) {
+        return { name: match[1].trim(), quantity: parseInt(match[2]) };
+      }
+      return { name: item, quantity: 1 };
+    });
   };
 
   const renderStars = (rating: number) => {
@@ -635,6 +784,102 @@ export default function LeaderboardScreen() {
             )}
           </View>
         </View>
+      </View>
+    );
+  };
+
+  const renderVendorCard = (vendor: any) => {
+    const displayImages = vendor.posts.slice(0, 3);
+    const extraCount = vendor.posts.length - 3;
+
+    return (
+      <View key={vendor.id} style={styles.vendorCard}>
+        {/* Vendor Header */}
+        <View style={styles.vendorHeader}>
+          <Text style={styles.vendorName}>{vendor.name}</Text>
+        </View>
+
+        {/* Distance and Rating Row */}
+        <View style={styles.vendorMetaRow}>
+          {vendor.distanceKm !== Infinity && (
+            <View style={styles.vendorMetaItem}>
+              <Text style={styles.vendorMetaIcon}>📍</Text>
+              <Text style={styles.vendorMetaText}>{formatDistance(vendor.distanceKm)} away</Text>
+            </View>
+          )}
+          {vendor.reviewCount > 0 && (
+            <>
+              <Text style={styles.vendorMetaDot}>•</Text>
+              <View style={styles.vendorMetaItem}>
+                <Ionicons name="star" size={14} color="#FFD700" />
+                <Text style={styles.vendorMetaText}>
+                  {(vendor.avgRating / 2).toFixed(1)} ({vendor.reviewCount})
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Menu Badge */}
+        {vendor.hasMenu && (
+          <View style={styles.menuBadge}>
+            <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+            <Text style={styles.menuBadgeText}>Menu available on Cofau</Text>
+          </View>
+        )}
+
+        {/* Image Thumbnails Row */}
+        <View style={styles.vendorImagesRow}>
+          {displayImages.map((post: any, index: number) => (
+            <TouchableOpacity
+              key={post.id || index}
+              onPress={() => {
+                setSelectedImage(fixUrl(post.thumbnail_url || post.media_url));
+                setFullImageModal(true);
+              }}
+              activeOpacity={0.9}
+            >
+              <Image
+                source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+                style={styles.vendorThumbnail}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ))}
+          {extraCount > 0 && (
+            <TouchableOpacity
+              style={styles.extraCountContainer}
+              onPress={() => {
+                router.push({
+                  pathname: "/location-posts",
+                  params: {
+                    posts: JSON.stringify(vendor.posts),
+                    locationName: vendor.name,
+                  },
+                });
+              }}
+              activeOpacity={0.9}
+            >
+              <Image
+                source={{ uri: fixUrl(vendor.posts[3]?.thumbnail_url || vendor.posts[3]?.media_url) }}
+                style={styles.extraCountImage}
+                resizeMode="cover"
+                blurRadius={3}
+              />
+              <View style={styles.extraCountOverlay}>
+                <Text style={styles.extraCountText}>+{extraCount}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Order Button */}
+        <TouchableOpacity
+          style={styles.vendorOrderButton}
+          onPress={() => handleOrderClick(vendor.closestPost)}
+        >
+          <Text style={styles.vendorOrderText}>Order Now</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -844,80 +1089,7 @@ export default function LeaderboardScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              getFilteredPosts().map((post) => (
-                <View key={post.id} style={styles.postCard}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectedImage(fixUrl(post.thumbnail_url || post.media_url));
-                      setFullImageModal(true);
-                    }}
-                    activeOpacity={0.9}
-                  >
-                    <Image
-                      source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
-                      style={styles.postImage}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.postInfo}
-                    onPress={() => router.push(`/post/${post.id}`)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.postHeader}>
-                      <View style={styles.userInfoContainer}>
-                        <UserAvatar
-                          profilePicture={getPostDP(post)}
-                          username={post.username || "Anonymous"}
-                          size={40}
-                          showLevelBadge={true}
-                          level={post.user_level || post.level || 1}
-                          style={{}}
-                        />
-                        <Text style={styles.username} numberOfLines={1}>
-                          {post.username || "Anonymous"}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {post.rating && (
-                      <View style={styles.postRatingContainer}>
-                        <Ionicons name="star" size={14} color="#FFD700" />
-                        <Text style={styles.postRatingText}>{post.rating}/10</Text>
-                      </View>
-                    )}
-
-                    {userLocation && post.latitude && post.longitude && (
-                      <View style={styles.distanceRow}>
-                        <Ionicons name="location" size={14} color="#FF3B30" />
-                        <Text style={styles.distanceText}>
-                          {calculateDistance(
-                            userLocation.latitude,
-                            userLocation.longitude,
-                            post.latitude,
-                            post.longitude
-                          )}
-                        </Text>
-                      </View>
-                    )}
-
-                    {post.review_text && (
-                      <Text style={styles.reviewText} numberOfLines={2}>
-                        {post.review_text}
-                      </Text>
-                    )}
-
-                    <TouchableOpacity
-                      style={styles.orderButton}
-                      onPress={() => handleOrderClick(post)}
-                    >
-                      <Text style={styles.orderButtonText}>Order</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#FFF" />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                </View>
-              ))
+              getGroupedLocations().map((location) => renderVendorCard(location))
             )}
           </>
         ) : activeTab === "In Progress" ? (
@@ -937,61 +1109,99 @@ export default function LeaderboardScreen() {
                 </Text>
               </View>
             ) : (
-              activeOrders.map((order) => (
-                <View key={order.id} style={styles.orderCard}>
-                  {order.post_media_url && (
-                    <Image
-                      source={{ uri: fixUrl(order.post_media_url) }}
-                      style={styles.orderImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <View style={styles.orderInfo}>
-                    <View style={styles.orderHeader}>
-                      <Text style={styles.orderDishName}>{order.dish_name}</Text>
-                      <View style={[
-                        styles.orderStatusBadge,
-                        order.status === "completed" && styles.orderStatusCompleted,
-                        order.status === "cancelled" && styles.orderStatusCancelled,
-                      ]}>
-                        <Text style={styles.orderStatusText}>
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </Text>
-                      </View>
+              activeOrders.map((order, orderIdx) => {
+                const { steps, currentIndex } = getStatusStep(order.status);
+                const currentStep = steps[currentIndex];
+                const dishItems = parseDishItems(order.dish_name);
+                const restaurantProfile = order.restaurant_id ? restaurantProfiles[order.restaurant_id] : null;
+
+                return (
+                  <View style={styles.newOrderCard} key={`order-${order.id}-${orderIdx}`}>
+                    {/* Restaurant Profile Picture (if on Cofau) */}
+                    {restaurantProfile && restaurantProfile.profile_picture && (
+                      <Image
+                        source={{ uri: fixUrl(restaurantProfile.profile_picture) }}
+                        style={styles.restaurantProfilePic}
+                        resizeMode="cover"
+                      />
+                    )}
+
+                    {/* Order Items */}
+                    <View style={styles.orderItemsSection}>
+                      <Text style={styles.orderItemsTitle}>Items:</Text>
+                      {dishItems.map((item, index) => (
+                        <View style={styles.orderItemRow} key={`item-${orderIdx}-${index}`}>
+                          <Text style={styles.orderItemName}>• {item.name}</Text>
+                          <Text style={styles.orderItemQuantity}>Qty: {item.quantity}</Text>
+                        </View>
+                      ))}
                     </View>
 
+                    {/* Restaurant Name */}
                     {order.restaurant_name && (
-                      <View style={styles.orderRestaurantRow}>
-                        <Ionicons name="restaurant" size={14} color="#666" />
-                        <Text style={styles.orderRestaurantName}>
-                          {order.restaurant_name}
-                        </Text>
+                      <View style={styles.newOrderRestaurantRow}>
+                        <Ionicons name="restaurant" size={16} color="#FF8C00" />
+                        <Text style={styles.newOrderRestaurantName}>{order.restaurant_name}</Text>
                       </View>
                     )}
 
-                    {order.post_location && (
-                      <View style={styles.orderLocationRow}>
-                        <Ionicons name="location" size={14} color="#FF3B30" />
-                        <Text style={styles.orderLocationText}>{order.post_location}</Text>
+                    {/* Status Progress Bar */}
+                    <View style={styles.statusProgressContainer}>
+                      <View style={styles.statusStepsRow}>
+                        {steps.map((step, index) => (
+                          <View style={styles.statusStepItem} key={`step-${step.key}`}>
+                            <View
+                              style={[
+                                styles.statusStepCircle,
+                                index <= currentIndex && styles.statusStepCircleActive,
+                                { borderColor: index <= currentIndex ? step.color : '#E0E0E0' },
+                              ]}
+                            >
+                              {index < currentIndex ? (
+                                <Ionicons name="checkmark" size={16} color={steps[index].color} />
+                              ) : index === currentIndex ? (
+                                <Ionicons name={step.icon as any} size={16} color={step.color} />
+                              ) : (
+                                <View style={styles.statusStepDot} />
+                              )}
+                            </View>
+                            {index < steps.length - 1 && (
+                              <View
+                                style={[
+                                  styles.statusStepLine,
+                                  index < currentIndex && styles.statusStepLineActive,
+                                ]}
+                              />
+                            )}
+                          </View>
+                        ))}
                       </View>
-                    )}
 
-                    {order.suggestions && (
-                      <Text style={styles.orderSuggestions} numberOfLines={2}>
-                        Note: {order.suggestions}
-                      </Text>
-                    )}
+                      {/* Current Status Message */}
+                      {currentStep && (
+                        <View style={[styles.currentStatusBox, { backgroundColor: currentStep.color + '15' }]}>
+                          <Ionicons name={currentStep.icon as any} size={20} color={currentStep.color} />
+                          <View style={styles.currentStatusTextContainer}>
+                            <Text style={[styles.currentStatusLabel, { color: currentStep.color }]}>
+                              {currentStep.label}
+                            </Text>
+                            <Text style={styles.currentStatusMessage}>{currentStep.message}</Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
 
-                    <Text style={styles.orderTime}>
-                      {new Date(order.created_at).toLocaleDateString()} at{" "}
+                    {/* Order Time */}
+                    <Text style={styles.orderTimeText}>
+                      Ordered: {new Date(order.created_at).toLocaleDateString()} at{" "}
                       {new Date(order.created_at).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                     </Text>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </>
         ) : activeTab === "Your Orders" ? (
@@ -2002,5 +2212,246 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#999",
     marginTop: 4,
+  },
+  // New Order Card Styles with Status Steps
+  newOrderCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  restaurantProfilePic: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#F0F0F0",
+    marginBottom: 12,
+    alignSelf: "center",
+  },
+  orderItemsSection: {
+    marginBottom: 12,
+  },
+  orderItemsTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 8,
+  },
+  orderItemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  orderItemName: {
+    fontSize: 14,
+    color: "#555",
+    flex: 1,
+  },
+  orderItemQuantity: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FF8C00",
+  },
+  newOrderRestaurantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  newOrderRestaurantName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginLeft: 6,
+  },
+  statusProgressContainer: {
+    marginBottom: 12,
+  },
+  statusStepsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  statusStepItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  statusStepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+  },
+  statusStepCircleActive: {
+    backgroundColor: "#FFF",
+  },
+  statusStepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E0E0E0",
+  },
+  statusStepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: "#E0E0E0",
+    marginLeft: 4,
+  },
+  statusStepLineActive: {
+    backgroundColor: "#4CAF50",
+  },
+  currentStatusBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 12,
+    borderRadius: 12,
+    gap: 10,
+  },
+  currentStatusTextContainer: {
+    flex: 1,
+  },
+  currentStatusLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  currentStatusMessage: {
+    fontSize: 13,
+    color: "#666",
+    lineHeight: 18,
+  },
+  orderTimeText: {
+    fontSize: 11,
+    color: "#999",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  // Vendor Card Styles
+  vendorCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  vendorHeader: {
+    marginBottom: 8,
+  },
+  vendorName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  vendorMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  vendorMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  vendorMetaIcon: {
+    fontSize: 14,
+  },
+  vendorMetaText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  vendorMetaDot: {
+    fontSize: 14,
+    color: "#999",
+    marginHorizontal: 8,
+  },
+  menuBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F5E9",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    marginBottom: 12,
+    gap: 6,
+  },
+  menuBadgeText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4CAF50",
+  },
+  vendorImagesRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  vendorThumbnail: {
+    width: 85,
+    height: 85,
+    borderRadius: 12,
+    backgroundColor: "#F0F0F0",
+  },
+  extraCountContainer: {
+    width: 85,
+    height: 85,
+    borderRadius: 12,
+    overflow: "hidden",
+    position: "relative",
+  },
+  extraCountImage: {
+    width: "100%",
+    height: "100%",
+  },
+  extraCountOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  extraCountText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  vendorOrderButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF8C00",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  vendorOrderText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });
