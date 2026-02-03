@@ -247,14 +247,36 @@ export default function LeaderboardScreen() {
     fetchOrders();
   };
 
-  // WebSocket connection for real-time order updates - only when there are active orders
+  // WebSocket connection for real-time order updates with fallback polling
   useEffect(() => {
-    // Only connect WebSocket if there are active orders
+    // Only set up updates if there are active orders
     if (!token || activeOrders.length === 0) return;
 
     let ws: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout | null = null;
+    let pollingInterval: NodeJS.Timeout | null = null;
     let shouldReconnect = true;
+    let wsConnected = false;
+
+    // Fallback: Poll for updates every 10 seconds if WebSocket fails
+    const startPolling = () => {
+      if (pollingInterval) return; // Already polling
+
+      console.log('📊 Starting fallback polling for order updates (every 10s)');
+      pollingInterval = setInterval(() => {
+        if (activeTab === "In Progress" || activeTab === "Your Orders") {
+          fetchOrders();
+        }
+      }, 10000); // Poll every 10 seconds
+    };
+
+    const stopPolling = () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+        console.log('⏹️ Stopped fallback polling');
+      }
+    };
 
     const connectWebSocket = () => {
       if (!shouldReconnect) return;
@@ -265,6 +287,8 @@ export default function LeaderboardScreen() {
 
         ws.onopen = () => {
           console.log('📡 Connected to order updates WebSocket');
+          wsConnected = true;
+          stopPolling(); // Stop polling since WebSocket is connected
         };
 
         ws.onmessage = (event) => {
@@ -289,7 +313,7 @@ export default function LeaderboardScreen() {
                   return prevActive.filter((order: any) => order.id !== data.order_id);
                 });
               } else {
-                // Update status within active orders (pending → confirmed → preparing → ready)
+                // Update status within active orders
                 setActiveOrders((prevOrders: any[]) =>
                   prevOrders.map((order: any) =>
                     order.id === data.order_id
@@ -307,38 +331,47 @@ export default function LeaderboardScreen() {
         };
 
         ws.onerror = (error) => {
-          console.error('❌ WebSocket error:', error);
-          // Stop reconnecting on error (likely auth failure)
-          shouldReconnect = false;
+          console.log('⚠️ WebSocket connection failed, using polling fallback');
+          wsConnected = false;
+          shouldReconnect = false; // Don't retry WebSocket
+          startPolling(); // Fall back to polling
         };
 
         ws.onclose = (event) => {
-          // Only reconnect if we still have active orders and no error occurred
-          if (shouldReconnect && activeOrders.length > 0) {
-            console.log('🔌 WebSocket disconnected, reconnecting in 30s...');
-            reconnectTimeout = setTimeout(() => {
-              connectWebSocket();
-            }, 30000); // Reconnect after 30 seconds instead of 5
-          }
+          wsConnected = false;
+          console.log('🔌 WebSocket disconnected, using polling fallback');
+          startPolling(); // Always fall back to polling when disconnected
         };
       } catch (error) {
         console.error('Failed to connect WebSocket:', error);
+        startPolling(); // Fall back to polling
       }
     };
 
+    // Try WebSocket first, fall back to polling if it fails
     connectWebSocket();
+
+    // If WebSocket doesn't connect within 3 seconds, start polling as backup
+    const wsTimeout = setTimeout(() => {
+      if (!wsConnected) {
+        console.log('⏱️ WebSocket connection timeout, starting polling');
+        startPolling();
+      }
+    }, 3000);
 
     // Cleanup on unmount or when active orders become empty
     return () => {
       shouldReconnect = false;
+      clearTimeout(wsTimeout);
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
       if (ws) {
         ws.close();
       }
+      stopPolling();
     };
-  }, [token, activeOrders.length]);
+  }, [token, activeOrders.length, activeTab]);
 
   const fetchUserAddress = async () => {
     try {
@@ -1243,6 +1276,19 @@ export default function LeaderboardScreen() {
                         </Text>
                       </View>
                     </View>
+
+                    {/* Cancellation Message */}
+                    {order.status === "cancelled" && (
+                      <View style={styles.cancellationBox}>
+                        <Ionicons name="close-circle" size={20} color="#FF3B30" />
+                        <View style={styles.cancellationTextContainer}>
+                          <Text style={styles.cancellationTitle}>Order Cancelled</Text>
+                          <Text style={styles.cancellationMessage}>
+                            We are so sorry. Your order has been cancelled. If you have any questions, please contact support.
+                          </Text>
+                        </View>
+                      </View>
+                    )}
 
                     {order.restaurant_name && (
                       <View style={styles.orderRestaurantRow}>
@@ -2212,6 +2258,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#999",
     marginTop: 4,
+  },
+  cancellationBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF0F0",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#FFCCCC",
+  },
+  cancellationTextContainer: {
+    flex: 1,
+  },
+  cancellationTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FF3B30",
+    marginBottom: 4,
+  },
+  cancellationMessage: {
+    fontSize: 13,
+    color: "#666",
+    lineHeight: 18,
   },
   // New Order Card Styles with Status Steps
   newOrderCard: {

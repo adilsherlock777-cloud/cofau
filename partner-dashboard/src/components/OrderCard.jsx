@@ -7,27 +7,38 @@ export default function OrderCard({ order, onStatusUpdate }) {
     switch (order.status) {
       case 'pending':
         return [
-          { label: 'Accept Order', nextStatus: 'accepted', color: 'bg-green-500' },
-          { label: 'Reject', nextStatus: 'cancelled', color: 'bg-red-500' }
+          { label: 'Accept Order', nextStatus: 'accepted', color: 'bg-green-500', primary: true },
+          { label: 'Cancel', nextStatus: 'cancelled', color: 'bg-red-500', primary: false }
         ];
       case 'accepted':
         return [
-          { label: 'Start Preparing', nextStatus: 'preparing', color: 'bg-blue-500' }
+          { label: 'Start Preparing', nextStatus: 'preparing', color: 'bg-blue-500', primary: true },
+          { label: 'Cancel Order', nextStatus: 'cancelled', color: 'bg-red-500', primary: false }
         ];
       case 'preparing':
         return [
-          { label: 'Out for Delivery', nextStatus: 'out_for_delivery', color: 'bg-purple-500' }
+          { label: 'Out for Delivery', nextStatus: 'out_for_delivery', color: 'bg-purple-500', primary: true },
+          { label: 'Cancel Order', nextStatus: 'cancelled', color: 'bg-red-500', primary: false }
         ];
       case 'out_for_delivery':
         return [
-          { label: 'Complete', nextStatus: 'completed', color: 'bg-green-600' }
+          { label: 'Complete', nextStatus: 'completed', color: 'bg-green-600', primary: true },
+          { label: 'Cancel Order', nextStatus: 'cancelled', color: 'bg-red-500', primary: false }
         ];
       default:
         return [];
     }
   };
 
-  const handleAction = async (nextStatus) => {
+  const handleAction = async (nextStatus, requiresConfirmation = false) => {
+    // Confirm cancellation
+    if (nextStatus === 'cancelled') {
+      const confirmed = window.confirm(
+        'Are you sure you want to cancel this order? This action cannot be undone and the customer will be notified.'
+      );
+      if (!confirmed) return;
+    }
+
     setUpdating(true);
     await onStatusUpdate(order.order_id, nextStatus);
     setUpdating(false);
@@ -101,7 +112,9 @@ export default function OrderCard({ order, onStatusUpdate }) {
               key={index}
               onClick={() => handleAction(action.nextStatus)}
               disabled={updating}
-              className={`flex-1 ${action.color} text-white py-2 px-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm`}
+              className={`${action.primary ? 'flex-1' : ''} ${action.color} text-white py-2 px-4 rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm ${
+                !action.primary ? 'min-w-fit' : ''
+              }`}
             >
               {updating ? 'Updating...' : action.label}
             </button>
