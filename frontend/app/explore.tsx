@@ -1022,29 +1022,39 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
   }
 };
 
-// Fetch followers posts for map with caching
+// Fetch followers posts for map with caching (NO RADIUS LIMIT - worldwide)
 const fetchFollowersPosts = async (forceRefresh = false) => {
-  if (!userLocation) return;
+  if (!userLocation) {
+    console.log('⚠️  Cannot fetch followers posts - no user location');
+    return;
+  }
 
   // If we have cached followers posts and not forcing refresh, use cache
   if (!forceRefresh && cachedFollowersPosts.current.length > 0) {
-    console.log('Using cached followers posts:', cachedFollowersPosts.current.length);
+    console.log('✅ Using cached followers posts:', cachedFollowersPosts.current.length);
     setMapPosts(cachedFollowersPosts.current);
     return;
   }
 
   setMapLoading(true);
   try {
-    const url = `${API_URL}/map/followers-posts?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+    // No radius limit for followers - show all worldwide
+    const url = `${API_URL}/map/followers-posts?lat=${userLocation.latitude}&lng=${userLocation.longitude}`;
 
-    console.log('Fetching followers posts URL:', url);
+    console.log('🔍 Fetching followers posts (worldwide):', url);
 
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token || ""}` },
     });
 
+    console.log('📦 Followers API response:', response.data);
+
     const posts = response.data.posts || [];
-    console.log('Followers posts:', posts.length);
+    const followingCount = response.data.following_count || 0;
+    const message = response.data.message || '';
+
+    console.log(`✅ Followers posts received: ${posts.length} posts from ${followingCount} followed users`);
+    if (message) console.log(`ℹ️  Message: ${message}`);
 
     // Cache the followers posts
     cachedFollowersPosts.current = posts;
@@ -1052,7 +1062,7 @@ const fetchFollowersPosts = async (forceRefresh = false) => {
     setMapPosts(posts);
     setMapRestaurants([]); // Clear restaurants when showing followers
   } catch (error) {
-    console.log("Fetch followers posts error:", error);
+    console.error("❌ Fetch followers posts error:", error);
     // If there's an error, clear the map posts
     setMapPosts([]);
     setMapRestaurants([]);

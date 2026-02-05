@@ -686,25 +686,32 @@ async def batch_geocode_posts(
 async def get_followers_posts_on_map(
     lat: float = Query(..., description="User's current latitude"),
     lng: float = Query(..., description="User's current longitude"),
-    radius_km: float = Query(10, description="Search radius in kilometers"),
+    radius_km: float = Query(None, description="Search radius in kilometers (optional, ignored for followers)"),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get posts from user's followers on the map within radius.
-    Shows only posts from people the current user is following.
+    Get posts from user's followers on the map - shows ALL followers' posts worldwide.
+    Shows only posts from people the current user is following (no radius limit).
     """
     db = get_database()
     current_user_id = str(current_user["_id"])
 
+    print(f"🔍 Fetching followers posts for user: {current_user_id}")
+
     # Get list of users that current user is following
+    # Note: follows collection uses camelCase (followerId, followingId)
     following_users = await db.follows.find({
-        "follower_id": current_user_id
+        "followerId": current_user_id
     }).to_list(None)
 
-    following_ids = [follow["following_id"] for follow in following_users]
+    following_ids = [follow["followingId"] for follow in following_users]
+
+    print(f"👥 User is following {len(following_ids)} users/restaurants")
+    print(f"📋 Following IDs: {following_ids[:5]}..." if len(following_ids) > 5 else f"📋 Following IDs: {following_ids}")
 
     # If not following anyone, return empty
     if not following_ids:
+        print("⚠️  User is not following anyone")
         return {
             "posts": [],
             "message": "You are not following anyone yet"
@@ -719,6 +726,8 @@ async def get_followers_posts_on_map(
         "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
 
+    print(f"📍 Found {len(posts)} posts from followed users with coordinates")
+
     for post in posts:
         distance = calculate_distance_km(
             lat, lng,
@@ -726,30 +735,29 @@ async def get_followers_posts_on_map(
             post["longitude"]
         )
 
-        if distance <= radius_km:
-            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-            posts_pins.append({
-                "id": str(post["_id"]),
-                "type": "post",
-                "user_id": post["user_id"],
-                "username": user.get("full_name", "Unknown") if user else "Unknown",
-                "user_profile_picture": user.get("profile_picture") if user else None,
-                "user_level": user.get("level", 1) if user else 1,
-                "latitude": post["latitude"],
-                "longitude": post["longitude"],
-                "distance_km": round(distance, 2),
-                "media_url": post.get("media_url") or post.get("image_url"),
-                "thumbnail_url": post.get("thumbnail_url"),
-                "media_type": post.get("media_type", "image"),
-                "rating": post.get("rating"),
-                "location_name": post.get("location_name"),
-                "category": post.get("category"),
-                "review_text": post.get("review_text", "")[:100],
-                "likes_count": post.get("likes_count", 0),
-                "map_link": post.get("map_link"),
-                "tagged_restaurant_id": post.get("tagged_restaurant_id"),
-                "account_type": "user"
-            })
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        posts_pins.append({
+            "id": str(post["_id"]),
+            "type": "post",
+            "user_id": post["user_id"],
+            "username": user.get("full_name", "Unknown") if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_level": user.get("level", 1) if user else 1,
+            "latitude": post["latitude"],
+            "longitude": post["longitude"],
+            "distance_km": round(distance, 2),
+            "media_url": post.get("media_url") or post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "rating": post.get("rating"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "review_text": post.get("review_text", "")[:100],
+            "likes_count": post.get("likes_count", 0),
+            "map_link": post.get("map_link"),
+            "tagged_restaurant_id": post.get("tagged_restaurant_id"),
+            "account_type": "user"
+        })
 
     # ==================== RESTAURANT POSTS FROM FOLLOWED RESTAURANTS ====================
     restaurant_posts = await db.restaurant_posts.find({
@@ -758,6 +766,8 @@ async def get_followers_posts_on_map(
         "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
 
+    print(f"🍽️  Found {len(restaurant_posts)} posts from followed restaurants with coordinates")
+
     for post in restaurant_posts:
         distance = calculate_distance_km(
             lat, lng,
@@ -765,33 +775,34 @@ async def get_followers_posts_on_map(
             post["longitude"]
         )
 
-        if distance <= radius_km:
-            restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
-            posts_pins.append({
-                "id": str(post["_id"]),
-                "type": "restaurant_post",
-                "user_id": post["restaurant_id"],
-                "username": restaurant.get("restaurant_name", "Unknown") if restaurant else "Unknown",
-                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
-                "user_level": 0,
-                "latitude": post["latitude"],
-                "longitude": post["longitude"],
-                "distance_km": round(distance, 2),
-                "media_url": post.get("media_url") or post.get("image_url"),
-                "thumbnail_url": post.get("thumbnail_url"),
-                "media_type": post.get("media_type", "image"),
-                "rating": None,
-                "location_name": post.get("location_name"),
-                "category": post.get("category"),
-                "review_text": post.get("caption", "")[:100],
-                "likes_count": post.get("likes_count", 0),
-                "map_link": post.get("map_link"),
-                "tagged_restaurant_id": post.get("restaurant_id"),
-                "account_type": "restaurant"
-            })
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+        posts_pins.append({
+            "id": str(post["_id"]),
+            "type": "restaurant_post",
+            "user_id": post["restaurant_id"],
+            "username": restaurant.get("restaurant_name", "Unknown") if restaurant else "Unknown",
+            "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+            "user_level": 0,
+            "latitude": post["latitude"],
+            "longitude": post["longitude"],
+            "distance_km": round(distance, 2),
+            "media_url": post.get("media_url") or post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "rating": None,
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "review_text": post.get("caption", "")[:100],
+            "likes_count": post.get("likes_count", 0),
+            "map_link": post.get("map_link"),
+            "tagged_restaurant_id": post.get("restaurant_id"),
+            "account_type": "restaurant"
+        })
 
-    # Sort by distance
+    # Sort by distance (closest first)
     posts_pins.sort(key=lambda x: x["distance_km"])
+
+    print(f"✅ Returning {len(posts_pins)} total followers posts")
 
     return {
         "posts": posts_pins,
