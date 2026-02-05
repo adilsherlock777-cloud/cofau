@@ -183,12 +183,24 @@ async def get_restaurant_orders(
             except Exception as e:
                 print(f"Error fetching customer info: {e}")
 
+        # Get price from the post
+        price = None
+        post_id = order.get("post_id")
+        if post_id:
+            try:
+                post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+                if post:
+                    price = post.get("price")
+            except Exception as e:
+                print(f"Error fetching post price: {e}")
+
         result.append({
             "id": str(order["_id"]),
             "post_id": order.get("post_id"),
             "restaurant_id": order.get("restaurant_id"),
             "restaurant_name": order.get("restaurant_name"),
             "dish_name": order.get("dish_name"),
+            "price": price,
             "suggestions": order.get("suggestions", ""),
             "post_location": order.get("post_location"),
             "post_media_url": order.get("post_media_url"),

@@ -1265,6 +1265,14 @@ export default function LeaderboardScreen() {
                       ))}
                     </View>
 
+                    {/* Total Amount */}
+                    {order.price && (
+                      <View style={styles.orderTotalRow}>
+                        <Text style={styles.orderTotalLabel}>Total Amount:</Text>
+                        <Text style={styles.orderTotalAmount}>₹{order.price}</Text>
+                      </View>
+                    )}
+
                     {/* Suggestions/Notes */}
                     {order.suggestions && (
                       <View style={styles.orderNotesRow}>
@@ -1455,6 +1463,14 @@ export default function LeaderboardScreen() {
                             {order.delivery_address}
                           </Text>
                         )}
+                      </View>
+                    )}
+
+                    {/* Total Amount for restaurants */}
+                    {isRestaurant && order.price && (
+                      <View style={styles.orderTotalRowSmall}>
+                        <Text style={styles.orderTotalLabelSmall}>Total:</Text>
+                        <Text style={styles.orderTotalAmountSmall}>₹{order.price}</Text>
                       </View>
                     )}
 
@@ -2845,5 +2861,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 2,
+  },
+  orderTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: "#F0FFF0",
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  orderTotalLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  orderTotalAmount: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#4CAF50",
+  },
+  orderTotalRowSmall: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+  },
+  orderTotalLabelSmall: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  orderTotalAmountSmall: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#4CAF50",
   },
 });
