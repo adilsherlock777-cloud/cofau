@@ -807,12 +807,24 @@ async def submit_review(
 
     # Create review document
     restaurant_id = order.get("restaurant_id")
+    restaurant_name = order.get("restaurant_name")
+
+    print(f"📝 Creating review for order {order_id}")
+    print(f"   Order restaurant_id: {restaurant_id}")
+    print(f"   Order restaurant_name: {restaurant_name}")
+    print(f"   Customer: {customer_name}")
+    print(f"   Rating: {review_data.rating}/5")
+    print(f"   Is complaint: {review_data.is_complaint}")
+
+    if not restaurant_id:
+        print(f"   ⚠️ WARNING: Order has no restaurant_id! Review will not be linked to restaurant.")
+
     review_doc = {
         "order_id": order_id,
         "user_id": user_id,
         "customer_name": customer_name,
         "restaurant_id": restaurant_id,
-        "restaurant_name": order.get("restaurant_name"),
+        "restaurant_name": restaurant_name,
         "dish_name": order.get("dish_name"),
         "rating": review_data.rating,
         "review_text": review_data.review_text.strip(),
@@ -824,10 +836,8 @@ async def submit_review(
     result = await db.reviews.insert_one(review_doc)
     review_id = str(result.inserted_id)
 
-    print(f"✅ Review created: {review_id} for order {order_id}")
-    print(f"   Restaurant ID: {restaurant_id}")
-    print(f"   Customer: {customer_name}")
-    print(f"   Rating: {review_data.rating}/5")
+    print(f"✅ Review created: {review_id}")
+    print(f"   Stored with restaurant_id: {restaurant_id}")
 
     return {
         "success": True,
@@ -846,56 +856,50 @@ async def get_restaurant_reviews(
     print(f"🎯 get_restaurant_reviews endpoint hit!")
     print(f"   Skip: {skip}, Limit: {limit}")
     print(f"   Restaurant param received: {current_restaurant is not None}")
-    try:
-        db = get_database()
 
-        print(f"📋 Current restaurant object: {current_restaurant}")
+    db = get_database()
 
-        if not current_restaurant:
-            raise HTTPException(status_code=400, detail="Restaurant not authenticated")
+    print(f"📋 Current restaurant object: {current_restaurant}")
 
-        restaurant_id = str(current_restaurant.get("_id"))
+    if not current_restaurant:
+        print(f"   ❌ Restaurant not authenticated")
+        raise HTTPException(status_code=400, detail="Restaurant not authenticated")
 
-        if not restaurant_id:
-            raise HTTPException(status_code=400, detail="Restaurant ID not found")
+    restaurant_id = str(current_restaurant.get("_id"))
 
-        print(f"🔍 Fetching reviews for restaurant: {restaurant_id}")
-        print(f"   Restaurant name: {current_restaurant.get('restaurant_name')}")
+    if not restaurant_id:
+        print(f"   ❌ Restaurant ID not found in current_restaurant object")
+        raise HTTPException(status_code=400, detail="Restaurant ID not found")
 
-        # Debug: Check all reviews in database
-        all_reviews = await db.reviews.find().to_list(None)
-        print(f"   Total reviews in database: {len(all_reviews)}")
-        for rev in all_reviews:
-            print(f"   Review: restaurant_id={rev.get('restaurant_id')}, rating={rev.get('rating')}")
+    print(f"🔍 Fetching reviews for restaurant: {restaurant_id}")
+    print(f"   Restaurant name: {current_restaurant.get('restaurant_name')}")
 
-        # Find reviews for this restaurant
-        reviews = await db.reviews.find(
-            {"restaurant_id": restaurant_id}
-        ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Debug: Check all reviews in database
+    all_reviews = await db.reviews.find().to_list(None)
+    print(f"   Total reviews in database: {len(all_reviews)}")
+    for rev in all_reviews:
+        print(f"   Review: restaurant_id={rev.get('restaurant_id')}, rating={rev.get('rating')}")
 
-        print(f"   Found {len(reviews)} reviews matching restaurant_id={restaurant_id}")
+    # Find reviews for this restaurant
+    reviews = await db.reviews.find(
+        {"restaurant_id": restaurant_id}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
 
-        result = []
-        for review in reviews:
-            result.append({
-                "id": str(review["_id"]),
-                "order_id": review.get("order_id"),
-                "customer_name": review.get("customer_name", "Anonymous"),
-                "dish_name": review.get("dish_name"),
-                "rating": review.get("rating"),
-                "review_text": review.get("review_text"),
-                "is_complaint": review.get("is_complaint", False),
-                "created_at": review["created_at"].isoformat() if isinstance(review.get("created_at"), datetime) else review.get("created_at", ""),
-                "updated_at": review["updated_at"].isoformat() if isinstance(review.get("updated_at"), datetime) else review.get("updated_at", ""),
-            })
+    print(f"   Found {len(reviews)} reviews matching restaurant_id={restaurant_id}")
 
-        return result
+    result = []
+    for review in reviews:
+        result.append({
+            "id": str(review["_id"]),
+            "order_id": review.get("order_id"),
+            "customer_name": review.get("customer_name", "Anonymous"),
+            "dish_name": review.get("dish_name"),
+            "rating": review.get("rating"),
+            "review_text": review.get("review_text"),
+            "is_complaint": review.get("is_complaint", False),
+            "created_at": review["created_at"].isoformat() if isinstance(review.get("created_at"), datetime) else review.get("created_at", ""),
+            "updated_at": review["updated_at"].isoformat() if isinstance(review.get("updated_at"), datetime) else review.get("updated_at", ""),
+        })
 
-    except HTTPException as he:
-        print(f"❌ HTTPException in get_restaurant_reviews: {he.status_code} - {he.detail}")
-        raise
-    except Exception as e:
-        print(f"❌ Unexpected error in get_restaurant_reviews: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to fetch reviews: {str(e)}")
+    print(f"   ✅ Returning {len(result)} reviews")
+    return result

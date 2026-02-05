@@ -21,10 +21,17 @@ def verify_token(token: str):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
+        account_type = payload.get("account_type")
+        print(f"   🔓 Token decoded - email: {email}, account_type: {account_type}")
         if email is None:
+            print(f"   ⚠️ Token payload missing 'sub' field")
             return None
         return email
-    except JWTError:
+    except JWTError as e:
+        print(f"   ❌ JWT decode error: {str(e)}")
+        return None
+    except Exception as e:
+        print(f"   ❌ Unexpected error in verify_token: {str(e)}")
         return None
         
 def decode_access_token(token: str):

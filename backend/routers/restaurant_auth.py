@@ -13,32 +13,50 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/restaurant/auth/login")
 
 async def get_current_restaurant(token: str = Depends(oauth2_scheme)):
     """Get current authenticated restaurant"""
-    print(f"🔐 Authenticating restaurant with token...")
-    email = verify_token(token)
-    print(f"   Email from token: {email}")
+    try:
+        print(f"🔐 Authenticating restaurant with token...")
+        print(f"   Token preview: {token[:50]}..." if len(token) > 50 else f"   Token: {token}")
 
-    if email is None:
-        print(f"   ❌ Token verification failed")
+        email = verify_token(token)
+        print(f"   Email from token: {email}")
+
+        if email is None:
+            print(f"   ❌ Token verification failed - email is None")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials - token verification returned None",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        db = get_database()
+        restaurant = await db.restaurants.find_one({"email": email})
+
+        if restaurant is None:
+            print(f"   ❌ Restaurant not found in database for email: {email}")
+            # Debug: List all restaurant emails in database
+            all_restaurants = await db.restaurants.find().to_list(None)
+            print(f"   📋 All restaurants in DB ({len(all_restaurants)} total):")
+            for r in all_restaurants:
+                print(f"      - {r.get('email')} (ID: {r.get('_id')})")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Restaurant account not found for email: {email}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        print(f"   ✅ Restaurant authenticated: {restaurant.get('restaurant_name')} (ID: {restaurant.get('_id')})")
+        return restaurant
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"   ❌ Unexpected error in get_current_restaurant: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail=f"Authentication failed: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    db = get_database()
-    restaurant = await db.restaurants.find_one({"email": email})
-
-    if restaurant is None:
-        print(f"   ❌ Restaurant not found in database for email: {email}")
-        # Debug: List all restaurant emails in database
-        all_restaurants = await db.restaurants.find().to_list(None)
-        print(f"   📋 All restaurants in DB:")
-        for r in all_restaurants:
-            print(f"      - {r.get('email')} (ID: {r.get('_id')})")
-        raise HTTPException(status_code=404, detail="Restaurant not found")
-
-    print(f"   ✅ Restaurant authenticated: {restaurant.get('restaurant_name')} (ID: {restaurant.get('_id')})")
-    return restaurant
 
 
 @router.post("/signup", response_model=Token)
