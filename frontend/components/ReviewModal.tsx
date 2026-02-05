@@ -9,6 +9,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -48,7 +52,14 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
     setSubmitting(true);
     try {
-      await axios.post(
+      console.log('Submitting review for order:', order.id);
+      console.log('Review data:', {
+        rating,
+        review_text: reviewText,
+        is_complaint: isComplaint,
+      });
+
+      const response = await axios.post(
         `${BACKEND_URL}/api/orders/${order.id}/review`,
         {
           rating,
@@ -60,15 +71,28 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         }
       );
 
+      console.log('Review submitted successfully:', response.data);
       Alert.alert("Success", "Your review has been submitted successfully!");
       onReviewAdded();
       handleClose();
     } catch (error: any) {
       console.error("Error submitting review:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.error || "Failed to submit review. Please try again."
-      );
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+
+      let errorMessage = "Failed to submit review. Please try again.";
+
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert("Error", errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -90,18 +114,26 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       visible={visible}
       onRequestClose={handleClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {isComplaint ? "Submit Complaint" : "Add Review"}
-            </Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {isComplaint ? "Submit Complaint" : "Add Review"}
+                </Text>
+                <TouchableOpacity onPress={handleClose}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
             {/* Order Details */}
             <View style={styles.orderDetailsSection}>
               <Text style={styles.sectionLabel}>Order Details</Text>
@@ -233,9 +265,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 </>
               )}
             </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </View>
+              </ScrollView>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -251,7 +285,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    maxHeight: "90%",
+    maxHeight: "85%",
+    minHeight: "60%",
   },
   modalHeader: {
     flexDirection: "row",

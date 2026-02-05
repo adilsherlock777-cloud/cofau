@@ -41,6 +41,12 @@ class OrderCreate(BaseModel):
     longitude: Optional[float] = None
 
 
+class ReviewCreate(BaseModel):
+    rating: int
+    review_text: str
+    is_complaint: bool = False
+
+
 @router.post("/create")
 async def create_order(
     order_data: OrderCreate,
@@ -749,3 +755,105 @@ async def orders_websocket(websocket: WebSocket):
             await websocket.close(code=http_status.WS_1011_INTERNAL_ERROR, reason=str(e))
         except:
             pass
+
+
+# ==================== REVIEW ENDPOINTS ====================
+
+@router.post("/{order_id}/review")
+async def submit_review(
+    order_id: str,
+    review_data: ReviewCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit a review for a completed order"""
+    db = get_database()
+
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+
+    # Validate order exists and belongs to user
+    try:
+        order = await db.orders.find_one({"_id": ObjectId(order_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Verify ownership
+    if order.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to review this order")
+
+    # Check if order is completed
+    if order.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="Can only review completed orders")
+
+    # Check if review already exists
+    existing_review = await db.reviews.find_one({"order_id": order_id})
+    if existing_review:
+        raise HTTPException(status_code=400, detail="Review already submitted for this order")
+
+    # Validate rating (1-5)
+    if not 1 <= review_data.rating <= 5:
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
+
+    # Get customer info
+    customer_name = current_user.get("full_name", "Anonymous")
+
+    # Create review document
+    review_doc = {
+        "order_id": order_id,
+        "user_id": user_id,
+        "customer_name": customer_name,
+        "restaurant_id": order.get("restaurant_id"),
+        "restaurant_name": order.get("restaurant_name"),
+        "dish_name": order.get("dish_name"),
+        "rating": review_data.rating,
+        "review_text": review_data.review_text.strip(),
+        "is_complaint": review_data.is_complaint,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+
+    result = await db.reviews.insert_one(review_doc)
+    review_id = str(result.inserted_id)
+
+    print(f"✅ Review created: {review_id} for order {order_id}")
+
+    return {
+        "success": True,
+        "message": "Review submitted successfully",
+        "review_id": review_id,
+    }
+
+
+@router.get("/restaurant-reviews")
+async def get_restaurant_reviews(
+    skip: int = 0,
+    limit: int = 50,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Get all reviews for the current restaurant"""
+    db = get_database()
+
+    restaurant_id = str(current_restaurant.get("_id"))
+
+    # Find reviews for this restaurant
+    reviews = await db.reviews.find(
+        {"restaurant_id": restaurant_id}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    result = []
+    for review in reviews:
+        result.append({
+            "id": str(review["_id"]),
+            "order_id": review.get("order_id"),
+            "customer_name": review.get("customer_name", "Anonymous"),
+            "dish_name": review.get("dish_name"),
+            "rating": review.get("rating"),
+            "review_text": review.get("review_text"),
+            "is_complaint": review.get("is_complaint", False),
+            "created_at": review["created_at"].isoformat() if isinstance(review.get("created_at"), datetime) else review.get("created_at", ""),
+            "updated_at": review["updated_at"].isoformat() if isinstance(review.get("updated_at"), datetime) else review.get("updated_at", ""),
+        })
+
+    return result
