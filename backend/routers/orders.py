@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect, status as http_status
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 from database import get_database
 from routers.auth import get_current_user
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict
 import re
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
@@ -1187,3 +1187,126 @@ async def get_restaurant_reviews_by_id(
 
     print(f"   ✅ Returning {len(result)} reviews")
     return result
+
+
+# ==================== RESTAURANT SALES ANALYTICS ====================
+
+@router.get("/restaurant/analytics")
+async def get_restaurant_sales_analytics(
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """
+    Get sales analytics for restaurant dashboard.
+    Returns: total sales, orders, weekly/monthly growth, daily sales data
+    """
+    db = get_database()
+    restaurant_id = str(current_restaurant.get("_id"))
+
+    now = datetime.utcnow()
+    one_week_ago = now - timedelta(days=7)
+    two_weeks_ago = now - timedelta(days=14)
+    one_month_ago = now - timedelta(days=30)
+    two_months_ago = now - timedelta(days=60)
+
+    # ==================== TOTAL SALES & ORDERS ====================
+    # Get all completed orders for this restaurant
+    all_completed_orders = await db.orders.find({
+        "restaurant_id": restaurant_id,
+        "status": "completed"
+    }).to_list(None)
+
+    total_orders = len(all_completed_orders)
+    total_sales = sum(order.get("total_price", 0) or order.get("price", 0) or 0
+                      for order in all_completed_orders)
+
+    # ==================== THIS WEEK VS LAST WEEK ====================
+    orders_this_week = await db.orders.find({
+        "restaurant_id": restaurant_id,
+        "status": "completed",
+        "created_at": {"$gte": one_week_ago}
+    }).to_list(None)
+
+    orders_last_week = await db.orders.find({
+        "restaurant_id": restaurant_id,
+        "status": "completed",
+        "created_at": {"$gte": two_weeks_ago, "$lt": one_week_ago}
+    }).to_list(None)
+
+    orders_count_this_week = len(orders_this_week)
+    orders_count_last_week = len(orders_last_week)
+
+    sales_this_week = sum(order.get("total_price", 0) or order.get("price", 0) or 0
+                          for order in orders_this_week)
+    sales_last_week = sum(order.get("total_price", 0) or order.get("price", 0) or 0
+                          for order in orders_last_week)
+
+    # Calculate week growth
+    if orders_count_last_week == 0:
+        week_growth = 100.0 if orders_count_this_week > 0 else 0.0
+    else:
+        week_growth = ((orders_count_this_week - orders_count_last_week) / orders_count_last_week) * 100
+
+    # ==================== THIS MONTH VS LAST MONTH ====================
+    orders_this_month = await db.orders.find({
+        "restaurant_id": restaurant_id,
+        "status": "completed",
+        "created_at": {"$gte": one_month_ago}
+    }).to_list(None)
+
+    orders_last_month = await db.orders.find({
+        "restaurant_id": restaurant_id,
+        "status": "completed",
+        "created_at": {"$gte": two_months_ago, "$lt": one_month_ago}
+    }).to_list(None)
+
+    orders_count_this_month = len(orders_this_month)
+    orders_count_last_month = len(orders_last_month)
+
+    sales_this_month = sum(order.get("total_price", 0) or order.get("price", 0) or 0
+                           for order in orders_this_month)
+    sales_last_month = sum(order.get("total_price", 0) or order.get("price", 0) or 0
+                           for order in orders_last_month)
+
+    # Calculate month growth
+    if orders_count_last_month == 0:
+        month_growth = 100.0 if orders_count_this_month > 0 else 0.0
+    else:
+        month_growth = ((orders_count_this_month - orders_count_last_month) / orders_count_last_month) * 100
+
+    # ==================== DAILY SALES (Last 7 Days) ====================
+    daily_sales: List[Dict] = []
+    for i in range(6, -1, -1):  # Last 7 days
+        day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+
+        day_orders = await db.orders.find({
+            "restaurant_id": restaurant_id,
+            "status": "completed",
+            "created_at": {"$gte": day_start, "$lt": day_end}
+        }).to_list(None)
+
+        day_sales = sum(order.get("total_price", 0) or order.get("price", 0) or 0
+                       for order in day_orders)
+
+        daily_sales.append({
+            "date": day_start.strftime("%Y-%m-%d"),
+            "sales": float(day_sales),
+            "orders": len(day_orders)
+        })
+
+    # ==================== BUILD RESPONSE ====================
+    return {
+        "total_sales": float(total_sales),
+        "total_orders": total_orders,
+        "week_growth": round(week_growth, 1),
+        "month_growth": round(month_growth, 1),
+        "orders_this_week": orders_count_this_week,
+        "orders_this_month": orders_count_this_month,
+        "orders_last_week": orders_count_last_week,
+        "orders_last_month": orders_count_last_month,
+        "sales_this_week": float(sales_this_week),
+        "sales_this_month": float(sales_this_month),
+        "sales_last_week": float(sales_last_week),
+        "sales_last_month": float(sales_last_month),
+        "daily_sales": daily_sales
+    }

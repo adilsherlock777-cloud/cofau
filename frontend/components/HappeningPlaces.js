@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { BlurView } from 'expo-blur';
 import * as Location from 'expo-location';
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import { SalesDashboard } from './SalesDashboard';
 
 export const options = {
   headerShown: false,
@@ -145,7 +146,8 @@ const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayo
 
 export default function HappeningPlaces() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, accountType } = useAuth();
+  const isRestaurant = accountType === 'restaurant';
   
   // ============================================
   // STATE DECLARATIONS
@@ -475,6 +477,87 @@ export default function HappeningPlaces() {
   // MAIN RENDER
   // ============================================
 
+  // If restaurant user, show Sales Dashboard instead
+  if (isRestaurant) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.container}>
+          {/* Header Container - Gradient with Premium Finish */}
+          <View style={styles.headerContainer}>
+            <LinearGradient
+              colors={["#FFF5F0", "#FFE5D9"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientHeader}
+            >
+            </LinearGradient>
+          </View>
+
+          {/* Title Box */}
+          <View style={styles.titleBoxWrapper}>
+            <BlurView intensity={60} tint="light" style={styles.titleBox}>
+              <Text style={styles.titleMain}>Sales Dashboard</Text>
+              <View style={styles.subtitleRow}>
+                <Ionicons name="analytics" size={16} color="#E94A37" />
+                <Text style={styles.titleSub}>Your Restaurant Performance</Text>
+              </View>
+            </BlurView>
+          </View>
+
+          {/* Sales Dashboard Component */}
+          <SalesDashboard token={token || ""} />
+
+          {/* Bottom Navigation */}
+          <View style={styles.navBar}>
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => router.push('/feed')}
+            >
+              <Ionicons name="home-outline" size={20} color="#000" />
+              <Text style={styles.navLabel}>Home</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => router.push('/explore')}
+            >
+              <Ionicons name="compass-outline" size={20} color="#000" />
+              <Text style={styles.navLabel}>Explore</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.centerNavItem}
+              onPress={() => router.push('/leaderboard')}
+            >
+              <View style={styles.centerIconCircle}>
+                <Ionicons name="fast-food" size={22} color="#000" />
+              </View>
+              <Text style={styles.navLabel}>Delivery</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => router.push('/happening')}
+            >
+              <Ionicons name="location" size={20} color="#000" />
+              <Text style={styles.navLabelActive}>Happening</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => router.push('/profile')}
+            >
+              <Ionicons name="person-outline" size={20} color="#000" />
+              <Text style={styles.navLabel}>Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  // Regular users see the normal happening places content
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
