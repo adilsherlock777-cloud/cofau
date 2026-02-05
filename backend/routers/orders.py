@@ -1041,19 +1041,6 @@ async def get_restaurant_reviews_by_id(
     print(f"🔍 Fetching reviews from 'reviews' collection for restaurant: {restaurant_id}")
     print(f"   Restaurant name: {restaurant.get('restaurant_name')}")
 
-    if not restaurant_id:
-        print(f"   ❌ Restaurant ID not found in current_restaurant object")
-        raise HTTPException(status_code=400, detail="Restaurant ID not found")
-
-    print(f"🔍 Fetching reviews for restaurant: {restaurant_id}")
-    print(f"   Restaurant name: {current_restaurant.get('restaurant_name')}")
-
-    # Debug: Check all reviews in database
-    all_reviews = await db.reviews.find().to_list(None)
-    print(f"   Total reviews in database: {len(all_reviews)}")
-    for rev in all_reviews:
-        print(f"   Review: restaurant_id={rev.get('restaurant_id')}, rating={rev.get('rating')}")
-
     # Find reviews for this restaurant
     reviews = await db.reviews.find(
         {"restaurant_id": restaurant_id}

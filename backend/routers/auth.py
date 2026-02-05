@@ -185,8 +185,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
             "badge": "verified" if current_user.get("is_verified", False) else None,
             "followers_count": current_user.get("followers_count", 0),
             "following_count": current_user.get("following_count", 0),
-            "phone_number": user.phone_number,      # ADD
-            "phone_verified": user.phone_verified,  # ADD
+            "phone_number": current_user.get("phone_number"),
+            "phone_verified": current_user.get("phone_verified", False),
             "account_type": "restaurant",
             "created_at": current_user["created_at"]
         }
