@@ -46,18 +46,26 @@ async def get_user_id_from_token(token: str) -> str:
     """Get user_id from JWT token by decoding and looking up user in database"""
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
-    
+
     try:
         payload = decode_access_token(token)
         email = payload.get("sub")
+        account_type = payload.get("account_type", "user")
+
         if not email:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token: no email in payload")
-        
+
         db = get_database()
-        user = await db.users.find_one({"email": email})
+
+        # Check appropriate collection based on account type
+        if account_type == "restaurant":
+            user = await db.restaurants.find_one({"email": email})
+        else:
+            user = await db.users.find_one({"email": email})
+
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-        
+
         return str(user["_id"])
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
@@ -250,15 +258,28 @@ async def get_chat_list(current_user: dict = Depends(get_current_user)):
 
     chat_list = []
     for other_id, m in last_by_other.items():
+        # Check both users and restaurants collections
         user = await db.users.find_one({"_id": ObjectId(other_id)})
-        chat_list.append({
-            "other_user_id": other_id,
-            "other_user_name": user["full_name"] if user else "Unknown",
-            "other_user_profile_picture": user.get("profile_picture") if user else None,
-            "last_message": m["message"],
-            "last_from_me": m["from_user"] == current_user_id,
-            "created_at": m["created_at"].isoformat() + "Z",
-        })
+        account_type = "user"
+
+        if not user:
+            # Check restaurants collection
+            user = await db.restaurants.find_one({"_id": ObjectId(other_id)})
+            account_type = "restaurant"
+
+        if user:
+            # Get name based on account type
+            other_name = user.get("restaurant_name") if account_type == "restaurant" else user.get("full_name")
+
+            chat_list.append({
+                "other_user_id": other_id,
+                "other_user_name": other_name or "Unknown",
+                "other_user_profile_picture": user.get("profile_picture"),
+                "account_type": account_type,
+                "last_message": m["message"],
+                "last_from_me": m["from_user"] == current_user_id,
+                "created_at": m["created_at"].isoformat() + "Z",
+            })
 
     chat_list.sort(key=lambda x: x["created_at"], reverse=True)
     return chat_list

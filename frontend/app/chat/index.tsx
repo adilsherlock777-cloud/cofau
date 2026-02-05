@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
+  SectionList,
   TextInput,
   Platform,
 } from "react-native";
@@ -33,17 +33,23 @@ interface ChatItem {
   other_user_id: string;
   other_user_name: string;
   other_user_profile_picture?: string | null;
+  account_type?: string;
   last_message?: string;
   last_from_me?: boolean;
   created_at?: string;
   unread_count?: number;
 }
 
+interface ChatSection {
+  title: string;
+  data: ChatItem[];
+}
+
 export default function ChatListScreen() {
   const { token } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<ChatItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<ChatItem[]>([]);
+  const [sections, setSections] = useState<ChatSection[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
 useEffect(() => {
@@ -70,7 +76,7 @@ useEffect(() => {
       }));
 
       setItems(mapped);
-      setFilteredItems(mapped);
+      updateSections(mapped, searchQuery);
     } catch (err: any) {
       console.log("Chat list error", err?.response?.data || err?.message);
     }
@@ -79,18 +85,38 @@ useEffect(() => {
   fetchChatList();
 }, [token]);
 
-  // Filter chats based on search query
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredItems(items);
-    } else {
-      const filtered = items.filter((item) =>
+  // Update sections when items or search changes
+  const updateSections = (chatItems: ChatItem[], query: string) => {
+    let filteredItems = chatItems;
+
+    if (query.trim() !== "") {
+      filteredItems = chatItems.filter((item) =>
         item.other_user_name
           ?.toLowerCase()
-          .includes(searchQuery.toLowerCase())
+          .includes(query.toLowerCase())
       );
-      setFilteredItems(filtered);
     }
+
+    // Separate users and restaurants
+    const users = filteredItems.filter((item) => item.account_type !== "restaurant");
+    const restaurants = filteredItems.filter((item) => item.account_type === "restaurant");
+
+    const newSections: ChatSection[] = [];
+
+    if (users.length > 0) {
+      newSections.push({ title: "Users", data: users });
+    }
+
+    if (restaurants.length > 0) {
+      newSections.push({ title: "Restaurants", data: restaurants });
+    }
+
+    setSections(newSections);
+  };
+
+  // Filter chats based on search query
+  useEffect(() => {
+    updateSections(items, searchQuery);
   }, [searchQuery, items]);
 
   const formatTime = (timestamp?: string) => {
@@ -241,10 +267,15 @@ useEffect(() => {
       </LinearGradient>
 
       {/* Chat List */}
-      <FlatList
-        data={filteredItems}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.other_user_id}
         renderItem={renderItem}
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{title}</Text>
+          </View>
+        )}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={() => (
@@ -261,6 +292,7 @@ useEffect(() => {
           </View>
         )}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
       />
     </View>
   );
@@ -430,5 +462,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#8E8E93",
     textAlign: "center",
+  },
+  sectionHeader: {
+    backgroundColor: "#F8F9FA",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  sectionHeaderText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });

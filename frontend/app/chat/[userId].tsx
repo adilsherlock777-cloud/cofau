@@ -47,7 +47,7 @@ interface Message {
 
 export default function ChatScreen() {
   const { user, token } = useAuth() as { user: any; token: string | null };
-  const { userId, fullName, profilePicture } = useLocalSearchParams();
+  const { userId, fullName, profilePicture, autoSendOrderCard, orderDetails } = useLocalSearchParams();
   const router = useRouter();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -64,6 +64,8 @@ export default function ChatScreen() {
 
   const currentUserId = user?.id || user?._id;
   const otherUserId = userId as string;
+  const [hasAutoSent, setHasAutoSent] = useState(false);
+
  // Check if user is blocked on mount and mark messages as read
 useEffect(() => {
   checkBlockStatus();
@@ -183,6 +185,65 @@ const markMessagesAsRead = async () => {
       }
     };
   }, [token, userId]);
+
+  // Auto-send order review card when coming from leaderboard
+  useEffect(() => {
+    if (autoSendOrderCard === "true" && orderDetails && !hasAutoSent && wsRef.current) {
+      const sendOrderCard = async () => {
+        // Wait for WebSocket to be ready
+        let attempts = 0;
+        while (wsRef.current?.readyState === WebSocket.CONNECTING && attempts < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          try {
+            const parsedOrderDetails = orderDetails ? JSON.parse(orderDetails as string) : null;
+
+            if (!parsedOrderDetails) return;
+
+            // Format the order details message as a card-like text
+            const orderId = parsedOrderDetails.order_id
+              ? `Order #${parsedOrderDetails.order_id.slice(0, 8)}`
+              : "Order";
+            const date = parsedOrderDetails.created_at
+              ? new Date(parsedOrderDetails.created_at).toLocaleDateString()
+              : "";
+
+            let messageText = "";
+            if (parsedOrderDetails.is_complaint) {
+              messageText = `📢 Regarding Your Complaint\n\n`;
+              messageText += `${orderId}${date ? ` • ${date}` : ""}\n`;
+              messageText += `Dish: ${parsedOrderDetails.dish_name}\n`;
+              messageText += `Rating: ${parsedOrderDetails.rating}⭐\n\n`;
+              messageText += `"${parsedOrderDetails.review_text}"\n\n`;
+              messageText += `I'd like to discuss your complaint and resolve this issue. How can I help?`;
+            } else {
+              messageText = `✨ Thank You for Your Review!\n\n`;
+              messageText += `${orderId}${date ? ` • ${date}` : ""}\n`;
+              messageText += `Dish: ${parsedOrderDetails.dish_name}\n`;
+              messageText += `Rating: ${parsedOrderDetails.rating}⭐\n\n`;
+              messageText += `"${parsedOrderDetails.review_text}"\n\n`;
+              messageText += `We appreciate your feedback! Is there anything else we can help you with?`;
+            }
+
+            // Send the formatted message
+            wsRef.current.send(JSON.stringify({
+              message: messageText
+            }));
+
+            console.log("📤 Auto-sent order card message");
+            setHasAutoSent(true);
+          } catch (error) {
+            console.error("❌ Error auto-sending order card:", error);
+          }
+        }
+      };
+
+      sendOrderCard();
+    }
+  }, [autoSendOrderCard, hasAutoSent, orderDetails, wsRef.current?.readyState]);
 
   const sendMsg = async () => {
     const text = input.trim();
@@ -483,8 +544,7 @@ const markMessagesAsRead = async () => {
 
       {/* Cofau Gradient Header */}
       <LinearGradient
-        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
-        locations={[0, 0.5, 1]}
+        colors={["#FFF5F0", "#FFE5D9"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.header}
@@ -494,7 +554,7 @@ const markMessagesAsRead = async () => {
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Chat</Text>
           <View style={styles.headerSpacer} />
@@ -651,19 +711,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: { 
+  headerTitle: {
     flex: 1,
     marginLeft: 12,
-    fontSize: 20, 
+    fontSize: 20,
     fontWeight: "700",
-    color: "#fff",
-    textShadowColor: "rgba(0, 0, 0, 0.15)",
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 3,
+    color: "#333",
+    textShadowColor: "rgba(255, 255, 255, 0.5)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   headerSpacer: {
     width: 40,

@@ -1718,8 +1718,20 @@ export default function LeaderboardScreen() {
                       style={styles.reviewMessageButton}
                       onPress={() => {
                         router.push({
-                          pathname: "/chat",
-                          params: { userId: review.user_id }
+                          pathname: `/chat/${review.user_id}`,
+                          params: {
+                            fullName: review.customer_name || "Customer",
+                            profilePicture: review.customer_profile_picture || "",
+                            autoSendOrderCard: "true",
+                            orderDetails: JSON.stringify({
+                              dish_name: review.dish_name,
+                              rating: review.rating,
+                              order_id: review.order_id,
+                              review_text: review.review_text,
+                              is_complaint: review.is_complaint,
+                              created_at: review.created_at
+                            })
+                          }
                         });
                       }}
                       activeOpacity={0.7}
