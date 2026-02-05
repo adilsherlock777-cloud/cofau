@@ -1050,10 +1050,23 @@ async def get_restaurant_reviews_by_id(
 
     result = []
     for review in reviews:
+        # Get user profile picture
+        user_id = review.get("user_id")
+        user_profile_picture = None
+        if user_id:
+            try:
+                user = await db.users.find_one({"_id": ObjectId(user_id)})
+                if user:
+                    user_profile_picture = user.get("profile_picture")
+            except Exception as e:
+                print(f"   ⚠️ Error fetching user profile picture: {e}")
+
         result.append({
             "id": str(review["_id"]),
             "order_id": review.get("order_id"),
+            "user_id": user_id,
             "customer_name": review.get("customer_name", "Anonymous"),
+            "customer_profile_picture": user_profile_picture,
             "dish_name": review.get("dish_name"),
             "rating": review.get("rating"),
             "review_text": review.get("review_text"),

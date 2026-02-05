@@ -2915,56 +2915,7 @@ async def get_suggested_users(
     
     return result
 
-@app.get("/api/users/me")
-async def get_current_user_profile(current_user: dict = Depends(get_current_user)):
-    """Get current user's own profile"""
-    # Check if it's a restaurant account
-    if current_user.get("account_type") == "restaurant":
-        return {
-            "id": str(current_user["_id"]),
-            "full_name": current_user.get("restaurant_name", "Restaurant"),
-            "username": current_user.get("restaurant_name", "Restaurant"),
-            "restaurant_name": current_user.get("restaurant_name"),
-            "email": current_user["email"],
-            "profile_picture": current_user.get("profile_picture"),
-            "bio": current_user.get("bio"),
-            "points": 0,
-            "level": None,
-            "currentPoints": 0,
-            "requiredPoints": 0,
-            "title": "Restaurant",
-            "badge": "verified" if current_user.get("is_verified", False) else None,
-            "followers_count": current_user.get("followers_count", 0),
-            "following_count": current_user.get("following_count", 0),
-            "phone_number": current_user.get("phone_number"),
-            "phone_verified": current_user.get("phone_verified", False),
-            "account_type": "restaurant",
-            "created_at": current_user["created_at"]
-        }
-
-    # Regular user response
-    return {
-        "id": str(current_user["_id"]),
-        "full_name": current_user["full_name"],
-        "username": current_user.get("username"),
-        "email": current_user["email"],
-        "profile_picture": current_user.get("profile_picture"),
-        "bio": current_user.get("bio"),
-        "points": current_user.get("points", 0),
-        "level": current_user.get("level", 1),
-        "currentPoints": current_user.get("currentPoints", 0),
-        "requiredPoints": current_user.get("requiredPoints", 1250),
-        "title": current_user.get("title", "Reviewer"),
-        "badge": current_user.get("badge"),
-        "followers_count": current_user.get("followers_count", 0),
-        "following_count": current_user.get("following_count", 0),
-        "completed_deliveries_count": current_user.get("completed_deliveries_count", 0),
-        "wallet_balance": current_user.get("wallet_balance", 0.0),
-        "account_type": "user",
-        "created_at": current_user["created_at"]
-    }
-
-
+# ==================== USER PROFILE ENDPOINTS ====================
 
 @app.get("/api/users/{user_id}")
 async def get_user_profile(user_id: str, current_user: dict = Depends(get_current_user)):

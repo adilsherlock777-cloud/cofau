@@ -1673,6 +1673,19 @@ export default function LeaderboardScreen() {
               restaurantReviews.map((review) => (
                 <View key={review.id} style={styles.reviewCard}>
                   <View style={styles.reviewHeader}>
+                    {/* Customer Avatar */}
+                    {review.customer_profile_picture ? (
+                      <Image
+                        source={{ uri: fixUrl(review.customer_profile_picture) }}
+                        style={styles.reviewCustomerAvatar}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.reviewCustomerAvatar}>
+                        <Ionicons name="person" size={20} color="#FFF" />
+                      </View>
+                    )}
+
                     <View style={styles.reviewOrderInfo}>
                       <Text style={styles.reviewOrderDish}>{review.dish_name}</Text>
                       <Text style={styles.reviewCustomerName}>
@@ -1697,6 +1710,23 @@ export default function LeaderboardScreen() {
                     <Text style={styles.reviewTimeText}>
                       Order #{review.order_id.slice(0, 8)} • {new Date(review.created_at).toLocaleDateString()}
                     </Text>
+                  )}
+
+                  {/* Message Button */}
+                  {review.user_id && (
+                    <TouchableOpacity
+                      style={styles.reviewMessageButton}
+                      onPress={() => {
+                        router.push({
+                          pathname: "/chat",
+                          params: { userId: review.user_id }
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="chatbubble-outline" size={16} color="#FF8C00" />
+                      <Text style={styles.reviewMessageButtonText}>Send Message</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               ))
@@ -3191,6 +3221,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 12,
   },
+  reviewCustomerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FF8C00",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
   reviewOrderInfo: {
     flex: 1,
     marginRight: 12,
@@ -3237,6 +3276,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
     marginTop: 8,
+  },
+  reviewMessageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF9E6",
+    borderWidth: 1,
+    borderColor: "#FF8C00",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 6,
+  },
+  reviewMessageButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FF8C00",
   },
   // Rewards Tab Styles
   rewardsCard: {
