@@ -207,6 +207,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "badge": current_user.get("badge"),
         "followers_count": current_user.get("followers_count", 0),
         "following_count": current_user.get("following_count", 0),
+        "completed_deliveries_count": current_user.get("completed_deliveries_count", 0),
         "account_type": "user",
         "created_at": current_user["created_at"]
     }

@@ -467,18 +467,70 @@ async def update_order_status(
         raise HTTPException(status_code=404, detail="Order not found")
 
     # Update the order status
+    now = datetime.utcnow()
     result = await db.orders.update_one(
         {"_id": ObjectId(order_id)},
         {
             "$set": {
                 "status": status,
-                "updated_at": datetime.utcnow()
+                "updated_at": now
             }
         }
     )
 
     if result.modified_count == 0:
         raise HTTPException(status_code=400, detail="Failed to update order status")
+
+    print(f"✅ Order {order_id} updated to {status}")
+
+    # If order is completed, track user's delivery reward progress
+    if status == "completed":
+        user_id = order.get("user_id")
+        if user_id:
+            try:
+                # Get user's current completed deliveries count
+                user = await db.users.find_one({"_id": ObjectId(user_id)})
+                if user:
+                    completed_deliveries = user.get("completed_deliveries_count", 0)
+                    completed_deliveries += 1
+
+                    print(f"💰 User {user_id} completed delivery {completed_deliveries}/10")
+
+                    # Check if user reached 10 deliveries
+                    if completed_deliveries >= 10:
+                        # Add ₹100 to wallet
+                        current_balance = user.get("wallet_balance", 0.0)
+                        new_balance = current_balance + 100.0
+
+                        await db.users.update_one(
+                            {"_id": ObjectId(user_id)},
+                            {
+                                "$set": {
+                                    "wallet_balance": new_balance,
+                                    "completed_deliveries_count": 0  # Reset counter
+                                }
+                            }
+                        )
+
+                        # Create wallet transaction
+                        transaction_doc = {
+                            "user_id": user_id,
+                            "amount": 100.0,
+                            "type": "earning",
+                            "description": "Earned for completing 10 deliveries",
+                            "created_at": now
+                        }
+                        await db.wallet_transactions.insert_one(transaction_doc)
+
+                        print(f"🎉 User {user_id} earned ₹100 for completing 10 deliveries! Balance: ₹{new_balance}")
+                    else:
+                        # Just increment the counter
+                        await db.users.update_one(
+                            {"_id": ObjectId(user_id)},
+                            {"$set": {"completed_deliveries_count": completed_deliveries}}
+                        )
+            except Exception as e:
+                print(f"⚠️ Error tracking delivery reward: {e}")
 
     return {
         "success": True,
@@ -730,6 +782,53 @@ async def update_order_status_partner(
             print(f"📡 Sent WebSocket update to user {user_id} for order {order_id}")
         except Exception as e:
             print(f"⚠️ Failed to send WebSocket update: {str(e)}")
+
+    # If order is completed, track user's delivery reward progress
+    if status == "completed" and user_id:
+        try:
+            # Get user's current completed deliveries count
+            user = await db.users.find_one({"_id": ObjectId(user_id)})
+            if user:
+                completed_deliveries = user.get("completed_deliveries_count", 0)
+                completed_deliveries += 1
+
+                print(f"💰 User {user_id} completed delivery {completed_deliveries}/10 (via partner)")
+
+                # Check if user reached 10 deliveries
+                if completed_deliveries >= 10:
+                    # Add ₹100 to wallet
+                    current_balance = user.get("wallet_balance", 0.0)
+                    new_balance = current_balance + 100.0
+
+                    await db.users.update_one(
+                        {"_id": ObjectId(user_id)},
+                        {
+                            "$set": {
+                                "wallet_balance": new_balance,
+                                "completed_deliveries_count": 0  # Reset counter
+                            }
+                        }
+                    )
+
+                    # Create wallet transaction
+                    transaction_doc = {
+                        "user_id": user_id,
+                        "amount": 100.0,
+                        "type": "earning",
+                        "description": "Earned for completing 10 deliveries",
+                        "created_at": now
+                    }
+                    await db.wallet_transactions.insert_one(transaction_doc)
+
+                    print(f"🎉 User {user_id} earned ₹100 for completing 10 deliveries! Balance: ₹{new_balance}")
+                else:
+                    # Just increment the counter
+                    await db.users.update_one(
+                        {"_id": ObjectId(user_id)},
+                        {"$set": {"completed_deliveries_count": completed_deliveries}}
+                    )
+        except Exception as e:
+            print(f"⚠️ Error tracking delivery reward: {e}")
 
     return {
         "success": True,

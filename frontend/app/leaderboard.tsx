@@ -14,7 +14,7 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { LocationSelector } from "../components/LocationSelector";
 import { WalletBalanceModal } from "../components/WalletBalanceModal";
@@ -335,6 +335,15 @@ export default function LeaderboardScreen() {
   const handleAddReview = (order: any) => {
     setSelectedOrderForReview(order);
     setShowReviewModal(true);
+
+  // Auto-refresh delivery rewards when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isRestaurant && activeTab === "Rewards") {
+        fetchDeliveryRewardProgress();
+      }
+    }, [isRestaurant, activeTab])
+  );
   };
 
   // WebSocket connection for real-time order updates with fallback polling
