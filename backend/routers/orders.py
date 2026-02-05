@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/orders", tags=["Orders"])
 from routers.chat import manager as websocket_manager
 from utils.jwt import decode_access_token, verify_token
 from routers.restaurant_auth import oauth2_scheme
+from routers.notifications import create_notification
 
 # Partner PIN (hardcoded for now - can be moved to env later)
 PARTNER_PIN = "1234"
@@ -334,6 +335,41 @@ async def update_restaurant_order_status(
 
     print(f"✅ Restaurant {restaurant_id} updated order {order_id} to {status}")
 
+    # Send notifications when order status changes to "preparing" (In Progress)
+    if status == "preparing":
+        user_id = order.get("user_id")
+        restaurant_name = order.get("restaurant_name", "Restaurant")
+        dish_name = order.get("dish_name", "your order")
+
+        # Notify the customer
+        if user_id:
+            try:
+                await create_notification(
+                    db=db,
+                    notification_type="order_preparing",
+                    from_user_id=restaurant_id,
+                    to_user_id=user_id,
+                    message=f"🍳 {restaurant_name} is now preparing {dish_name}!",
+                    send_push=True
+                )
+                print(f"✅ Sent 'preparing' notification to customer {user_id}")
+            except Exception as e:
+                print(f"⚠️ Error sending notification to customer: {e}")
+
+        # Notify the restaurant (confirmation)
+        try:
+            await create_notification(
+                db=db,
+                notification_type="order_in_progress",
+                from_user_id=user_id if user_id else restaurant_id,
+                to_user_id=restaurant_id,
+                message=f"✅ Order for {dish_name} is now In Progress",
+                send_push=True
+            )
+            print(f"✅ Sent 'in progress' confirmation to restaurant {restaurant_id}")
+        except Exception as e:
+            print(f"⚠️ Error sending notification to restaurant: {e}")
+
     # If order is completed, track user's delivery reward progress
     if status == "completed":
         user_id = order.get("user_id")
@@ -482,6 +518,43 @@ async def update_order_status(
         raise HTTPException(status_code=400, detail="Failed to update order status")
 
     print(f"✅ Order {order_id} updated to {status}")
+
+    # Send notifications when order status changes to "preparing" (In Progress)
+    if status == "preparing":
+        user_id = order.get("user_id")
+        restaurant_id = order.get("restaurant_id")
+        restaurant_name = order.get("restaurant_name", "Restaurant")
+        dish_name = order.get("dish_name", "your order")
+
+        # Notify the customer
+        if user_id and restaurant_id:
+            try:
+                await create_notification(
+                    db=db,
+                    notification_type="order_preparing",
+                    from_user_id=restaurant_id,
+                    to_user_id=user_id,
+                    message=f"🍳 {restaurant_name} is now preparing {dish_name}!",
+                    send_push=True
+                )
+                print(f"✅ Sent 'preparing' notification to customer {user_id}")
+            except Exception as e:
+                print(f"⚠️ Error sending notification to customer: {e}")
+
+        # Notify the restaurant (confirmation)
+        if restaurant_id:
+            try:
+                await create_notification(
+                    db=db,
+                    notification_type="order_in_progress",
+                    from_user_id=user_id if user_id else restaurant_id,
+                    to_user_id=restaurant_id,
+                    message=f"✅ Order for {dish_name} is now In Progress",
+                    send_push=True
+                )
+                print(f"✅ Sent 'in progress' confirmation to restaurant {restaurant_id}")
+            except Exception as e:
+                print(f"⚠️ Error sending notification to restaurant: {e}")
 
     # If order is completed, track user's delivery reward progress
     if status == "completed":
@@ -768,6 +841,43 @@ async def update_order_status_partner(
         raise HTTPException(status_code=400, detail="Failed to update order status")
 
     print(f"✅ Partner updated order {order_id} to {status}")
+
+    # Send notifications when order status changes to "preparing" (In Progress)
+    if status == "preparing":
+        user_id = order.get("user_id")
+        restaurant_id = order.get("restaurant_id")
+        restaurant_name = order.get("restaurant_name", "Restaurant")
+        dish_name = order.get("dish_name", "your order")
+
+        # Notify the customer
+        if user_id and restaurant_id:
+            try:
+                await create_notification(
+                    db=db,
+                    notification_type="order_preparing",
+                    from_user_id=restaurant_id,
+                    to_user_id=user_id,
+                    message=f"🍳 {restaurant_name} is now preparing {dish_name}!",
+                    send_push=True
+                )
+                print(f"✅ Sent 'preparing' notification to customer {user_id}")
+            except Exception as e:
+                print(f"⚠️ Error sending notification to customer: {e}")
+
+        # Notify the restaurant (confirmation)
+        if restaurant_id:
+            try:
+                await create_notification(
+                    db=db,
+                    notification_type="order_in_progress",
+                    from_user_id=user_id if user_id else restaurant_id,
+                    to_user_id=restaurant_id,
+                    message=f"✅ Order for {dish_name} is now In Progress",
+                    send_push=True
+                )
+                print(f"✅ Sent 'in progress' confirmation to restaurant {restaurant_id}")
+            except Exception as e:
+                print(f"⚠️ Error sending notification to restaurant: {e}")
 
     # Send real-time WebSocket update to the customer
     user_id = order.get("user_id")

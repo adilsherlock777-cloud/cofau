@@ -34,14 +34,22 @@ async def create_notification(
 ):
     """
     Helper function to create a notification and optionally send push notification.
-    Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward"
+    Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward", "order_preparing", "order_in_progress"
     """
-    # Don't notify yourself (except for wallet rewards)
-    if from_user_id == to_user_id and notification_type != "wallet_reward":
+    # Don't notify yourself (except for wallet rewards and order notifications)
+    if from_user_id == to_user_id and notification_type not in ["wallet_reward", "order_preparing", "order_in_progress"]:
         return None
-    
-    # Get from_user details
+
+    # Get from_user details - check both users and restaurants collections
     from_user = await db.users.find_one({"_id": ObjectId(from_user_id)})
+
+    # If not found in users, check restaurants collection
+    if not from_user:
+        from_user = await db.restaurants.find_one({"_id": ObjectId(from_user_id)})
+        # Use restaurant_name instead of full_name for restaurants
+        if from_user and "restaurant_name" in from_user:
+            from_user["full_name"] = from_user["restaurant_name"]
+
     if not from_user:
         return None
     
@@ -141,6 +149,10 @@ async def create_notification(
                     title = "Story Like"
                 elif notification_type == "wallet_reward":
                     title = "Wallet Reward"
+                elif notification_type == "order_preparing":
+                    title = "Order In Progress"
+                elif notification_type == "order_in_progress":
+                    title = "Order Update"
                 
                 await send_push_notification(
                     device_tokens=device_tokens,
