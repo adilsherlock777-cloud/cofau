@@ -848,9 +848,9 @@ async def submit_review(
 
 @router.get("/restaurant-reviews")
 async def get_restaurant_reviews(
-    skip: Optional[int] = 0,
-    limit: Optional[int] = 50,
-    current_restaurant: dict = Depends(get_current_restaurant)
+    current_restaurant: dict = Depends(get_current_restaurant),
+    skip: int = 0,
+    limit: int = 50
 ):
     """Get all reviews for the current restaurant"""
     print(f"🎯 get_restaurant_reviews endpoint hit!")
