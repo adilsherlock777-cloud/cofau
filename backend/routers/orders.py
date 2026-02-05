@@ -843,38 +843,55 @@ async def get_restaurant_reviews(
     current_restaurant: dict = Depends(get_current_restaurant)
 ):
     """Get all reviews for the current restaurant"""
-    db = get_database()
+    try:
+        db = get_database()
 
-    restaurant_id = str(current_restaurant.get("_id"))
+        print(f"📋 Current restaurant object: {current_restaurant}")
 
-    print(f"🔍 Fetching reviews for restaurant: {restaurant_id}")
-    print(f"   Restaurant name: {current_restaurant.get('restaurant_name')}")
+        if not current_restaurant:
+            raise HTTPException(status_code=400, detail="Restaurant not authenticated")
 
-    # Debug: Check all reviews in database
-    all_reviews = await db.reviews.find().to_list(None)
-    print(f"   Total reviews in database: {len(all_reviews)}")
-    for rev in all_reviews:
-        print(f"   Review: restaurant_id={rev.get('restaurant_id')}, rating={rev.get('rating')}")
+        restaurant_id = str(current_restaurant.get("_id"))
 
-    # Find reviews for this restaurant
-    reviews = await db.reviews.find(
-        {"restaurant_id": restaurant_id}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        if not restaurant_id:
+            raise HTTPException(status_code=400, detail="Restaurant ID not found")
 
-    print(f"   Found {len(reviews)} reviews matching restaurant_id={restaurant_id}")
+        print(f"🔍 Fetching reviews for restaurant: {restaurant_id}")
+        print(f"   Restaurant name: {current_restaurant.get('restaurant_name')}")
 
-    result = []
-    for review in reviews:
-        result.append({
-            "id": str(review["_id"]),
-            "order_id": review.get("order_id"),
-            "customer_name": review.get("customer_name", "Anonymous"),
-            "dish_name": review.get("dish_name"),
-            "rating": review.get("rating"),
-            "review_text": review.get("review_text"),
-            "is_complaint": review.get("is_complaint", False),
-            "created_at": review["created_at"].isoformat() if isinstance(review.get("created_at"), datetime) else review.get("created_at", ""),
-            "updated_at": review["updated_at"].isoformat() if isinstance(review.get("updated_at"), datetime) else review.get("updated_at", ""),
-        })
+        # Debug: Check all reviews in database
+        all_reviews = await db.reviews.find().to_list(None)
+        print(f"   Total reviews in database: {len(all_reviews)}")
+        for rev in all_reviews:
+            print(f"   Review: restaurant_id={rev.get('restaurant_id')}, rating={rev.get('rating')}")
 
-    return result
+        # Find reviews for this restaurant
+        reviews = await db.reviews.find(
+            {"restaurant_id": restaurant_id}
+        ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+        print(f"   Found {len(reviews)} reviews matching restaurant_id={restaurant_id}")
+
+        result = []
+        for review in reviews:
+            result.append({
+                "id": str(review["_id"]),
+                "order_id": review.get("order_id"),
+                "customer_name": review.get("customer_name", "Anonymous"),
+                "dish_name": review.get("dish_name"),
+                "rating": review.get("rating"),
+                "review_text": review.get("review_text"),
+                "is_complaint": review.get("is_complaint", False),
+                "created_at": review["created_at"].isoformat() if isinstance(review.get("created_at"), datetime) else review.get("created_at", ""),
+                "updated_at": review["updated_at"].isoformat() if isinstance(review.get("updated_at"), datetime) else review.get("updated_at", ""),
+            })
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error fetching restaurant reviews: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch reviews: {str(e)}")
