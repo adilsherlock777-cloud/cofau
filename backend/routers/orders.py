@@ -123,8 +123,13 @@ async def get_my_orders(
         # Get price from the order
         price = order.get("total_price") or order.get("price")
 
+        # Check if review exists for this order
+        order_id = str(order["_id"])
+        existing_review = await db.reviews.find_one({"order_id": order_id})
+        has_review = existing_review is not None
+
         result.append({
-            "id": str(order["_id"]),
+            "id": order_id,
             "post_id": order.get("post_id"),
             "restaurant_id": order.get("restaurant_id"),
             "restaurant_name": order.get("restaurant_name"),
@@ -136,6 +141,7 @@ async def get_my_orders(
             "latitude": order.get("latitude"),
             "longitude": order.get("longitude"),
             "status": order.get("status", "pending"),
+            "has_review": has_review,
             "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
             "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", ""),
         })
@@ -800,11 +806,12 @@ async def submit_review(
     customer_name = current_user.get("full_name", "Anonymous")
 
     # Create review document
+    restaurant_id = order.get("restaurant_id")
     review_doc = {
         "order_id": order_id,
         "user_id": user_id,
         "customer_name": customer_name,
-        "restaurant_id": order.get("restaurant_id"),
+        "restaurant_id": restaurant_id,
         "restaurant_name": order.get("restaurant_name"),
         "dish_name": order.get("dish_name"),
         "rating": review_data.rating,
@@ -818,6 +825,9 @@ async def submit_review(
     review_id = str(result.inserted_id)
 
     print(f"✅ Review created: {review_id} for order {order_id}")
+    print(f"   Restaurant ID: {restaurant_id}")
+    print(f"   Customer: {customer_name}")
+    print(f"   Rating: {review_data.rating}/5")
 
     return {
         "success": True,
@@ -837,10 +847,21 @@ async def get_restaurant_reviews(
 
     restaurant_id = str(current_restaurant.get("_id"))
 
+    print(f"🔍 Fetching reviews for restaurant: {restaurant_id}")
+    print(f"   Restaurant name: {current_restaurant.get('restaurant_name')}")
+
+    # Debug: Check all reviews in database
+    all_reviews = await db.reviews.find().to_list(None)
+    print(f"   Total reviews in database: {len(all_reviews)}")
+    for rev in all_reviews:
+        print(f"   Review: restaurant_id={rev.get('restaurant_id')}, rating={rev.get('rating')}")
+
     # Find reviews for this restaurant
     reviews = await db.reviews.find(
         {"restaurant_id": restaurant_id}
     ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    print(f"   Found {len(reviews)} reviews matching restaurant_id={restaurant_id}")
 
     result = []
     for review in reviews:

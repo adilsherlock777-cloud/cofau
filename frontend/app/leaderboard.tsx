@@ -1569,7 +1569,7 @@ export default function LeaderboardScreen() {
                     )}
 
                     {/* Add Review Button for Regular Users on Completed Orders */}
-                    {!isRestaurant && order.status === "completed" && (
+                    {!isRestaurant && order.status === "completed" && !order.has_review && (
                       <TouchableOpacity
                         style={styles.addReviewButton}
                         onPress={() => handleAddReview(order)}
