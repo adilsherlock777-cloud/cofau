@@ -14,7 +14,7 @@ import {
 } from "../utils/pushNotifications";
 
 function RootLayoutNav() {
-  const { isAuthenticated, loading, user, token } = useAuth();
+  const { isAuthenticated, loading, user, token, accountType } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -58,9 +58,9 @@ function RootLayoutNav() {
     if (!isAuthenticated && !inAuthGroup && !inShareGroup) {
       router.replace("/auth/login");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace("/feed");
+      router.replace(accountType === 'restaurant' ? "/leaderboard" : "/feed");
     }
-  }, [isAuthenticated, loading, segments]);
+  }, [isAuthenticated, loading, segments, accountType]);
 
   // ✅ NOW it is safe to return conditionally
   if (!fontsLoaded) return null;

@@ -11,7 +11,8 @@ router = APIRouter(prefix="/api/orders", tags=["Orders"])
 
 # Import WebSocket manager from chat router for real-time updates
 from routers.chat import manager as websocket_manager
-from utils.jwt import decode_access_token
+from utils.jwt import decode_access_token, verify_token
+from routers.restaurant_auth import oauth2_scheme
 
 # Partner PIN (hardcoded for now - can be moved to env later)
 PARTNER_PIN = "1234"
@@ -128,11 +129,23 @@ async def get_my_orders(
         existing_review = await db.reviews.find_one({"order_id": order_id})
         has_review = existing_review is not None
 
+        # Get restaurant profile picture
+        restaurant_profile_picture = None
+        restaurant_id = order.get("restaurant_id")
+        if restaurant_id:
+            try:
+                restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+                if restaurant:
+                    restaurant_profile_picture = restaurant.get("profile_picture")
+            except Exception as e:
+                print(f"Error fetching restaurant profile picture: {e}")
+
         result.append({
             "id": order_id,
             "post_id": order.get("post_id"),
             "restaurant_id": order.get("restaurant_id"),
             "restaurant_name": order.get("restaurant_name"),
+            "restaurant_profile_picture": restaurant_profile_picture,
             "dish_name": order.get("dish_name"),
             "price": price,
             "suggestions": order.get("suggestions", ""),
@@ -178,6 +191,7 @@ async def get_restaurant_orders(
         # Get customer info
         customer_name = "Unknown Customer"
         customer_phone = None
+        customer_profile_picture = None
         delivery_address = "No address provided"
 
         user_id = order.get("user_id")
@@ -187,6 +201,7 @@ async def get_restaurant_orders(
                 if customer:
                     customer_name = customer.get("full_name", "Unknown Customer")
                     customer_phone = customer.get("phone_number") or customer.get("phone")
+                    customer_profile_picture = customer.get("profile_picture")
                     # Get delivery address from user's delivery_address field
                     user_address = customer.get("delivery_address")
                     if user_address:
@@ -266,6 +281,7 @@ async def get_restaurant_orders(
             "status": order.get("status", "pending"),
             "customer_name": customer_name,
             "customer_phone": customer_phone,
+            "customer_profile_picture": customer_profile_picture,
             "delivery_address": delivery_address,
             "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
             "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", ""),
@@ -317,6 +333,55 @@ async def update_restaurant_order_status(
         raise HTTPException(status_code=400, detail="Failed to update order status")
 
     print(f"✅ Restaurant {restaurant_id} updated order {order_id} to {status}")
+
+    # If order is completed, track user's delivery reward progress
+    if status == "completed":
+        user_id = order.get("user_id")
+        if user_id:
+            try:
+                # Get user's current completed deliveries count
+                user = await db.users.find_one({"_id": ObjectId(user_id)})
+                if user:
+                    completed_deliveries = user.get("completed_deliveries_count", 0)
+                    completed_deliveries += 1
+
+                    print(f"💰 User {user_id} completed delivery {completed_deliveries}/10")
+
+                    # Check if user reached 10 deliveries
+                    if completed_deliveries >= 10:
+                        # Add ₹100 to wallet
+                        current_balance = user.get("wallet_balance", 0.0)
+                        new_balance = current_balance + 100.0
+
+                        await db.users.update_one(
+                            {"_id": ObjectId(user_id)},
+                            {
+                                "$set": {
+                                    "wallet_balance": new_balance,
+                                    "completed_deliveries_count": 0  # Reset counter
+                                }
+                            }
+                        )
+
+                        # Create wallet transaction
+                        transaction_doc = {
+                            "user_id": user_id,
+                            "amount": 100.0,
+                            "type": "earning",
+                            "description": "Earned for completing 10 deliveries",
+                            "created_at": now
+                        }
+                        await db.wallet_transactions.insert_one(transaction_doc)
+
+                        print(f"🎉 User {user_id} earned ₹100 for completing 10 deliveries! Balance: ₹{new_balance}")
+                    else:
+                        # Just increment the counter
+                        await db.users.update_one(
+                            {"_id": ObjectId(user_id)},
+                            {"$set": {"completed_deliveries_count": completed_deliveries}}
+                        )
+            except Exception as e:
+                print(f"⚠️ Error tracking delivery reward: {e}")
 
     # Send real-time WebSocket update to the customer
     user_id = order.get("user_id")
@@ -846,26 +911,36 @@ async def submit_review(
     }
 
 
-@router.get("/restaurant-reviews")
-async def get_restaurant_reviews(
-    current_restaurant: dict = Depends(get_current_restaurant),
+@router.get("/restaurant-reviews/{restaurant_id}")
+async def get_restaurant_reviews_by_id(
+    restaurant_id: str,
+    token: str = Depends(oauth2_scheme),
     skip: int = 0,
     limit: int = 50
 ):
-    """Get all reviews for the current restaurant"""
-    print(f"🎯 get_restaurant_reviews endpoint hit!")
+    """Get all reviews for a specific restaurant"""
+    print(f"🎯 get_restaurant_reviews_by_id endpoint hit!")
+    print(f"   Restaurant ID: {restaurant_id}")
     print(f"   Skip: {skip}, Limit: {limit}")
-    print(f"   Restaurant param received: {current_restaurant is not None}")
+
+    # Verify token is valid (basic auth check)
+    email = verify_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid authentication")
 
     db = get_database()
 
-    print(f"📋 Current restaurant object: {current_restaurant}")
+    # Verify restaurant exists
+    try:
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid restaurant ID format")
 
-    if not current_restaurant:
-        print(f"   ❌ Restaurant not authenticated")
-        raise HTTPException(status_code=400, detail="Restaurant not authenticated")
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    restaurant_id = str(current_restaurant.get("_id"))
+    print(f"🔍 Fetching reviews from 'reviews' collection for restaurant: {restaurant_id}")
+    print(f"   Restaurant name: {restaurant.get('restaurant_name')}")
 
     if not restaurant_id:
         print(f"   ❌ Restaurant ID not found in current_restaurant object")

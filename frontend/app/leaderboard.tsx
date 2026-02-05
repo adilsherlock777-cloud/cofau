@@ -162,6 +162,7 @@ export default function LeaderboardScreen() {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [userAddress, setUserAddress] = useState<any>(null);
   const [loadingAddress, setLoadingAddress] = useState(true);
+  const [deliveryRewardProgress, setDeliveryRewardProgress] = useState(0); // 0-10 deliveries
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [nearbyPosts, setNearbyPosts] = useState<any[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -197,6 +198,8 @@ export default function LeaderboardScreen() {
         fetchOrders();
       } else if (activeTab === "Reviews/Complaints" && isRestaurant) {
         fetchRestaurantReviews();
+      } else if (activeTab === "Rewards" && !isRestaurant) {
+        fetchDeliveryRewardProgress();
       }
     }
   }, [token, activeTab]);
@@ -254,21 +257,41 @@ export default function LeaderboardScreen() {
   };
 
   const fetchRestaurantReviews = async () => {
-    if (!token || !isRestaurant) return;
+    if (!token || !isRestaurant || !user?.id) return;
 
     setLoadingReviews(true);
     try {
+      // Use the correct endpoint that reads from the reviews collection
       const response = await axios.get(
-        `${BACKEND_URL}/api/orders/restaurant-reviews`,
+        `${BACKEND_URL}/api/orders/restaurant-reviews/${user.id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       setRestaurantReviews(response.data || []);
+      console.log(`✅ Fetched ${response.data?.length || 0} reviews for restaurant`);
     } catch (error) {
       console.error("Error fetching reviews:", error);
     } finally {
       setLoadingReviews(false);
+    }
+  };
+
+  const fetchDeliveryRewardProgress = async () => {
+    if (!token || !user?.id) return;
+
+    try {
+      const response = await axios.get(
+        `${BACKEND_URL}/api/users/me`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const completedDeliveries = response.data?.completed_deliveries_count || 0;
+      setDeliveryRewardProgress(completedDeliveries);
+      console.log(`📦 User has completed ${completedDeliveries}/10 deliveries`);
+    } catch (error) {
+      console.error("Error fetching delivery reward progress:", error);
     }
   };
 
@@ -728,6 +751,10 @@ export default function LeaderboardScreen() {
     setRefreshing(true);
     if (activeTab === "Near Me" && userLocation) {
       fetchNearbyPosts();
+    } else if (activeTab === "Rewards" && !isRestaurant) {
+      fetchDeliveryRewardProgress();
+    } else if (activeTab === "In Progress" || activeTab === "Your Orders") {
+      fetchOrders();
     }
     setTimeout(() => setRefreshing(false), 1000);
   };
@@ -1284,9 +1311,17 @@ export default function LeaderboardScreen() {
                     {isRestaurant && (
                       <View style={styles.customerInfoSection}>
                         <View style={styles.customerHeader}>
-                          <View style={styles.customerAvatar}>
-                            <Ionicons name="person" size={24} color="#FFF" />
-                          </View>
+                          {order.customer_profile_picture ? (
+                            <Image
+                              source={{ uri: fixUrl(order.customer_profile_picture) }}
+                              style={styles.customerAvatar}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={styles.customerAvatar}>
+                              <Ionicons name="person" size={24} color="#FFF" />
+                            </View>
+                          )}
                           <View style={styles.customerDetails}>
                             <Text style={styles.customerName}>{order.customer_name || "Customer"}</Text>
                             {order.customer_phone && (
@@ -1304,12 +1339,18 @@ export default function LeaderboardScreen() {
                     )}
 
                     {/* For Regular User: Show Restaurant Profile Picture */}
-                    {!isRestaurant && restaurantProfile && restaurantProfile.profile_picture && (
-                      <Image
-                        source={{ uri: fixUrl(restaurantProfile.profile_picture) }}
-                        style={styles.restaurantProfilePic}
-                        resizeMode="cover"
-                      />
+                    {!isRestaurant && (
+                      order.restaurant_profile_picture ? (
+                        <Image
+                          source={{ uri: fixUrl(order.restaurant_profile_picture) }}
+                          style={styles.restaurantProfilePic}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.restaurantProfilePic}>
+                          <Ionicons name="restaurant" size={30} color="#999" />
+                        </View>
+                      )
                     )}
 
                     {/* Order Items */}
@@ -1484,16 +1525,28 @@ export default function LeaderboardScreen() {
                 <View key={order.id} style={styles.orderCard}>
                   {/* For restaurants: show customer avatar instead of post image */}
                   {isRestaurant ? (
-                    <View style={styles.customerAvatarSmall}>
-                      <Ionicons name="person" size={20} color="#FFF" />
-                    </View>
-                  ) : (
-                    order.post_media_url && (
+                    order.customer_profile_picture ? (
                       <Image
-                        source={{ uri: fixUrl(order.post_media_url) }}
+                        source={{ uri: fixUrl(order.customer_profile_picture) }}
+                        style={styles.customerAvatarSmall}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.customerAvatarSmall}>
+                        <Ionicons name="person" size={20} color="#FFF" />
+                      </View>
+                    )
+                  ) : (
+                    order.restaurant_profile_picture ? (
+                      <Image
+                        source={{ uri: fixUrl(order.restaurant_profile_picture) }}
                         style={styles.orderImage}
                         resizeMode="cover"
                       />
+                    ) : (
+                      <View style={styles.orderImage}>
+                        <Ionicons name="restaurant" size={30} color="#999" />
+                      </View>
                     )
                   )}
                   <View style={styles.orderInfo}>
@@ -1639,6 +1692,64 @@ export default function LeaderboardScreen() {
                 </View>
               ))
             )}
+          </>
+        ) : activeTab === "Rewards" && !isRestaurant ? (
+          <>
+            <Text style={styles.sectionTitle}>Delivery Rewards</Text>
+
+            <View style={styles.rewardsCard}>
+              <View style={styles.rewardsHeader}>
+                <Ionicons name="gift" size={32} color="#FF8C00" />
+                <Text style={styles.rewardsTitle}>Complete 10 Deliveries</Text>
+              </View>
+
+              <Text style={styles.rewardsSubtitle}>
+                Earn ₹10 for each delivery. Complete 10 deliveries to get ₹100 in your Cofau Wallet!
+              </Text>
+
+              <View style={styles.rewardsProgressContainer}>
+                <View style={styles.rewardsProgressHeader}>
+                  <Text style={styles.rewardsProgressLabel}>Progress</Text>
+                  <Text style={styles.rewardsProgressText}>
+                    {deliveryRewardProgress}/10 deliveries
+                  </Text>
+                </View>
+
+                <View style={styles.rewardsProgressBar}>
+                  <LinearGradient
+                    colors={["#FF8C00", "#FFB84D"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[
+                      styles.rewardsProgressFill,
+                      { width: `${(deliveryRewardProgress / 10) * 100}%` }
+                    ]}
+                  />
+                </View>
+
+                <View style={styles.rewardsAmountContainer}>
+                  <View style={styles.rewardsAmountBox}>
+                    <Text style={styles.rewardsAmountLabel}>Earned</Text>
+                    <Text style={styles.rewardsAmountValue}>
+                      ₹{deliveryRewardProgress * 10}
+                    </Text>
+                  </View>
+                  <View style={styles.rewardsAmountBox}>
+                    <Text style={styles.rewardsAmountLabel}>Remaining</Text>
+                    <Text style={styles.rewardsAmountValue}>
+                      ₹{(10 - deliveryRewardProgress) * 10}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.rewardsInfoBox}>
+                <Ionicons name="information-circle" size={20} color="#666" />
+                <Text style={styles.rewardsInfoText}>
+                  Complete orders will automatically count towards your reward progress. Once you reach 10 deliveries, ₹100 will be added to your Cofau Wallet!
+                </Text>
+              </View>
+            </View>
           </>
         ) : (
           <>
@@ -2519,6 +2630,8 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 10,
     backgroundColor: "#F0F0F0",
+    justifyContent: "center",
+    alignItems: "center",
   },
   orderInfo: {
     flex: 1,
@@ -2633,6 +2746,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F0F0",
     marginBottom: 12,
     alignSelf: "center",
+    justifyContent: "center",
+    alignItems: "center",
   },
   orderItemsSection: {
     marginBottom: 12,
@@ -3113,5 +3228,104 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
     marginTop: 8,
+  },
+  // Rewards Tab Styles
+  rewardsCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  rewardsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  rewardsTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  rewardsSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  rewardsProgressContainer: {
+    backgroundColor: "#F8F9FA",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  rewardsProgressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  rewardsProgressLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  rewardsProgressText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FF8C00",
+  },
+  rewardsProgressBar: {
+    height: 12,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 6,
+    overflow: "hidden",
+    marginBottom: 16,
+  },
+  rewardsProgressFill: {
+    height: "100%",
+    borderRadius: 6,
+  },
+  rewardsAmountContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  rewardsAmountBox: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+  },
+  rewardsAmountLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 4,
+  },
+  rewardsAmountValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FF8C00",
+  },
+  rewardsInfoBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF9E6",
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  rewardsInfoText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#666",
+    lineHeight: 18,
   },
 });
