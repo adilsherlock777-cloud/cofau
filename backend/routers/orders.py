@@ -175,8 +175,8 @@ async def get_restaurant_orders(
                 if customer:
                     customer_name = customer.get("full_name", "Unknown Customer")
                     customer_phone = customer.get("phone_number") or customer.get("phone")
-                    # Get delivery address from user_addresses collection
-                    user_address = await db.user_addresses.find_one({"user_id": user_id})
+                    # Get delivery address from user's delivery_address field
+                    user_address = customer.get("delivery_address")
                     if user_address:
                         addr_parts = []
                         if user_address.get("house_number"):
@@ -521,37 +521,29 @@ async def get_all_orders_for_partner(
         customer = None
         user_lat = None
         user_lng = None
-        if user_id:
-            try:
-                customer = await db.users.find_one({"_id": ObjectId(user_id)})
-                # Get delivery address and coordinates from user_addresses
-                user_address = await db.user_addresses.find_one({"user_id": user_id})
-                if user_address:
-                    user_lat = user_address.get("latitude")
-                    user_lng = user_address.get("longitude")
-            except:
-                pass
-
         customer_name = "Unknown Customer"
         delivery_address = "No address provided"
 
-        if customer:
-            customer_name = customer.get("full_name", "Unknown Customer")
-
-        # Get delivery address from user_addresses
         if user_id:
             try:
-                user_address = await db.user_addresses.find_one({"user_id": user_id})
-                if user_address:
-                    addr_parts = []
-                    if user_address.get("house_number"):
-                        addr_parts.append(user_address.get("house_number"))
-                    if user_address.get("street_address"):
-                        addr_parts.append(user_address.get("street_address"))
-                    if user_address.get("address"):
-                        addr_parts.append(user_address.get("address"))
-                    if addr_parts:
-                        delivery_address = ", ".join(addr_parts)
+                customer = await db.users.find_one({"_id": ObjectId(user_id)})
+                if customer:
+                    customer_name = customer.get("full_name", "Unknown Customer")
+                    # Get delivery address from user's delivery_address field
+                    user_address = customer.get("delivery_address")
+                    if user_address:
+                        user_lat = user_address.get("latitude")
+                        user_lng = user_address.get("longitude")
+                        # Build delivery address string
+                        addr_parts = []
+                        if user_address.get("house_number"):
+                            addr_parts.append(user_address.get("house_number"))
+                        if user_address.get("street_address"):
+                            addr_parts.append(user_address.get("street_address"))
+                        if user_address.get("address"):
+                            addr_parts.append(user_address.get("address"))
+                        if addr_parts:
+                            delivery_address = ", ".join(addr_parts)
             except:
                 pass
 
