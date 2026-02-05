@@ -1466,8 +1466,8 @@ export default function LeaderboardScreen() {
                       </View>
                     )}
 
-                    {/* Total Amount for restaurants */}
-                    {isRestaurant && order.price && (
+                    {/* Total Amount */}
+                    {order.price && (
                       <View style={styles.orderTotalRowSmall}>
                         <Text style={styles.orderTotalLabelSmall}>Total:</Text>
                         <Text style={styles.orderTotalAmountSmall}>₹{order.price}</Text>

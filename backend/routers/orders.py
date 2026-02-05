@@ -5,6 +5,7 @@ from database import get_database
 from routers.auth import get_current_user
 from pydantic import BaseModel
 from typing import Optional
+import re
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
 
@@ -32,6 +33,7 @@ class OrderCreate(BaseModel):
     restaurant_id: Optional[str] = None
     restaurant_name: Optional[str] = None
     dish_name: str
+    total_price: Optional[float] = None
     suggestions: Optional[str] = None
     post_location: Optional[str] = None
     post_media_url: Optional[str] = None
@@ -68,6 +70,7 @@ async def create_order(
         "restaurant_id": order_data.restaurant_id,
         "restaurant_name": order_data.restaurant_name,
         "dish_name": order_data.dish_name.strip(),
+        "total_price": order_data.total_price,
         "suggestions": order_data.suggestions.strip() if order_data.suggestions else "",
         "post_location": order_data.post_location,
         "post_media_url": order_data.post_media_url,
@@ -111,12 +114,16 @@ async def get_my_orders(
 
     result = []
     for order in orders:
+        # Get price from the order
+        price = order.get("total_price") or order.get("price")
+
         result.append({
             "id": str(order["_id"]),
             "post_id": order.get("post_id"),
             "restaurant_id": order.get("restaurant_id"),
             "restaurant_name": order.get("restaurant_name"),
             "dish_name": order.get("dish_name"),
+            "price": price,
             "suggestions": order.get("suggestions", ""),
             "post_location": order.get("post_location"),
             "post_media_url": order.get("post_media_url"),
@@ -183,14 +190,52 @@ async def get_restaurant_orders(
             except Exception as e:
                 print(f"Error fetching customer info: {e}")
 
-        # Get price from the post
+        # Get price from the post or calculate from menu items
         price = None
+        total_price = 0
         post_id = order.get("post_id")
-        if post_id:
+
+        # First try to get price from the order itself (if stored)
+        if order.get("total_price"):
+            price = order.get("total_price")
+        elif order.get("price"):
+            price = order.get("price")
+
+        # If no price in order, try to calculate from menu items
+        if not price and order.get("dish_name"):
+            dish_name = order.get("dish_name", "")
+            # Parse dish items format: "Item1 x2, Item2 x1"
+            items = dish_name.split(',')
+            for item in items:
+                item = item.strip()
+                # Try to match "ItemName xQuantity" pattern
+                match = re.match(r'^(.+?)\s+x(\d+)$', item)
+                if match:
+                    item_name = match.group(1).strip()
+                    quantity = int(match.group(2))
+                    # Look up menu item price
+                    menu_item = await db.menu_items.find_one({
+                        "restaurant_id": restaurant_id,
+                        "name": {"$regex": f"^{re.escape(item_name)}$", "$options": "i"}
+                    })
+                    if menu_item and menu_item.get("price"):
+                        total_price += float(menu_item.get("price")) * quantity
+
+            if total_price > 0:
+                price = total_price
+
+        # Fallback: try to get price from post
+        if not price and post_id:
             try:
+                # Check restaurant_posts first
                 post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
-                if post:
+                if post and post.get("price"):
                     price = post.get("price")
+                else:
+                    # Try regular posts
+                    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+                    if post and post.get("price"):
+                        price = post.get("price")
             except Exception as e:
                 print(f"Error fetching post price: {e}")
 

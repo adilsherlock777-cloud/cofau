@@ -287,6 +287,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
         restaurant_name: restaurantDetails?.restaurant_name || restaurantDetails?.name,
         dish_name: dishNames,
         quantity: getTotalItems(),
+        total_price: getCartTotal() > 0 ? getCartTotal() : null,
         suggestions: suggestions.trim(),
         post_location: post.location_name,
         post_media_url: post.thumbnail_url || post.media_url,
