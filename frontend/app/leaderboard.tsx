@@ -105,6 +105,7 @@ const DUMMY_RESTAURANTS = [
 ];
 
 const TABS = ["Near Me", "Your Orders", "In Progress", "Rewards"];
+const RESTAURANT_TABS = ["Your Orders", "In Progress", "Rewards"];
 
 const CATEGORIES = [
   { id: 'all', name: 'Nearby Food', emoji: '🍽️' },
@@ -149,8 +150,9 @@ const CATEGORIES = [
 
 export default function LeaderboardScreen() {
   const router = useRouter();
-  const { token, user } = useAuth();
-  const [activeTab, setActiveTab] = useState("Near Me");
+  const { token, user, accountType } = useAuth();
+  const isRestaurant = accountType === 'restaurant';
+  const [activeTab, setActiveTab] = useState(isRestaurant ? "Your Orders" : "Near Me");
   const [refreshing, setRefreshing] = useState(false);
   const [favorites, setFavorites] = useState<{ [key: string]: boolean }>({
     "1": true,
@@ -197,7 +199,12 @@ export default function LeaderboardScreen() {
 
     setLoadingOrders(true);
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/orders/my-orders`, {
+      // Use different endpoint based on account type
+      const endpoint = isRestaurant
+        ? `${BACKEND_URL}/api/orders/restaurant-orders`
+        : `${BACKEND_URL}/api/orders/my-orders`;
+
+      const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const allOrders = response.data || [];
@@ -213,23 +220,25 @@ export default function LeaderboardScreen() {
       setActiveOrders(active);
       setCompletedOrders(completed);
 
-      // Fetch restaurant profiles for orders with restaurant_id
-      const restaurantIds = [...new Set(allOrders
-        .filter((order: any) => order.restaurant_id)
-        .map((order: any) => order.restaurant_id))];
+      // Fetch restaurant profiles for orders with restaurant_id (only for regular users)
+      if (!isRestaurant) {
+        const restaurantIds = [...new Set(allOrders
+          .filter((order: any) => order.restaurant_id)
+          .map((order: any) => order.restaurant_id))];
 
-      const profiles: { [key: string]: any } = {};
-      for (const restaurantId of restaurantIds) {
-        try {
-          const profileResponse = await axios.get(
-            `${BACKEND_URL}/api/restaurant/posts/public/profile/${restaurantId}`
-          );
-          profiles[restaurantId] = profileResponse.data;
-        } catch (error) {
-          console.log(`Failed to fetch profile for restaurant ${restaurantId}`);
+        const profiles: { [key: string]: any } = {};
+        for (const restaurantId of restaurantIds) {
+          try {
+            const profileResponse = await axios.get(
+              `${BACKEND_URL}/api/restaurant/posts/public/profile/${restaurantId}`
+            );
+            profiles[restaurantId] = profileResponse.data;
+          } catch (error) {
+            console.log(`Failed to fetch profile for restaurant ${restaurantId}`);
+          }
         }
+        setRestaurantProfiles(profiles);
       }
-      setRestaurantProfiles(profiles);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {
@@ -722,6 +731,60 @@ export default function LeaderboardScreen() {
     });
   };
 
+  // Get status message for restaurant view
+  const getRestaurantStatusMessage = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'New order! Please accept or reject this order.';
+      case 'accepted':
+        return 'You accepted this order. Start preparing when ready.';
+      case 'preparing':
+        return 'Order is being prepared. Mark ready when done.';
+      case 'out_for_delivery':
+        return 'Order is ready for pickup/delivery.';
+      default:
+        return '';
+    }
+  };
+
+  // Update order status (for restaurant accounts)
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    if (!token) return;
+
+    try {
+      const response = await axios.patch(
+        `${BACKEND_URL}/api/orders/restaurant-orders/${orderId}/status?status=${newStatus}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        // Update local state
+        if (['completed', 'cancelled'].includes(newStatus)) {
+          // Move to completed orders
+          setActiveOrders((prev) => {
+            const order = prev.find((o) => o.id === orderId);
+            if (order) {
+              setCompletedOrders((completed) => [{ ...order, status: newStatus }, ...completed]);
+            }
+            return prev.filter((o) => o.id !== orderId);
+          });
+        } else {
+          // Update status in active orders
+          setActiveOrders((prev) =>
+            prev.map((order) =>
+              order.id === orderId ? { ...order, status: newStatus } : order
+            )
+          );
+        }
+        Alert.alert("Success", `Order ${newStatus === 'cancelled' ? 'rejected' : 'updated'} successfully`);
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      Alert.alert("Error", "Failed to update order status. Please try again.");
+    }
+  };
+
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -982,35 +1045,38 @@ export default function LeaderboardScreen() {
         contentContainerStyle={styles.tabsContainer}
         bounces={false}
       >
-        {TABS.map((tab, index) => (
-          <TouchableOpacity
-            key={tab}
-            style={[
-              styles.tab,
-              index === TABS.length - 1 && styles.lastTab,
-            ]}
-            onPress={() => setActiveTab(tab)}
-          >
-            {activeTab === tab ? (
-              <LinearGradient
-                colors={["#FF6B35", "#FF8C00"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.tabInner}
-              >
-                <Text style={styles.activeTabText}>{tab}</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.tabInner}>
-                <Text style={styles.tabText}>{tab}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+        {(isRestaurant ? RESTAURANT_TABS : TABS).map((tab, index) => {
+          const tabsArray = isRestaurant ? RESTAURANT_TABS : TABS;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[
+                styles.tab,
+                index === tabsArray.length - 1 && styles.lastTab,
+              ]}
+              onPress={() => setActiveTab(tab)}
+            >
+              {activeTab === tab ? (
+                <LinearGradient
+                  colors={["#FF6B35", "#FF8C00"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabInner}
+                >
+                  <Text style={styles.activeTabText}>{tab}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.tabInner}>
+                  <Text style={styles.tabText}>{tab}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
-      {/* Categories - Only show when Near Me is selected */}
-      {activeTab === "Near Me" && (
+      {/* Categories - Only show when Near Me is selected and not restaurant */}
+      {activeTab === "Near Me" && !isRestaurant && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1127,18 +1193,24 @@ export default function LeaderboardScreen() {
           </>
         ) : activeTab === "In Progress" ? (
           <>
-            <Text style={styles.sectionTitle}>Orders In Progress</Text>
+            <Text style={styles.sectionTitle}>
+              {isRestaurant ? "Incoming Orders" : "Orders In Progress"}
+            </Text>
             {loadingOrders ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#FF8C00" />
-                <Text style={styles.loadingText}>Loading your orders...</Text>
+                <Text style={styles.loadingText}>Loading orders...</Text>
               </View>
             ) : activeOrders.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="receipt-outline" size={64} color="#CCC" />
-                <Text style={styles.emptyText}>No active orders</Text>
+                <Text style={styles.emptyText}>
+                  {isRestaurant ? "No incoming orders" : "No active orders"}
+                </Text>
                 <Text style={styles.emptySubtext}>
-                  Order from nearby posts to see them here
+                  {isRestaurant
+                    ? "Orders from customers will appear here"
+                    : "Order from nearby posts to see them here"}
                 </Text>
               </View>
             ) : (
@@ -1150,8 +1222,31 @@ export default function LeaderboardScreen() {
 
                 return (
                   <View style={styles.newOrderCard} key={`order-${order.id}-${orderIdx}`}>
-                    {/* Restaurant Profile Picture (if on Cofau) */}
-                    {restaurantProfile && restaurantProfile.profile_picture && (
+                    {/* For Restaurant: Show Customer Info */}
+                    {isRestaurant && (
+                      <View style={styles.customerInfoSection}>
+                        <View style={styles.customerHeader}>
+                          <View style={styles.customerAvatar}>
+                            <Ionicons name="person" size={24} color="#FFF" />
+                          </View>
+                          <View style={styles.customerDetails}>
+                            <Text style={styles.customerName}>{order.customer_name || "Customer"}</Text>
+                            {order.customer_phone && (
+                              <Text style={styles.customerPhone}>{order.customer_phone}</Text>
+                            )}
+                          </View>
+                        </View>
+                        {order.delivery_address && order.delivery_address !== "No address provided" && (
+                          <View style={styles.deliveryAddressRow}>
+                            <Ionicons name="location" size={16} color="#FF3B30" />
+                            <Text style={styles.deliveryAddressText}>{order.delivery_address}</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {/* For Regular User: Show Restaurant Profile Picture */}
+                    {!isRestaurant && restaurantProfile && restaurantProfile.profile_picture && (
                       <Image
                         source={{ uri: fixUrl(restaurantProfile.profile_picture) }}
                         style={styles.restaurantProfilePic}
@@ -1170,8 +1265,16 @@ export default function LeaderboardScreen() {
                       ))}
                     </View>
 
-                    {/* Restaurant Name */}
-                    {order.restaurant_name && (
+                    {/* Suggestions/Notes */}
+                    {order.suggestions && (
+                      <View style={styles.orderNotesRow}>
+                        <Ionicons name="chatbubble-outline" size={14} color="#666" />
+                        <Text style={styles.orderNotesText}>Note: {order.suggestions}</Text>
+                      </View>
+                    )}
+
+                    {/* Restaurant Name (for regular users) */}
+                    {!isRestaurant && order.restaurant_name && (
                       <View style={styles.newOrderRestaurantRow}>
                         <Ionicons name="restaurant" size={16} color="#FF8C00" />
                         <Text style={styles.newOrderRestaurantName}>{order.restaurant_name}</Text>
@@ -1218,11 +1321,66 @@ export default function LeaderboardScreen() {
                             <Text style={[styles.currentStatusLabel, { color: currentStep.color }]}>
                               {currentStep.label}
                             </Text>
-                            <Text style={styles.currentStatusMessage}>{currentStep.message}</Text>
+                            <Text style={styles.currentStatusMessage}>
+                              {isRestaurant
+                                ? getRestaurantStatusMessage(order.status)
+                                : currentStep.message}
+                            </Text>
                           </View>
                         </View>
                       )}
                     </View>
+
+                    {/* Restaurant Action Buttons */}
+                    {isRestaurant && (
+                      <View style={styles.restaurantActionButtons}>
+                        {order.status === 'pending' && (
+                          <>
+                            <TouchableOpacity
+                              style={styles.acceptButton}
+                              onPress={() => updateOrderStatus(order.id, 'accepted')}
+                            >
+                              <Ionicons name="checkmark-circle" size={18} color="#FFF" />
+                              <Text style={styles.acceptButtonText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.rejectButton}
+                              onPress={() => updateOrderStatus(order.id, 'cancelled')}
+                            >
+                              <Ionicons name="close-circle" size={18} color="#FFF" />
+                              <Text style={styles.rejectButtonText}>Reject</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                        {order.status === 'accepted' && (
+                          <TouchableOpacity
+                            style={styles.nextStatusButton}
+                            onPress={() => updateOrderStatus(order.id, 'preparing')}
+                          >
+                            <Ionicons name="restaurant" size={18} color="#FFF" />
+                            <Text style={styles.nextStatusButtonText}>Start Preparing</Text>
+                          </TouchableOpacity>
+                        )}
+                        {order.status === 'preparing' && (
+                          <TouchableOpacity
+                            style={styles.nextStatusButton}
+                            onPress={() => updateOrderStatus(order.id, 'out_for_delivery')}
+                          >
+                            <Ionicons name="bicycle" size={18} color="#FFF" />
+                            <Text style={styles.nextStatusButtonText}>Ready for Pickup</Text>
+                          </TouchableOpacity>
+                        )}
+                        {order.status === 'out_for_delivery' && (
+                          <TouchableOpacity
+                            style={[styles.nextStatusButton, { backgroundColor: '#4CAF50' }]}
+                            onPress={() => updateOrderStatus(order.id, 'completed')}
+                          >
+                            <Ionicons name="checkmark-done" size={18} color="#FFF" />
+                            <Text style={styles.nextStatusButtonText}>Mark Delivered</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
 
                     {/* Order Time */}
                     <Text style={styles.orderTimeText}>
@@ -1239,11 +1397,13 @@ export default function LeaderboardScreen() {
           </>
         ) : activeTab === "Your Orders" ? (
           <>
-            <Text style={styles.sectionTitle}>Order History</Text>
+            <Text style={styles.sectionTitle}>
+              {isRestaurant ? "Completed Orders" : "Order History"}
+            </Text>
             {loadingOrders ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#FF8C00" />
-                <Text style={styles.loadingText}>Loading your orders...</Text>
+                <Text style={styles.loadingText}>Loading orders...</Text>
               </View>
             ) : completedOrders.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -1256,12 +1416,19 @@ export default function LeaderboardScreen() {
             ) : (
               completedOrders.map((order) => (
                 <View key={order.id} style={styles.orderCard}>
-                  {order.post_media_url && (
-                    <Image
-                      source={{ uri: fixUrl(order.post_media_url) }}
-                      style={styles.orderImage}
-                      resizeMode="cover"
-                    />
+                  {/* For restaurants: show customer avatar instead of post image */}
+                  {isRestaurant ? (
+                    <View style={styles.customerAvatarSmall}>
+                      <Ionicons name="person" size={20} color="#FFF" />
+                    </View>
+                  ) : (
+                    order.post_media_url && (
+                      <Image
+                        source={{ uri: fixUrl(order.post_media_url) }}
+                        style={styles.orderImage}
+                        resizeMode="cover"
+                      />
+                    )
                   )}
                   <View style={styles.orderInfo}>
                     <View style={styles.orderHeader}>
@@ -1277,8 +1444,22 @@ export default function LeaderboardScreen() {
                       </View>
                     </View>
 
+                    {/* For restaurants: show customer info */}
+                    {isRestaurant && (
+                      <View style={styles.customerInfoSmall}>
+                        <Text style={styles.customerNameSmall}>
+                          {order.customer_name || "Customer"}
+                        </Text>
+                        {order.delivery_address && order.delivery_address !== "No address provided" && (
+                          <Text style={styles.deliveryAddressSmall} numberOfLines={1}>
+                            {order.delivery_address}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
                     {/* Cancellation Message */}
-                    {order.status === "cancelled" && (
+                    {order.status === "cancelled" && !isRestaurant && (
                       <View style={styles.cancellationBox}>
                         <Ionicons name="close-circle" size={20} color="#FF3B30" />
                         <View style={styles.cancellationTextContainer}>
@@ -1290,7 +1471,8 @@ export default function LeaderboardScreen() {
                       </View>
                     )}
 
-                    {order.restaurant_name && (
+                    {/* For regular users: show restaurant name */}
+                    {!isRestaurant && order.restaurant_name && (
                       <View style={styles.orderRestaurantRow}>
                         <Ionicons name="restaurant" size={14} color="#666" />
                         <Text style={styles.orderRestaurantName}>
@@ -1299,7 +1481,7 @@ export default function LeaderboardScreen() {
                       </View>
                     )}
 
-                    {order.post_location && (
+                    {order.post_location && !isRestaurant && (
                       <View style={styles.orderLocationRow}>
                         <Ionicons name="location" size={14} color="#FF3B30" />
                         <Text style={styles.orderLocationText}>{order.post_location}</Text>
@@ -1552,7 +1734,9 @@ export default function LeaderboardScreen() {
           <View style={styles.centerIconCircle}>
             <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabelActive}>Delivery</Text>
+          <Text style={styles.navLabelActive}>
+            {accountType === 'restaurant' ? 'ORDERS' : 'Delivery'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -2525,5 +2709,141 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  // Restaurant Order Styles
+  customerInfoSection: {
+    backgroundColor: "#F8F9FA",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  customerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  customerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FF8C00",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  customerDetails: {
+    flex: 1,
+  },
+  customerName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  customerPhone: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 2,
+  },
+  deliveryAddressRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+    gap: 6,
+  },
+  deliveryAddressText: {
+    fontSize: 13,
+    color: "#555",
+    flex: 1,
+    lineHeight: 18,
+  },
+  orderNotesRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF9E6",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  orderNotesText: {
+    fontSize: 13,
+    color: "#666",
+    flex: 1,
+    fontStyle: "italic",
+  },
+  restaurantActionButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  acceptButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  acceptButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  rejectButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF3B30",
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  rejectButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  nextStatusButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2196F3",
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  nextStatusButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  // Small customer info for completed orders
+  customerAvatarSmall: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#FF8C00",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  customerInfoSmall: {
+    marginBottom: 6,
+  },
+  customerNameSmall: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  deliveryAddressSmall: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
   },
 });

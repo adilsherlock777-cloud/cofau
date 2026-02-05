@@ -130,6 +130,147 @@ async def get_my_orders(
     return result
 
 
+# Import restaurant auth for the new endpoint
+from routers.restaurant_auth import get_current_restaurant
+
+
+@router.get("/restaurant-orders")
+async def get_restaurant_orders(
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Get orders placed at this restaurant (for restaurant accounts)"""
+    db = get_database()
+
+    restaurant_id = str(current_restaurant.get("_id"))
+
+    # Find orders where restaurant_id matches this restaurant
+    query = {"restaurant_id": restaurant_id}
+
+    if status:
+        query["status"] = status
+
+    orders = await db.orders.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    result = []
+    for order in orders:
+        # Get customer info
+        customer_name = "Unknown Customer"
+        customer_phone = None
+        delivery_address = "No address provided"
+
+        user_id = order.get("user_id")
+        if user_id:
+            try:
+                customer = await db.users.find_one({"_id": ObjectId(user_id)})
+                if customer:
+                    customer_name = customer.get("full_name", "Unknown Customer")
+                    customer_phone = customer.get("phone_number") or customer.get("phone")
+                    # Get delivery address from user_addresses collection
+                    user_address = await db.user_addresses.find_one({"user_id": user_id})
+                    if user_address:
+                        addr_parts = []
+                        if user_address.get("house_number"):
+                            addr_parts.append(user_address.get("house_number"))
+                        if user_address.get("street_address"):
+                            addr_parts.append(user_address.get("street_address"))
+                        if user_address.get("address"):
+                            addr_parts.append(user_address.get("address"))
+                        if addr_parts:
+                            delivery_address = ", ".join(addr_parts)
+            except Exception as e:
+                print(f"Error fetching customer info: {e}")
+
+        result.append({
+            "id": str(order["_id"]),
+            "post_id": order.get("post_id"),
+            "restaurant_id": order.get("restaurant_id"),
+            "restaurant_name": order.get("restaurant_name"),
+            "dish_name": order.get("dish_name"),
+            "suggestions": order.get("suggestions", ""),
+            "post_location": order.get("post_location"),
+            "post_media_url": order.get("post_media_url"),
+            "latitude": order.get("latitude"),
+            "longitude": order.get("longitude"),
+            "status": order.get("status", "pending"),
+            "customer_name": customer_name,
+            "customer_phone": customer_phone,
+            "delivery_address": delivery_address,
+            "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
+            "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", ""),
+        })
+
+    return result
+
+
+@router.patch("/restaurant-orders/{order_id}/status")
+async def update_restaurant_order_status(
+    order_id: str,
+    status: str,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Update order status (for restaurant accounts)"""
+    db = get_database()
+
+    restaurant_id = str(current_restaurant.get("_id"))
+    valid_statuses = ["pending", "accepted", "preparing", "out_for_delivery", "completed", "cancelled"]
+
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+    try:
+        order = await db.orders.find_one({"_id": ObjectId(order_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Verify this order belongs to this restaurant
+    if order.get("restaurant_id") != restaurant_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this order")
+
+    # Update the order status
+    now = datetime.utcnow()
+    result = await db.orders.update_one(
+        {"_id": ObjectId(order_id)},
+        {
+            "$set": {
+                "status": status,
+                "updated_at": now
+            }
+        }
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to update order status")
+
+    print(f"✅ Restaurant {restaurant_id} updated order {order_id} to {status}")
+
+    # Send real-time WebSocket update to the customer
+    user_id = order.get("user_id")
+    if user_id:
+        try:
+            await websocket_manager.send_personal_message(user_id, {
+                "type": "order_status_update",
+                "order_id": order_id,
+                "status": status,
+                "updated_at": now.isoformat() + "Z"
+            })
+            print(f"📡 Sent WebSocket update to user {user_id} for order {order_id}")
+        except Exception as e:
+            print(f"⚠️ Failed to send WebSocket update: {str(e)}")
+
+    return {
+        "success": True,
+        "message": f"Order status updated to {status}",
+        "order_id": order_id,
+        "status": status
+    }
+
+
 @router.get("/{order_id}")
 async def get_order(
     order_id: str,
