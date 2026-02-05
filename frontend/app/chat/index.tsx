@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SectionList,
+  FlatList,
   TextInput,
   Platform,
 } from "react-native";
@@ -40,17 +40,13 @@ interface ChatItem {
   unread_count?: number;
 }
 
-interface ChatSection {
-  title: string;
-  data: ChatItem[];
-}
-
 export default function ChatListScreen() {
   const { token } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<ChatItem[]>([]);
-  const [sections, setSections] = useState<ChatSection[]>([]);
+  const [activeTab, setActiveTab] = useState<"users" | "restaurants">("users");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filteredItems, setFilteredItems] = useState<ChatItem[]>([]);
 
 useEffect(() => {
   if (!token) return;
@@ -76,7 +72,6 @@ useEffect(() => {
       }));
 
       setItems(mapped);
-      updateSections(mapped, searchQuery);
     } catch (err: any) {
       console.log("Chat list error", err?.response?.data || err?.message);
     }
@@ -85,39 +80,28 @@ useEffect(() => {
   fetchChatList();
 }, [token]);
 
-  // Update sections when items or search changes
-  const updateSections = (chatItems: ChatItem[], query: string) => {
-    let filteredItems = chatItems;
+  // Filter chats based on active tab and search query
+  useEffect(() => {
+    let filtered = items;
 
-    if (query.trim() !== "") {
-      filteredItems = chatItems.filter((item) =>
+    // Filter by account type based on active tab
+    if (activeTab === "users") {
+      filtered = items.filter((item) => item.account_type !== "restaurant");
+    } else {
+      filtered = items.filter((item) => item.account_type === "restaurant");
+    }
+
+    // Filter by search query
+    if (searchQuery.trim() !== "") {
+      filtered = filtered.filter((item) =>
         item.other_user_name
           ?.toLowerCase()
-          .includes(query.toLowerCase())
+          .includes(searchQuery.toLowerCase())
       );
     }
 
-    // Separate users and restaurants
-    const users = filteredItems.filter((item) => item.account_type !== "restaurant");
-    const restaurants = filteredItems.filter((item) => item.account_type === "restaurant");
-
-    const newSections: ChatSection[] = [];
-
-    if (users.length > 0) {
-      newSections.push({ title: "Users", data: users });
-    }
-
-    if (restaurants.length > 0) {
-      newSections.push({ title: "Restaurants", data: restaurants });
-    }
-
-    setSections(newSections);
-  };
-
-  // Filter chats based on search query
-  useEffect(() => {
-    updateSections(items, searchQuery);
-  }, [searchQuery, items]);
+    setFilteredItems(filtered);
+  }, [items, activeTab, searchQuery]);
 
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return "";
@@ -266,16 +250,36 @@ useEffect(() => {
         </View>
       </LinearGradient>
 
+      {/* Instagram-style Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "users" && styles.activeTab]}
+          onPress={() => setActiveTab("users")}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === "users" && styles.activeTabText]}>
+            USERS
+          </Text>
+          {activeTab === "users" && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "restaurants" && styles.activeTab]}
+          onPress={() => setActiveTab("restaurants")}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === "restaurants" && styles.activeTabText]}>
+            RESTAURANTS
+          </Text>
+          {activeTab === "restaurants" && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+      </View>
+
       {/* Chat List */}
-      <SectionList
-        sections={sections}
+      <FlatList
+        data={filteredItems}
         keyExtractor={(item) => item.other_user_id}
         renderItem={renderItem}
-        renderSectionHeader={({ section: { title } }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{title}</Text>
-          </View>
-        )}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={() => (
@@ -292,7 +296,6 @@ useEffect(() => {
           </View>
         )}
         showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled={false}
       />
     </View>
   );
@@ -463,18 +466,38 @@ const styles = StyleSheet.create({
     color: "#8E8E93",
     textAlign: "center",
   },
-  sectionHeader: {
-    backgroundColor: "#F8F9FA",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  // Instagram-style Tabs
+  tabsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "#DBDBDB",
   },
-  sectionHeaderText: {
-    fontSize: 14,
+  tab: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  activeTab: {
+    // Active tab styling handled by indicator
+  },
+  tabText: {
+    fontSize: 13,
     fontWeight: "600",
-    color: "#666",
-    textTransform: "uppercase",
+    color: "#8E8E93",
     letterSpacing: 0.5,
+  },
+  activeTabText: {
+    color: "#000",
+  },
+  tabIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "#000",
   },
 });
