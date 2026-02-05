@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { LocationSelector } from "../components/LocationSelector";
 import { WalletBalanceModal } from "../components/WalletBalanceModal";
 import { OrderModal } from "../components/OrderModal";
+import { ReviewModal } from "../components/ReviewModal";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import * as Location from "expo-location";
@@ -105,7 +106,7 @@ const DUMMY_RESTAURANTS = [
 ];
 
 const TABS = ["Near Me", "Your Orders", "In Progress", "Rewards"];
-const RESTAURANT_TABS = ["Your Orders", "In Progress", "Rewards"];
+const RESTAURANT_TABS = ["Your Orders", "In Progress", "Reviews/Complaints"];
 
 const CATEGORIES = [
   { id: 'all', name: 'Nearby Food', emoji: '🍽️' },
@@ -182,6 +183,10 @@ export default function LeaderboardScreen() {
   const [completedOrders, setCompletedOrders] = useState<any[]>([]); // completed, cancelled
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [restaurantProfiles, setRestaurantProfiles] = useState<{ [key: string]: any }>({});
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedOrderForReview, setSelectedOrderForReview] = useState<any>(null);
+  const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -190,6 +195,8 @@ export default function LeaderboardScreen() {
         getCurrentLocation();
       } else if (activeTab === "In Progress" || activeTab === "Your Orders") {
         fetchOrders();
+      } else if (activeTab === "Reviews/Complaints" && isRestaurant) {
+        fetchRestaurantReviews();
       }
     }
   }, [token, activeTab]);
@@ -246,6 +253,25 @@ export default function LeaderboardScreen() {
     }
   };
 
+  const fetchRestaurantReviews = async () => {
+    if (!token || !isRestaurant) return;
+
+    setLoadingReviews(true);
+    try {
+      const response = await axios.get(
+        `${BACKEND_URL}/api/orders/restaurant-reviews`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setRestaurantReviews(response.data || []);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
   const handleOrderClick = (post: any) => {
     // Check if user has added their delivery location (only for regular users)
     if (!isRestaurant && !userAddress) {
@@ -273,6 +299,19 @@ export default function LeaderboardScreen() {
   const handleOrderPlaced = () => {
     // Refresh orders when a new order is placed
     fetchOrders();
+  };
+
+  const handleReviewAdded = () => {
+    // Refresh orders and close modal
+    fetchOrders();
+    if (isRestaurant) {
+      fetchRestaurantReviews();
+    }
+  };
+
+  const handleAddReview = (order: any) => {
+    setSelectedOrderForReview(order);
+    setShowReviewModal(true);
   };
 
   // WebSocket connection for real-time order updates with fallback polling
@@ -1529,6 +1568,17 @@ export default function LeaderboardScreen() {
                       </Text>
                     )}
 
+                    {/* Add Review Button for Regular Users on Completed Orders */}
+                    {!isRestaurant && order.status === "completed" && (
+                      <TouchableOpacity
+                        style={styles.addReviewButton}
+                        onPress={() => handleAddReview(order)}
+                      >
+                        <Ionicons name="star-outline" size={16} color="#FF8C00" />
+                        <Text style={styles.addReviewButtonText}>Add Review</Text>
+                      </TouchableOpacity>
+                    )}
+
                     <Text style={styles.orderTime}>
                       {new Date(order.created_at).toLocaleDateString()} at{" "}
                       {new Date(order.created_at).toLocaleTimeString([], {
@@ -1537,6 +1587,55 @@ export default function LeaderboardScreen() {
                       })}
                     </Text>
                   </View>
+                </View>
+              ))
+            )}
+          </>
+        ) : activeTab === "Reviews/Complaints" && isRestaurant ? (
+          <>
+            <Text style={styles.sectionTitle}>Customer Reviews & Complaints</Text>
+            {loadingReviews ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF8C00" />
+                <Text style={styles.loadingText}>Loading reviews...</Text>
+              </View>
+            ) : restaurantReviews.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="chatbubbles-outline" size={64} color="#CCC" />
+                <Text style={styles.emptyText}>No reviews yet</Text>
+                <Text style={styles.emptySubtext}>
+                  Customer reviews and complaints will appear here
+                </Text>
+              </View>
+            ) : (
+              restaurantReviews.map((review) => (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewOrderInfo}>
+                      <Text style={styles.reviewOrderDish}>{review.dish_name}</Text>
+                      <Text style={styles.reviewCustomerName}>
+                        {review.customer_name || "Customer"}
+                      </Text>
+                    </View>
+                    <View style={styles.reviewRatingContainer}>
+                      <Ionicons name="star" size={16} color="#FFD700" />
+                      <Text style={styles.postRatingText}>{review.rating}</Text>
+                    </View>
+                  </View>
+
+                  {review.is_complaint && (
+                    <View style={[styles.reviewTypeBadge, styles.reviewTypeBadgeComplaint]}>
+                      <Text style={styles.reviewTypeBadgeText}>COMPLAINT</Text>
+                    </View>
+                  )}
+
+                  <Text style={styles.reviewTextContent}>{review.review_text}</Text>
+
+                  {review.order_id && (
+                    <Text style={styles.reviewTimeText}>
+                      Order #{review.order_id.slice(0, 8)} • {new Date(review.created_at).toLocaleDateString()}
+                    </Text>
+                  )}
                 </View>
               ))
             )}
@@ -1742,6 +1841,15 @@ export default function LeaderboardScreen() {
         post={selectedPost}
         token={token || ""}
         onOrderPlaced={handleOrderPlaced}
+      />
+
+      {/* Review Modal */}
+      <ReviewModal
+        visible={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        order={selectedOrderForReview}
+        token={token || ""}
+        onReviewAdded={handleReviewAdded}
       />
 
       {/* Bottom Navigation */}
@@ -2921,5 +3029,89 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: "#4CAF50",
+  },
+  addReviewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF9E6",
+    borderWidth: 1,
+    borderColor: "#FF8C00",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 6,
+  },
+  addReviewButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FF8C00",
+  },
+  reviewCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  reviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  reviewOrderInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  reviewOrderDish: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 4,
+  },
+  reviewCustomerName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  reviewRatingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  reviewTypeBadge: {
+    backgroundColor: "#FF8C00",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  reviewTypeBadgeComplaint: {
+    backgroundColor: "#FF3B30",
+  },
+  reviewTypeBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  reviewTextContent: {
+    fontSize: 14,
+    color: "#333",
+    lineHeight: 20,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  reviewTimeText: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 8,
   },
 });
