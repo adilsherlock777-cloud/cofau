@@ -1141,6 +1141,10 @@ export default function LeaderboardScreen() {
       >
         {(isRestaurant ? RESTAURANT_TABS : TABS).map((tab, index) => {
           const tabsArray = isRestaurant ? RESTAURANT_TABS : TABS;
+          const isInProgressTab = tab === "In Progress";
+          const orderCount = isInProgressTab ? activeOrders.length : 0;
+          const showBadge = isInProgressTab && orderCount > 0;
+
           return (
             <TouchableOpacity
               key={tab}
@@ -1158,56 +1162,26 @@ export default function LeaderboardScreen() {
                   style={styles.tabInner}
                 >
                   <Text style={styles.activeTabText}>{tab}</Text>
+                  {showBadge && (
+                    <View style={styles.tabBadgeActive}>
+                      <Text style={styles.tabBadgeTextActive}>{orderCount}</Text>
+                    </View>
+                  )}
                 </LinearGradient>
               ) : (
                 <View style={styles.tabInner}>
                   <Text style={styles.tabText}>{tab}</Text>
+                  {showBadge && (
+                    <View style={styles.tabBadge}>
+                      <Text style={styles.tabBadgeText}>{orderCount}</Text>
+                    </View>
+                  )}
                 </View>
               )}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
-
-      {/* Categories - Only show when Near Me is selected and not restaurant */}
-      {activeTab === "Near Me" && !isRestaurant && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScrollView}
-          contentContainerStyle={styles.categoryContainer}
-          bounces={false}
-        >
-          {CATEGORIES.map((category, index) => (
-            <TouchableOpacity
-              key={category.id}
-              style={[
-                styles.categoryChipOuter,
-                index === CATEGORIES.length - 1 && styles.lastCategory,
-              ]}
-              onPress={() => handleCategoryChange(category.id)}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.categoryChipInner,
-                  selectedCategory === category.id && styles.categoryChipInnerActive,
-                ]}
-              >
-                <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-                <Text
-                  style={[
-                    styles.categoryName,
-                    selectedCategory === category.id && styles.categoryNameActive,
-                  ]}
-                >
-                  {category.name}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
 
       {/* Content */}
       <ScrollView
@@ -1338,7 +1312,7 @@ export default function LeaderboardScreen() {
                             )}
                           </View>
                         </View>
-                        {order.delivery_address && order.delivery_address !== "No address provided" && (
+                        {!isRestaurant && order.delivery_address && order.delivery_address !== "No address provided" && (
                           <View style={styles.deliveryAddressRow}>
                             <Ionicons name="location" size={16} color="#FF3B30" />
                             <Text style={styles.deliveryAddressText}>{order.delivery_address}</Text>
@@ -1578,11 +1552,6 @@ export default function LeaderboardScreen() {
                         <Text style={styles.customerNameSmall}>
                           {order.customer_name || "Customer"}
                         </Text>
-                        {order.delivery_address && order.delivery_address !== "No address provided" && (
-                          <Text style={styles.deliveryAddressSmall} numberOfLines={1}>
-                            {order.delivery_address}
-                          </Text>
-                        )}
                       </View>
                     )}
 
@@ -2003,6 +1972,7 @@ export default function LeaderboardScreen() {
         post={selectedPost}
         token={token || ""}
         onOrderPlaced={handleOrderPlaced}
+        userLocation={userLocation}
       />
 
       {/* Review Modal */}
@@ -2134,6 +2104,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   tabText: {
     fontSize: 14,
@@ -2144,6 +2116,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  tabBadge: {
+    backgroundColor: "#FF8C00",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  tabBadgeActive: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+  },
+  tabBadgeTextActive: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FF8C00",
   },
   lastTab: {
     marginRight: 16, // Extra padding for the last item

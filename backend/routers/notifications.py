@@ -34,7 +34,7 @@ async def create_notification(
 ):
     """
     Helper function to create a notification and optionally send push notification.
-    Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward", "order_preparing", "order_in_progress"
+    Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward", "new_order", "order_preparing", "order_in_progress", "order_completed"
     """
     # Don't notify yourself (except for wallet rewards and order notifications)
     if from_user_id == to_user_id and notification_type not in ["wallet_reward", "order_preparing", "order_in_progress"]:
@@ -149,10 +149,14 @@ async def create_notification(
                     title = "Story Like"
                 elif notification_type == "wallet_reward":
                     title = "Wallet Reward"
+                elif notification_type == "new_order":
+                    title = "New Order"
                 elif notification_type == "order_preparing":
                     title = "Order In Progress"
                 elif notification_type == "order_in_progress":
                     title = "Order Update"
+                elif notification_type == "order_completed":
+                    title = "Order Delivered!"
                 
                 await send_push_notification(
                     device_tokens=device_tokens,

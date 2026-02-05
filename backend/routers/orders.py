@@ -94,6 +94,30 @@ async def create_order(
 
     print(f"✅ Order created: {order_id} by user {user_id}")
 
+    # Send push notification to restaurant when new order is placed
+    restaurant_id = order_data.restaurant_id
+    if restaurant_id:
+        try:
+            # Get customer name
+            customer_name = current_user.get("full_name", "A customer")
+            dish_name = order_data.dish_name
+            restaurant_name = order_data.restaurant_name or "your restaurant"
+
+            await create_notification(
+                db=db,
+                notification_type="new_order",
+                from_user_id=user_id,
+                to_user_id=restaurant_id,
+                message=f"🍽️ New order from {customer_name}: {dish_name}",
+                send_push=True
+            )
+            print(f"✅ Sent new order notification to restaurant {restaurant_id}")
+        except Exception as e:
+            print(f"⚠️ Error sending notification to restaurant: {e}")
+            # Don't fail the order creation if notification fails
+            import traceback
+            traceback.print_exc()
+
     return {
         "success": True,
         "message": "Order placed successfully",
@@ -189,11 +213,10 @@ async def get_restaurant_orders(
 
     result = []
     for order in orders:
-        # Get customer info
+        # Get customer info (NO delivery address for restaurant users - only for partner dashboard)
         customer_name = "Unknown Customer"
         customer_phone = None
         customer_profile_picture = None
-        delivery_address = "No address provided"
 
         user_id = order.get("user_id")
         if user_id:
@@ -203,18 +226,6 @@ async def get_restaurant_orders(
                     customer_name = customer.get("full_name", "Unknown Customer")
                     customer_phone = customer.get("phone_number") or customer.get("phone")
                     customer_profile_picture = customer.get("profile_picture")
-                    # Get delivery address from user's delivery_address field
-                    user_address = customer.get("delivery_address")
-                    if user_address:
-                        addr_parts = []
-                        if user_address.get("house_number"):
-                            addr_parts.append(user_address.get("house_number"))
-                        if user_address.get("street_address"):
-                            addr_parts.append(user_address.get("street_address"))
-                        if user_address.get("address"):
-                            addr_parts.append(user_address.get("address"))
-                        if addr_parts:
-                            delivery_address = ", ".join(addr_parts)
             except Exception as e:
                 print(f"Error fetching customer info: {e}")
 
@@ -283,7 +294,7 @@ async def get_restaurant_orders(
             "customer_name": customer_name,
             "customer_phone": customer_phone,
             "customer_profile_picture": customer_profile_picture,
-            "delivery_address": delivery_address,
+            # NO delivery_address - only available in partner dashboard
             "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
             "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", ""),
         })
@@ -370,9 +381,28 @@ async def update_restaurant_order_status(
         except Exception as e:
             print(f"⚠️ Error sending notification to restaurant: {e}")
 
-    # If order is completed, track user's delivery reward progress
+    # If order is completed, notify customer and track user's delivery reward progress
     if status == "completed":
         user_id = order.get("user_id")
+        restaurant_id = order.get("restaurant_id")
+        dish_name = order.get("dish_name", "your order")
+
+        # Send congratulations notification to customer
+        if user_id:
+            try:
+                await create_notification(
+                    db=db,
+                    notification_type="order_completed",
+                    from_user_id=restaurant_id if restaurant_id else user_id,
+                    to_user_id=user_id,
+                    message=f"🎉 Congratulations! Enjoy your food and earn reward ₹10/-",
+                    send_push=True
+                )
+                print(f"✅ Sent completion notification to customer {user_id}")
+            except Exception as e:
+                print(f"⚠️ Error sending completion notification to customer: {e}")
+
+        # Track user's delivery reward progress
         if user_id:
             try:
                 # Get user's current completed deliveries count
@@ -556,9 +586,28 @@ async def update_order_status(
             except Exception as e:
                 print(f"⚠️ Error sending notification to restaurant: {e}")
 
-    # If order is completed, track user's delivery reward progress
+    # If order is completed, notify customer and track user's delivery reward progress
     if status == "completed":
         user_id = order.get("user_id")
+        restaurant_id = order.get("restaurant_id")
+        dish_name = order.get("dish_name", "your order")
+
+        # Send congratulations notification to customer
+        if user_id:
+            try:
+                await create_notification(
+                    db=db,
+                    notification_type="order_completed",
+                    from_user_id=restaurant_id if restaurant_id else user_id,
+                    to_user_id=user_id,
+                    message=f"🎉 Congratulations! Enjoy your food and earn reward ₹10/-",
+                    send_push=True
+                )
+                print(f"✅ Sent completion notification to customer {user_id}")
+            except Exception as e:
+                print(f"⚠️ Error sending completion notification to customer: {e}")
+
+        # Track user's delivery reward progress
         if user_id:
             try:
                 # Get user's current completed deliveries count

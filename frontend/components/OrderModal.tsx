@@ -47,6 +47,7 @@ interface OrderModalProps {
   post: any;
   token: string;
   onOrderPlaced?: () => void;
+  userLocation?: { latitude: number; longitude: number } | null;
 }
 
 export const OrderModal: React.FC<OrderModalProps> = ({
@@ -55,6 +56,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
   post,
   token,
   onOrderPlaced,
+  userLocation,
 }) => {
   const [loading, setLoading] = useState(false);
   const [restaurantDetails, setRestaurantDetails] = useState<RestaurantDetails | null>(null);
@@ -66,7 +68,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
-  const [customDishName, setCustomDishName] = useState("");
 
   // Reset state when modal opens
   useEffect(() => {
@@ -74,7 +75,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       setCart([]);
       setShowCart(false);
       setSuggestions("");
-      setCustomDishName("");
       setExpandedCategories(new Set());
       setShowMenuDropdown(false);
       fetchRestaurantDetails();
@@ -229,18 +229,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
     });
   };
 
-  const addCustomDish = () => {
-    if (!customDishName.trim()) return;
-
-    const customId = `custom_${Date.now()}`;
-    setCart((prev) => [...prev, {
-      id: customId,
-      item_name: customDishName.trim(),
-      quantity: 1,
-    }]);
-    setCustomDishName("");
-  };
-
   const updateCartQuantity = (itemId: string, delta: number) => {
     setCart((prev) => {
       return prev.map((item) => {
@@ -265,6 +253,41 @@ export const OrderModal: React.FC<OrderModalProps> = ({
 
   const getTotalItems = () => {
     return cart.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  // Calculate distance in km between two coordinates
+  const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Get delivery charge based on distance
+  const getDeliveryCharge = () => {
+    if (!userLocation || !post.latitude || !post.longitude) {
+      return null;
+    }
+
+    const distance = calculateDistanceKm(
+      userLocation.latitude,
+      userLocation.longitude,
+      post.latitude,
+      post.longitude
+    );
+
+    if (distance <= 3) {
+      return { charge: 50, distance: distance.toFixed(1) };
+    } else if (distance <= 4) {
+      return { charge: 60, distance: distance.toFixed(1) };
+    } else {
+      return { charge: 80, distance: distance.toFixed(1) };
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -427,6 +450,25 @@ export const OrderModal: React.FC<OrderModalProps> = ({
           Final price may vary. Delivery charges will be added.
         </Text>
       </View>
+
+      {/* Delivery Charge Note */}
+      {getDeliveryCharge() && (
+        <View style={styles.deliveryChargeNote}>
+          <View style={styles.deliveryChargeHeader}>
+            <Ionicons name="information-circle" size={20} color="#4CAF50" />
+            <Text style={styles.deliveryChargeTitle}>Delivery Information</Text>
+          </View>
+          <Text style={styles.deliveryChargeText}>
+            Distance: ~{getDeliveryCharge()?.distance} km
+          </Text>
+          <Text style={styles.deliveryChargeText}>
+            Delivery Charge: ₹{getDeliveryCharge()?.charge}/-
+          </Text>
+          <Text style={styles.deliveryChargeDisclaimer}>
+            (This is just an estimate and not included in the order total above)
+          </Text>
+        </View>
+      )}
 
       {/* Place Order Button */}
       <TouchableOpacity
@@ -659,19 +701,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                     )}
                   </View>
 
-                  {/* Delivery Highlight Box */}
-                  <View style={styles.deliveryHighlightBox}>
-                    <View style={styles.deliveryHighlightIcon}>
-                      <Ionicons name="bicycle" size={24} color="#FF8C00" />
-                    </View>
-                    <View style={styles.deliveryHighlightContent}>
-                      <Text style={styles.deliveryHighlightTitle}>We'll bring it to you!</Text>
-                      <Text style={styles.deliveryHighlightText}>
-                        Our runners will pick up your order and deliver it fresh to your doorstep. You only pay for the food + delivery.
-                      </Text>
-                    </View>
-                  </View>
-
                   {/* Cart Items Preview - Shows items added to cart */}
                   {cart.length > 0 && (
                     <View style={styles.cartPreview}>
@@ -724,26 +753,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                       )}
                     </View>
                   )}
-
-                  {/* Custom Dish Input */}
-                  <View style={styles.inputSection}>
-                    <Text style={styles.inputLabel}>Add Custom Item</Text>
-                    <View style={styles.customDishRow}>
-                      <TextInput
-                        style={[styles.input, styles.customDishInput]}
-                        placeholder="Enter dish name not in menu"
-                        value={customDishName}
-                        onChangeText={setCustomDishName}
-                      />
-                      <TouchableOpacity
-                        style={[styles.addCustomButton, !customDishName.trim() && styles.addCustomButtonDisabled]}
-                        onPress={addCustomDish}
-                        disabled={!customDishName.trim()}
-                      >
-                        <Ionicons name="add" size={24} color="#FFF" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
 
                   {/* Proceed to Cart Button */}
                   {cart.length > 0 && (
@@ -1093,45 +1102,6 @@ const styles = StyleSheet.create({
     minWidth: 24,
     textAlign: "center",
   },
-  // Delivery Highlight Box
-  deliveryHighlightBox: {
-    flexDirection: "row",
-    backgroundColor: "#FFF8F0",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: "#FFE0B2",
-    alignItems: "flex-start",
-  },
-  deliveryHighlightIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-    shadowColor: "#FF8C00",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  deliveryHighlightContent: {
-    flex: 1,
-  },
-  deliveryHighlightTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#E65100",
-    marginBottom: 4,
-  },
-  deliveryHighlightText: {
-    fontSize: 14,
-    color: "#795548",
-    lineHeight: 20,
-  },
   // Cart Preview
   cartPreview: {
     backgroundColor: "#FFF8F0",
@@ -1246,25 +1216,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#FF8C00",
-  },
-  // Custom Dish Input
-  customDishRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  customDishInput: {
-    flex: 1,
-  },
-  addCustomButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "#FF8C00",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addCustomButtonDisabled: {
-    backgroundColor: "#CCC",
   },
   // Proceed Button
   proceedButton: {
@@ -1414,6 +1365,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
     marginTop: 8,
+    fontStyle: "italic",
+  },
+  // Delivery Charge Note
+  deliveryChargeNote: {
+    backgroundColor: "#E8F5E9",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#A5D6A7",
+  },
+  deliveryChargeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  deliveryChargeTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2E7D32",
+  },
+  deliveryChargeText: {
+    fontSize: 14,
+    color: "#1B5E20",
+    marginBottom: 4,
+    fontWeight: "600",
+  },
+  deliveryChargeDisclaimer: {
+    fontSize: 11,
+    color: "#558B2F",
+    marginTop: 6,
     fontStyle: "italic",
   },
 });
