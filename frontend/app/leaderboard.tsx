@@ -2048,8 +2048,10 @@ export default function LeaderboardScreen() {
           style={styles.navItem}
           onPress={() => router.push("/happening")}
         >
-          <Ionicons name="location-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Happening</Text>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" />
+          <Text style={styles.navLabel}>
+            {accountType === 'restaurant' ? 'Sales' : 'Happening'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity

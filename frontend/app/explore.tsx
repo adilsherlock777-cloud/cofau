@@ -549,10 +549,10 @@ const getCategoryEmoji = (categoryName: string | null) => {
         </TouchableOpacity>
         <View style={styles.mapToggleDivider} />
         <TouchableOpacity
-          style={[styles.mapToggleOption, filterType === 'squad' && styles.mapToggleOptionActive]}
-          onPress={() => onFilterChange('squad')}
+          style={[styles.mapToggleOption, filterType === 'followers' && styles.mapToggleOptionActive]}
+          onPress={() => onFilterChange('followers')}
         >
-          <Text style={[styles.mapToggleText, filterType === 'squad' && styles.mapToggleTextActive]}>Squad</Text>
+          <Text style={[styles.mapToggleText, filterType === 'followers' && styles.mapToggleTextActive]}>Followers</Text>
         </TouchableOpacity>
       </View>
 
@@ -564,28 +564,19 @@ const getCategoryEmoji = (categoryName: string | null) => {
       )}
 
       {/* Results Count */}
-      {filterType !== 'squad' && (
-        <View style={styles.resultsCountContainer}>
-          <Text style={styles.resultsCountText}>
-            {filterType === 'posts' 
-              ? `${posts.length} posts at ${singlePosts.length + clusters.length} locations`
-              : `${restaurants.length} restaurants nearby`
-            }
-          </Text>
-        </View>
-      )}
+      <View style={styles.resultsCountContainer}>
+        <Text style={styles.resultsCountText}>
+          {filterType === 'posts'
+            ? `${posts.length} posts at ${singlePosts.length + clusters.length} locations`
+            : filterType === 'restaurants'
+            ? `${restaurants.length} restaurants nearby`
+            : `${posts.length} posts from followers at ${singlePosts.length + clusters.length} locations`
+          }
+        </Text>
+      </View>
 
       {/* Location Button */}
       <LocationButton onPress={onCenterLocation} />
-
-      {/* Squad Coming Soon */}
-      {filterType === 'squad' && (
-        <View style={styles.squadOverlay}>
-          <Ionicons name="people" size={48} color="#E94A37" />
-          <Text style={styles.squadOverlayTitle}>Squad Feature</Text>
-          <Text style={styles.squadOverlayText}>Coming Soon!</Text>
-        </View>
-      )}
     </View>
   );
 });
@@ -775,13 +766,14 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
 
 export default function ExploreScreen() {
   const router = useRouter();
-  const auth = useAuth() as { user: any; token: string | null };
-  const { user, token } = auth;
+  const auth = useAuth() as { user: any; token: string | null; accountType: string | null };
+  const { user, token, accountType } = auth;
 
   const scrollViewRef = useRef<ScrollView>(null);
   const mapRef = useRef<MapView>(null);
   const videoPositions = useRef<Map<string, { top: number; height: number }>>(new Map());
   const cachedMapPosts = useRef<any[]>([]);
+  const cachedFollowersPosts = useRef<any[]>([]);
   const cachedUserLocation = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -809,7 +801,7 @@ export default function ExploreScreen() {
   const [showRestaurantModal, setShowRestaurantModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedQuickCategory, setSelectedQuickCategory] = useState<string | null>(null);
-  const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'squad'>('posts');
+  const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'followers'>('posts');
   
 
   const POSTS_PER_PAGE = 30;
@@ -1030,6 +1022,45 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
   }
 };
 
+// Fetch followers posts for map with caching
+const fetchFollowersPosts = async (forceRefresh = false) => {
+  if (!userLocation) return;
+
+  // If we have cached followers posts and not forcing refresh, use cache
+  if (!forceRefresh && cachedFollowersPosts.current.length > 0) {
+    console.log('Using cached followers posts:', cachedFollowersPosts.current.length);
+    setMapPosts(cachedFollowersPosts.current);
+    return;
+  }
+
+  setMapLoading(true);
+  try {
+    const url = `${API_URL}/map/followers-posts?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+
+    console.log('Fetching followers posts URL:', url);
+
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token || ""}` },
+    });
+
+    const posts = response.data.posts || [];
+    console.log('Followers posts:', posts.length);
+
+    // Cache the followers posts
+    cachedFollowersPosts.current = posts;
+
+    setMapPosts(posts);
+    setMapRestaurants([]); // Clear restaurants when showing followers
+  } catch (error) {
+    console.log("Fetch followers posts error:", error);
+    // If there's an error, clear the map posts
+    setMapPosts([]);
+    setMapRestaurants([]);
+  } finally {
+    setMapLoading(false);
+  }
+};
+
 const handleQuickCategoryPress = (category: any) => {
   if (selectedQuickCategory === category.id) {
     // Deselect - show all cached posts (NO API CALL)
@@ -1063,6 +1094,31 @@ const handleQuickCategoryPress = (category: any) => {
     }
   }
 };
+
+  // Handle map filter type changes
+  const handleMapFilterChange = async (newFilterType: 'posts' | 'restaurants' | 'followers') => {
+    setMapFilterType(newFilterType);
+
+    // Clear quick category selection when changing filter type
+    setSelectedQuickCategory(null);
+
+    if (newFilterType === 'followers') {
+      // Fetch followers posts (will use cache if available)
+      await fetchFollowersPosts();
+    } else if (newFilterType === 'posts') {
+      // Restore cached regular posts
+      if (cachedMapPosts.current.length > 0) {
+        setMapPosts(cachedMapPosts.current);
+        // Restaurants are already loaded from initial fetch
+      } else {
+        // Fetch if no cache
+        await fetchMapPins(undefined, true);
+      }
+    } else if (newFilterType === 'restaurants') {
+      // Just show restaurants (already loaded from initial fetch)
+      // No need to fetch again
+    }
+  };
 
   const handleRestaurantPress = (restaurant: any) => {
     setSelectedRestaurant(restaurant);
@@ -1364,71 +1420,70 @@ return (
   <View style={styles.container}>
     <View style={styles.headerContainer}>
       {/* GRADIENT HEADER REMOVED - START DIRECTLY WITH SEARCH */}
-      
-      {/* Search Box - Now at the top */}
-      <View style={styles.searchBoxWrapper}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
-          <TextInput 
-            style={styles.searchInput} 
-            placeholder="Search" 
-            placeholderTextColor="#999" 
-            value={searchQuery} 
-            onChangeText={setSearchQuery} 
-            returnKeyType="search" 
-            onSubmitEditing={() => {
-              if (activeTab === 'map') {
-                handleMapSearch(searchQuery);
-              } else {
-                performSearch();
-              }
-            }} 
-          />
-          
-          {/* UPDATED CATEGORY BUTTON - NEW BRAND COLORS */}
-          <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
-            <LinearGradient 
-              colors={["#FF2E2E", "#FF7A18"]}  // NEW BRAND COLORS
-              start={{ x: 0, y: 0 }} 
-              end={{ x: 1, y: 0 }} 
-              style={styles.categoryButtonGradient}
-            >
-              <Ionicons name="options-outline" size={18} color="#FFF" />
-              <Text style={styles.categoryButtonText}>
-                {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
-    
-{/* QUICK CATEGORY CHIPS */}
-<ScrollView 
-  horizontal 
-  showsHorizontalScrollIndicator={false} 
-  style={styles.quickCategoryScroll}
-  contentContainerStyle={styles.quickCategoryContainer}
->
-  {QUICK_CATEGORIES.map((category) => (
-    <TouchableOpacity
-      key={category.id}
-      style={[
-        styles.quickCategoryChip,
-        selectedQuickCategory === category.id && styles.quickCategoryChipActive
-      ]}
-      onPress={() => handleQuickCategoryPress(category)}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.quickCategoryEmoji}>{category.emoji}</Text>
-      <Text style={[
-        styles.quickCategoryText,
-        selectedQuickCategory === category.id && styles.quickCategoryTextActive
-      ]}>
-        {category.name}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</ScrollView>
+
+      {/* Search Box and Categories - Hidden for restaurant users */}
+      {accountType !== 'restaurant' && (
+        <>
+          {/* Search Box - Now at the top */}
+          <View style={styles.searchBoxWrapper}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search"
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                onSubmitEditing={performSearch}
+              />
+
+              {/* UPDATED CATEGORY BUTTON - NEW BRAND COLORS */}
+              <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
+                <LinearGradient
+                  colors={["#FF2E2E", "#FF7A18"]}  // NEW BRAND COLORS
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.categoryButtonGradient}
+                >
+                  <Ionicons name="options-outline" size={18} color="#FFF" />
+                  <Text style={styles.categoryButtonText}>
+                    {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* QUICK CATEGORY CHIPS */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.quickCategoryScroll}
+            contentContainerStyle={styles.quickCategoryContainer}
+          >
+            {QUICK_CATEGORIES.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.quickCategoryChip,
+                  selectedQuickCategory === category.id && styles.quickCategoryChipActive
+                ]}
+                onPress={() => handleQuickCategoryPress(category)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.quickCategoryEmoji}>{category.emoji}</Text>
+                <Text style={[
+                  styles.quickCategoryText,
+                  selectedQuickCategory === category.id && styles.quickCategoryTextActive
+                ]}>
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
+      )}
 
       {/* MAP | USERS TOGGLE */}
 <View style={styles.toggleContainer}>
@@ -1480,8 +1535,8 @@ return (
 </View>
 </View>
 
-      {/* USERS TAB: Category Tags */}
-      {activeTab === 'users' && appliedCategories.length > 0 && (
+      {/* USERS TAB: Category Tags - Hidden for restaurant users */}
+      {accountType !== 'restaurant' && activeTab === 'users' && appliedCategories.length > 0 && (
         <View style={styles.selectedTagsWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectedTagsContainer}>
             {appliedCategories.map((cat) => (
@@ -1524,7 +1579,7 @@ return (
     isLoading={mapLoading}
     mapRef={mapRef}
     filterType={mapFilterType}
-    onFilterChange={setMapFilterType}
+    onFilterChange={handleMapFilterChange}
     onCenterLocation={centerOnUserLocation}
     selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
   />
@@ -1575,12 +1630,13 @@ return (
       <View style={styles.navBar}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}><Ionicons name="home-outline" size={20} color="#000" /><Text style={styles.navLabel}>Home</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}><Ionicons name="compass" size={20} color="#000" /><Text style={styles.navLabelActive}>Explore</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push("/leaderboard")}><View style={styles.centerIconCircle}><Ionicons name="fast-food" size={22} color="#000" /></View><Text style={styles.navLabel}>Delivery</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}><Ionicons name="location-outline" size={20} color="#000" /><Text style={styles.navLabel}>Happening</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push("/leaderboard")}><View style={styles.centerIconCircle}><Ionicons name="fast-food" size={22} color="#000" /></View><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}><Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" /><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}><Ionicons name="person-outline" size={20} color="#000" /><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
       </View>
 
-      {/* CATEGORY MODAL */}
+      {/* CATEGORY MODAL - Hidden for restaurant users */}
+      {accountType !== 'restaurant' && (
       <Modal visible={showCategoryModal} transparent animationType="slide" onRequestClose={() => { setSelectedCategories(appliedCategories); setShowCategoryModal(false); }}>
         <View style={styles.modalOverlay}>
           <View style={styles.categoryModal}>
@@ -1667,6 +1723,7 @@ return (
           </View>
         </View>
       </Modal>
+      )}
 
       {/* RESTAURANT DETAIL MODAL */}
       <RestaurantDetailModal

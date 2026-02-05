@@ -271,13 +271,13 @@ const LargeStatCard = ({
         </TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
           <View style={styles.centerIconCircle}>
-            <Ionicons name="camera" size={22} color="#000" />
+            <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabel}>Top Posts</Text>
+          <Text style={styles.navLabel}>Orders</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-          <Ionicons name="location-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Happening</Text>
+          <Ionicons name="analytics-outline" size={20} color="#000" />
+          <Text style={styles.navLabel}>Sales</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
           <Ionicons name="person" size={20} color="#000" />

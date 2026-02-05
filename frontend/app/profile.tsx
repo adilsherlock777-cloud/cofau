@@ -2653,11 +2653,11 @@ const renderRestaurantProfile = () => {
           <View style={styles.centerIconCircle}>
             <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabel}>Delivery</Text>
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-          <Ionicons name="location-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Happening</Text>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" />
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
           <Ionicons name="person" size={20} color="#000" />
@@ -3741,11 +3741,11 @@ if (loading) {
             <View style={styles.centerIconCircle}>
               <Ionicons name="fast-food" size={28} color="#000" />
             </View>
-            <Text style={styles.navLabel}>Delivery</Text>
+            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-            <Ionicons name="location-outline" size={28} color="#000" />
-            <Text style={styles.navLabel}>Happening</Text>
+            <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={28} color="#000" />
+            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
             <Ionicons name="person" size={28} color="#000" />
@@ -4225,11 +4225,11 @@ if (isRestaurantProfile) {
           <View style={styles.centerIconCircle}>
             <Ionicons name="fast-food" size={22} color="#000" />
           </View>
-          <Text style={styles.navLabel}>Delivery</Text>
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-          <Ionicons name="location-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Happening</Text>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" />
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
           <Ionicons name="person" size={20} color="#000" />

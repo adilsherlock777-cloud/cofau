@@ -157,7 +157,8 @@ export default function HappeningPlaces() {
   const [showFixedLine, setShowFixedLine] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
-  
+  const [visibleCards, setVisibleCards] = useState(3); // Initially show 3 cards
+
   // Video autoplay state
   const videoPositions = useRef(new Map());
   const [scrollY, setScrollY] = useState(0);
@@ -431,11 +432,21 @@ export default function HappeningPlaces() {
             {/* Title Box */}
             <View style={styles.titleBoxWrapper}>
               <BlurView intensity={60} tint="light" style={styles.titleBox}>
-                <Text style={styles.titleMain}>Happening places</Text>
-                <View style={styles.subtitleRow}>
-                  <Ionicons name="location" size={16} color="#E94A37" />
-                  <Text style={styles.titleSub}>Most Visited Places Around you</Text>
-                </View>
+                <Text style={[styles.titleMain, isRestaurant && styles.titleMainLarge]}>
+                  {isRestaurant ? 'Sales Dashboard' : 'Happening places'}
+                </Text>
+                {!isRestaurant && (
+                  <View style={styles.subtitleRow}>
+                    <Ionicons
+                      name="location"
+                      size={16}
+                      color="#E94A37"
+                    />
+                    <Text style={styles.titleSub}>
+                      Most Visited Places Around you
+                    </Text>
+                  </View>
+                )}
               </BlurView>
             </View>
             
@@ -457,11 +468,11 @@ export default function HappeningPlaces() {
               <View style={styles.centerIconCircle}>
                 <Ionicons name="fast-food" size={22} color="#000" />
               </View>
-              <Text style={styles.navLabel}>Delivery</Text>
+              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-              <Ionicons name="location" size={20} color="#000" />
-              <Text style={styles.navLabelActive}>Happening</Text>
+              <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={20} color="#000" />
+              <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
               <Ionicons name="person-outline" size={20} color="#000" />
@@ -483,30 +494,32 @@ export default function HappeningPlaces() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.container}>
-          {/* Header Container - Gradient with Premium Finish */}
-          <View style={styles.headerContainer}>
-            <LinearGradient
-              colors={["#FFF5F0", "#FFE5D9"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientHeader}
-            >
-            </LinearGradient>
-          </View>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header Container - Gradient with Premium Finish */}
+            <View style={styles.headerContainer}>
+              <LinearGradient
+                colors={["#FFF5F0", "#FFE5D9"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientHeader}
+              >
+              </LinearGradient>
+            </View>
 
-          {/* Title Box */}
-          <View style={styles.titleBoxWrapper}>
-            <BlurView intensity={60} tint="light" style={styles.titleBox}>
-              <Text style={styles.titleMain}>Sales Dashboard</Text>
-              <View style={styles.subtitleRow}>
-                <Ionicons name="analytics" size={16} color="#E94A37" />
-                <Text style={styles.titleSub}>Your Restaurant Performance</Text>
-              </View>
-            </BlurView>
-          </View>
+            {/* Title Box */}
+            <View style={styles.titleBoxWrapper}>
+              <BlurView intensity={60} tint="light" style={styles.titleBox}>
+                <Text style={[styles.titleMain, styles.titleMainLarge]}>Sales Dashboard</Text>
+              </BlurView>
+            </View>
 
-          {/* Sales Dashboard Component */}
-          <SalesDashboard token={token || ""} />
+            {/* Sales Dashboard Component */}
+            <SalesDashboard token={token || ""} />
+          </ScrollView>
 
           {/* Bottom Navigation */}
           <View style={styles.navBar}>
@@ -533,15 +546,15 @@ export default function HappeningPlaces() {
               <View style={styles.centerIconCircle}>
                 <Ionicons name="fast-food" size={22} color="#000" />
               </View>
-              <Text style={styles.navLabel}>Delivery</Text>
+              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.navItem}
               onPress={() => router.push('/happening')}
             >
-              <Ionicons name="location" size={20} color="#000" />
-              <Text style={styles.navLabelActive}>Happening</Text>
+              <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={20} color="#000" />
+              <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -618,7 +631,7 @@ export default function HappeningPlaces() {
           )}
 
           {/* Location Cards */}
-          {topLocations.map((location, index) => {
+          {topLocations.slice(0, visibleCards).map((location, index) => {
             const images = location.images || [];
             const thumbnails = location.thumbnails || [];
             const imagesData = location.images_data || [];
@@ -737,6 +750,25 @@ export default function HappeningPlaces() {
               </TouchableOpacity>
             );
           })}
+
+          {/* Load More Button */}
+          {visibleCards < topLocations.length && (
+            <TouchableOpacity
+              style={styles.loadMoreButton}
+              onPress={() => setVisibleCards(prev => Math.min(prev + 3, topLocations.length))}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.loadMoreGradient}
+              >
+                <Text style={styles.loadMoreText}>Load More</Text>
+                <Ionicons name="chevron-down" size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {/* Bottom Navigation */}
@@ -764,15 +796,15 @@ export default function HappeningPlaces() {
             <View style={styles.centerIconCircle}>
               <Ionicons name="fast-food" size={22} color="#000" />
             </View>
-            <Text style={styles.navLabel}>Delivery</Text>
+            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.navItem}
             onPress={() => router.push('/happening')}
           >
-            <Ionicons name="location" size={20} color="#000" />
-            <Text style={styles.navLabelActive}>Happening</Text>
+            <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={20} color="#000" />
+            <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -928,16 +960,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
   },
+  titleMainLarge: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
 
   subtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 6,
+    gap: 6,
   },
   titleSub: {
     fontSize: 14,
     color: '#666',
-    marginLeft: 6,
   },
 
   cardHeader: {
@@ -1268,5 +1305,31 @@ skeletonImageLarge: {
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
+  },
+
+  // Load More Button
+  loadMoreButton: {
+    marginHorizontal: 20,
+    marginVertical: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  loadMoreGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  loadMoreText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
