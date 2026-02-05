@@ -838,11 +838,14 @@ async def submit_review(
 
 @router.get("/restaurant-reviews")
 async def get_restaurant_reviews(
-    skip: int = 0,
-    limit: int = 50,
+    skip: Optional[int] = 0,
+    limit: Optional[int] = 50,
     current_restaurant: dict = Depends(get_current_restaurant)
 ):
     """Get all reviews for the current restaurant"""
+    print(f"🎯 get_restaurant_reviews endpoint hit!")
+    print(f"   Skip: {skip}, Limit: {limit}")
+    print(f"   Restaurant param received: {current_restaurant is not None}")
     try:
         db = get_database()
 
@@ -888,10 +891,11 @@ async def get_restaurant_reviews(
 
         return result
 
-    except HTTPException:
+    except HTTPException as he:
+        print(f"❌ HTTPException in get_restaurant_reviews: {he.status_code} - {he.detail}")
         raise
     except Exception as e:
-        print(f"❌ Error fetching restaurant reviews: {str(e)}")
+        print(f"❌ Unexpected error in get_restaurant_reviews: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch reviews: {str(e)}")
