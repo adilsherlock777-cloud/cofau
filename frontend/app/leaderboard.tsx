@@ -247,6 +247,25 @@ export default function LeaderboardScreen() {
   };
 
   const handleOrderClick = (post: any) => {
+    // Check if user has added their delivery location (only for regular users)
+    if (!isRestaurant && !userAddress) {
+      Alert.alert(
+        "Delivery Location Required",
+        "Please add your delivery location before placing an order.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Add Location",
+            onPress: () => setShowLocationModal(true),
+          },
+        ]
+      );
+      return;
+    }
+
     setSelectedPost(post);
     setShowOrderModal(true);
   };

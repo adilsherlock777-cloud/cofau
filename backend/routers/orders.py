@@ -498,15 +498,37 @@ async def get_all_orders_for_partner(
         "cancelled": []
     }
 
+    # Helper function to calculate distance in km
+    def calculate_distance_km(lat1, lon1, lat2, lon2):
+        import math
+        if not all([lat1, lon1, lat2, lon2]):
+            return None
+        R = 6371  # Earth's radius in km
+        d_lat = math.radians(lat2 - lat1)
+        d_lon = math.radians(lon2 - lon1)
+        a = (math.sin(d_lat / 2) ** 2 +
+             math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+             math.sin(d_lon / 2) ** 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return round(R * c, 2)
+
     for order in all_orders:
         order_id = str(order["_id"])
         user_id = order.get("user_id")
+        restaurant_id = order.get("restaurant_id")
 
-        # Get customer info
+        # Get customer info and delivery coordinates
         customer = None
+        user_lat = None
+        user_lng = None
         if user_id:
             try:
                 customer = await db.users.find_one({"_id": ObjectId(user_id)})
+                # Get delivery address and coordinates from user_addresses
+                user_address = await db.user_addresses.find_one({"user_id": user_id})
+                if user_address:
+                    user_lat = user_address.get("latitude")
+                    user_lng = user_address.get("longitude")
             except:
                 pass
 
@@ -515,8 +537,43 @@ async def get_all_orders_for_partner(
 
         if customer:
             customer_name = customer.get("full_name", "Unknown Customer")
-            # Get delivery address from user profile or order
-            delivery_address = customer.get("address", "No address provided")
+
+        # Get delivery address from user_addresses
+        if user_id:
+            try:
+                user_address = await db.user_addresses.find_one({"user_id": user_id})
+                if user_address:
+                    addr_parts = []
+                    if user_address.get("house_number"):
+                        addr_parts.append(user_address.get("house_number"))
+                    if user_address.get("street_address"):
+                        addr_parts.append(user_address.get("street_address"))
+                    if user_address.get("address"):
+                        addr_parts.append(user_address.get("address"))
+                    if addr_parts:
+                        delivery_address = ", ".join(addr_parts)
+            except:
+                pass
+
+        # Get restaurant coordinates
+        restaurant_lat = None
+        restaurant_lng = None
+        restaurant_profile_name = order.get("restaurant_name", "Unknown Restaurant")
+        if restaurant_id:
+            try:
+                restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+                if restaurant:
+                    restaurant_lat = restaurant.get("latitude")
+                    restaurant_lng = restaurant.get("longitude")
+                    restaurant_profile_name = restaurant.get("restaurant_name", restaurant_profile_name)
+            except:
+                pass
+
+        # Calculate distance
+        distance_km = calculate_distance_km(restaurant_lat, restaurant_lng, user_lat, user_lng)
+
+        # Get total price
+        price = order.get("total_price") or order.get("price")
 
         order_data = {
             "order_id": order_id,
@@ -526,8 +583,15 @@ async def get_all_orders_for_partner(
             "suggestions": order.get("suggestions", ""),
             "post_media_url": order.get("post_media_url", ""),
             "restaurant_name": order.get("restaurant_name", "Unknown Restaurant"),
+            "restaurant_profile_name": restaurant_profile_name,
             "post_location": order.get("post_location", ""),
             "status": order.get("status", "pending"),
+            "price": price,
+            "restaurant_lat": restaurant_lat,
+            "restaurant_lng": restaurant_lng,
+            "user_lat": user_lat,
+            "user_lng": user_lng,
+            "distance_km": distance_km,
             "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
             "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", "")
         }

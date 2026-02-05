@@ -89,12 +89,58 @@ export default function OrderCard({ order, onStatusUpdate }) {
         </div>
       </div>
 
+      {/* Price */}
+      {order.price && (
+        <div className="mb-3 flex items-center justify-between bg-green-50 p-2 rounded-lg border border-green-200">
+          <span className="text-sm font-medium text-gray-700">Total Amount</span>
+          <span className="text-lg font-bold text-green-600">₹{order.price}</span>
+        </div>
+      )}
+
       {/* Customer Info */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
         <p className="text-sm font-medium text-gray-700">Customer</p>
         <p className="text-sm text-gray-900">{order.customer_name}</p>
         <p className="text-xs text-gray-600 mt-1">{order.delivery_address}</p>
       </div>
+
+      {/* Distance Visualization */}
+      {order.distance_km !== null && order.distance_km !== undefined && (
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-xs font-medium text-blue-800 mb-3">Delivery Route</p>
+          <div className="flex items-center justify-between">
+            {/* Restaurant Location */}
+            <div className="flex flex-col items-center text-center flex-1">
+              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center mb-1">
+                <span className="text-white text-lg">🏪</span>
+              </div>
+              <p className="text-xs text-gray-700 font-medium truncate max-w-[80px]" title={order.restaurant_profile_name || order.restaurant_name}>
+                {order.restaurant_profile_name || order.restaurant_name}
+              </p>
+            </div>
+
+            {/* Distance Line */}
+            <div className="flex-1 flex flex-col items-center mx-2">
+              <div className="relative w-full flex items-center">
+                <div className="flex-1 border-t-2 border-dashed border-blue-400"></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-bold whitespace-nowrap">
+                  {order.distance_km} km
+                </div>
+              </div>
+            </div>
+
+            {/* User Location */}
+            <div className="flex flex-col items-center text-center flex-1">
+              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-1">
+                <span className="text-white text-lg">📍</span>
+              </div>
+              <p className="text-xs text-gray-700 font-medium truncate max-w-[80px]" title={order.customer_name}>
+                {order.customer_name}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Suggestions */}
       {order.suggestions && (
