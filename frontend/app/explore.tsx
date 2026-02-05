@@ -14,6 +14,7 @@ import {
   LayoutChangeEvent,
   Platform,
   Alert,
+  Image as RNImage,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -187,14 +188,81 @@ const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos }: any) 
 const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [tracksChanges, setTracksChanges] = useState(true);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
-  
+
+  // Android - ULTRA LARGE (200x200) to prevent scaling down
+  if (Platform.OS === 'android') {
+    return (
+      <Marker
+        coordinate={{
+          latitude: restaurant.latitude,
+          longitude: restaurant.longitude,
+        }}
+        onPress={() => onPress(restaurant)}
+        tracksViewChanges={false}
+      >
+        <View style={{
+          width: 200,
+          height: 200,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            width: 140,
+            height: 140,
+            borderRadius: 70,
+            backgroundColor: '#E94A37',
+            borderWidth: 6,
+            borderColor: '#FFFFFF',
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'hidden',
+            elevation: 8,
+          }}>
+            {restaurant.profile_picture ? (
+              <RNImage
+                source={{ uri: fixUrl(restaurant.profile_picture) || '' }}
+                style={{ width: 128, height: 128, borderRadius: 64 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{ width: 128, height: 128, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center', borderRadius: 64 }}>
+                <Ionicons name="restaurant" size={52} color="#fff" />
+              </View>
+            )}
+          </View>
+          {/* Reviews badge */}
+          <View style={{
+            position: 'absolute',
+            bottom: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#E94A37',
+            borderRadius: 14,
+            paddingVertical: 5,
+            paddingHorizontal: 10,
+            gap: 4,
+            borderWidth: 2,
+            borderColor: '#FFFFFF',
+            elevation: 4,
+          }}>
+            <Ionicons name="chatbubble" size={14} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
+              {restaurant.review_count || 0}
+            </Text>
+          </View>
+        </View>
+      </Marker>
+    );
+  }
+
+  // iOS rendering
   return (
     <Marker
       coordinate={{
@@ -208,7 +276,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
         <View style={styles.restaurantMarkerBubble}>
           {restaurant.profile_picture ? (
             <Image
-              source={{ uri: fixUrl(restaurant.profile_picture) }}
+              source={{ uri: fixUrl(restaurant.profile_picture) || '' }}
               style={styles.restaurantMarkerImage}
               contentFit="cover"
               cachePolicy="memory-disk"
@@ -233,19 +301,121 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
 // Single Post Marker (for locations with 1 post)
 const PostMarker = memo(({ post, onPress }: any) => {
   const [imageLoaded, setImageLoaded] = useState(false);
-  
-  if (!post.latitude || !post.longitude) return null;
-  
+
+  if (!post.latitude || !post.longitude) {
+    console.log('❌ PostMarker: No coordinates for post', post.id);
+    return null;
+  }
+
+  console.log('✅ Rendering PostMarker:', {
+    id: post.id,
+    lat: post.latitude,
+    lng: post.longitude,
+    platform: Platform.OS
+  });
+
   // Stop tracking after 2 seconds regardless of image load
   const [tracksChanges, setTracksChanges] = useState(true);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
-  
+
+  // Android - Colored pin with beautiful image callout
+  if (Platform.OS === 'android') {
+    console.log('📍 Creating marker with callout for Android post:', post.id);
+
+    // Color-code by rating
+    let pinColor = '#F2CF68'; // Default: Gold
+    if (post.rating) {
+      if (post.rating >= 8) pinColor = '#00C853'; // Green = Excellent
+      else if (post.rating >= 6) pinColor = '#FF9800'; // Orange = Good
+      else pinColor = '#FF2E2E'; // Red = Lower rated
+    }
+
+    const imageUrl = fixUrl(post.thumbnail_url || post.media_url);
+
+    return (
+      <Marker
+        coordinate={{
+          latitude: post.latitude,
+          longitude: post.longitude,
+        }}
+        pinColor={pinColor}
+        onCalloutPress={() => {
+          console.log('🎯 Callout pressed, opening post:', post.id);
+          onPress(post);
+        }}
+      >
+        <Callout tooltip style={{ width: 220 }}>
+          <View style={{
+            backgroundColor: 'white',
+            borderRadius: 12,
+            padding: 10,
+            width: 220,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.3,
+            shadowRadius: 5,
+            elevation: 8,
+          }}>
+            {imageUrl && (
+              <RNImage
+                source={{ uri: imageUrl }}
+                style={{
+                  width: 200,
+                  height: 150,
+                  borderRadius: 8,
+                  marginBottom: 10,
+                  backgroundColor: '#f0f0f0',
+                }}
+                resizeMode="cover"
+              />
+            )}
+            <Text
+              numberOfLines={2}
+              style={{
+                fontSize: 15,
+                fontWeight: 'bold',
+                color: '#000',
+                marginBottom: 6,
+              }}
+            >
+              {post.location_name || "Food Post"}
+            </Text>
+            {post.rating && (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: 6,
+                backgroundColor: '#FFF8E1',
+                padding: 6,
+                borderRadius: 6,
+              }}>
+                <Text style={{ fontSize: 18, marginRight: 6 }}>⭐</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FF9800' }}>
+                  {post.rating}/10
+                </Text>
+              </View>
+            )}
+            <Text style={{
+              fontSize: 13,
+              color: '#1E88E5',
+              fontWeight: '600',
+              marginTop: 4,
+            }}>
+              Tap to view full post →
+            </Text>
+          </View>
+        </Callout>
+      </Marker>
+    );
+  }
+
+  // iOS rendering
   return (
     <Marker
       coordinate={{
@@ -259,7 +429,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
         <View style={styles.postMarkerBubble}>
           {post.thumbnail_url || post.media_url ? (
             <Image
-              source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+              source={{ uri: fixUrl(post.thumbnail_url || post.media_url) || '' }}
               style={styles.postMarkerImage}
               contentFit="cover"
               cachePolicy="memory-disk"
@@ -288,12 +458,12 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
   const [imagesLoaded, setImagesLoaded] = useState(0);
   const [tracksChanges, setTracksChanges] = useState(true);
   const { posts, latitude, longitude, count } = cluster;
-  
+
   // Get latest 3 posts
   const latestPosts = posts
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 3);
-  
+
   // Stop tracking after 3 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -301,7 +471,36 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
-  
+
+  console.log('✅ Rendering ClusterMarker:', {
+    count,
+    lat: latitude,
+    lng: longitude,
+    platform: Platform.OS
+  });
+
+  // Android - Use NATIVE pin with distinct color for clusters
+  if (Platform.OS === 'android') {
+    console.log('📍 Creating cluster marker for Android, count:', count);
+
+    // Purple/violet for clusters to stand out from single posts
+    const clusterColor = '#9C27B0'; // Purple for clusters
+
+    return (
+      <Marker
+        coordinate={{ latitude, longitude }}
+        onPress={() => {
+          console.log('🎯 Cluster tapped! Count:', count);
+          onPress(cluster);
+        }}
+        pinColor={clusterColor}
+        title={`📍 ${count} posts here`}
+        description={`Tap to see all ${count} posts at ${cluster.locationName || 'this location'}`}
+      />
+    );
+  }
+
+  // iOS layout with overlapping images
   return (
     <Marker
       coordinate={{ latitude, longitude }}
@@ -310,15 +509,17 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     >
       <View style={styles.clusterMarkerContainer}>
         {/* Preview Images */}
-        <View style={styles.clusterPreviewContainer}>
+        <View style={[styles.clusterPreviewContainer, { width: 60 + (latestPosts.length - 1) * 45 }]}>
           {latestPosts.map((post: any, index: number) => (
-            <View 
-              key={post.id} 
+            <View
+              key={post.id}
               style={[
                 styles.clusterPreviewImage,
-                { 
+                {
+                  position: 'absolute',
+                  left: index * 45,
                   zIndex: 3 - index,
-                  marginLeft: index > 0 ? -15 : 0,
+                  elevation: 4 + (3 - index),
                 }
               ]}
             >
@@ -345,7 +546,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
             </View>
           ))}
         </View>
-        
+
         {/* Pin with count */}
         <View style={styles.clusterPinContainer}>
           <View style={[
@@ -394,7 +595,7 @@ const MapViewComponent = memo(({
   // Group posts by location
   const { singlePosts, clusters } = React.useMemo(() => {
     const groups = new Map<string, any[]>();
-    
+
     posts.forEach((post: any) => {
       if (post.latitude && post.longitude) {
         const key = `${post.latitude.toFixed(5)},${post.longitude.toFixed(5)}`;
@@ -404,13 +605,13 @@ const MapViewComponent = memo(({
         groups.get(key)!.push(post);
       }
     });
-    
+
     const singlePosts: any[] = [];
     const clusters: any[] = [];
-    
+
     groups.forEach((groupPosts, key) => {
       const [lat, lng] = key.split(',').map(Number);
-      
+
       if (groupPosts.length === 1) {
         singlePosts.push(groupPosts[0]);
       } else {
@@ -424,7 +625,9 @@ const MapViewComponent = memo(({
         });
       }
     });
-    
+
+    console.log(`📊 Map clustering: ${singlePosts.length} single posts, ${clusters.length} clusters (Platform: ${Platform.OS})`);
+
     return { singlePosts, clusters };
   }, [posts]);
 
@@ -507,16 +710,19 @@ const getCategoryEmoji = (categoryName: string | null) => {
           ))}
 
           {/* Single Post Markers */}
-          {filterType === 'posts' && singlePosts.map((post: any) => (
-            <PostMarker
-              key={`post-${post.id}`}
-              post={post}
-              onPress={onPostPress}
-            />
-          ))}
+          {(filterType === 'posts' || filterType === 'followers') && (() => {
+            console.log(`🗺️  Rendering ${singlePosts.length} single PostMarkers for filterType: ${filterType}`);
+            return singlePosts.map((post: any) => (
+              <PostMarker
+                key={`post-${post.id}`}
+                post={post}
+                onPress={onPostPress}
+              />
+            ));
+          })()}
 
           {/* Cluster Markers */}
-          {filterType === 'posts' && clusters.map((cluster: any) => (
+          {(filterType === 'posts' || filterType === 'followers') && clusters.map((cluster: any) => (
             <ClusterMarker
               key={`cluster-${cluster.id}`}
               cluster={cluster}
@@ -1968,8 +2174,8 @@ clusterMarkerContainer: {
   alignItems: 'center',
 },
 clusterPreviewContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
+  position: 'relative',
+  height: 60,
   marginBottom: -10,
 },
 clusterPreviewImage: {
@@ -1978,21 +2184,21 @@ clusterPreviewImage: {
   borderRadius: 10,
   borderWidth: 3,
   borderColor: '#fff',
-  overflow: 'hidden',
   backgroundColor: '#f0f0f0',
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.2,
   shadowRadius: 4,
-  elevation: 4,
 },
 clusterImage: {
-  width: '100%',
-  height: '100%',
+  width: 54,
+  height: 54,
+  borderRadius: 7,
 },
 clusterImagePlaceholder: {
-  width: '100%',
-  height: '100%',
+  width: 54,
+  height: 54,
+  borderRadius: 7,
   backgroundColor: '#ccc',
   justifyContent: 'center',
   alignItems: 'center',
@@ -2070,6 +2276,45 @@ clusterPinArrow: {
   borderTopColor: '#fff',
   marginTop: -3,
 },
+// Android-specific cluster styles
+androidClusterPreview: {
+  width: 70,
+  height: 70,
+  borderRadius: 12,
+  borderWidth: 3,
+  borderColor: '#fff',
+  backgroundColor: '#f0f0f0',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 4,
+  elevation: 5,
+  marginBottom: -10,
+},
+androidClusterImage: {
+  width: 64,
+  height: 64,
+  borderRadius: 9,
+},
+androidClusterImagePlaceholder: {
+  width: 64,
+  height: 64,
+  borderRadius: 9,
+  backgroundColor: '#ccc',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+androidGridIndicator: {
+  position: 'absolute',
+  top: 4,
+  right: 4,
+  backgroundColor: 'rgba(0,0,0,0.7)',
+  borderRadius: 12,
+  width: 24,
+  height: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
 
  // ======================================================
 // RESTAURANT MARKER STYLES - UPDATED
@@ -2094,13 +2339,13 @@ restaurantMarkerBubble: {
   overflow: 'hidden',
 },
 restaurantMarkerImage: {
-  width: '100%',
-  height: '100%',
+  width: 74,
+  height: 74,
   borderRadius: 37,
 },
 restaurantMarkerPlaceholder: {
-  width: '100%',
-  height: '100%',
+  width: 74,
+  height: 74,
   justifyContent: 'center',
   alignItems: 'center',
   backgroundColor: '#E94A37',
@@ -2188,16 +2433,16 @@ postMarkerBubble: {
   shadowOpacity: 0.3,
   shadowRadius: 4,
   elevation: 5,
-  overflow: 'hidden',
 },
 postMarkerImage: {
-  width: '100%',
-  height: '100%',
-  borderRadius: 8,
+  width: 74,
+  height: 74,
+  borderRadius: 7,
 },
 postMarkerPlaceholder: {
-  width: '100%',
-  height: '100%',
+  width: 74,
+  height: 74,
+  borderRadius: 7,
   justifyContent: 'center',
   alignItems: 'center',
   backgroundColor: '#F2CF68',
@@ -2231,6 +2476,39 @@ postMarkerArrow: {
   borderTopColor: '#fff',
   marginTop: -2,
 },
+// Android-specific PostMarker styles with explicit sizing
+postMarkerContainerAndroid: {
+  alignItems: 'center',
+  width: 100,
+},
+postMarkerBubbleAndroid: {
+  width: 90,
+  height: 90,
+  borderRadius: 12,
+  backgroundColor: '#F2CF68',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.4,
+  shadowRadius: 5,
+  elevation: 6,
+},
+postMarkerImageAndroid: {
+  width: 84,
+  height: 84,
+  borderRadius: 9,
+},
+postMarkerPlaceholderAndroid: {
+  width: 84,
+  height: 84,
+  borderRadius: 9,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#F2CF68',
+},
 // FLOATING MAP TOGGLE STYLES
 mapFloatingToggle: {
   position: 'absolute',
@@ -2258,6 +2536,12 @@ mapToggleOptionActive: {
   shadowOpacity: 0.1,
   shadowRadius: 2,
   elevation: 2,
+},
+mapToggleDivider: {
+  width: 1,
+  height: 20,
+  backgroundColor: '#ddd',
+  marginHorizontal: 2,
 },
 mapToggleText: {
   fontSize: 12,
