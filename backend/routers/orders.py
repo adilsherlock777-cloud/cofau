@@ -1598,17 +1598,29 @@ async def get_rewards_history(
     current_user: dict = Depends(get_current_user)
 ):
     """Get user's wallet transactions / rewards history"""
-    print(f"📊 rewards-history called with skip={skip}, limit={limit}, user={current_user.get('email')}")
-
-    # Check if this is a restaurant account (restaurants don't have rewards)
-    if current_user.get("account_type") == "restaurant":
-        raise HTTPException(status_code=403, detail="Rewards are not available for restaurant accounts")
-
     try:
+        print(f"📊 rewards-history endpoint called")
+        print(f"   Skip: {skip}, Limit: {limit}")
+        print(f"   User email: {current_user.get('email')}")
+        print(f"   current_user keys: {list(current_user.keys())}")
+        print(f"   Has _id: {'_id' in current_user}")
+        print(f"   _id value: {current_user.get('_id')}")
+        print(f"   _id type: {type(current_user.get('_id'))}")
+
+        # Check if this is a restaurant account (restaurants don't have rewards)
+        if current_user.get("account_type") == "restaurant":
+            raise HTTPException(status_code=403, detail="Rewards are not available for restaurant accounts")
+
         db = get_database()
+
+        # Check if _id exists before accessing
+        if "_id" not in current_user:
+            print(f"❌ ERROR: _id not in current_user!")
+            raise HTTPException(status_code=500, detail=f"User object missing _id field. Keys: {list(current_user.keys())}")
 
         # Use direct dictionary access like /me endpoint does (MongoDB always returns _id)
         user_id = str(current_user["_id"])
+        print(f"✅ Successfully extracted user_id: {user_id}")
 
         print(f"🔍 Fetching rewards history for user: {user_id}")
 
