@@ -267,6 +267,7 @@ async def get_restaurant_profile(current_restaurant: dict = Depends(get_current_
         "cover_image": current_restaurant.get("cover_image"),
         "bio": current_restaurant.get("bio"),
         "phone": current_restaurant.get("phone"),
+        "phone_number": current_restaurant.get("phone_number"),  # Include phone_number field
         "address": current_restaurant.get("address"),
         "cuisine_type": current_restaurant.get("cuisine_type"),
         "posts_count": current_restaurant.get("posts_count", 0),
@@ -307,6 +308,9 @@ async def update_restaurant_profile(
         update_dict["bio"] = update_data.bio
     if update_data.phone is not None:
         update_dict["phone"] = update_data.phone
+        # Also update phone_number field for consistency
+        update_dict["phone_number"] = update_data.phone
+        print(f"📞 Restaurant phone updated: {update_data.phone}")
     if update_data.address is not None:
         update_dict["address"] = update_data.address
     if update_data.cuisine_type is not None:
@@ -320,7 +324,7 @@ async def update_restaurant_profile(
         )
     
     updated_restaurant = await db.restaurants.find_one({"_id": current_restaurant["_id"]})
-    
+
     return {
         "id": str(updated_restaurant["_id"]),
         "restaurant_name": updated_restaurant["restaurant_name"],
@@ -329,6 +333,7 @@ async def update_restaurant_profile(
         "cover_image": updated_restaurant.get("cover_image"),
         "bio": updated_restaurant.get("bio"),
         "phone": updated_restaurant.get("phone"),
+        "phone_number": updated_restaurant.get("phone_number"),  # Include phone_number field
         "address": updated_restaurant.get("address"),
         "cuisine_type": updated_restaurant.get("cuisine_type"),
         "posts_count": updated_restaurant.get("posts_count", 0),

@@ -19,6 +19,13 @@ from routers.notifications import create_notification
 PARTNER_PIN = "1234"
 
 
+def is_valid_objectid(id_string: str) -> bool:
+    """Check if a string is a valid MongoDB ObjectId (24 character hex string)"""
+    if not id_string or not isinstance(id_string, str):
+        return False
+    return len(id_string) == 24 and all(c in '0123456789abcdefABCDEF' for c in id_string)
+
+
 def verify_partner_pin(pin: str):
     """Verify partner PIN"""
     if pin != PARTNER_PIN:
@@ -71,11 +78,24 @@ async def create_order(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
+    # Validate restaurant_id if provided (must be valid MongoDB ObjectId, not Google Place ID)
+    validated_restaurant_id = None
+    if order_data.restaurant_id:
+        if is_valid_objectid(order_data.restaurant_id):
+            validated_restaurant_id = order_data.restaurant_id
+            print(f"✅ Valid restaurant_id: {validated_restaurant_id}")
+        else:
+            # Invalid ID (likely Google Place ID starting with "ChIJ")
+            print(f"⚠️ Invalid restaurant_id rejected (Google Place ID?): {order_data.restaurant_id}")
+            print(f"   Restaurant name will be preserved: {order_data.restaurant_name}")
+            # Set to None so order continues without restaurant_id
+            validated_restaurant_id = None
+
     # Create order document
     order_doc = {
         "user_id": user_id,
         "post_id": order_data.post_id,
-        "restaurant_id": order_data.restaurant_id,
+        "restaurant_id": validated_restaurant_id,
         "restaurant_name": order_data.restaurant_name,
         "dish_name": order_data.dish_name.strip(),
         "total_price": order_data.total_price,
@@ -95,7 +115,7 @@ async def create_order(
     print(f"✅ Order created: {order_id} by user {user_id}")
 
     # Send push notification to restaurant when new order is placed
-    restaurant_id = order_data.restaurant_id
+    restaurant_id = validated_restaurant_id
     if restaurant_id:
         try:
             # Get customer name
@@ -814,20 +834,23 @@ async def get_all_orders_for_partner(
         restaurant_phone = None
         restaurant_profile_name = order.get("restaurant_name", "Unknown Restaurant")
         if restaurant_id:
-            try:
-                restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
-                if restaurant:
-                    restaurant_lat = restaurant.get("latitude")
-                    restaurant_lng = restaurant.get("longitude")
-                    restaurant_phone = restaurant.get("phone_number") or restaurant.get("phone")
-                    restaurant_profile_name = restaurant.get("restaurant_name", restaurant_profile_name)
+            # Only try to fetch if it's a valid ObjectId
+            if is_valid_objectid(restaurant_id):
+                try:
+                    restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+                    if restaurant:
+                        restaurant_lat = restaurant.get("latitude")
+                        restaurant_lng = restaurant.get("longitude")
+                        restaurant_phone = restaurant.get("phone_number") or restaurant.get("phone")
+                        restaurant_profile_name = restaurant.get("restaurant_name", restaurant_profile_name)
 
-                    # Debug: Log if restaurant phone is missing
-                    if not restaurant_phone:
-                        print(f"⚠️ No phone number found for restaurant {restaurant_id} ({restaurant_profile_name}) in order {order_id}")
-            except Exception as e:
-                print(f"❌ Error fetching restaurant info for order {order_id}: {e}")
-                pass
+                        # Debug: Log if restaurant phone is missing
+                        if not restaurant_phone:
+                            print(f"⚠️ No phone number found for restaurant {restaurant_id} ({restaurant_profile_name}) in order {order_id}")
+                except Exception as e:
+                    print(f"❌ Error fetching restaurant info for order {order_id}: {e}")
+            else:
+                print(f"⚠️ Skipping invalid restaurant_id for order {order_id}: {restaurant_id} (likely Google Place ID)")
 
         # Calculate distance
         distance_km = calculate_distance_km(restaurant_lat, restaurant_lng, user_lat, user_lng)

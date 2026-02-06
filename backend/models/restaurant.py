@@ -39,6 +39,7 @@ class RestaurantResponse(BaseModel):
     cover_image: Optional[str] = None
     bio: Optional[str] = None
     phone: Optional[str] = None
+    phone_number: Optional[str] = None  # Added for consistency with partner dashboard checks
     address: Optional[str] = None
     cuisine_type: Optional[str] = None
     posts_count: int = 0
