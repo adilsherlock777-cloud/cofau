@@ -751,6 +751,7 @@ async def get_all_orders_for_partner(
 
     verify_partner_pin(pin)
 
+    print("🔍 Partner dashboard accessing orders...")
     db = get_database()
 
     # Get all orders
@@ -857,6 +858,12 @@ async def get_all_orders_for_partner(
 
         # Get total price
         price = order.get("total_price") or order.get("price")
+
+        # Log what we're returning for this order
+        if customer_phone:
+            print(f"✅ Order {order_id}: Customer {customer_name} - Phone: {customer_phone}")
+        else:
+            print(f"❌ Order {order_id}: Customer {customer_name} - NO PHONE")
 
         order_data = {
             "order_id": order_id,
