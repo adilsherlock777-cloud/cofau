@@ -1897,60 +1897,12 @@ export default function LeaderboardScreen() {
           </>
         ) : activeTab === "Rewards" && !isRestaurant ? (
           <>
-            <Text style={styles.sectionTitle}>Delivery Rewards</Text>
-
-            <View style={styles.rewardsCard}>
-              <View style={styles.rewardsHeader}>
-                <Ionicons name="gift" size={32} color="#FF8C00" />
-                <Text style={styles.rewardsTitle}>Complete 10 Deliveries</Text>
-              </View>
-
-              <Text style={styles.rewardsSubtitle}>
-                Earn ₹10 for each delivery. Complete 10 deliveries to get ₹100 in your Cofau Wallet!
+            {/* Info Note */}
+            <View style={styles.rewardsInfoNote}>
+              <Ionicons name="information-circle" size={20} color="#FF8C00" />
+              <Text style={styles.rewardsInfoNoteText}>
+                Every delivery gives you a reward of ₹10/-
               </Text>
-
-              <View style={styles.rewardsProgressContainer}>
-                <View style={styles.rewardsProgressHeader}>
-                  <Text style={styles.rewardsProgressLabel}>Progress</Text>
-                  <Text style={styles.rewardsProgressText}>
-                    {deliveryRewardProgress}/10 deliveries
-                  </Text>
-                </View>
-
-                <View style={styles.rewardsProgressBar}>
-                  <LinearGradient
-                    colors={["#FF8C00", "#FFB84D"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[
-                      styles.rewardsProgressFill,
-                      { width: `${(deliveryRewardProgress / 10) * 100}%` }
-                    ]}
-                  />
-                </View>
-
-                <View style={styles.rewardsAmountContainer}>
-                  <View style={styles.rewardsAmountBox}>
-                    <Text style={styles.rewardsAmountLabel}>Earned</Text>
-                    <Text style={styles.rewardsAmountValue}>
-                      ₹{deliveryRewardProgress * 10}
-                    </Text>
-                  </View>
-                  <View style={styles.rewardsAmountBox}>
-                    <Text style={styles.rewardsAmountLabel}>Remaining</Text>
-                    <Text style={styles.rewardsAmountValue}>
-                      ₹{(10 - deliveryRewardProgress) * 10}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.rewardsInfoBox}>
-                <Ionicons name="information-circle" size={20} color="#666" />
-                <Text style={styles.rewardsInfoText}>
-                  Complete orders will automatically count towards your reward progress. Once you reach 10 deliveries, ₹100 will be added to your Cofau Wallet!
-                </Text>
-              </View>
             </View>
 
             {/* Wallet Balance */}
@@ -3718,6 +3670,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
     lineHeight: 18,
+  },
+  rewardsInfoNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF9E6",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  rewardsInfoNoteText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "600",
+    lineHeight: 20,
   },
 
   // Wallet Balance Card
