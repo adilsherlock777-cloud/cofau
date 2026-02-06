@@ -18,6 +18,9 @@ from routers.notifications import create_notification
 # Partner PIN (hardcoded for now - can be moved to env later)
 PARTNER_PIN = "1234"
 
+# Debug: Verify this module is loaded with the latest code
+print("🔧 orders.py module loaded - VERSION 2026-02-06 08:25 - WITH DEBUG LOGGING")
+
 
 def is_valid_objectid(id_string: str) -> bool:
     """Check if a string is a valid MongoDB ObjectId (24 character hex string)"""
