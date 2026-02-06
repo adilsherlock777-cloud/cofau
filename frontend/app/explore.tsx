@@ -171,6 +171,11 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => (
     <TouchableOpacity style={styles.likeBtn} onPress={(e) => { e.stopPropagation(); onLike(item.id, item.is_liked); }}>
       {item.is_liked ? <GradientHeart size={18} /> : <Ionicons name="heart-outline" size={18} color="#ffffff" />}
     </TouchableOpacity>
+    {item.dish_name && (
+      <View style={styles.dishNameTag}>
+        <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
+      </View>
+    )}
   </TouchableOpacity>
 ));
 
@@ -2320,6 +2325,8 @@ const styles = StyleSheet.create({
   likeBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", padding: 8, borderRadius: 20 },
   viewsContainer: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
   viewsText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  dishNameTag: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(233, 74, 55, 0.9)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, maxWidth: "80%" },
+  dishNameText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   loadingMore: { padding: 20, alignItems: "center" },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 },
   emptyStateText: { fontSize: 18, fontWeight: "600", color: "#333", marginTop: 16 },

@@ -223,7 +223,7 @@ return (
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>New Story</Text>
+      <Text style={styles.headerTitle}>Bite Stories</Text>
       <View style={styles.headerRight} />
     </View>
 

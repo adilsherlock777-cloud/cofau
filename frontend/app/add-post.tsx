@@ -41,6 +41,7 @@ export default function AddPostScreen() {
   );
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
+  const [dishName, setDishName] = useState('');  // NEW: Dish name for all posts
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
@@ -180,7 +181,7 @@ const getAverageRating = () => {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: true,
       quality: 0.8,
-      videoMaxDuration: 15,
+      videoMaxDuration: 90,
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -194,9 +195,9 @@ const getAverageRating = () => {
       pickImageOrVideo();
     } else {
       Alert.alert('Add Media', 'Choose an option:', [
-        { text: 'Take Photo', onPress: takePhoto },
-        { text: 'Choose Photo', onPress: pickImage },
-        { text: 'Choose Video (max 15s)', onPress: pickVideo },
+        { text: 'Open Camera', onPress: takePhoto },
+        { text: 'Choose from gallery', onPress: pickImage },
+        { text: 'Post a Video', onPress: pickVideo },
         { text: 'Cancel', style: 'cancel' },
       ]);
     }
@@ -209,7 +210,7 @@ const getAverageRating = () => {
         allowsEditing: true,
         aspect: [4, 5],
         quality: 0.8,
-        videoMaxDuration: 15,
+        videoMaxDuration: 90,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -402,6 +403,18 @@ const handlePost = async () => {
     return;
   }
 
+  // Validate dish name - mandatory for all posts
+  if (!dishName.trim()) {
+    Alert.alert('Dish Name Required', 'Please enter the dish name.');
+    return;
+  }
+
+  // Validate categories - mandatory for all posts
+  if (categories.length === 0) {
+    Alert.alert('Category Required', 'Please select at least one category.');
+    return;
+  }
+
   // Grammar check - only for regular users (not restaurants, not menu items)
 if (accountType !== 'restaurant') {
   const grammarResult = await checkGrammar(review.trim());
@@ -450,6 +463,7 @@ if (accountType !== 'restaurant') {
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
         category: categories.length > 0 ? categories.join(', ') : undefined,
+        dish_name: dishName.trim(),  // NEW: Add dish name
         file: fileToUpload,
         media_type: mediaType,
       };
@@ -472,6 +486,7 @@ if (accountType !== 'restaurant') {
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
         category: categories.length > 0 ? categories.join(', ') : undefined,
+        dish_name: dishName.trim(),  // NEW: Add dish name
         tagged_restaurant_id: taggedRestaurant?.id || undefined,
         file: fileToUpload,
         media_type: mediaType,
@@ -673,7 +688,11 @@ return (
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>
-  {accountType === 'restaurant' && postMode === 'menu' ? 'Add Menu Item' : 'Add Post'}
+  {accountType === 'restaurant' && postMode === 'menu'
+    ? 'Add Menu Item'
+    : accountType === 'restaurant'
+      ? 'Add Post'
+      : 'Post a Bite'}
 </Text>
       <View style={styles.headerRight} />
     </View>
@@ -764,7 +783,7 @@ return (
               <View style={styles.uploadPrompt}>
                 <Ionicons name="camera" size={50} color="#CCC" />
                 <Text style={styles.uploadText}>Tap to add photo or video</Text>
-                <Text style={styles.uploadSubText}>Videos max 15 seconds</Text>
+                <Text style={styles.uploadSubText}>Videos max 90 seconds</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -878,10 +897,10 @@ return (
         {/* Review */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>
-  {accountType === 'restaurant' && postMode === 'menu' 
-    ? 'Description (Optional)' 
-    : accountType === 'restaurant' 
-      ? 'About' 
+  {accountType === 'restaurant' && postMode === 'menu'
+    ? 'Description (Optional)'
+    : accountType === 'restaurant'
+      ? 'About'
       : 'Review'}
 </Text>
           <TextInput
@@ -889,8 +908,8 @@ return (
             placeholder={
   accountType === 'restaurant' && postMode === 'menu'
     ? 'Describe this dish (ingredients, taste, etc.)'
-    : accountType === 'restaurant' 
-      ? 'Write about this dish...' 
+    : accountType === 'restaurant'
+      ? 'Write about this dish...'
       : 'Write your review...'
 }
             placeholderTextColor="#999"
@@ -900,18 +919,32 @@ return (
           />
         </View>
 
-        {/* CATEGORY (OPTIONAL) - MULTI-SELECT */}
+        {/* Dish Name - Mandatory for all posts except menu items */}
+        {!(accountType === 'restaurant' && postMode === 'menu') && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Dish Name *</Text>
+            <TextInput
+              style={styles.linkInput}
+              placeholder="e.g., Butter Chicken, Margherita Pizza"
+              placeholderTextColor="#999"
+              value={dishName}
+              onChangeText={setDishName}
+            />
+          </View>
+        )}
+
+        {/* CATEGORY - MULTI-SELECT (MANDATORY) */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Categories (Optional)</Text>
-          <TouchableOpacity 
+          <Text style={styles.sectionLabel}>Select from Categories *</Text>
+          <TouchableOpacity
             style={styles.categoryButton}
             onPress={() => setShowCategoryModal(true)}
           >
             <View style={styles.categoryButtonContent}>
               <Ionicons name="fast-food-outline" size={20} color="#666" />
-              <Text 
+              <Text
                 style={[
-                  styles.categoryButtonText, 
+                  styles.categoryButtonText,
                   categories.length > 0 && styles.categoryButtonTextSelected
                 ]}
                 numberOfLines={2}
@@ -1014,7 +1047,7 @@ return (
 {/* LOCATION SECTION */}
 {!(accountType === 'restaurant' && postMode === 'menu') && (
   <View style={styles.section}>
-    <Text style={styles.sectionLabel}>Location (Google Maps)</Text>
+    <Text style={styles.sectionLabel}>Location</Text>
 
     <View style={styles.locationInputContainer}>
       <TextInput
@@ -1333,7 +1366,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
-    minHeight: 120,
+    minHeight: 60,  // Reduced from 120 - will expand with content
+    maxHeight: 200,  // Max height to prevent too large
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: '#E5E5E5',

@@ -1056,7 +1056,7 @@ const renderPost = useCallback(
         </TouchableOpacity>
       </View>
 
-      {/* Add Post/Story Modal */}
+      {/* Post a Bite/Bite Stories Modal */}
 <Modal
   visible={showAddMenu}
   transparent={true}
@@ -1078,7 +1078,7 @@ const renderPost = useCallback(
         activeOpacity={0.7}
       >
         <Ionicons name="image-outline" size={24} color="#333" />
-        <Text style={styles.menuItemText}>Add Post</Text>
+        <Text style={styles.menuItemText}>Post a Bite</Text>
       </TouchableOpacity>
 
       <View style={styles.menuDivider} />
@@ -1092,7 +1092,7 @@ const renderPost = useCallback(
         activeOpacity={0.7}
       >
         <Ionicons name="camera-outline" size={24} color="#333" />
-        <Text style={styles.menuItemText}>Add Story</Text>
+        <Text style={styles.menuItemText}>Bite Stories</Text>
       </TouchableOpacity>
     </View>
   </TouchableOpacity>
