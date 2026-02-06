@@ -372,6 +372,44 @@ export default function LeaderboardScreen() {
   );
   };
 
+  // Silent background update function that doesn't cause UI refresh
+  const updateOrdersInBackground = async () => {
+    if (!token) return;
+
+    try {
+      const endpoint = isRestaurant
+        ? `${BACKEND_URL}/api/orders/restaurant-orders`
+        : `${BACKEND_URL}/api/orders/my-orders`;
+
+      const response = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allOrders = response.data || [];
+
+      // Separate active and completed orders
+      const active = allOrders.filter((order: any) =>
+        ['pending', 'accepted', 'preparing', 'out_for_delivery'].includes(order.status)
+      );
+      const completed = allOrders.filter((order: any) =>
+        ['completed', 'cancelled'].includes(order.status)
+      );
+
+      // Only update if there are actual changes to prevent unnecessary re-renders
+      setActiveOrders((prev: any[]) => {
+        const hasChanges = JSON.stringify(prev.map(o => ({ id: o.id, status: o.status }))) !==
+                          JSON.stringify(active.map(o => ({ id: o.id, status: o.status })));
+        return hasChanges ? active : prev;
+      });
+
+      setCompletedOrders((prev: any[]) => {
+        const hasChanges = prev.length !== completed.length;
+        return hasChanges ? completed : prev;
+      });
+    } catch (error) {
+      console.error('Error updating orders in background:', error);
+    }
+  };
+
   // WebSocket connection for real-time order updates with fallback polling
   useEffect(() => {
     // Only set up updates if there are active orders
@@ -383,16 +421,16 @@ export default function LeaderboardScreen() {
     let shouldReconnect = true;
     let wsConnected = false;
 
-    // Fallback: Poll for updates every 10 seconds if WebSocket fails
+    // Fallback: Poll for updates every 30 seconds if WebSocket fails (reduced from 10s)
     const startPolling = () => {
       if (pollingInterval) return; // Already polling
 
-      console.log('📊 Starting fallback polling for order updates (every 10s)');
+      console.log('📊 Starting fallback polling for order updates (every 30s)');
       pollingInterval = setInterval(() => {
         if (activeTab === "In Progress" || activeTab === "Your Orders") {
-          fetchOrders();
+          updateOrdersInBackground(); // Use silent update instead of full fetchOrders
         }
-      }, 10000); // Poll every 10 seconds
+      }, 30000); // Poll every 30 seconds (reduced from 10s)
     };
 
     const stopPolling = () => {
@@ -914,7 +952,7 @@ export default function LeaderboardScreen() {
       case 'preparing':
         return 'Order is being prepared. Mark ready when done.';
       case 'out_for_delivery':
-        return 'Order is ready for pickup/delivery.';
+        return 'Order is out for delivery. Partner will mark as delivered.';
       default:
         return '';
     }
@@ -1402,7 +1440,7 @@ export default function LeaderboardScreen() {
                             )}
                           </View>
                         </View>
-                        {!isRestaurant && order.delivery_address && order.delivery_address !== "No address provided" && (
+                        {order.delivery_address && order.delivery_address !== "No address provided" && (
                           <View style={styles.deliveryAddressRow}>
                             <Ionicons name="location" size={16} color="#FF3B30" />
                             <Text style={styles.deliveryAddressText}>{order.delivery_address}</Text>
@@ -1551,13 +1589,10 @@ export default function LeaderboardScreen() {
                           </TouchableOpacity>
                         )}
                         {order.status === 'out_for_delivery' && (
-                          <TouchableOpacity
-                            style={[styles.nextStatusButton, { backgroundColor: '#4CAF50' }]}
-                            onPress={() => updateOrderStatus(order.id, 'completed')}
-                          >
-                            <Ionicons name="checkmark-done" size={18} color="#FFF" />
-                            <Text style={styles.nextStatusButtonText}>Mark Delivered</Text>
-                          </TouchableOpacity>
+                          <View style={[styles.orderStatusBadge, { backgroundColor: '#9C27B0', paddingHorizontal: 16, paddingVertical: 8 }]}>
+                            <Ionicons name="bicycle" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                            <Text style={[styles.orderStatusText, { color: '#FFF', fontSize: 14 }]}>Out for Delivery</Text>
+                          </View>
                         )}
                       </View>
                     )}

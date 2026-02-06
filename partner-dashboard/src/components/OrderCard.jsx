@@ -99,10 +99,34 @@ export default function OrderCard({ order, onStatusUpdate }) {
 
       {/* Customer Info */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-        <p className="text-sm font-medium text-gray-700">Customer</p>
-        <p className="text-sm text-gray-900">{order.customer_name}</p>
+        <p className="text-sm font-medium text-gray-700 mb-2">Customer</p>
+        <p className="text-sm text-gray-900 font-medium">{order.customer_name}</p>
+        {order.customer_phone && (
+          <a
+            href={`tel:${order.customer_phone}`}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 mt-1"
+          >
+            <span>📞</span>
+            <span>{order.customer_phone}</span>
+          </a>
+        )}
         <p className="text-xs text-gray-600 mt-1">{order.delivery_address}</p>
       </div>
+
+      {/* Restaurant Info */}
+      {order.restaurant_phone && (
+        <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+          <p className="text-sm font-medium text-gray-700 mb-2">Restaurant</p>
+          <p className="text-sm text-gray-900 font-medium">{order.restaurant_profile_name || order.restaurant_name}</p>
+          <a
+            href={`tel:${order.restaurant_phone}`}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 mt-1"
+          >
+            <span>📞</span>
+            <span>{order.restaurant_phone}</span>
+          </a>
+        </div>
+      )}
 
       {/* Distance Visualization */}
       {order.distance_km !== null && order.distance_km !== undefined && (

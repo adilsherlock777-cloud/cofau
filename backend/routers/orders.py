@@ -213,7 +213,7 @@ async def get_restaurant_orders(
 
     result = []
     for order in orders:
-        # Get customer info (NO delivery address or phone for restaurant users - only for partner dashboard)
+        # Get customer info (NO phone or delivery address - only for partner dashboard)
         customer_name = "Unknown Customer"
         customer_profile_picture = None
 
