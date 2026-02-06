@@ -945,7 +945,7 @@ async def update_order_status_partner(
         except Exception as e:
             print(f"⚠️ Failed to send WebSocket update: {str(e)}")
 
-    # If order is completed, track user's delivery reward progress
+    # If order is completed, track user's delivery reward progress and send notifications
     if status == "completed" and user_id:
         try:
             # Get user's current completed deliveries count
@@ -972,23 +972,63 @@ async def update_order_status_partner(
                         }
                     )
 
-                    # Create wallet transaction
+                    # Create wallet transaction with order reference
                     transaction_doc = {
                         "user_id": user_id,
+                        "order_id": order_id,
                         "amount": 100.0,
                         "type": "earning",
-                        "description": "Earned for completing 10 deliveries",
+                        "description": "Delivery reward - 10 deliveries completed",
                         "created_at": now
                     }
                     await db.wallet_transactions.insert_one(transaction_doc)
 
                     print(f"🎉 User {user_id} earned ₹100 for completing 10 deliveries! Balance: ₹{new_balance}")
+
+                    # Send push notification for ₹100 reward
+                    try:
+                        await create_notification(
+                            db=db,
+                            notification_type="reward_earned",
+                            from_user_id=user_id,
+                            to_user_id=user_id,
+                            message=f"🎉 Congratulations! You've earned ₹100 for completing 10 deliveries! Your wallet balance is now ₹{new_balance}",
+                            send_push=True
+                        )
+                        print(f"✅ Sent ₹100 reward notification to user {user_id}")
+                    except Exception as e:
+                        print(f"⚠️ Error sending ₹100 reward notification: {e}")
                 else:
                     # Just increment the counter
                     await db.users.update_one(
                         {"_id": ObjectId(user_id)},
                         {"$set": {"completed_deliveries_count": completed_deliveries}}
                     )
+
+                    # Create wallet transaction for ₹10 per delivery
+                    transaction_doc = {
+                        "user_id": user_id,
+                        "order_id": order_id,
+                        "amount": 10.0,
+                        "type": "earning",
+                        "description": f"Delivery reward - {completed_deliveries}/10 completed",
+                        "created_at": now
+                    }
+                    await db.wallet_transactions.insert_one(transaction_doc)
+
+                    # Send push notification for delivery completion with ₹10 progress
+                    try:
+                        await create_notification(
+                            db=db,
+                            notification_type="delivery_completed_reward",
+                            from_user_id=user_id,
+                            to_user_id=user_id,
+                            message=f"✅ Delivery completed! Earned ₹10. Progress: {completed_deliveries}/10 deliveries (₹{completed_deliveries * 10}/₹100)",
+                            send_push=True
+                        )
+                        print(f"✅ Sent delivery completion notification to user {user_id} ({completed_deliveries}/10)")
+                    except Exception as e:
+                        print(f"⚠️ Error sending delivery completion notification: {e}")
         except Exception as e:
             print(f"⚠️ Error tracking delivery reward: {e}")
 
@@ -1361,4 +1401,63 @@ async def get_restaurant_sales_analytics(
         "sales_last_week": float(sales_last_week),
         "sales_last_month": float(sales_last_month),
         "daily_sales": daily_sales
+    }
+
+
+# ==================== WALLET TRANSACTIONS / REWARDS HISTORY ====================
+
+@router.get("/rewards-history")
+async def get_rewards_history(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user's wallet transactions / rewards history"""
+    db = get_database()
+
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+
+    # Fetch wallet transactions for this user
+    transactions = await db.wallet_transactions.find(
+        {"user_id": user_id}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    result = []
+    for transaction in transactions:
+        # Get order details if order_id exists
+        order_details = None
+        order_id = transaction.get("order_id")
+        if order_id:
+            try:
+                order = await db.orders.find_one({"_id": ObjectId(order_id)})
+                if order:
+                    order_details = {
+                        "dish_name": order.get("dish_name"),
+                        "restaurant_name": order.get("restaurant_name"),
+                        "post_location": order.get("post_location"),
+                        "completed_at": order.get("updated_at")
+                    }
+            except Exception as e:
+                print(f"Error fetching order details for transaction: {e}")
+
+        result.append({
+            "id": str(transaction["_id"]),
+            "amount": float(transaction.get("amount", 0)),
+            "type": transaction.get("type", "earning"),  # earning, spending, etc.
+            "description": transaction.get("description", ""),
+            "order_id": order_id,
+            "order_details": order_details,
+            "created_at": transaction["created_at"].isoformat() if isinstance(transaction.get("created_at"), datetime) else transaction.get("created_at", ""),
+        })
+
+    # Also get user's current wallet balance and delivery progress
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    wallet_balance = user.get("wallet_balance", 0.0) if user else 0.0
+    completed_deliveries = user.get("completed_deliveries_count", 0) if user else 0
+
+    return {
+        "transactions": result,
+        "wallet_balance": float(wallet_balance),
+        "completed_deliveries": completed_deliveries,
+        "deliveries_to_next_reward": 10 - completed_deliveries
     }

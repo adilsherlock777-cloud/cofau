@@ -192,6 +192,9 @@ export default function LeaderboardScreen() {
   const [restaurantProfile, setRestaurantProfile] = useState<any>(null);
   const [showRestaurantPhoneModal, setShowRestaurantPhoneModal] = useState(false);
   const [restaurantPhone, setRestaurantPhone] = useState("");
+  const [rewardsHistory, setRewardsHistory] = useState<any[]>([]);
+  const [loadingRewardsHistory, setLoadingRewardsHistory] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
 
   useEffect(() => {
     if (token) {
@@ -207,7 +210,7 @@ export default function LeaderboardScreen() {
       } else if (activeTab === "Reviews/Complaints" && isRestaurant) {
         fetchRestaurantReviews();
       } else if (activeTab === "Rewards" && !isRestaurant) {
-        fetchDeliveryRewardProgress();
+        fetchRewardsHistory();
       }
     }
   }, [token, activeTab]);
@@ -319,6 +322,28 @@ export default function LeaderboardScreen() {
     }
   };
 
+  const fetchRewardsHistory = async () => {
+    if (!token) return;
+
+    setLoadingRewardsHistory(true);
+    try {
+      const response = await axios.get(
+        `${BACKEND_URL}/api/orders/rewards-history`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setRewardsHistory(response.data.transactions || []);
+      setWalletBalance(response.data.wallet_balance || 0);
+      setDeliveryRewardProgress(response.data.completed_deliveries || 0);
+      console.log(`💰 Fetched ${response.data.transactions?.length || 0} reward transactions`);
+    } catch (error) {
+      console.error("Error fetching rewards history:", error);
+    } finally {
+      setLoadingRewardsHistory(false);
+    }
+  };
+
   const handleOrderClick = (post: any) => {
     // Check if user has added their delivery location and phone number (only for regular users)
     if (!isRestaurant && (!userAddress || !userAddress.phone_number)) {
@@ -366,7 +391,7 @@ export default function LeaderboardScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (!isRestaurant && activeTab === "Rewards") {
-        fetchDeliveryRewardProgress();
+        fetchRewardsHistory();
       }
     }, [isRestaurant, activeTab])
   );
@@ -878,7 +903,7 @@ export default function LeaderboardScreen() {
     if (activeTab === "Near Me" && userLocation) {
       fetchNearbyPosts();
     } else if (activeTab === "Rewards" && !isRestaurant) {
-      fetchDeliveryRewardProgress();
+      fetchRewardsHistory();
     } else if (activeTab === "In Progress" || activeTab === "Your Orders") {
       fetchOrders();
     }
@@ -1895,6 +1920,85 @@ export default function LeaderboardScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Wallet Balance */}
+            <View style={styles.walletBalanceCard}>
+              <View style={styles.walletBalanceHeader}>
+                <Ionicons name="wallet" size={24} color="#4CAF50" />
+                <Text style={styles.walletBalanceTitle}>Cofau Wallet</Text>
+              </View>
+              <Text style={styles.walletBalanceAmount}>₹{walletBalance.toFixed(2)}</Text>
+              <Text style={styles.walletBalanceSubtext}>Available Balance</Text>
+            </View>
+
+            {/* Rewards History */}
+            <Text style={styles.rewardsHistoryTitle}>Rewards History</Text>
+
+            {loadingRewardsHistory ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF8C00" />
+                <Text style={styles.loadingText}>Loading history...</Text>
+              </View>
+            ) : rewardsHistory.length === 0 ? (
+              <View style={styles.emptyHistoryContainer}>
+                <Ionicons name="receipt-outline" size={48} color="#CCC" />
+                <Text style={styles.emptyHistoryText}>No rewards yet</Text>
+                <Text style={styles.emptyHistorySubtext}>
+                  Complete deliveries to start earning rewards!
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={rewardsHistory}
+                scrollEnabled={false}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item: transaction }) => (
+                  <View style={styles.rewardHistoryItem}>
+                    <View style={styles.rewardHistoryIcon}>
+                      <Ionicons
+                        name={transaction.amount >= 100 ? "gift" : "checkmark-circle"}
+                        size={24}
+                        color={transaction.amount >= 100 ? "#4CAF50" : "#FF8C00"}
+                      />
+                    </View>
+                    <View style={styles.rewardHistoryContent}>
+                      <Text style={styles.rewardHistoryDescription}>
+                        {transaction.description}
+                      </Text>
+                      {transaction.order_details && (
+                        <View style={styles.rewardOrderDetails}>
+                          <Text style={styles.rewardOrderDish}>
+                            {transaction.order_details.dish_name}
+                          </Text>
+                          {transaction.order_details.restaurant_name && (
+                            <Text style={styles.rewardOrderRestaurant}>
+                              {transaction.order_details.restaurant_name}
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                      <Text style={styles.rewardHistoryDate}>
+                        {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.rewardHistoryAmount}>
+                      <Text style={[
+                        styles.rewardHistoryAmountText,
+                        transaction.amount >= 100 && styles.rewardHistoryBigAmount
+                      ]}>
+                        +₹{transaction.amount}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              />
+            )}
           </>
         ) : (
           <>
@@ -3588,6 +3692,136 @@ const styles = StyleSheet.create({
     color: "#666",
     lineHeight: 18,
   },
+
+  // Wallet Balance Card
+  walletBalanceCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#E8F5E9",
+    alignItems: "center",
+  },
+  walletBalanceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  walletBalanceTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  walletBalanceAmount: {
+    fontSize: 36,
+    fontWeight: "700",
+    color: "#4CAF50",
+    marginBottom: 4,
+  },
+  walletBalanceSubtext: {
+    fontSize: 13,
+    color: "#666",
+  },
+
+  // Rewards History
+  rewardsHistorySection: {
+    marginBottom: 16,
+  },
+  rewardsHistoryTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 12,
+  },
+  emptyHistoryContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 32,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  emptyHistoryText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#999",
+    marginTop: 12,
+  },
+  emptyHistorySubtext: {
+    fontSize: 14,
+    color: "#CCC",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  rewardHistoryItem: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  rewardHistoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFF9E6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rewardHistoryContent: {
+    flex: 1,
+  },
+  rewardHistoryDescription: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  rewardOrderDetails: {
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  rewardOrderDish: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 2,
+  },
+  rewardOrderRestaurant: {
+    fontSize: 12,
+    color: "#999",
+  },
+  rewardHistoryDate: {
+    fontSize: 12,
+    color: "#999",
+  },
+  rewardHistoryAmount: {
+    alignItems: "flex-end",
+  },
+  rewardHistoryAmountText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#4CAF50",
+  },
+  rewardHistoryBigAmount: {
+    fontSize: 18,
+    color: "#FF8C00",
+  },
+
   // Phone Modal Styles
   modalOverlay: {
     flex: 1,
