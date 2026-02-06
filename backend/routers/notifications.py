@@ -37,7 +37,8 @@ async def create_notification(
     Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward", "new_order", "order_preparing", "order_in_progress", "order_completed"
     """
     # Don't notify yourself (except for wallet rewards and order notifications)
-    if from_user_id == to_user_id and notification_type not in ["wallet_reward", "order_preparing", "order_in_progress"]:
+    order_notification_types = ["wallet_reward", "order_preparing", "order_in_progress", "order_completed", "delivery_completed_reward", "reward_earned"]
+    if from_user_id == to_user_id and notification_type not in order_notification_types:
         return None
 
     # Get from_user details - check both users and restaurants collections
@@ -157,6 +158,10 @@ async def create_notification(
                     title = "Order Update"
                 elif notification_type == "order_completed":
                     title = "Order Delivered!"
+                elif notification_type == "delivery_completed_reward":
+                    title = "Delivery Reward!"
+                elif notification_type == "reward_earned":
+                    title = "Reward Earned!"
                 
                 await send_push_notification(
                     device_tokens=device_tokens,

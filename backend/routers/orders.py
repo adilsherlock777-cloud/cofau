@@ -1038,10 +1038,18 @@ async def update_order_status_partner(
                     except Exception as e:
                         print(f"⚠️ Error sending ₹100 reward notification: {e}")
                 else:
-                    # Just increment the counter
+                    # Add ₹10 to wallet and increment the counter
+                    current_balance = user.get("wallet_balance", 0.0)
+                    new_balance = current_balance + 10.0
+
                     await db.users.update_one(
                         {"_id": ObjectId(user_id)},
-                        {"$set": {"completed_deliveries_count": completed_deliveries}}
+                        {
+                            "$set": {
+                                "wallet_balance": new_balance,
+                                "completed_deliveries_count": completed_deliveries
+                            }
+                        }
                     )
 
                     # Create wallet transaction for ₹10 per delivery
@@ -1055,14 +1063,16 @@ async def update_order_status_partner(
                     }
                     await db.wallet_transactions.insert_one(transaction_doc)
 
-                    # Send push notification for delivery completion with ₹10 progress
+                    print(f"💰 User {user_id} earned ₹10 for delivery {completed_deliveries}/10! Balance: ₹{new_balance}")
+
+                    # Send push notification for delivery completion with ₹10 reward
                     try:
                         await create_notification(
                             db=db,
                             notification_type="delivery_completed_reward",
                             from_user_id=user_id,
                             to_user_id=user_id,
-                            message=f"✅ Delivery completed! Earned ₹10. Progress: {completed_deliveries}/10 deliveries (₹{completed_deliveries * 10}/₹100)",
+                            message=f"✅ Delivery completed! Earned ₹10. Progress: {completed_deliveries}/10 deliveries. Wallet: ₹{new_balance}",
                             send_push=True
                         )
                         print(f"✅ Sent delivery completion notification to user {user_id} ({completed_deliveries}/10)")

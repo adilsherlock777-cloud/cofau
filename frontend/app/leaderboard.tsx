@@ -218,23 +218,38 @@ export default function LeaderboardScreen() {
   const fetchOrders = async () => {
     if (!token) return;
 
-    // For restaurant users, check if phone number exists before fetching orders
-    if (isRestaurant && !restaurantProfile?.phone && !restaurantProfile?.phone_number) {
-      setLoadingOrders(false);
-      Alert.alert(
-        "Phone Number Required",
-        "Please add your phone number before receiving orders. This helps customers contact you for delivery coordination.",
-        [
-          {
-            text: "Add Phone Number",
-            onPress: () => setShowRestaurantPhoneModal(true),
-          },
-        ]
-      );
-      return;
-    }
-
     setLoadingOrders(true);
+
+    // For restaurant users, fetch latest profile to check phone number
+    if (isRestaurant) {
+      try {
+        const profileResponse = await axios.get(
+          `${BACKEND_URL}/api/restaurant/auth/me`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const profile = profileResponse.data;
+
+        // Check if phone number exists
+        if (!profile.phone && !profile.phone_number) {
+          setLoadingOrders(false);
+          Alert.alert(
+            "Phone Number Required",
+            "Please add your phone number before receiving orders. This helps customers contact you for delivery coordination.",
+            [
+              {
+                text: "Add Phone Number",
+                onPress: () => setShowRestaurantPhoneModal(true),
+              },
+            ]
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("Error fetching restaurant profile:", error);
+      }
+    }
     try {
       // Use different endpoint based on account type
       const endpoint = isRestaurant
