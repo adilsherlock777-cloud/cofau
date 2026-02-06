@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect, status as http_status
+from fastapi import APIRouter, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect, status as http_status, Query
 from datetime import datetime, timedelta
 from bson import ObjectId
 from database import get_database
@@ -233,9 +233,11 @@ async def get_restaurant_orders(
 
     result = []
     for order in orders:
-        # Get customer info (NO phone or delivery address - only for partner dashboard)
+        # Get customer info including phone and delivery address
         customer_name = "Unknown Customer"
         customer_profile_picture = None
+        customer_phone = None
+        delivery_address = "No address provided"
 
         user_id = order.get("user_id")
         if user_id:
@@ -244,6 +246,31 @@ async def get_restaurant_orders(
                 if customer:
                     customer_name = customer.get("full_name", "Unknown Customer")
                     customer_profile_picture = customer.get("profile_picture")
+
+                    # Get delivery address from user's delivery_address field
+                    user_address = customer.get("delivery_address")
+                    if user_address:
+                        customer_phone = user_address.get("phone_number")
+                        # Build delivery address string
+                        addr_parts = []
+                        if user_address.get("house_number"):
+                            addr_parts.append(user_address.get("house_number"))
+                        if user_address.get("street_address"):
+                            addr_parts.append(user_address.get("street_address"))
+                        if user_address.get("address"):
+                            addr_parts.append(user_address.get("address"))
+                        if addr_parts:
+                            delivery_address = ", ".join(addr_parts)
+
+                    # Fallback: Check main phone_number field if not found in delivery_address
+                    if not customer_phone:
+                        customer_phone = customer.get("phone_number")
+                        if customer_phone:
+                            print(f"📞 Using main phone_number for user {user_id}: {customer_phone}")
+
+                    # Debug: Log if phone is still missing
+                    if not customer_phone:
+                        print(f"⚠️ No phone number found for user {user_id} ({customer_name}) in order {str(order['_id'])}")
             except Exception as e:
                 print(f"Error fetching customer info: {e}")
 
@@ -311,7 +338,8 @@ async def get_restaurant_orders(
             "status": order.get("status", "pending"),
             "customer_name": customer_name,
             "customer_profile_picture": customer_profile_picture,
-            # NO customer_phone or delivery_address - only available in partner dashboard
+            "customer_phone": customer_phone,
+            "delivery_address": delivery_address,
             "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
             "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", ""),
         })
@@ -1464,15 +1492,26 @@ async def get_restaurant_sales_analytics(
 
 @router.get("/rewards-history")
 async def get_rewards_history(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
 ):
     """Get user's wallet transactions / rewards history"""
+    print(f"📊 rewards-history called with skip={skip}, limit={limit}, user={current_user.get('email')}")
+
+    # Check if this is a restaurant account (restaurants don't have rewards)
+    if current_user.get("account_type") == "restaurant":
+        raise HTTPException(status_code=403, detail="Rewards are not available for restaurant accounts")
+
     try:
         db = get_database()
 
         user_id = str(current_user.get("_id") or current_user.get("id"))
+
+        if not user_id or user_id == "None":
+            print(f"❌ Invalid user_id in current_user: {current_user}")
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+
         print(f"🔍 Fetching rewards history for user: {user_id}")
 
         # Fetch wallet transactions for this user
