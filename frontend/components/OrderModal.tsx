@@ -64,10 +64,14 @@ export const OrderModal: React.FC<OrderModalProps> = ({
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loadingMenu, setLoadingMenu] = useState(false);
   const [isGoogleMapsRestaurant, setIsGoogleMapsRestaurant] = useState(false);
-  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
+  const [activeTab, setActiveTab] = useState<'menu' | 'posts' | 'reviews' | null>(null);
+  const [restaurantPosts, setRestaurantPosts] = useState<any[]>([]);
+  const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -76,18 +80,20 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       setShowCart(false);
       setSuggestions("");
       setExpandedCategories(new Set());
-      setShowMenuDropdown(false);
+      setActiveTab(null);
+      setRestaurantPosts([]);
+      setRestaurantReviews([]);
       fetchRestaurantDetails();
     }
   }, [visible, post]);
 
   // Auto-expand all categories when menu is shown and items are loaded
   useEffect(() => {
-    if (showMenuDropdown && menuItems.length > 0) {
+    if (activeTab === 'menu' && menuItems.length > 0) {
       const categories = getMenuByCategory().map(([category]) => category);
       setExpandedCategories(new Set(categories));
     }
-  }, [showMenuDropdown, menuItems.length]);
+  }, [activeTab, menuItems.length]);
 
   const fetchRestaurantDetails = async () => {
     setLoading(true);
@@ -177,6 +183,37 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       console.error("Error fetching menu items:", error);
     } finally {
       setLoadingMenu(false);
+    }
+  };
+
+  const fetchRestaurantPosts = async (restaurantId: string) => {
+    setLoadingPosts(true);
+    try {
+      const response = await axios.get(
+        `${BACKEND_URL}/api/restaurant/posts/public/${restaurantId}`
+      );
+      setRestaurantPosts(response.data || []);
+    } catch (error) {
+      console.error("Error fetching restaurant posts:", error);
+      setRestaurantPosts([]);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const fetchRestaurantReviews = async (restaurantId: string) => {
+    setLoadingReviews(true);
+    try {
+      const response = await axios.get(
+        `${BACKEND_URL}/api/orders/restaurant-reviews/${restaurantId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setRestaurantReviews(response.data || []);
+    } catch (error) {
+      console.error("Error fetching restaurant reviews:", error);
+      setRestaurantReviews([]);
+    } finally {
+      setLoadingReviews(false);
     }
   };
 
@@ -545,32 +582,78 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                     <View style={styles.statsRow}>
                       {!isGoogleMapsRestaurant && (
                         <TouchableOpacity
-                          style={[styles.statItem, styles.menuStatItem, showMenuDropdown && styles.menuStatItemActive]}
-                          onPress={() => setShowMenuDropdown(!showMenuDropdown)}
+                          style={[styles.statItem, styles.menuStatItem, activeTab === 'menu' && styles.menuStatItemActive]}
+                          onPress={() => {
+                            if (activeTab === 'menu') {
+                              setActiveTab(null);
+                            } else {
+                              setActiveTab('menu');
+                            }
+                          }}
                           activeOpacity={0.7}
                         >
-                          <Ionicons name="list" size={16} color={showMenuDropdown ? "#FFF" : "#FF8C00"} />
-                          <Text style={[styles.statText, showMenuDropdown && styles.statTextActive]}>
+                          <Ionicons name="list" size={16} color={activeTab === 'menu' ? "#FFF" : "#FF8C00"} />
+                          <Text style={[styles.statText, activeTab === 'menu' && styles.statTextActive]}>
                             Menu {menuItems.length > 0 ? `(${menuItems.length})` : ""}
                           </Text>
                           <Ionicons
-                            name={showMenuDropdown ? "chevron-up" : "chevron-down"}
+                            name={activeTab === 'menu' ? "chevron-up" : "chevron-down"}
                             size={14}
-                            color={showMenuDropdown ? "#FFF" : "#666"}
+                            color={activeTab === 'menu' ? "#FFF" : "#666"}
                           />
                         </TouchableOpacity>
                       )}
-                      {restaurantDetails.posts_count !== undefined && (
-                        <View style={styles.statItem}>
-                          <Ionicons name="images" size={16} color="#FF8C00" />
-                          <Text style={styles.statText}>{restaurantDetails.posts_count} Posts</Text>
-                        </View>
+                      {restaurantDetails.posts_count !== undefined && !isGoogleMapsRestaurant && (
+                        <TouchableOpacity
+                          style={[styles.statItem, styles.menuStatItem, activeTab === 'posts' && styles.menuStatItemActive]}
+                          onPress={() => {
+                            if (activeTab === 'posts') {
+                              setActiveTab(null);
+                            } else {
+                              setActiveTab('posts');
+                              if (restaurantPosts.length === 0) {
+                                fetchRestaurantPosts(restaurantDetails.id);
+                              }
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="images" size={16} color={activeTab === 'posts' ? "#FFF" : "#FF8C00"} />
+                          <Text style={[styles.statText, activeTab === 'posts' && styles.statTextActive]}>
+                            {restaurantDetails.posts_count} Posts
+                          </Text>
+                          <Ionicons
+                            name={activeTab === 'posts' ? "chevron-up" : "chevron-down"}
+                            size={14}
+                            color={activeTab === 'posts' ? "#FFF" : "#666"}
+                          />
+                        </TouchableOpacity>
                       )}
-                      {restaurantDetails.reviews_count !== undefined && (
-                        <View style={styles.statItem}>
-                          <Ionicons name="star" size={16} color="#FFD700" />
-                          <Text style={styles.statText}>{restaurantDetails.reviews_count} Reviews</Text>
-                        </View>
+                      {restaurantDetails.reviews_count !== undefined && !isGoogleMapsRestaurant && (
+                        <TouchableOpacity
+                          style={[styles.statItem, styles.menuStatItem, activeTab === 'reviews' && styles.menuStatItemActive]}
+                          onPress={() => {
+                            if (activeTab === 'reviews') {
+                              setActiveTab(null);
+                            } else {
+                              setActiveTab('reviews');
+                              if (restaurantReviews.length === 0) {
+                                fetchRestaurantReviews(restaurantDetails.id);
+                              }
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="star" size={16} color={activeTab === 'reviews' ? "#FFF" : "#FFD700"} />
+                          <Text style={[styles.statText, activeTab === 'reviews' && styles.statTextActive]}>
+                            {restaurantDetails.reviews_count} Reviews
+                          </Text>
+                          <Ionicons
+                            name={activeTab === 'reviews' ? "chevron-up" : "chevron-down"}
+                            size={14}
+                            color={activeTab === 'reviews' ? "#FFF" : "#666"}
+                          />
+                        </TouchableOpacity>
                       )}
                       {restaurantDetails.followers_count !== undefined && (
                         <View style={styles.statItem}>
@@ -588,8 +671,106 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                       )}
                     </View>
 
+                    {/* Posts Dropdown */}
+                    {!isGoogleMapsRestaurant && activeTab === 'posts' && (
+                      <View style={styles.menuDropdown}>
+                        {loadingPosts ? (
+                          <View style={styles.menuLoadingContainer}>
+                            <ActivityIndicator size="small" color="#FF8C00" />
+                            <Text style={styles.menuLoadingText}>Loading posts...</Text>
+                          </View>
+                        ) : restaurantPosts.length === 0 ? (
+                          <View style={styles.menuEmptyContainer}>
+                            <Ionicons name="images-outline" size={32} color="#CCC" />
+                            <Text style={styles.menuEmptyText}>No posts available</Text>
+                          </View>
+                        ) : (
+                          <ScrollView style={styles.postsGrid} horizontal showsHorizontalScrollIndicator={false}>
+                            {restaurantPosts.map((postItem: any) => (
+                              <View key={postItem.id} style={styles.postCard}>
+                                {postItem.media_url && (
+                                  <Image
+                                    source={{
+                                      uri: postItem.media_url.startsWith('http')
+                                        ? postItem.media_url
+                                        : `${BACKEND_URL}${postItem.media_url}`
+                                    }}
+                                    style={styles.postImage}
+                                    resizeMode="cover"
+                                  />
+                                )}
+                                {postItem.description && (
+                                  <Text style={styles.postDescription} numberOfLines={2}>
+                                    {postItem.description}
+                                  </Text>
+                                )}
+                                {postItem.price && (
+                                  <Text style={styles.postPrice}>₹{postItem.price}</Text>
+                                )}
+                              </View>
+                            ))}
+                          </ScrollView>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Reviews Dropdown */}
+                    {!isGoogleMapsRestaurant && activeTab === 'reviews' && (
+                      <View style={styles.menuDropdown}>
+                        {loadingReviews ? (
+                          <View style={styles.menuLoadingContainer}>
+                            <ActivityIndicator size="small" color="#FF8C00" />
+                            <Text style={styles.menuLoadingText}>Loading reviews...</Text>
+                          </View>
+                        ) : restaurantReviews.length === 0 ? (
+                          <View style={styles.menuEmptyContainer}>
+                            <Ionicons name="star-outline" size={32} color="#CCC" />
+                            <Text style={styles.menuEmptyText}>No reviews yet</Text>
+                          </View>
+                        ) : (
+                          <ScrollView style={styles.reviewsList} nestedScrollEnabled={true}>
+                            {restaurantReviews.map((review: any) => (
+                              <View key={review.id} style={styles.reviewItem}>
+                                <View style={styles.reviewHeader}>
+                                  <View style={styles.reviewUserInfo}>
+                                    {review.customer_profile_picture && (
+                                      <Image
+                                        source={{
+                                          uri: review.customer_profile_picture.startsWith('http')
+                                            ? review.customer_profile_picture
+                                            : `${BACKEND_URL}${review.customer_profile_picture}`
+                                        }}
+                                        style={styles.reviewUserAvatar}
+                                      />
+                                    )}
+                                    <Text style={styles.reviewUserName}>{review.customer_name || 'Anonymous'}</Text>
+                                  </View>
+                                  <View style={styles.reviewRating}>
+                                    {[...Array(5)].map((_, i) => (
+                                      <Ionicons
+                                        key={i}
+                                        name={i < review.rating ? "star" : "star-outline"}
+                                        size={14}
+                                        color="#FFD700"
+                                      />
+                                    ))}
+                                  </View>
+                                </View>
+                                {review.review_text && (
+                                  <Text style={styles.reviewText}>{review.review_text}</Text>
+                                )}
+                                {review.dish_name && (
+                                  <Text style={styles.reviewDish}>Ordered: {review.dish_name}</Text>
+                                )}
+                              </View>
+                            ))}
+                          </ScrollView>
+                        )}
+                      </View>
+                    )}
+
                     {/* Category-wise Menu Dropdown */}
-                    {!isGoogleMapsRestaurant && showMenuDropdown && (
+                    {!isGoogleMapsRestaurant && activeTab === 'menu' && (
                       <View style={styles.menuDropdown}>
                         {loadingMenu ? (
                           <View style={styles.menuLoadingContainer}>
@@ -1397,6 +1578,84 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#558B2F",
     marginTop: 6,
+    fontStyle: "italic",
+  },
+  // Posts Grid
+  postsGrid: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  postCard: {
+    width: 160,
+    marginRight: 12,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  postImage: {
+    width: "100%",
+    height: 120,
+    backgroundColor: "#F0F0F0",
+  },
+  postDescription: {
+    fontSize: 12,
+    color: "#333",
+    padding: 8,
+    lineHeight: 16,
+  },
+  postPrice: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FF8C00",
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+  },
+  // Reviews List
+  reviewsList: {
+    maxHeight: 350,
+  },
+  reviewItem: {
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  reviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  reviewUserInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  reviewUserAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F0F0F0",
+  },
+  reviewUserName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  reviewRating: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  reviewText: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  reviewDish: {
+    fontSize: 12,
+    color: "#888",
     fontStyle: "italic",
   },
 });

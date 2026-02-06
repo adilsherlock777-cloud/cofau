@@ -24,7 +24,7 @@ const API_URL = `${API_BASE_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const NUM_COLUMNS = 3;
 const SPACING = 2;
-const TILE_SIZE = (SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
+const TILE_SIZE = Math.floor((SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS);
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
 type TabType = "users" | "posts" | "places";
@@ -63,6 +63,7 @@ export default function SearchResultsScreen() {
   const [posts, setPosts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [expandedLocations, setExpandedLocations] = useState<{ [key: string]: boolean }>({});
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const performUserSearch = async (query: string) => {
@@ -147,6 +148,13 @@ export default function SearchResultsScreen() {
       console.error("❌ Location search error:", err);
       setLocations([]);
     }
+  };
+
+  const toggleLocation = (locationName: string) => {
+    setExpandedLocations((prev) => ({
+      ...prev,
+      [locationName]: !prev[locationName],
+    }));
   };
 
   const performSearch = async (query: string) => {
@@ -283,45 +291,44 @@ export default function SearchResultsScreen() {
             <Ionicons name="play-circle" size={28} color="#fff" />
           </View>
         )}
-        {item.location_name && (
-          <View style={styles.locationBadge}>
-            <Ionicons name="location" size={12} color="#fff" />
-            <Text style={styles.locationBadgeText} numberOfLines={1}>
-              {item.location_name}
-            </Text>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
 
   const renderLocationItem = ({ item }: any) => {
     // Use all_images if available, otherwise fall back to sample_photos
-    const imagesToShow = item.all_images && item.all_images.length > 0 
-      ? item.all_images 
+    const imagesToShow = item.all_images && item.all_images.length > 0
+      ? item.all_images
       : (item.sample_photos || []);
-    
+
+    const isExpanded = expandedLocations[item.name] || false;
+
     return (
-      <View style={styles.locationCard}>
+      <View style={styles.placesLocationSection}>
+        {/* Location Header - Collapsible */}
         <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() =>
-            router.push(
-              `/location-details?locationName=${encodeURIComponent(item.name)}`
-            )
-          }
+          style={styles.placesLocationHeader}
+          onPress={() => toggleLocation(item.name)}
+          activeOpacity={0.7}
         >
-          <View style={styles.locationHeader}>
-            <Ionicons name="location" size={20} color="#4dd0e1" />
-            <View style={styles.locationInfo}>
-              <Text style={styles.locationName}>{item.name}</Text>
-              <Text style={styles.locationPostCount}>
-                {item.total_posts} {item.total_posts === 1 ? "post" : "posts"}
-              </Text>
-            </View>
+          <View style={styles.placesLocationHeaderLeft}>
+            <Ionicons name="location" size={20} color="#E94A37" />
+            <Text style={styles.placesLocationName}>{item.name}</Text>
+          </View>
+          <View style={styles.placesLocationHeaderRight}>
+            <Text style={styles.placesLocationCount}>
+              ({item.total_posts})
+            </Text>
+            <Ionicons
+              name={isExpanded ? "chevron-up" : "chevron-down"}
+              size={20}
+              color="#666"
+            />
           </View>
         </TouchableOpacity>
-        {imagesToShow.length > 0 && (
+
+        {/* Photos Grid - Show when expanded */}
+        {isExpanded && imagesToShow.length > 0 && (
           <View style={styles.locationGrid}>
             {imagesToShow.map((photo: any, index: number) => (
               <TouchableOpacity
@@ -350,7 +357,7 @@ export default function SearchResultsScreen() {
     );
   };
 
-  const renderPostsWithLocationGroups = () => {
+  const renderPostsGrid = () => {
     if (posts.length === 0) {
       return (
         <View style={styles.emptyContainer}>
@@ -372,58 +379,25 @@ export default function SearchResultsScreen() {
       );
     }
 
-    // Group posts by location_name
-    const locationGroups: { [key: string]: any[] } = {};
-    const postsWithoutLocation: any[] = [];
-
-    posts.forEach((post) => {
-      if (post.location_name) {
-        if (!locationGroups[post.location_name]) {
-          locationGroups[post.location_name] = [];
-        }
-        locationGroups[post.location_name].push(post);
-      } else {
-        postsWithoutLocation.push(post);
-      }
-    });
-
     return (
       <ScrollView
         style={styles.postsContainer}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
-        {/* Render location groups */}
-        {Object.entries(locationGroups).map(([locationName, locationPosts]) => (
-          <View key={locationName}>
-            {locationPosts.length > 1 && (
-              <View style={styles.locationHeaderRow}>
-                <Ionicons name="location" size={18} color="#4dd0e1" />
-                <Text style={styles.locationHeaderText}>
-                  {locationName} ({locationPosts.length} posts)
-                </Text>
-              </View>
-            )}
-            <View style={styles.postsGrid}>
-              {locationPosts.map((post) => (
-                <View key={post.id} style={styles.gridItemWrapper}>
-                  {renderPostItem({ item: post })}
-                </View>
-              ))}
+        <View style={styles.postsGrid}>
+          {posts.map((post, index) => (
+            <View
+              key={post.id}
+              style={[
+                styles.gridItemWrapper,
+                (index + 1) % NUM_COLUMNS === 0 && { marginRight: 0 }
+              ]}
+            >
+              {renderPostItem({ item: post })}
             </View>
-          </View>
-        ))}
-
-        {/* Render posts without location */}
-        {postsWithoutLocation.length > 0 && (
-          <View style={styles.postsGrid}>
-            {postsWithoutLocation.map((post) => (
-              <View key={post.id} style={styles.gridItemWrapper}>
-                {renderPostItem({ item: post })}
-              </View>
-            ))}
-          </View>
-        )}
+          ))}
+        </View>
       </ScrollView>
     );
   };
@@ -432,7 +406,7 @@ export default function SearchResultsScreen() {
     if (loading) {
       return (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#4dd0e1" />
+          <ActivityIndicator size="large" color="#E94A37" />
           <Text style={styles.loadingText}>Searching...</Text>
         </View>
       );
@@ -467,7 +441,7 @@ export default function SearchResultsScreen() {
         );
 
       case "posts":
-        return renderPostsWithLocationGroups();
+        return renderPostsGrid();
 
       case "places":
         return (
@@ -652,7 +626,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: "#4dd0e1",
+    backgroundColor: "#E94A37",
   },
   center: {
     flex: 1,
@@ -775,18 +749,90 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 8,
   },
+  postsLocationSection: {
+    marginBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  postsLocationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: "#fff",
+  },
+  postsLocationHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  postsLocationHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  postsLocationName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    flex: 1,
+  },
+  postsLocationCount: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  placesLocationSection: {
+    marginBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  placesLocationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: "#fff",
+  },
+  placesLocationHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  placesLocationHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  placesLocationName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    flex: 1,
+  },
+  placesLocationCount: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
   postsContainer: {
     flex: 1,
   },
   postsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "flex-start",
     paddingHorizontal: SPACING,
     marginBottom: SPACING,
   },
   gridItemWrapper: {
     width: TILE_SIZE,
     marginRight: SPACING,
+    marginBottom: SPACING,
   },
   // Location card styles
   locationCard: {

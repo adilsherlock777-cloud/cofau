@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -472,16 +473,16 @@ export default function LeaderboardScreen() {
     let shouldReconnect = true;
     let wsConnected = false;
 
-    // Fallback: Poll for updates every 30 seconds if WebSocket fails (reduced from 10s)
+    // Fallback: Poll for updates every 15 seconds if WebSocket fails
     const startPolling = () => {
       if (pollingInterval) return; // Already polling
 
-      console.log('📊 Starting fallback polling for order updates (every 30s)');
+      console.log('📊 Starting fallback polling for order updates (every 15s)');
       pollingInterval = setInterval(() => {
         if (activeTab === "In Progress" || activeTab === "Your Orders") {
           updateOrdersInBackground(); // Use silent update instead of full fetchOrders
         }
-      }, 30000); // Poll every 30 seconds (reduced from 10s)
+      }, 15000); // Poll every 15 seconds
     };
 
     const stopPolling = () => {
@@ -1475,7 +1476,7 @@ export default function LeaderboardScreen() {
 
                 return (
                   <View style={styles.newOrderCard} key={`order-${order.id}-${orderIdx}`}>
-                    {/* For Restaurant: Show Customer Info */}
+                    {/* For Restaurant: Show Customer Info (without contact details) */}
                     {isRestaurant && (
                       <View style={styles.customerInfoSection}>
                         <View style={styles.customerHeader}>
@@ -1492,17 +1493,8 @@ export default function LeaderboardScreen() {
                           )}
                           <View style={styles.customerDetails}>
                             <Text style={styles.customerName}>{order.customer_name || "Customer"}</Text>
-                            {order.customer_phone && (
-                              <Text style={styles.customerPhone}>{order.customer_phone}</Text>
-                            )}
                           </View>
                         </View>
-                        {order.delivery_address && order.delivery_address !== "No address provided" && (
-                          <View style={styles.deliveryAddressRow}>
-                            <Ionicons name="location" size={16} color="#FF3B30" />
-                            <Text style={styles.deliveryAddressText}>{order.delivery_address}</Text>
-                          </View>
-                        )}
                       </View>
                     )}
 
@@ -1605,6 +1597,17 @@ export default function LeaderboardScreen() {
                         </View>
                       )}
                     </View>
+
+                    {/* Support Button for Regular Users */}
+                    {!isRestaurant && (
+                      <TouchableOpacity
+                        style={styles.supportButton}
+                        onPress={() => Linking.openURL('tel:8296534353')}
+                      >
+                        <Ionicons name="call" size={18} color="#FFF" />
+                        <Text style={styles.supportButtonText}>Contact Support</Text>
+                      </TouchableOpacity>
+                    )}
 
                     {/* Restaurant Action Buttons */}
                     {isRestaurant && (
@@ -3394,6 +3397,24 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   nextStatusButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  // Support button for regular users
+  supportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF8C00",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginTop: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  supportButtonText: {
     fontSize: 14,
     fontWeight: "700",
     color: "#FFFFFF",

@@ -192,7 +192,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
-    }, 2000);
+    }, 5000); // Increased to 5s for Android image loading
     return () => clearTimeout(timer);
   }, []);
 
@@ -205,7 +205,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
           longitude: restaurant.longitude,
         }}
         onPress={() => onPress(restaurant)}
-        tracksViewChanges={false}
+        tracksViewChanges={tracksChanges && !imageLoaded}
       >
         <View style={{
           width: 200,
@@ -230,6 +230,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
                 source={{ uri: fixUrl(restaurant.profile_picture) || '' }}
                 style={{ width: 128, height: 128, borderRadius: 64 }}
                 resizeMode="cover"
+                onLoad={() => setImageLoaded(true)}
               />
             ) : (
               <View style={{ width: 128, height: 128, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center', borderRadius: 64 }}>
@@ -314,29 +315,20 @@ const PostMarker = memo(({ post, onPress }: any) => {
     platform: Platform.OS
   });
 
-  // Stop tracking after 2 seconds regardless of image load
+  // Stop tracking after image loads or timeout
   const [tracksChanges, setTracksChanges] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
-    }, 2000);
+    }, 5000); // Increased to 5s for Android image loading
     return () => clearTimeout(timer);
   }, []);
 
-  // Android - Colored pin with beautiful image callout
+  // Android - Show image preview with rounded rectangle style
   if (Platform.OS === 'android') {
-    console.log('📍 Creating marker with callout for Android post:', post.id);
-
-    // Color-code by rating
-    let pinColor = '#F2CF68'; // Default: Gold
-    if (post.rating) {
-      if (post.rating >= 8) pinColor = '#00C853'; // Green = Excellent
-      else if (post.rating >= 6) pinColor = '#FF9800'; // Orange = Good
-      else pinColor = '#FF2E2E'; // Red = Lower rated
-    }
-
-    const imageUrl = fixUrl(post.thumbnail_url || post.media_url);
+    const imageUrl = post.full_thumbnail_url || post.full_image_url;
+    console.log('🖼️ Android PostMarker image URL:', imageUrl, 'for post:', post.id);
 
     return (
       <Marker
@@ -344,73 +336,54 @@ const PostMarker = memo(({ post, onPress }: any) => {
           latitude: post.latitude,
           longitude: post.longitude,
         }}
-        pinColor={pinColor}
-        onCalloutPress={() => {
-          console.log('🎯 Callout pressed, opening post:', post.id);
-          onPress(post);
-        }}
+        onPress={() => onPress(post)}
+        tracksViewChanges={false}
       >
-        <Callout tooltip style={{ width: 220 }}>
+        <View style={{
+          alignItems: 'center',
+        }}>
           <View style={{
-            backgroundColor: 'white',
+            width: 80,
+            height: 80,
             borderRadius: 12,
-            padding: 10,
-            width: 220,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.3,
-            shadowRadius: 5,
-            elevation: 8,
+            backgroundColor: '#F2CF68',
+            borderWidth: 3,
+            borderColor: '#FFFFFF',
+            elevation: 6,
           }}>
-            {imageUrl && (
-              <RNImage
+            {imageUrl ? (
+              <Image
                 source={{ uri: imageUrl }}
-                style={{
-                  width: 200,
-                  height: 150,
-                  borderRadius: 8,
-                  marginBottom: 10,
-                  backgroundColor: '#f0f0f0',
+                style={{ width: 74, height: 74, borderRadius: 9 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => {
+                  console.log('✅ Android image loaded:', imageUrl);
+                  setImageLoaded(true);
                 }}
-                resizeMode="cover"
+                onError={(error: any) => {
+                  console.log('❌ Android image error:', error, 'URL:', imageUrl);
+                }}
               />
-            )}
-            <Text
-              numberOfLines={2}
-              style={{
-                fontSize: 15,
-                fontWeight: 'bold',
-                color: '#000',
-                marginBottom: 6,
-              }}
-            >
-              {post.location_name || "Food Post"}
-            </Text>
-            {post.rating && (
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 6,
-                backgroundColor: '#FFF8E1',
-                padding: 6,
-                borderRadius: 6,
-              }}>
-                <Text style={{ fontSize: 18, marginRight: 6 }}>⭐</Text>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FF9800' }}>
-                  {post.rating}/10
-                </Text>
+            ) : (
+              <View style={{ width: 74, height: 74, backgroundColor: '#F2CF68', justifyContent: 'center', alignItems: 'center', borderRadius: 9 }}>
+                <Ionicons name="image" size={32} color="#fff" />
               </View>
             )}
-            <Text style={{
-              fontSize: 13,
-              color: '#1E88E5',
-              fontWeight: '600',
-              marginTop: 4,
-            }}>
-              Tap to view full post →
-            </Text>
           </View>
-        </Callout>
+          {/* Arrow pointing down */}
+          <View style={{
+            width: 0,
+            height: 0,
+            borderLeftWidth: 6,
+            borderRightWidth: 6,
+            borderTopWidth: 8,
+            borderLeftColor: 'transparent',
+            borderRightColor: 'transparent',
+            borderTopColor: '#FFFFFF',
+            marginTop: -2,
+          }} />
+        </View>
       </Marker>
     );
   }
@@ -427,9 +400,9 @@ const PostMarker = memo(({ post, onPress }: any) => {
     >
       <View style={styles.postMarkerContainer}>
         <View style={styles.postMarkerBubble}>
-          {post.thumbnail_url || post.media_url ? (
+          {post.full_thumbnail_url || post.full_image_url ? (
             <Image
-              source={{ uri: fixUrl(post.thumbnail_url || post.media_url) || '' }}
+              source={{ uri: post.full_thumbnail_url || post.full_image_url }}
               style={styles.postMarkerImage}
               contentFit="cover"
               cachePolicy="memory-disk"
@@ -441,12 +414,6 @@ const PostMarker = memo(({ post, onPress }: any) => {
             </View>
           )}
         </View>
-        {post.rating && (
-          <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={10} color="#FFD700" />
-            <Text style={styles.ratingBadgeText}>{post.rating}</Text>
-          </View>
-        )}
         <View style={styles.postMarkerArrow} />
       </View>
     </Marker>
@@ -464,11 +431,11 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 3);
 
-  // Stop tracking after 3 seconds
+  // Stop tracking after images load or timeout
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
-    }, 3000);
+    }, 5000); // Increased to 5s for Android image loading
     return () => clearTimeout(timer);
   }, []);
 
@@ -479,24 +446,75 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     platform: Platform.OS
   });
 
-  // Android - Use NATIVE pin with distinct color for clusters
+  // Android - Show single preview image with count badge (rounded rectangle style)
   if (Platform.OS === 'android') {
-    console.log('📍 Creating cluster marker for Android, count:', count);
-
-    // Purple/violet for clusters to stand out from single posts
-    const clusterColor = '#9C27B0'; // Purple for clusters
+    const previewPost = latestPosts[0]; // Just use the first/latest post
+    const imageUrl = previewPost?.full_thumbnail_url || previewPost?.full_image_url;
 
     return (
       <Marker
         coordinate={{ latitude, longitude }}
-        onPress={() => {
-          console.log('🎯 Cluster tapped! Count:', count);
-          onPress(cluster);
-        }}
-        pinColor={clusterColor}
-        title={`📍 ${count} posts here`}
-        description={`Tap to see all ${count} posts at ${cluster.locationName || 'this location'}`}
-      />
+        onPress={() => onPress(cluster)}
+        tracksViewChanges={false}
+      >
+        <View style={{
+          alignItems: 'center',
+        }}>
+          <View style={{
+            width: 80,
+            height: 80,
+            borderRadius: 12,
+            backgroundColor: '#9C27B0',
+            borderWidth: 3,
+            borderColor: '#FFFFFF',
+            elevation: 6,
+            position: 'relative',
+          }}>
+            {imageUrl ? (
+              <Image
+                source={{ uri: imageUrl }}
+                style={{ width: 74, height: 74, borderRadius: 9 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => setImagesLoaded(1)}
+              />
+            ) : (
+              <View style={{ width: 74, height: 74, backgroundColor: '#9C27B0', justifyContent: 'center', alignItems: 'center', borderRadius: 9 }}>
+                <Ionicons name="images" size={32} color="#fff" />
+              </View>
+            )}
+            {/* Count badge */}
+            <View style={{
+              position: 'absolute',
+              top: -8,
+              right: -8,
+              backgroundColor: '#E94A37',
+              borderRadius: 14,
+              width: 28,
+              height: 28,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderWidth: 2,
+              borderColor: '#FFFFFF',
+              elevation: 8,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>{count}</Text>
+            </View>
+          </View>
+          {/* Arrow pointing down */}
+          <View style={{
+            width: 0,
+            height: 0,
+            borderLeftWidth: 6,
+            borderRightWidth: 6,
+            borderTopWidth: 8,
+            borderLeftColor: 'transparent',
+            borderRightColor: 'transparent',
+            borderTopColor: '#FFFFFF',
+            marginTop: -2,
+          }} />
+        </View>
+      </Marker>
     );
   }
 
@@ -523,9 +541,9 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
                 }
               ]}
             >
-              {post.thumbnail_url || post.media_url ? (
+              {post.full_thumbnail_url || post.full_image_url ? (
                 <Image
-                  source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+                  source={{ uri: post.full_thumbnail_url || post.full_image_url }}
                   style={styles.clusterImage}
                   contentFit="cover"
                   cachePolicy="memory-disk"
@@ -534,13 +552,6 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
               ) : (
                 <View style={styles.clusterImagePlaceholder}>
                   <Ionicons name="image" size={16} color="#fff" />
-                </View>
-              )}
-              {/* Rating badge on each preview */}
-              {post.rating && (
-                <View style={styles.clusterRatingBadge}>
-                  <Ionicons name="star" size={8} color="#FFD700" />
-                  <Text style={styles.clusterRatingText}>{post.rating}</Text>
                 </View>
               )}
             </View>
@@ -826,7 +837,7 @@ const RestaurantDetailModal = memo(({ visible, restaurant, onClose, onViewProfil
               <Text style={styles.restaurantDetailName}>{restaurant.name}</Text>
               {restaurant.is_verified && (
                 <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#4ECDC4" />
+                  <Ionicons name="checkmark-circle" size={16} color="#E94A37" />
                   <Text style={styles.verifiedText}>Verified</Text>
                 </View>
               )}
@@ -1125,7 +1136,7 @@ export default function ExploreScreen() {
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'map' | 'users'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'users'>(Platform.OS === 'android' ? 'users' : 'map');
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -1363,7 +1374,18 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
       // Search results - don't cache these
       const results = response.data.results || [];
       console.log('Search results:', results.length);
-      setMapPosts(results);
+
+      // Process results to add full URLs
+      const processedResults = results.map((post: any) => {
+        const fullUrl = fixUrl(post.media_url || post.image_url);
+        return {
+          ...post,
+          full_image_url: fullUrl,
+          full_thumbnail_url: fixUrl(post.thumbnail_url),
+        };
+      });
+
+      setMapPosts(processedResults);
       setMapRestaurants([]);
     } else {
       // All pins - cache these
@@ -1371,11 +1393,25 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
       const restaurants = response.data.restaurants || [];
       console.log('All posts:', posts.length);
       console.log('All restaurants:', restaurants.length);
-      
-      // Cache the posts
-      cachedMapPosts.current = posts;
-      
-      setMapPosts(posts);
+
+      // Process posts to add full URLs
+      const processedPosts = posts.map((post: any) => {
+        const fullUrl = fixUrl(post.media_url || post.image_url);
+        const thumbnailUrl = fixUrl(post.thumbnail_url);
+        console.log('📸 Processing post:', post.id, 'media_url:', post.media_url, 'thumbnail_url:', post.thumbnail_url, 'full_image_url:', fullUrl, 'full_thumbnail_url:', thumbnailUrl);
+        return {
+          ...post,
+          full_image_url: fullUrl,
+          full_thumbnail_url: thumbnailUrl,
+        };
+      });
+
+      console.log('✅ Processed', processedPosts.length, 'posts with URLs');
+
+      // Cache the processed posts
+      cachedMapPosts.current = processedPosts;
+
+      setMapPosts(processedPosts);
       setMapRestaurants(restaurants);
     }
   } catch (error) {
@@ -1419,10 +1455,20 @@ const fetchFollowersPosts = async (forceRefresh = false) => {
     console.log(`✅ Followers posts received: ${posts.length} posts from ${followingCount} followed users`);
     if (message) console.log(`ℹ️  Message: ${message}`);
 
-    // Cache the followers posts
-    cachedFollowersPosts.current = posts;
+    // Process posts to add full URLs
+    const processedPosts = posts.map((post: any) => {
+      const fullUrl = fixUrl(post.media_url || post.image_url);
+      return {
+        ...post,
+        full_image_url: fullUrl,
+        full_thumbnail_url: fixUrl(post.thumbnail_url),
+      };
+    });
 
-    setMapPosts(posts);
+    // Cache the processed followers posts
+    cachedFollowersPosts.current = processedPosts;
+
+    setMapPosts(processedPosts);
     setMapRestaurants([]); // Clear restaurants when showing followers
   } catch (error) {
     console.error("❌ Fetch followers posts error:", error);
@@ -1849,10 +1895,12 @@ return (
           {/* Search Box - Now at the top */}
           <View style={styles.searchBoxWrapper}>
             <View style={styles.searchBox}>
-              <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+              <TouchableOpacity onPress={performSearch} activeOpacity={0.7}>
+                <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+              </TouchableOpacity>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search"
+                placeholder="What are you hungry for? 🤤"
                 placeholderTextColor="#999"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -2113,7 +2161,7 @@ return (
           </Text>
         </View>
         {isSelected ? (
-          <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+          <Ionicons name="checkmark-circle" size={24} color="#FFF" />
         ) : (
           <Ionicons name="ellipse-outline" size={24} color="#CCC" />
         )}
@@ -2122,18 +2170,18 @@ return (
   }} 
             contentContainerStyle={styles.categoryList} />
             <View style={styles.modalFooter}>
-             <TouchableOpacity 
-  style={styles.doneButton} 
-  onPress={() => { 
-    setAppliedCategories(selectedCategories); 
-    setShowCategoryModal(false); 
-    
+             <TouchableOpacity
+  style={styles.doneButton}
+  onPress={() => {
+    setAppliedCategories(selectedCategories);
+    setShowCategoryModal(false);
+
     if (activeTab === 'map') {
   // For map tab - filter from cache (fast!)
   if (selectedCategories.length > 0) {
     const filteredPosts = cachedMapPosts.current.filter((post: any) => {
       const postCategory = post.category?.toLowerCase().trim();
-      return selectedCategories.some(cat => 
+      return selectedCategories.some(cat =>
         postCategory === cat.toLowerCase().trim()
       );
     });
@@ -2143,8 +2191,11 @@ return (
     // No filter - show all cached posts
     setMapPosts(cachedMapPosts.current);
   }
+} else {
+  // For users tab - fetch filtered posts from API
+  fetchPostsWithCategories(selectedCategories);
 }
-    
+
     // Clear quick category selection when using modal
     setSelectedQuickCategory(null);
   }}
@@ -2247,7 +2298,7 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     color: "#333" 
   },
-  inlineFilterButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#1B7C82", borderRadius: 18, paddingVertical: 5, paddingHorizontal: 12, gap: 4 },
+  inlineFilterButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#E94A37", borderRadius: 18, paddingVertical: 5, paddingHorizontal: 12, gap: 4 },
   gradientBorder: { borderRadius: 20, padding: 2 },
   inlineFilterText: { fontSize: 12, color: "#FFF", fontWeight: "600", maxWidth: 70 },
   selectedTagsWrapper: { paddingHorizontal: 16, marginBottom: 10 },
@@ -2282,17 +2333,17 @@ const styles = StyleSheet.create({
   categoryModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" },
   categoryModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#E5E5E5" },
   categoryModalTitle: { fontSize: 20, fontWeight: "bold", color: "#000" },
-  selectedCountContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 12, backgroundColor: "#F0F9F9" },
-  selectedCountText: { fontSize: 14, color: "#4ECDC4", fontWeight: "600" },
+  selectedCountContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 12, backgroundColor: "#FFF5E6" },
+  selectedCountText: { fontSize: 14, color: "#E94A37", fontWeight: "600" },
   clearAllModalText: { fontSize: 14, color: "#E94A37", fontWeight: "600" },
   categoryList: { padding: 12 },
   categoryItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderRadius: 12, marginBottom: 8, backgroundColor: "#F9F9F9" },
-  categoryItemSelected: { backgroundColor: "#1B7C82", borderWidth: 2, borderColor: "#4ECDC4" },
+  categoryItemSelected: { backgroundColor: "#E94A37", borderWidth: 2, borderColor: "#F2CF68" },
   categoryItemContent: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   categoryItemText: { fontSize: 16, color: "#000", flex: 1 },
   categoryItemTextSelected: { fontWeight: "600", color: "#fff" },
   modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: "#E5E5E5" },
-  doneButton: { backgroundColor: "#4ECDC4", paddingVertical: 14, borderRadius: 12, alignItems: "center" },
+  doneButton: { backgroundColor: "#E94A37", paddingVertical: 14, borderRadius: 12, alignItems: "center" },
   doneButtonText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
 
   // ======================================================
@@ -2702,7 +2753,7 @@ postMarkerContainerAndroid: {
 postMarkerBubbleAndroid: {
   width: 90,
   height: 90,
-  borderRadius: 12,
+  borderRadius: 45, // Perfect circle (half of width/height)
   backgroundColor: '#F2CF68',
   justifyContent: 'center',
   alignItems: 'center',
@@ -2717,16 +2768,80 @@ postMarkerBubbleAndroid: {
 postMarkerImageAndroid: {
   width: 84,
   height: 84,
-  borderRadius: 9,
+  borderRadius: 42, // Perfect circle (half of width/height)
 },
 postMarkerPlaceholderAndroid: {
   width: 84,
   height: 84,
-  borderRadius: 9,
+  borderRadius: 42, // Perfect circle
   justifyContent: 'center',
   alignItems: 'center',
   backgroundColor: '#F2CF68',
 },
+
+// Android-specific ClusterMarker styles
+clusterMarkerContainerAndroid: {
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+clusterPreviewContainerAndroid: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  height: 70,
+},
+clusterImageWrapperAndroid: {
+  width: 70,
+  height: 70,
+  borderRadius: 35, // Perfect circle (half of width/height)
+  backgroundColor: '#fff',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.4,
+  shadowRadius: 5,
+  elevation: 6,
+  overflow: 'hidden',
+},
+clusterImageAndroid: {
+  width: 64,
+  height: 64,
+  borderRadius: 32, // Perfect circle (half of width/height)
+},
+clusterImagePlaceholderAndroid: {
+  width: 64,
+  height: 64,
+  borderRadius: 32, // Perfect circle
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#9C27B0',
+},
+clusterCountBadgeAndroid: {
+  position: 'absolute',
+  top: -8,
+  right: -8,
+  backgroundColor: '#E94A37',
+  borderRadius: 16,
+  width: 32,
+  height: 32,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 3,
+  elevation: 5,
+},
+clusterCountTextAndroid: {
+  color: '#fff',
+  fontSize: 13,
+  fontWeight: 'bold',
+},
+
 // FLOATING MAP TOGGLE STYLES
 mapFloatingToggle: {
   position: 'absolute',
@@ -2990,7 +3105,7 @@ toggleTabTextActive: {
   },
   verifiedText: {
     fontSize: 12,
-    color: '#4ECDC4',
+    color: '#E94A37',
     marginLeft: 4,
   },
   restaurantDetailBio: {

@@ -24,7 +24,6 @@ import { Video, ResizeMode } from 'expo-av';
 import { createPost, createRestaurantPost, createMenuItem } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
-import ImageCropper from '../components/ImageCropper';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
 import PostRewardModal from '../components/PostRewardModal';
 import axios from 'axios';
@@ -60,9 +59,6 @@ export default function AddPostScreen() {
   const [pointsEarned, setPointsEarned] = useState(0);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardData, setRewardData] = useState(null);
-  // Crop states
-  const [showCropper, setShowCropper] = useState(false);
-  const [tempImageUri, setTempImageUri] = useState<string | null>(null);
 
   // User location state
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -136,14 +132,14 @@ const CATEGORIES = [
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: false,  // We'll use our own cropper
+    allowsEditing: true,  // Use native free-form crop editor
     quality: 0.8,
   });
 
   if (!result.canceled && result.assets[0]) {
-    // Store temp URI and open cropper
-    setTempImageUri(result.assets[0].uri);
-    setShowCropper(true);
+    // Directly use the cropped image from native editor
+    setMediaUri(result.assets[0].uri);
+    setMediaType('image');
   }
 };
 
@@ -151,18 +147,6 @@ const getAverageRating = () => {
   const total = tasteRating + valueRating + portionRating;
   if (total === 0) return 0;
   return Math.round((total / 3) * 10) / 10; // Round to 1 decimal
-};
-
-const handleCropDone = (croppedUri: string) => {
-  setMediaUri(croppedUri);
-  setMediaType('image');
-  setShowCropper(false);
-  setTempImageUri(null);
-};
-
-const handleCropCancel = () => {
-  setShowCropper(false);
-  setTempImageUri(null);
 };
 
   const takePhoto = async () => {
@@ -174,14 +158,14 @@ const handleCropCancel = () => {
 
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: false,  // We'll use our own cropper
+    allowsEditing: true,  // Use native free-form crop editor
     quality: 0.8,
   });
 
   if (!result.canceled && result.assets[0]) {
-    // Store temp URI and open cropper
-    setTempImageUri(result.assets[0].uri);
-    setShowCropper(true);
+    // Directly use the cropped image from native editor
+    setMediaUri(result.assets[0].uri);
+    setMediaType('image');
   }
 };
 
@@ -1219,20 +1203,6 @@ return (
     </View>
   </View>
 </Modal>
-{/* Image Cropper Modal */}
-{showCropper && tempImageUri && (
-  <Modal
-    visible={showCropper}
-    animationType="slide"
-    onRequestClose={handleCropCancel}
-  >
-    <ImageCropper
-      imageUri={tempImageUri}
-      onCropDone={handleCropDone}
-      onCancel={handleCropCancel}
-    />
-  </Modal>
-)}
 
 {/* Grammar Correction Modal */}
 <Modal

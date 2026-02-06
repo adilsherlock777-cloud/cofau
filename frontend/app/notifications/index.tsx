@@ -25,7 +25,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { token } = useAuth();
   const { refreshUnreadCount, setUnreadCount } = useNotifications(); // ⬅️ ADD THIS
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -58,10 +58,9 @@ export default function NotificationsScreen() {
         await markNotificationAsRead(token, notification.id);
         // Update local state
         setNotifications((prev) =>
-  prev.map((n: any) => (n.id === notification.id ? { ...n, isRead: true } : n))
-);
-setUnreadCount((prev: number) => Math.max(0, prev - 1)); 
-        // ⬅️ Decrement unread count
+          prev.map((n: any) => (n.id === notification.id ? { ...n, isRead: true } : n))
+        );
+        // Decrement unread count
         setUnreadCount((prev: number) => Math.max(0, prev - 1));
       } catch (error) {
         console.error('❌ Error marking notification as read:', error);
@@ -69,12 +68,53 @@ setUnreadCount((prev: number) => Math.max(0, prev - 1));
     }
 
     // Navigate based on notification type
-    if (notification.type === 'like' || notification.type === 'comment' || notification.type === 'new_post') {
+    const type = notification.type;
+
+    // Post-related notifications
+    if (type === 'like' || type === 'comment' || type === 'new_post') {
       if (notification.postId) {
         router.push(`/post-details/${notification.postId}`);
       }
-    } else if (notification.type === 'follow' || notification.type === 'compliment') {
-      router.push(`/profile?userId=${notification.fromUserId}`);
+    }
+    // User-related notifications
+    else if (type === 'follow' || type === 'compliment') {
+      if (notification.fromUserId) {
+        router.push(`/profile?userId=${notification.fromUserId}`);
+      }
+    }
+    // Story-related notifications
+    else if (type === 'story_like') {
+      // Route to the user's profile who posted the story
+      if (notification.fromUserId) {
+        router.push(`/profile?userId=${notification.fromUserId}`);
+      }
+    }
+    // Message notifications
+    else if (type === 'message') {
+      if (notification.fromUserId) {
+        router.push(`/chat?userId=${notification.fromUserId}`);
+      } else {
+        router.push('/chat');
+      }
+    }
+    // Wallet and reward notifications
+    else if (type === 'wallet_reward' || type === 'delivery_completed_reward' || type === 'reward_earned') {
+      // Route to the leaderboard screen which shows Delivery/Rewards
+      router.push('/leaderboard');
+    }
+    // Order notifications for customers
+    else if (type === 'order_preparing' || type === 'order_in_progress' || type === 'order_completed') {
+      // Route to leaderboard which shows orders/delivery for customers
+      router.push('/leaderboard');
+    }
+    // Order notifications for restaurants
+    else if (type === 'new_order') {
+      // Route to leaderboard which shows orders for restaurants
+      router.push('/leaderboard');
+    }
+    // Fallback: if no specific route, go to feed
+    else {
+      console.log(`⚠️ Unhandled notification type: ${type}`);
     }
   };
 
