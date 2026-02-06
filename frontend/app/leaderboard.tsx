@@ -447,6 +447,11 @@ export default function LeaderboardScreen() {
 
       setCompletedOrders((prev: any[]) => {
         const hasChanges = prev.length !== completed.length;
+        // Check if a new order was just completed (length increased)
+        if (hasChanges && completed.length > prev.length && !isRestaurant) {
+          console.log('💰 New completed order detected - refreshing rewards history');
+          fetchRewardsHistory();
+        }
         return hasChanges ? completed : prev;
       });
     } catch (error) {
@@ -519,6 +524,12 @@ export default function LeaderboardScreen() {
                   // Remove from active orders
                   return prevActive.filter((order: any) => order.id !== data.order_id);
                 });
+
+                // Refresh rewards history when an order is completed (for delivery rewards)
+                if (newStatus === 'completed' && !isRestaurant) {
+                  console.log('💰 Order completed - refreshing rewards history');
+                  fetchRewardsHistory();
+                }
               } else {
                 // Update status within active orders
                 setActiveOrders((prevOrders: any[]) =>

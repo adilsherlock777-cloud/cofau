@@ -64,7 +64,7 @@ async def create_order(
     """Create a new order from a food post"""
     db = get_database()
 
-    user_id = str(current_user.get("_id") or current_user.get("id"))
+    user_id = str(current_user["_id"])
 
     # Verify post exists
     try:
@@ -155,7 +155,7 @@ async def get_my_orders(
     """Get current user's orders"""
     db = get_database()
 
-    user_id = str(current_user.get("_id") or current_user.get("id"))
+    user_id = str(current_user["_id"])
 
     query = {"user_id": user_id}
 
@@ -574,7 +574,7 @@ async def get_order(
     """Get a specific order by ID"""
     db = get_database()
 
-    user_id = str(current_user.get("_id") or current_user.get("id"))
+    user_id = str(current_user["_id"])
 
     try:
         order = await db.orders.find_one({"_id": ObjectId(order_id)})
@@ -815,7 +815,7 @@ async def cancel_order(
     """Cancel an order"""
     db = get_database()
 
-    user_id = str(current_user.get("_id") or current_user.get("id"))
+    user_id = str(current_user["_id"])
 
     try:
         order = await db.orders.find_one({"_id": ObjectId(order_id)})
@@ -1325,7 +1325,7 @@ async def submit_review(
     """Submit a review for a completed order"""
     db = get_database()
 
-    user_id = str(current_user.get("_id") or current_user.get("id"))
+    user_id = str(current_user["_id"])
 
     # Validate order exists and belongs to user
     try:
@@ -1607,11 +1607,8 @@ async def get_rewards_history(
     try:
         db = get_database()
 
-        user_id = str(current_user.get("_id") or current_user.get("id"))
-
-        if not user_id or user_id == "None":
-            print(f"❌ Invalid user_id in current_user: {current_user}")
-            raise HTTPException(status_code=400, detail="Invalid user ID")
+        # Use direct dictionary access like /me endpoint does (MongoDB always returns _id)
+        user_id = str(current_user["_id"])
 
         print(f"🔍 Fetching rewards history for user: {user_id}")
 
@@ -1619,6 +1616,10 @@ async def get_rewards_history(
         transactions = await db.wallet_transactions.find(
             {"user_id": user_id}
         ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+        print(f"   Found {len(transactions)} transactions in database")
+        if len(transactions) > 0:
+            print(f"   First transaction: {transactions[0].get('description')} - ₹{transactions[0].get('amount')}")
 
         result = []
         for transaction in transactions:
