@@ -259,8 +259,12 @@ export default function LeaderboardScreen() {
 
       // Fetch restaurant profiles for orders with restaurant_id (only for regular users)
       if (!isRestaurant) {
+        // Filter out invalid restaurant IDs (e.g., Google Place IDs that start with "ChIJ")
+        // Only fetch profiles for valid MongoDB ObjectIds (24 character hex strings)
+        const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
+
         const restaurantIds = [...new Set(allOrders
-          .filter((order: any) => order.restaurant_id)
+          .filter((order: any) => order.restaurant_id && isValidObjectId(order.restaurant_id))
           .map((order: any) => order.restaurant_id))];
 
         const profiles: { [key: string]: any } = {};

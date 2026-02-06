@@ -794,7 +794,18 @@ async def get_all_orders_for_partner(
                             addr_parts.append(user_address.get("address"))
                         if addr_parts:
                             delivery_address = ", ".join(addr_parts)
-            except:
+
+                    # Fallback: Check main phone_number field if not found in delivery_address
+                    if not customer_phone:
+                        customer_phone = customer.get("phone_number")
+                        if customer_phone:
+                            print(f"📞 Using main phone_number for user {user_id}: {customer_phone}")
+
+                    # Debug: Log if phone is still missing
+                    if not customer_phone:
+                        print(f"⚠️ No phone number found for user {user_id} ({customer_name}) in order {order_id}")
+            except Exception as e:
+                print(f"❌ Error fetching customer info for order {order_id}: {e}")
                 pass
 
         # Get restaurant coordinates and phone
@@ -810,7 +821,12 @@ async def get_all_orders_for_partner(
                     restaurant_lng = restaurant.get("longitude")
                     restaurant_phone = restaurant.get("phone_number") or restaurant.get("phone")
                     restaurant_profile_name = restaurant.get("restaurant_name", restaurant_profile_name)
-            except:
+
+                    # Debug: Log if restaurant phone is missing
+                    if not restaurant_phone:
+                        print(f"⚠️ No phone number found for restaurant {restaurant_id} ({restaurant_profile_name}) in order {order_id}")
+            except Exception as e:
+                print(f"❌ Error fetching restaurant info for order {order_id}: {e}")
                 pass
 
         # Calculate distance
@@ -1429,16 +1445,24 @@ async def get_rewards_history(
         order_id = transaction.get("order_id")
         if order_id:
             try:
-                order = await db.orders.find_one({"_id": ObjectId(order_id)})
-                if order:
-                    order_details = {
-                        "dish_name": order.get("dish_name"),
-                        "restaurant_name": order.get("restaurant_name"),
-                        "post_location": order.get("post_location"),
-                        "completed_at": order.get("updated_at")
-                    }
+                # Try to convert to ObjectId, skip if invalid
+                try:
+                    order_object_id = ObjectId(order_id)
+                except:
+                    print(f"⚠️ Invalid ObjectId in transaction {transaction.get('_id')}: {order_id}")
+                    order_object_id = None
+
+                if order_object_id:
+                    order = await db.orders.find_one({"_id": order_object_id})
+                    if order:
+                        order_details = {
+                            "dish_name": order.get("dish_name"),
+                            "restaurant_name": order.get("restaurant_name"),
+                            "post_location": order.get("post_location"),
+                            "completed_at": order.get("updated_at")
+                        }
             except Exception as e:
-                print(f"Error fetching order details for transaction: {e}")
+                print(f"❌ Error fetching order details for transaction {transaction.get('_id')}: {e}")
 
         result.append({
             "id": str(transaction["_id"]),
