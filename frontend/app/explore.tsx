@@ -1533,9 +1533,10 @@ const handleQuickCategoryPress = (category: any) => {
     // Deselect - show all cached posts (NO API CALL)
     setSelectedQuickCategory(null);
     if (activeTab === 'map') {
-      // Use cached posts instead of fetching
-      console.log('Deselecting category, using cache:', cachedMapPosts.current.length);
-      setMapPosts(cachedMapPosts.current);
+      // Use appropriate cache based on filter type
+      const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      console.log('Deselecting category, using cache:', cacheToUse.length);
+      setMapPosts(cacheToUse);
     } else {
       setAppliedCategories([]);
       setSelectedCategories([]);
@@ -1545,14 +1546,15 @@ const handleQuickCategoryPress = (category: any) => {
     // Select - filter from cached posts (NO API CALL)
     setSelectedQuickCategory(category.id);
     if (activeTab === 'map') {
-      // Filter cached posts by category name
-      const filteredPosts = cachedMapPosts.current.filter((post: any) => {
+      // Filter from appropriate cache based on filter type
+      const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      const filteredPosts = cacheToUse.filter((post: any) => {
   const postCategory = post.category?.toLowerCase().trim();
   const selectedCategoryName = category.name.toLowerCase().trim();
   // Strict match only - exact category or exact substring
   return postCategory === selectedCategoryName;
 });
-      console.log(`Filtered ${filteredPosts.length} posts for category: ${category.name} (from cache)`);
+      console.log(`Filtered ${filteredPosts.length} posts for category: ${category.name} from ${mapFilterType} cache`);
       setMapPosts(filteredPosts);
     } else {
       setAppliedCategories([category.name]);
@@ -1701,29 +1703,36 @@ useFocusEffect(
     
     // When returning to this screen and map tab is active
     if (activeTab === 'map' && userLocation) {
-      if (mapPosts.length === 0 && cachedMapPosts.current.length > 0) {
+      // Determine which cache to use based on filter type
+      const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+
+      if (mapPosts.length === 0 && cacheToUse.length > 0) {
         // Cache exists but mapPosts is empty (returned from navigation)
         console.log('Restoring from cache on focus...');
         if (selectedQuickCategory) {
           // Re-apply category filter from cache
           const category = QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory);
           if (category) {
-            const filteredPosts = cachedMapPosts.current.filter((post: any) => {
+            const filteredPosts = cacheToUse.filter((post: any) => {
   const postCategory = post.category?.toLowerCase().trim();
   const selectedCategoryName = category.name.toLowerCase().trim();
   return postCategory === selectedCategoryName;
 });
             setMapPosts(filteredPosts);
           } else {
-            setMapPosts(cachedMapPosts.current);
+            setMapPosts(cacheToUse);
           }
         } else {
-          setMapPosts(cachedMapPosts.current);
+          setMapPosts(cacheToUse);
         }
-      } else if (cachedMapPosts.current.length === 0) {
+      } else if (cacheToUse.length === 0) {
         // No cache exists, need to fetch
         console.log('No cache, fetching...');
-        fetchMapPins(undefined, true);
+        if (mapFilterType === 'followers') {
+          fetchFollowersPosts(true);
+        } else {
+          fetchMapPins(undefined, true);
+        }
       }
       // If mapPosts.length > 0, do nothing - data already there
     }
@@ -1921,7 +1930,7 @@ return (
                   end={{ x: 1, y: 0 }}
                   style={styles.categoryButtonGradient}
                 >
-                  <Ionicons name="options-outline" size={18} color="#FFF" />
+                  <Text style={styles.categoryButtonEmoji}>🍽️</Text>
                   <Text style={styles.categoryButtonText}>
                     {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
                   </Text>
@@ -2023,17 +2032,18 @@ return (
                 <Text style={styles.selectedTagText}>{cat}</Text><Ionicons name="close-circle" size={16} color="#666" />
               </TouchableOpacity>
             ))}
-            <TouchableOpacity 
-  style={styles.clearAllButton} 
-  onPress={() => { 
-  setSelectedCategories([]); 
-  setAppliedCategories([]); 
+            <TouchableOpacity
+  style={styles.clearAllButton}
+  onPress={() => {
+  setSelectedCategories([]);
+  setAppliedCategories([]);
   setSelectedQuickCategory(null);
   if (activeTab === 'map') {
-    // Use cached posts instead of fetching
-    setMapPosts(cachedMapPosts.current);
+    // Use appropriate cache based on filter type
+    const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+    setMapPosts(cacheToUse);
   } else {
-    fetchPostsWithCategories([]); 
+    fetchPostsWithCategories([]);
   }
 }}
 >
@@ -2144,15 +2154,17 @@ return (
       <TouchableOpacity 
         style={[styles.categoryItem, isSelected && styles.categoryItemSelected]} 
         onPress={() => { 
-          if (item.name === "All") { 
-            setSelectedCategories([]); 
-            setShowCategoryModal(false); 
-            setAppliedCategories([]); 
+          if (item.name === "All") {
+            setSelectedCategories([]);
+            setShowCategoryModal(false);
+            setAppliedCategories([]);
             setSelectedQuickCategory(null);
             if (activeTab === 'map') {
-              fetchMapPins();
+              // Use appropriate cache based on filter type
+              const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+              setMapPosts(cacheToUse);
             } else {
-              fetchPostsWithCategories([]); 
+              fetchPostsWithCategories([]);
             }
           } else {
             toggleCategory(item.name); 
@@ -2182,19 +2194,20 @@ return (
     setShowCategoryModal(false);
 
     if (activeTab === 'map') {
-  // For map tab - filter from cache (fast!)
+  // For map tab - filter from appropriate cache based on filter type
+  const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
   if (selectedCategories.length > 0) {
-    const filteredPosts = cachedMapPosts.current.filter((post: any) => {
+    const filteredPosts = cacheToUse.filter((post: any) => {
       const postCategory = post.category?.toLowerCase().trim();
       return selectedCategories.some(cat =>
         postCategory === cat.toLowerCase().trim()
       );
     });
-    console.log(`Modal filter: ${filteredPosts.length} posts for categories: ${selectedCategories.join(', ')}`);
+    console.log(`Modal filter: ${filteredPosts.length} posts for categories: ${selectedCategories.join(', ')} from ${mapFilterType} cache`);
     setMapPosts(filteredPosts);
   } else {
     // No filter - show all cached posts
-    setMapPosts(cachedMapPosts.current);
+    setMapPosts(cacheToUse);
   }
 } else {
   // For users tab - fetch filtered posts from API
@@ -2681,6 +2694,9 @@ markerArrow: {
   paddingVertical: 8,
   paddingHorizontal: 14,
   gap: 6,
+},
+categoryButtonEmoji: {
+  fontSize: 18,
 },
 categoryButtonText: {
   fontSize: 12,

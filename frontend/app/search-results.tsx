@@ -9,7 +9,9 @@ import {
   TextInput,
   Dimensions,
   ScrollView,
+  Alert,
 } from "react-native";
+import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../context/AuthContext";
@@ -27,7 +29,7 @@ const SPACING = 2;
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS);
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
-type TabType = "users" | "posts" | "places";
+type TabType = "nearby" | "posts" | "places";
 
 const fixUrl = (url: string | null) => {
   if (!url) return null;
@@ -62,8 +64,10 @@ export default function SearchResultsScreen() {
   const [users, setUsers] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [nearbyPosts, setNearbyPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedLocations, setExpandedLocations] = useState<{ [key: string]: boolean }>({});
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const performUserSearch = async (query: string) => {
@@ -157,11 +161,82 @@ export default function SearchResultsScreen() {
     }));
   };
 
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Location Permission Required",
+          "Please enable location access to see nearby posts.",
+          [{ text: "OK" }]
+        );
+        return null;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const userLoc = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      setUserLocation(userLoc);
+      return userLoc;
+    } catch (err) {
+      console.error("❌ Error getting location:", err);
+      Alert.alert("Error", "Could not get your location. Please try again.");
+      return null;
+    }
+  };
+
+  const performNearbySearch = async (query: string) => {
+    if (!query.trim() || query.trim().length < 3) {
+      setNearbyPosts([]);
+      return;
+    }
+
+    try {
+      // Get user location first
+      const location = userLocation || await getUserLocation();
+      if (!location) {
+        setNearbyPosts([]);
+        return;
+      }
+
+      const url = `${API_URL}/map/search?q=${encodeURIComponent(query.trim())}&lat=${location.latitude}&lng=${location.longitude}&radius_km=12`;
+
+      console.log('🔍 Fetching nearby posts:', url);
+
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token || ''}` },
+      });
+
+      const formattedPosts = res.data.map((post: any) => {
+        const rawUrl = post.media_url || post.image_url;
+        const fullUrl = fixUrl(rawUrl);
+
+        return {
+          ...post,
+          full_image_url: fullUrl,
+          _isVideo: isVideoFile(fullUrl || "", post.media_type || "image"),
+        };
+      });
+
+      setNearbyPosts(formattedPosts);
+    } catch (err) {
+      console.error("❌ Nearby posts search error:", err);
+      setNearbyPosts([]);
+    }
+  };
+
   const performSearch = async (query: string) => {
     if (!query.trim() || query.trim().length < 3) {
       setUsers([]);
       setPosts([]);
       setLocations([]);
+      setNearbyPosts([]);
       setLoading(false);
       return;
     }
@@ -172,6 +247,7 @@ export default function SearchResultsScreen() {
         performUserSearch(query),
         performPostSearch(query),
         performLocationSearch(query),
+        performNearbySearch(query),
       ]);
     } catch (err) {
       console.error("❌ Search error:", err);
@@ -202,6 +278,7 @@ export default function SearchResultsScreen() {
       setUsers([]);
       setPosts([]);
       setLocations([]);
+      setNearbyPosts([]);
       setLoading(false);
     }
 
@@ -211,6 +288,11 @@ export default function SearchResultsScreen() {
       }
     };
   }, [searchQuery, token]);
+
+  // Get user location on mount for nearby posts
+  useEffect(() => {
+    getUserLocation();
+  }, []);
 
   const renderUserItem = ({ item }: any) => {
     const hasLocationImages = item.location_images && item.location_images.length > 0;
@@ -357,14 +439,14 @@ export default function SearchResultsScreen() {
     );
   };
 
-  const renderPostsGrid = () => {
-    if (posts.length === 0) {
+  const renderPostsGrid = (postsData: any[] = posts, emptyMessage: string = "No posts found") => {
+    if (postsData.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           {searchQuery.trim() ? (
             <>
               <Ionicons name="images-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No posts found</Text>
+              <Text style={styles.emptyText}>{emptyMessage}</Text>
               <Text style={styles.emptySubtext}>
                 Try searching for a different name or location
               </Text>
@@ -386,7 +468,7 @@ export default function SearchResultsScreen() {
         contentContainerStyle={{ paddingBottom: 20 }}
       >
         <View style={styles.postsGrid}>
-          {posts.map((post, index) => (
+          {postsData.map((post, index) => (
             <View
               key={post.id}
               style={[
@@ -413,35 +495,11 @@ export default function SearchResultsScreen() {
     }
 
     switch (activeTab) {
-      case "users":
-        return (
-          <FlatList
-            data={users}
-            renderItem={renderUserItem}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            ListEmptyComponent={
-              searchQuery.trim() ? (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="person-outline" size={64} color="#ccc" />
-                  <Text style={styles.emptyText}>No users found</Text>
-                  <Text style={styles.emptySubtext}>
-                    Try searching for a different name
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="search-outline" size={64} color="#ccc" />
-                  <Text style={styles.emptyText}>Enter a name to search</Text>
-                </View>
-              )
-            }
-          />
-        );
+      case "nearby":
+        return renderPostsGrid(nearbyPosts, "No nearby posts found");
 
       case "posts":
-        return renderPostsGrid();
+        return renderPostsGrid(posts, "No posts found");
 
       case "places":
         return (
@@ -520,18 +578,18 @@ export default function SearchResultsScreen() {
           {activeTab === "posts" && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === "users" && styles.activeTab]}
-          onPress={() => setActiveTab("users")}
+          style={[styles.tab, activeTab === "nearby" && styles.activeTab]}
+          onPress={() => setActiveTab("nearby")}
         >
           <Text
             style={[
               styles.tabText,
-              activeTab === "users" && styles.activeTabText,
+              activeTab === "nearby" && styles.activeTabText,
             ]}
           >
-            Users
+            Near me
           </Text>
-          {activeTab === "users" && <View style={styles.tabIndicator} />}
+          {activeTab === "nearby" && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === "places" && styles.activeTab]}

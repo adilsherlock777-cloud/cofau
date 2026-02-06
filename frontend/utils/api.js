@@ -13,8 +13,37 @@ const api = axios.create({
   },
 });
 
+// Add request interceptor to automatically include Authorization header
+api.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add request interceptor for global axios instance as well
+axios.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Note: Authorization header is set globally in AuthContext after login
 // via axios.defaults.headers.common['Authorization']
+// AND via request interceptors above for reliability
 
 /**
  * Create a new post with image/video upload

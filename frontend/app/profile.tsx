@@ -2151,7 +2151,13 @@ const renderRestaurantProfile = () => {
             <View style={restaurantStyles.statsContainer}>
               <View style={restaurantStyles.statBox}>
                 <Text style={restaurantStyles.statValue}>{userStats?.total_posts || 0}</Text>
-                <Text style={restaurantStyles.statLabel}>Posts</Text>
+                <Text
+                  style={restaurantStyles.statLabel}
+                  allowFontScaling={false}
+                  maxFontSizeMultiplier={1}
+                >
+                  Posts
+                </Text>
               </View>
 
               <View style={restaurantStyles.statDivider} />
@@ -2165,7 +2171,13 @@ const renderRestaurantProfile = () => {
                 activeOpacity={0.7}
               >
                 <Text style={restaurantStyles.statValue}>{userStats?.followers_count || 0}</Text>
-                <Text style={restaurantStyles.statLabel}>Followers</Text>
+                <Text
+                  style={restaurantStyles.statLabel}
+                  allowFontScaling={false}
+                  maxFontSizeMultiplier={1}
+                >
+                  Followers
+                </Text>
               </TouchableOpacity>
 
               <View style={restaurantStyles.statDivider} />
@@ -2174,9 +2186,8 @@ const renderRestaurantProfile = () => {
                 <Text style={restaurantStyles.statValue}>{restaurantReviews.length || 0}</Text>
                 <Text
                   style={restaurantStyles.statLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit={Platform.OS === 'android'}
                   allowFontScaling={false}
+                  maxFontSizeMultiplier={1}
                 >
                   Customer Reviews
                 </Text>
@@ -3910,12 +3921,18 @@ if (isRestaurantProfile) {
     <Text style={styles.statValue}>
       {userStats?.total_posts || 0}
     </Text>
-    <Text style={styles.statLabel}>Posts</Text>
+    <Text
+      style={styles.statLabel}
+      allowFontScaling={false}
+      maxFontSizeMultiplier={1}
+    >
+      Posts
+    </Text>
   </View>
-  
+
   <View style={styles.statDivider} />
-  
-  <TouchableOpacity 
+
+  <TouchableOpacity
     style={styles.statBox}
     onPress={() => {
       if (userData?.id) {
@@ -3928,16 +3945,28 @@ if (isRestaurantProfile) {
     <Text style={styles.statValue}>
       {userStats?.followers_count || 0}
     </Text>
-    <Text style={styles.statLabel}>People</Text>
+    <Text
+      style={styles.statLabel}
+      allowFontScaling={false}
+      maxFontSizeMultiplier={1}
+    >
+      People
+    </Text>
   </TouchableOpacity>
-  
+
   <View style={styles.statDivider} />
-  
+
   <View style={styles.statBox}>
     <Text style={styles.statValue}>
       {complimentsCount}
     </Text>
-    <Text style={styles.statLabel}>Compliments</Text>
+    <Text
+      style={styles.statLabel}
+      allowFontScaling={false}
+      maxFontSizeMultiplier={1}
+    >
+      Compliments
+    </Text>
   </View>
 </View>
         
@@ -4062,7 +4091,6 @@ if (isRestaurantProfile) {
 
         {/* Bio Section */}
         <View style={styles.bioSection}>
-          <Text style={styles.bioLabel}>Bio:</Text>
           <Text style={styles.bioText}>
             {userData.bio || 'No bio yet. Add one by editing your profile!'}
           </Text>
@@ -4079,6 +4107,8 @@ if (isRestaurantProfile) {
         styles.tabText,
         activeTab === 'posts' && styles.activeTabText,
       ]}
+      allowFontScaling={false}
+      maxFontSizeMultiplier={1}
     >
       Photos
     </Text>
@@ -4100,6 +4130,8 @@ if (isRestaurantProfile) {
         styles.tabText,
         activeTab === 'videos' && styles.activeTabText,
       ]}
+      allowFontScaling={false}
+      maxFontSizeMultiplier={1}
     >
       Videos
     </Text>
@@ -4121,6 +4153,8 @@ if (isRestaurantProfile) {
         styles.tabText,
         activeTab === 'favourite' && styles.activeTabText,
       ]}
+      allowFontScaling={false}
+      maxFontSizeMultiplier={1}
     >
       Favourite
     </Text>
@@ -5014,14 +5048,14 @@ actionButtonGradient: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  paddingVertical: 10,
-  paddingHorizontal: 16,
+  paddingVertical: 7,
+  paddingHorizontal: 12,
   borderRadius: 20,
-  gap: 6,
+  gap: 4,
 },
 actionButtonTextGradient: {
   color: '#fff',
-  fontSize: 14,
+  fontSize: 11,
   fontWeight: '600',
 },
  bannerContainer: {
@@ -5406,6 +5440,10 @@ reviewUsername: {
   fontWeight: '600',
   color: '#333',
   flex: 1,
+  ...(Platform.OS === 'android' && {
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  }),
 },
 reviewDetailRow: {
   flexDirection: 'row',
@@ -5436,6 +5474,10 @@ reviewUsername: {
   fontSize: 14,
   fontWeight: '600',
   color: '#333',
+  ...(Platform.OS === 'android' && {
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  }),
 },
 reviewDate: {
   fontSize: 11,
@@ -5514,9 +5556,13 @@ whiteInfoBox: {
 },
   restaurantName: {
     fontSize: 23,
-    marginTop: -25, 
+    marginTop: -25,
     fontWeight: 'bold',
     color: '#333',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   restaurantLabel: {
     fontSize: 9,
@@ -5532,6 +5578,10 @@ whiteInfoBox: {
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   statsContainer: {
     flexDirection: 'row',
@@ -5556,10 +5606,19 @@ whiteInfoBox: {
     fontWeight: '700',
     color: '#333',
     marginBottom: 4,
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   statLabel: {
     fontSize: 12,
     color: '#666',
+    textAlign: 'center',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
 });
 const styles = StyleSheet.create({
@@ -5660,6 +5719,10 @@ listDetailText: {
   color: '#333',
   fontWeight: '600',
   flex: 1,
+  ...(Platform.OS === 'android' && {
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  }),
 },
 
 videoThumbnailContainer: {
@@ -5724,6 +5787,10 @@ locationName: {
   fontWeight: '600',
   color: '#333',
   flex: 1,
+  ...(Platform.OS === 'android' && {
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  }),
 },
 locationCount: {
   fontSize: 14,
@@ -5786,6 +5853,10 @@ favouriteGridImage: {
     fontWeight: '700',
     color: '#1A1A1A',
     marginLeft: 10,
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   menuCategoryHeaderRight: {
     flexDirection: 'row',
@@ -5821,6 +5892,10 @@ favouriteGridImage: {
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 4,
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   menuItemDescription: {
     fontSize: 13,
@@ -5933,42 +6008,46 @@ favouriteGridImage: {
 categoryFilterContainer: {
   flexDirection: 'row',
   alignItems: 'center',
-  paddingVertical: 12,
+  paddingVertical: 8,
   paddingHorizontal: 16,
   borderBottomWidth: 1,
   borderBottomColor: '#f0f0f0',
   backgroundColor: '#fff',
-  gap: 12,
+  gap: 10,
 },
 categoryDropdownButton: {
   flexDirection: 'row',
   alignItems: 'center',
   backgroundColor: '#f5f5f5',
-  paddingHorizontal: 14,
-  paddingVertical: 10,
-  borderRadius: 25,
-  gap: 8,
+  paddingHorizontal: 10,
+  paddingVertical: 7,
+  borderRadius: 20,
+  gap: 6,
   flex: 1,
 },
 categoryDropdownEmoji: {
-  fontSize: 18,
+  fontSize: 16,
 },
 categoryDropdownText: {
-  fontSize: 14,
+  fontSize: 12,
   color: '#333',
   fontWeight: '600',
   flex: 1,
+  ...(Platform.OS === 'android' && {
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  }),
 },
 categoryDropdownCount: {
   backgroundColor: '#E94A37',
-  paddingHorizontal: 8,
-  paddingVertical: 3,
-  borderRadius: 12,
-  minWidth: 28,
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  borderRadius: 10,
+  minWidth: 24,
   alignItems: 'center',
 },
 categoryDropdownCountText: {
-  fontSize: 12,
+  fontSize: 10,
   color: '#fff',
   fontWeight: '700',
 },
@@ -6083,6 +6162,10 @@ reviewFullText: {
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   logoutMenuText: {
     color: '#FF6B6B',
@@ -6307,20 +6390,24 @@ statDivider: {
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: 3,
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
 
   bioSection: {
@@ -6338,6 +6425,10 @@ statDivider: {
     fontSize: 14,
     color: '#666',
     lineHeight: 40,
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
 
   tabBar: {
@@ -6359,12 +6450,20 @@ statDivider: {
     height: 2,
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#999',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   activeTabText: {
     color: '#333',
     fontWeight: '600',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
 
   gridItem: {
@@ -6489,6 +6588,10 @@ statDivider: {
     marginTop: 2,
     textAlign: 'center',
     fontWeight: '500',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
 
   bottomSpacer: {
@@ -6630,6 +6733,10 @@ statDivider: {
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   followersListContent: {
     paddingBottom: 20,
