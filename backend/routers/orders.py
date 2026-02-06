@@ -1462,59 +1462,68 @@ async def get_rewards_history(
     current_user: dict = Depends(get_current_user)
 ):
     """Get user's wallet transactions / rewards history"""
-    db = get_database()
+    try:
+        db = get_database()
 
-    user_id = str(current_user.get("_id") or current_user.get("id"))
+        user_id = str(current_user.get("_id") or current_user.get("id"))
+        print(f"🔍 Fetching rewards history for user: {user_id}")
 
-    # Fetch wallet transactions for this user
-    transactions = await db.wallet_transactions.find(
-        {"user_id": user_id}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        # Fetch wallet transactions for this user
+        transactions = await db.wallet_transactions.find(
+            {"user_id": user_id}
+        ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
 
-    result = []
-    for transaction in transactions:
-        # Get order details if order_id exists
-        order_details = None
-        order_id = transaction.get("order_id")
-        if order_id:
-            try:
-                # Try to convert to ObjectId, skip if invalid
+        result = []
+        for transaction in transactions:
+            # Get order details if order_id exists
+            order_details = None
+            order_id = transaction.get("order_id")
+            if order_id:
                 try:
-                    order_object_id = ObjectId(order_id)
-                except:
-                    print(f"⚠️ Invalid ObjectId in transaction {transaction.get('_id')}: {order_id}")
-                    order_object_id = None
+                    # Try to convert to ObjectId, skip if invalid
+                    try:
+                        order_object_id = ObjectId(order_id)
+                    except:
+                        print(f"⚠️ Invalid ObjectId in transaction {transaction.get('_id')}: {order_id}")
+                        order_object_id = None
 
-                if order_object_id:
-                    order = await db.orders.find_one({"_id": order_object_id})
-                    if order:
-                        order_details = {
-                            "dish_name": order.get("dish_name"),
-                            "restaurant_name": order.get("restaurant_name"),
-                            "post_location": order.get("post_location"),
-                            "completed_at": order.get("updated_at")
-                        }
-            except Exception as e:
-                print(f"❌ Error fetching order details for transaction {transaction.get('_id')}: {e}")
+                    if order_object_id:
+                        order = await db.orders.find_one({"_id": order_object_id})
+                        if order:
+                            order_details = {
+                                "dish_name": order.get("dish_name"),
+                                "restaurant_name": order.get("restaurant_name"),
+                                "post_location": order.get("post_location"),
+                                "completed_at": order.get("updated_at")
+                            }
+                except Exception as e:
+                    print(f"❌ Error fetching order details for transaction {transaction.get('_id')}: {e}")
 
-        result.append({
-            "id": str(transaction["_id"]),
-            "amount": float(transaction.get("amount", 0)),
-            "type": transaction.get("type", "earning"),  # earning, spending, etc.
-            "description": transaction.get("description", ""),
-            "order_id": order_id,
-            "order_details": order_details,
-            "created_at": transaction["created_at"].isoformat() if isinstance(transaction.get("created_at"), datetime) else transaction.get("created_at", ""),
-        })
+            result.append({
+                "id": str(transaction["_id"]),
+                "amount": float(transaction.get("amount", 0)),
+                "type": transaction.get("type", "earning"),  # earning, spending, etc.
+                "description": transaction.get("description", ""),
+                "order_id": order_id,
+                "order_details": order_details,
+                "created_at": transaction["created_at"].isoformat() if isinstance(transaction.get("created_at"), datetime) else transaction.get("created_at", ""),
+            })
 
-    # Also get user's current wallet balance and delivery progress
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
-    wallet_balance = user.get("wallet_balance", 0.0) if user else 0.0
-    completed_deliveries = user.get("completed_deliveries_count", 0) if user else 0
+        # Also get user's current wallet balance and delivery progress
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        wallet_balance = user.get("wallet_balance", 0.0) if user else 0.0
+        completed_deliveries = user.get("completed_deliveries_count", 0) if user else 0
 
-    return {
-        "transactions": result,
-        "wallet_balance": float(wallet_balance),
-        "completed_deliveries": completed_deliveries,
-        "deliveries_to_next_reward": 10 - completed_deliveries
-    }
+        print(f"✅ Returning {len(result)} transactions, balance: ₹{wallet_balance}, deliveries: {completed_deliveries}/10")
+
+        return {
+            "transactions": result,
+            "wallet_balance": float(wallet_balance),
+            "completed_deliveries": completed_deliveries,
+            "deliveries_to_next_reward": 10 - completed_deliveries
+        }
+    except Exception as e:
+        print(f"❌ Error in get_rewards_history: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error fetching rewards history: {str(e)}")
