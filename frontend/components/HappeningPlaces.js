@@ -461,8 +461,8 @@ export default function HappeningPlaces() {
               <Text style={styles.navLabel}>Home</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-              <Ionicons name="compass-outline" size={20} color="#000" />
-              <Text style={styles.navLabel}>Explore</Text>
+              <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
+              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
               <View style={styles.centerIconCircle}>
@@ -535,8 +535,8 @@ export default function HappeningPlaces() {
               style={styles.navItem}
               onPress={() => router.push('/explore')}
             >
-              <Ionicons name="compass-outline" size={20} color="#000" />
-              <Text style={styles.navLabel}>Explore</Text>
+              <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
+              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -785,8 +785,8 @@ export default function HappeningPlaces() {
             style={styles.navItem}
             onPress={() => router.push('/explore')}
           >
-            <Ionicons name="compass-outline" size={20} color="#000" />
-            <Text style={styles.navLabel}>Explore</Text>
+            <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
+            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

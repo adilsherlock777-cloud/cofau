@@ -1021,8 +1021,8 @@ const renderPost = useCallback(
           style={styles.navItem}
           onPress={() => router.push("/explore")}
         >
-          <Ionicons name="compass-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Explore</Text>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

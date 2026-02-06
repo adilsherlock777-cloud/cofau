@@ -213,9 +213,8 @@ async def get_restaurant_orders(
 
     result = []
     for order in orders:
-        # Get customer info (NO delivery address for restaurant users - only for partner dashboard)
+        # Get customer info (NO delivery address or phone for restaurant users - only for partner dashboard)
         customer_name = "Unknown Customer"
-        customer_phone = None
         customer_profile_picture = None
 
         user_id = order.get("user_id")
@@ -224,7 +223,6 @@ async def get_restaurant_orders(
                 customer = await db.users.find_one({"_id": ObjectId(user_id)})
                 if customer:
                     customer_name = customer.get("full_name", "Unknown Customer")
-                    customer_phone = customer.get("phone_number") or customer.get("phone")
                     customer_profile_picture = customer.get("profile_picture")
             except Exception as e:
                 print(f"Error fetching customer info: {e}")
@@ -292,9 +290,8 @@ async def get_restaurant_orders(
             "longitude": order.get("longitude"),
             "status": order.get("status", "pending"),
             "customer_name": customer_name,
-            "customer_phone": customer_phone,
             "customer_profile_picture": customer_profile_picture,
-            # NO delivery_address - only available in partner dashboard
+            # NO customer_phone or delivery_address - only available in partner dashboard
             "created_at": order["created_at"].isoformat() if isinstance(order.get("created_at"), datetime) else order.get("created_at", ""),
             "updated_at": order["updated_at"].isoformat() if isinstance(order.get("updated_at"), datetime) else order.get("updated_at", ""),
         })
@@ -774,6 +771,7 @@ async def get_all_orders_for_partner(
         user_lng = None
         customer_name = "Unknown Customer"
         delivery_address = "No address provided"
+        customer_phone = None
 
         if user_id:
             try:
@@ -785,6 +783,7 @@ async def get_all_orders_for_partner(
                     if user_address:
                         user_lat = user_address.get("latitude")
                         user_lng = user_address.get("longitude")
+                        customer_phone = user_address.get("phone_number")
                         # Build delivery address string
                         addr_parts = []
                         if user_address.get("house_number"):
@@ -798,9 +797,10 @@ async def get_all_orders_for_partner(
             except:
                 pass
 
-        # Get restaurant coordinates
+        # Get restaurant coordinates and phone
         restaurant_lat = None
         restaurant_lng = None
+        restaurant_phone = None
         restaurant_profile_name = order.get("restaurant_name", "Unknown Restaurant")
         if restaurant_id:
             try:
@@ -808,6 +808,7 @@ async def get_all_orders_for_partner(
                 if restaurant:
                     restaurant_lat = restaurant.get("latitude")
                     restaurant_lng = restaurant.get("longitude")
+                    restaurant_phone = restaurant.get("phone_number") or restaurant.get("phone")
                     restaurant_profile_name = restaurant.get("restaurant_name", restaurant_profile_name)
             except:
                 pass
@@ -821,12 +822,14 @@ async def get_all_orders_for_partner(
         order_data = {
             "order_id": order_id,
             "customer_name": customer_name,
+            "customer_phone": customer_phone,
             "delivery_address": delivery_address,
             "dish_name": order.get("dish_name", "Unknown Dish"),
             "suggestions": order.get("suggestions", ""),
             "post_media_url": order.get("post_media_url", ""),
             "restaurant_name": order.get("restaurant_name", "Unknown Restaurant"),
             "restaurant_profile_name": restaurant_profile_name,
+            "restaurant_phone": restaurant_phone,
             "post_location": order.get("post_location", ""),
             "status": order.get("status", "pending"),
             "price": price,

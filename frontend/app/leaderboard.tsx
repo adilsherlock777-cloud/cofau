@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -188,10 +189,17 @@ export default function LeaderboardScreen() {
   const [selectedOrderForReview, setSelectedOrderForReview] = useState<any>(null);
   const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [restaurantProfile, setRestaurantProfile] = useState<any>(null);
+  const [showRestaurantPhoneModal, setShowRestaurantPhoneModal] = useState(false);
+  const [restaurantPhone, setRestaurantPhone] = useState("");
 
   useEffect(() => {
     if (token) {
-      fetchUserAddress();
+      if (isRestaurant) {
+        fetchRestaurantProfile();
+      } else {
+        fetchUserAddress();
+      };
       if (activeTab === "Near Me") {
         getCurrentLocation();
       } else if (activeTab === "In Progress" || activeTab === "Your Orders") {
@@ -206,6 +214,22 @@ export default function LeaderboardScreen() {
 
   const fetchOrders = async () => {
     if (!token) return;
+
+    // For restaurant users, check if phone number exists before fetching orders
+    if (isRestaurant && !restaurantProfile?.phone && !restaurantProfile?.phone_number) {
+      setLoadingOrders(false);
+      Alert.alert(
+        "Phone Number Required",
+        "Please add your phone number before receiving orders. This helps customers contact you for delivery coordination.",
+        [
+          {
+            text: "Add Phone Number",
+            onPress: () => setShowRestaurantPhoneModal(true),
+          },
+        ]
+      );
+      return;
+    }
 
     setLoadingOrders(true);
     try {
@@ -296,18 +320,20 @@ export default function LeaderboardScreen() {
   };
 
   const handleOrderClick = (post: any) => {
-    // Check if user has added their delivery location (only for regular users)
-    if (!isRestaurant && !userAddress) {
+    // Check if user has added their delivery location and phone number (only for regular users)
+    if (!isRestaurant && (!userAddress || !userAddress.phone_number)) {
       Alert.alert(
-        "Delivery Location Required",
-        "Please add your delivery location before placing an order.",
+        "Delivery Details Required",
+        !userAddress
+          ? "Please add your delivery address and phone number before placing an order."
+          : "Please add your phone number to your delivery address before placing an order.",
         [
           {
             text: "Cancel",
             style: "cancel",
           },
           {
-            text: "Add Location",
+            text: userAddress ? "Update Address" : "Add Address",
             onPress: () => setShowLocationModal(true),
           },
         ]
@@ -501,16 +527,60 @@ export default function LeaderboardScreen() {
           house_number: locationData.house_number,
           street_address: locationData.street_address,
           pincode: locationData.pincode,
+          phone_number: locationData.phone_number,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       setUserAddress(response.data);
-      Alert.alert("Success", "Address saved successfully!");
+      Alert.alert("Success", "Address and phone number saved successfully!");
     } catch (error) {
       console.error("Error saving address:", error);
       Alert.alert("Error", "Failed to save address. Please try again.");
+    }
+  };
+
+  const fetchRestaurantProfile = async () => {
+    try {
+      setLoadingAddress(true);
+      const response = await axios.get(`${BACKEND_URL}/api/restaurant/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.data) {
+        setRestaurantProfile(response.data);
+        // Check if phone number is missing
+        if (!response.data.phone && !response.data.phone_number) {
+          setShowRestaurantPhoneModal(true);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error fetching restaurant profile:", error);
+    } finally {
+      setLoadingAddress(false);
+    }
+  };
+
+  const saveRestaurantPhone = async () => {
+    if (!restaurantPhone.trim() || restaurantPhone.length !== 10) {
+      Alert.alert("Invalid Phone Number", "Please enter a valid 10-digit phone number");
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${BACKEND_URL}/api/restaurant/auth/update`,
+        { phone: restaurantPhone.trim() },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setShowRestaurantPhoneModal(false);
+      Alert.alert("Success", "Phone number saved successfully!");
+      fetchRestaurantProfile();
+    } catch (error) {
+      console.error("Error saving phone:", error);
+      Alert.alert("Error", "Failed to save phone number. Please try again.");
     }
   };
 
@@ -518,8 +588,17 @@ export default function LeaderboardScreen() {
     if (loadingAddress) {
       return "Loading...";
     }
+    if (isRestaurant) {
+      if (!restaurantProfile || (!restaurantProfile.phone && !restaurantProfile.phone_number)) {
+        return "Add phone number";
+      }
+      return restaurantProfile.phone || restaurantProfile.phone_number || "Add phone number";
+    }
     if (!userAddress) {
-      return "Add location";
+      return "Add delivery address & phone";
+    }
+    if (!userAddress.phone_number) {
+      return `${userAddress.house_number}, ${userAddress.street_address} (No phone)`;
     }
     return `${userAddress.house_number}, ${userAddress.street_address}`;
   };
@@ -1082,24 +1161,35 @@ export default function LeaderboardScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.locationContainer}
-          onPress={() => setShowLocationModal(true)}
+          onPress={() => {
+            if (isRestaurant) {
+              setShowRestaurantPhoneModal(true);
+            } else {
+              setShowLocationModal(true);
+            }
+          }}
         >
           <Ionicons
-            name={userAddress ? "location" : "add-circle-outline"}
+            name={isRestaurant ? "call" : (userAddress ? "location" : "add-circle-outline")}
             size={20}
-            color={userAddress ? "#4CAF50" : "#FF7A18"}
+            color={
+              isRestaurant
+                ? (restaurantProfile?.phone || restaurantProfile?.phone_number ? "#4CAF50" : "#FF7A18")
+                : (userAddress ? "#4CAF50" : "#FF7A18")
+            }
           />
           <View style={styles.locationTextContainer}>
             <Text
               style={[
                 styles.locationText,
-                !userAddress && styles.addLocationText,
+                (!userAddress && !isRestaurant) && styles.addLocationText,
+                (isRestaurant && !restaurantProfile?.phone && !restaurantProfile?.phone_number) && styles.addLocationText,
               ]}
               numberOfLines={1}
             >
               {getDisplayAddress()}
             </Text>
-            {userAddress && userAddress.address && (
+            {!isRestaurant && userAddress && userAddress.address && (
               <Text style={styles.locationSubtext} numberOfLines={1}>
                 {userAddress.address}
               </Text>
@@ -1984,6 +2074,61 @@ export default function LeaderboardScreen() {
         onReviewAdded={handleReviewAdded}
       />
 
+      {/* Restaurant Phone Number Modal */}
+      {isRestaurant && (
+        <Modal
+          visible={showRestaurantPhoneModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => {
+            if (restaurantProfile?.phone || restaurantProfile?.phone_number) {
+              setShowRestaurantPhoneModal(false);
+            }
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.phoneModal}>
+              <View style={styles.phoneModalHeader}>
+                <Text style={styles.phoneModalTitle}>Add Phone Number</Text>
+                {(restaurantProfile?.phone || restaurantProfile?.phone_number) && (
+                  <TouchableOpacity onPress={() => setShowRestaurantPhoneModal(false)}>
+                    <Ionicons name="close" size={24} color="#333" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <Text style={styles.phoneModalDescription}>
+                Please add your phone number to receive orders. Customers need this to contact you for delivery coordination.
+              </Text>
+
+              <View style={styles.phoneInputContainer}>
+                <Ionicons name="call" size={20} color="#FF7A18" style={{ marginRight: 12 }} />
+                <TextInput
+                  style={styles.phoneInput}
+                  placeholder="Enter 10-digit phone number"
+                  placeholderTextColor="#999"
+                  value={restaurantPhone}
+                  onChangeText={setRestaurantPhone}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.savePhoneButton,
+                  (!restaurantPhone.trim() || restaurantPhone.length !== 10) && styles.savePhoneButtonDisabled
+                ]}
+                onPress={saveRestaurantPhone}
+                disabled={!restaurantPhone.trim() || restaurantPhone.length !== 10}
+              >
+                <Text style={styles.savePhoneButtonText}>Save Phone Number</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Bottom Navigation */}
       <View style={styles.navBar}>
         <TouchableOpacity
@@ -1998,8 +2143,8 @@ export default function LeaderboardScreen() {
           style={styles.navItem}
           onPress={() => router.push("/explore")}
         >
-          <Ionicons name="compass-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Explore</Text>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -3407,5 +3552,73 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
     lineHeight: 18,
+  },
+  // Phone Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phoneModal: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    maxWidth: 400,
+  },
+  phoneModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  phoneModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#000",
+  },
+  phoneModalDescription: {
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  phoneInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  phoneInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  savePhoneButton: {
+    backgroundColor: "#FF7A18",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#FF7A18",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  savePhoneButtonDisabled: {
+    backgroundColor: "#CCC",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  savePhoneButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFF",
   },
 });

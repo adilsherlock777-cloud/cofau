@@ -2147,55 +2147,41 @@ const renderRestaurantProfile = () => {
               </Text>
             </View>
 
-            {/* Stats for visitors OR Dashboard button for owner */}
-{isOwnProfile ? (
-  // Restaurant Dashboard Button for Owner
-  <TouchableOpacity
-    style={restaurantStyles.dashboardButton}
-    onPress={() => router.push('/restaurant-dashboard')}
-    activeOpacity={0.8}
-  >
-    <LinearGradient
-      colors={['#D62828', '#FF6B00']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={restaurantStyles.dashboardButtonGradient}
-    >
-      <Ionicons name="bar-chart" size={16} color="#fff" />
-      <Text style={restaurantStyles.dashboardButtonTextGradient}>Restaurant Dashboard</Text>
-      <Ionicons name="chevron-forward" size={16} color="#fff" />
-    </LinearGradient>
-  </TouchableOpacity>
-) : (
-  // Stats for visitors
-  <View style={restaurantStyles.statsContainer}>
-    <View style={restaurantStyles.statBox}>
-      <Text style={restaurantStyles.statValue}>{userStats?.total_posts || 0}</Text>
-      <Text style={restaurantStyles.statLabel}>Posts</Text>
-    </View>
+            {/* Stats for restaurant profile */}
+            <View style={restaurantStyles.statsContainer}>
+              <View style={restaurantStyles.statBox}>
+                <Text style={restaurantStyles.statValue}>{userStats?.total_posts || 0}</Text>
+                <Text style={restaurantStyles.statLabel}>Posts</Text>
+              </View>
 
-    <View style={restaurantStyles.statDivider} />
+              <View style={restaurantStyles.statDivider} />
 
-    <TouchableOpacity
-      style={restaurantStyles.statBox}
-      onPress={() => {
-        setFollowersModalVisible(true);
-        fetchFollowers();
-      }}
-      activeOpacity={0.7}
-    >
-      <Text style={restaurantStyles.statValue}>{userStats?.followers_count || 0}</Text>
-      <Text style={restaurantStyles.statLabel}>Followers</Text>
-    </TouchableOpacity>
+              <TouchableOpacity
+                style={restaurantStyles.statBox}
+                onPress={() => {
+                  setFollowersModalVisible(true);
+                  fetchFollowers();
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={restaurantStyles.statValue}>{userStats?.followers_count || 0}</Text>
+                <Text style={restaurantStyles.statLabel}>Followers</Text>
+              </TouchableOpacity>
 
-    <View style={restaurantStyles.statDivider} />
+              <View style={restaurantStyles.statDivider} />
 
-    <View style={restaurantStyles.statBox}>
-      <Text style={restaurantStyles.statValue}>{restaurantReviews.length || 0}</Text>
-      <Text style={restaurantStyles.statLabel}>Customer Reviews</Text>
-    </View>
-  </View>
-)}
+              <View style={restaurantStyles.statBox}>
+                <Text style={restaurantStyles.statValue}>{restaurantReviews.length || 0}</Text>
+                <Text
+                  style={restaurantStyles.statLabel}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={Platform.OS === 'android'}
+                  allowFontScaling={false}
+                >
+                  Customer Reviews
+                </Text>
+              </View>
+            </View>
 </View> 
 
           {/* Profile Picture */}
@@ -2348,7 +2334,12 @@ const renderRestaurantProfile = () => {
             style={styles.tab}
             onPress={() => setRestaurantActiveTab('posts')}
           >
-            <Text style={[styles.tabText, restaurantActiveTab === 'posts' && styles.activeTabText]}>
+            <Text
+              style={[styles.tabText, restaurantActiveTab === 'posts' && styles.activeTabText]}
+              numberOfLines={1}
+              adjustsFontSizeToFit={Platform.OS === 'android'}
+              allowFontScaling={false}
+            >
               Posts
             </Text>
             {restaurantActiveTab === 'posts' && (
@@ -2364,7 +2355,12 @@ const renderRestaurantProfile = () => {
             style={styles.tab}
             onPress={() => setRestaurantActiveTab('reviews')}
           >
-            <Text style={[styles.tabText, restaurantActiveTab === 'reviews' && styles.activeTabText]}>
+            <Text
+              style={[styles.tabText, restaurantActiveTab === 'reviews' && styles.activeTabText]}
+              numberOfLines={1}
+              adjustsFontSizeToFit={Platform.OS === 'android'}
+              allowFontScaling={false}
+            >
               Customer Reviews
             </Text>
             {restaurantActiveTab === 'reviews' && (
@@ -2380,7 +2376,12 @@ const renderRestaurantProfile = () => {
             style={styles.tab}
             onPress={() => setRestaurantActiveTab('menu')}
           >
-            <Text style={[styles.tabText, restaurantActiveTab === 'menu' && styles.activeTabText]}>
+            <Text
+              style={[styles.tabText, restaurantActiveTab === 'menu' && styles.activeTabText]}
+              numberOfLines={1}
+              adjustsFontSizeToFit={Platform.OS === 'android'}
+              allowFontScaling={false}
+            >
               Menu
             </Text>
             {restaurantActiveTab === 'menu' && (
@@ -2646,8 +2647,8 @@ const renderRestaurantProfile = () => {
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-          <Ionicons name="compass-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Explore</Text>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
           <View style={styles.centerIconCircle}>
@@ -3734,8 +3735,8 @@ if (loading) {
             <Text style={styles.navLabel}>Home</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-            <Ionicons name="compass-outline" size={28} color="#000" />
-            <Text style={styles.navLabel}>Explore</Text>
+            <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={28} color="#000" />
+            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
             <View style={styles.centerIconCircle}>
@@ -4218,8 +4219,8 @@ if (isRestaurantProfile) {
           <Text style={styles.navLabel}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-          <Ionicons name="compass-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Explore</Text>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
+          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
           <View style={styles.centerIconCircle}>

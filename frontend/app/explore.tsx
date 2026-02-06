@@ -967,6 +967,147 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
 });
 
 // ======================================================
+// DASHBOARD CONTENT (for restaurant users)
+// ======================================================
+
+const StatCard = ({ icon, label, value, color, subtitle }: { icon: string; label: string; value: number; color: string; subtitle?: string; }) => (
+  <View style={styles.dashboardStatCard}>
+    <View style={[styles.dashboardStatIconContainer, { backgroundColor: color + '15' }]}>
+      <Ionicons name={icon as any} size={24} color={color} />
+    </View>
+    <Text style={styles.dashboardStatValue}>{value.toLocaleString()}</Text>
+    <Text style={styles.dashboardStatLabel}>{label}</Text>
+    {subtitle && <Text style={styles.dashboardStatSubtitle}>{subtitle}</Text>}
+  </View>
+);
+
+const LargeStatCard = ({ icon, label, value, color, trend }: { icon: string; label: string; value: number; color: string; trend?: string; }) => (
+  <View style={styles.dashboardLargeStatCard}>
+    <View style={styles.dashboardLargeStatLeft}>
+      <View style={[styles.dashboardLargeStatIconContainer, { backgroundColor: color + '15' }]}>
+        <Ionicons name={icon as any} size={26} color={color} />
+      </View>
+      <View style={styles.dashboardLargeStatInfo}>
+        <Text style={styles.dashboardLargeStatLabel}>{label}</Text>
+        {trend && (
+          <View style={styles.dashboardTrendContainer}>
+            <Ionicons name="trending-up" size={14} color="#4CAF50" />
+            <Text style={styles.dashboardTrendText}>{trend}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+    <Text style={[styles.dashboardLargeStatValue, { color: color }]}>{value.toLocaleString()}</Text>
+  </View>
+);
+
+const DashboardContent = memo(({ analytics, loading, onRefresh }: { analytics: any; loading: boolean; onRefresh: () => void }) => {
+  if (loading) {
+    return (
+      <View style={styles.dashboardLoadingContainer}>
+        <ActivityIndicator size="large" color="#E94A37" />
+        <Text style={styles.dashboardLoadingText}>Loading analytics...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.dashboardScrollContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor="#E94A37" />}
+    >
+      {/* Analytics Header */}
+      <View style={styles.dashboardAnalyticsHeader}>
+        <Ionicons name="analytics" size={28} color="#E94A37" />
+        <Text style={styles.dashboardAnalyticsTitle}>Analytics Overview</Text>
+      </View>
+      <Text style={styles.dashboardAnalyticsSubtitle}>
+        Track your restaurant's performance
+      </Text>
+
+      {/* Primary Stats - 3 Column Grid */}
+      <View style={styles.dashboardSectionTitle}>
+        <Ionicons name="stats-chart" size={20} color="#333" />
+        <Text style={styles.dashboardSectionTitleText}>Key Metrics</Text>
+      </View>
+
+      <View style={styles.dashboardStatsGrid}>
+        <StatCard
+          icon="images"
+          label="Total Posts"
+          value={analytics.total_posts}
+          color="#E94A37"
+        />
+        <StatCard
+          icon="people"
+          label="Followers"
+          value={analytics.followers_count}
+          color="#1B7C82"
+        />
+        <StatCard
+          icon="star"
+          label="Reviews"
+          value={analytics.customer_reviews}
+          color="#F2CF68"
+        />
+      </View>
+
+      {/* Engagement Stats - Large Cards */}
+      <View style={styles.dashboardSectionTitle}>
+        <Ionicons name="eye" size={20} color="#333" />
+        <Text style={styles.dashboardSectionTitleText}>Visibility & Engagement</Text>
+      </View>
+
+      <LargeStatCard
+        icon="eye"
+        label="Profile Views"
+        value={analytics.profile_views}
+        color="#9C27B0"
+        trend={analytics.profile_views_trend}
+      />
+
+      <LargeStatCard
+        icon="footsteps"
+        label="Profile Visits"
+        value={analytics.profile_visits}
+        color="#2196F3"
+        trend={analytics.profile_visits_trend}
+      />
+
+      <LargeStatCard
+        icon="search"
+        label="Search Appearances"
+        value={analytics.search_appearances}
+        color="#FF9800"
+        trend={analytics.search_appearances_trend}
+      />
+
+      <LargeStatCard
+        icon="hand-left"
+        label="Post Clicks"
+        value={analytics.post_clicks}
+        color="#4CAF50"
+        trend={analytics.post_clicks_trend}
+      />
+
+      {/* Info Card */}
+      <View style={styles.dashboardInfoCard}>
+        <Ionicons name="information-circle" size={24} color="#1B7C82" />
+        <View style={styles.dashboardInfoContent}>
+          <Text style={styles.dashboardInfoTitle}>How to improve?</Text>
+          <Text style={styles.dashboardInfoText}>
+            Post regularly, respond to reviews, and keep your menu updated to increase visibility and engagement.
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ height: 120 }} />
+    </ScrollView>
+  );
+});
+
+// ======================================================
 // MAIN EXPLORE SCREEN
 // ======================================================
 
@@ -1008,7 +1149,23 @@ export default function ExploreScreen() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedQuickCategory, setSelectedQuickCategory] = useState<string | null>(null);
   const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'followers'>('posts');
-  
+
+  // Dashboard state (for restaurant users)
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [analytics, setAnalytics] = useState({
+    total_posts: 0,
+    followers_count: 0,
+    customer_reviews: 0,
+    profile_visits: 0,
+    profile_visits_trend: '',
+    search_appearances: 0,
+    search_appearances_trend: '',
+    post_clicks: 0,
+    post_clicks_trend: '',
+    profile_views: 0,
+    profile_views_trend: '',
+  });
+
 
   const POSTS_PER_PAGE = 30;
   const CATEGORIES = [
@@ -1277,6 +1434,49 @@ const fetchFollowersPosts = async (forceRefresh = false) => {
   }
 };
 
+// Fetch analytics for restaurant dashboard
+const fetchAnalytics = async () => {
+  if (accountType !== 'restaurant') return;
+
+  setDashboardLoading(true);
+  try {
+    const response = await axios.get(`${API_URL}/restaurant/analytics`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    setAnalytics({
+      total_posts: response.data.total_posts || 0,
+      followers_count: response.data.followers_count || 0,
+      customer_reviews: response.data.customer_reviews || 0,
+      profile_views: response.data.profile_views || 0,
+      profile_views_trend: response.data.profile_views_trend || '',
+      profile_visits: response.data.profile_visits || 0,
+      profile_visits_trend: response.data.profile_visits_trend || '',
+      search_appearances: response.data.search_appearances || 0,
+      search_appearances_trend: response.data.search_appearances_trend || '',
+      post_clicks: response.data.post_clicks || 0,
+      post_clicks_trend: response.data.post_clicks_trend || '',
+    });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    setAnalytics({
+      total_posts: 0,
+      followers_count: 0,
+      customer_reviews: 0,
+      profile_views: 0,
+      profile_views_trend: '',
+      profile_visits: 0,
+      profile_visits_trend: '',
+      search_appearances: 0,
+      search_appearances_trend: '',
+      post_clicks: 0,
+      post_clicks_trend: '',
+    });
+  } finally {
+    setDashboardLoading(false);
+  }
+};
+
 const handleQuickCategoryPress = (category: any) => {
   if (selectedQuickCategory === category.id) {
     // Deselect - show all cached posts (NO API CALL)
@@ -1406,21 +1606,27 @@ const handleQuickCategoryPress = (category: any) => {
 };
 
   // ======================================================
-  // INITIALIZE MAP WHEN TAB CHANGES
+  // INITIALIZE MAP/DASHBOARD WHEN TAB CHANGES
   // ======================================================
 // Remove initialMapLoadDone state, we don't need it
 useEffect(() => {
   const loadMapData = async () => {
     // Only proceed if we're on map tab
     if (activeTab !== 'map') return;
-    
+
+    // For restaurant users, fetch analytics instead of map data
+    if (accountType === 'restaurant') {
+      fetchAnalytics();
+      return;
+    }
+
     // If we don't have location, get it first
     if (!userLocation) {
       const coords = await getCurrentLocation();
       // fetchMapPins will be called by the next useEffect run when userLocation updates
       return;
     }
-    
+
     // We have location - check if we need to fetch posts
     // Only fetch if cache is empty (first time load)
     if (cachedMapPosts.current.length === 0 && mapPosts.length === 0) {
@@ -1429,9 +1635,9 @@ useEffect(() => {
     }
     // Otherwise, data is already in mapPosts or will be restored from cache
   };
-  
+
   loadMapData();
-}, [activeTab, userLocation]);
+}, [activeTab, userLocation, accountType]);
 
 
 useFocusEffect(
@@ -1701,30 +1907,34 @@ return (
         </>
       )}
 
-      {/* MAP | USERS TOGGLE */}
+      {/* DASHBOARD/MAP | USERS TOGGLE */}
 <View style={styles.toggleContainer}>
   <View style={styles.toggleBackground}>
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.toggleTab, activeTab === 'map' && styles.toggleTabActive]}
       onPress={() => {
         if (activeTab !== 'map') {
           setActiveTab('map');
           setPlayingVideos([]);
+          // For restaurant users, fetch analytics when switching to dashboard
+          if (accountType === 'restaurant') {
+            fetchAnalytics();
+          }
         }
       }}
     >
-      <Ionicons 
-        name="location" 
-        size={16} 
-        color={activeTab === 'map' ? '#E94A37' : '#999'} 
-        style={{ marginRight: 6 }} 
+      <Ionicons
+        name={accountType === 'restaurant' ? "analytics" : "location"}
+        size={16}
+        color={activeTab === 'map' ? '#E94A37' : '#999'}
+        style={{ marginRight: 6 }}
       />
       <Text style={[styles.toggleTabText, activeTab === 'map' && styles.toggleTabTextActive]}>
-        Map
+        {accountType === 'restaurant' ? 'Dashboard' : 'Map'}
       </Text>
     </TouchableOpacity>
 
-    <TouchableOpacity 
+    <TouchableOpacity
   style={[styles.toggleTab, activeTab === 'users' && styles.toggleTabActive]}
   onPress={() => {
     if (activeTab !== 'users') {
@@ -1737,11 +1947,11 @@ return (
     }
   }}
 >
-      <Ionicons 
-        name="person" 
-        size={16} 
-        color={activeTab === 'users' ? '#E94A37' : '#999'} 
-        style={{ marginRight: 6 }} 
+      <Ionicons
+        name="person"
+        size={16}
+        color={activeTab === 'users' ? '#E94A37' : '#999'}
+        style={{ marginRight: 6 }}
       />
       <Text style={[styles.toggleTabText, activeTab === 'users' && styles.toggleTabTextActive]}>
         Users
@@ -1784,21 +1994,29 @@ return (
 
       {/* CONTENT AREA */}
       {activeTab === 'map' ? (
-  // MAP VIEW
-  <MapViewComponent
-    userLocation={userLocation}
-    restaurants={mapRestaurants}
-    posts={mapPosts}
-    onRestaurantPress={handleRestaurantPress}
-    onPostPress={handlePostPress}
-    onClusterPress={handleClusterPress}
-    isLoading={mapLoading}
-    mapRef={mapRef}
-    filterType={mapFilterType}
-    onFilterChange={handleMapFilterChange}
-    onCenterLocation={centerOnUserLocation}
-    selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
-  />
+  // DASHBOARD VIEW for restaurant users, MAP VIEW for regular users
+  accountType === 'restaurant' ? (
+    <DashboardContent
+      analytics={analytics}
+      loading={dashboardLoading}
+      onRefresh={fetchAnalytics}
+    />
+  ) : (
+    <MapViewComponent
+      userLocation={userLocation}
+      restaurants={mapRestaurants}
+      posts={mapPosts}
+      onRestaurantPress={handleRestaurantPress}
+      onPostPress={handlePostPress}
+      onClusterPress={handleClusterPress}
+      isLoading={mapLoading}
+      mapRef={mapRef}
+      filterType={mapFilterType}
+      onFilterChange={handleMapFilterChange}
+      onCenterLocation={centerOnUserLocation}
+      selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
+    />
+  )
 ) : (
         // USERS GRID VIEW
         <>
@@ -1845,7 +2063,7 @@ return (
       {/* BOTTOM NAVIGATION */}
       <View style={styles.navBar}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}><Ionicons name="home-outline" size={20} color="#000" /><Text style={styles.navLabel}>Home</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}><Ionicons name="compass" size={20} color="#000" /><Text style={styles.navLabelActive}>Explore</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}><Ionicons name={accountType === 'restaurant' ? "analytics" : "compass"} size={20} color="#000" /><Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push("/leaderboard")}><View style={styles.centerIconCircle}><Ionicons name="fast-food" size={22} color="#000" /></View><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}><Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" /><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}><Ionicons name="person-outline" size={20} color="#000" /><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
@@ -2911,5 +3129,168 @@ toggleTabTextActive: {
     fontSize: 13,
     color: '#666',
     fontWeight: '500',
+  },
+
+  // ======================================================
+  // DASHBOARD STYLES (for restaurant users)
+  // ======================================================
+  dashboardLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  dashboardLoadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  dashboardScrollContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  dashboardAnalyticsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 10,
+  },
+  dashboardAnalyticsTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+  },
+  dashboardAnalyticsSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  dashboardSectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 12,
+    gap: 8,
+  },
+  dashboardSectionTitleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  dashboardStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  dashboardStatCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dashboardStatIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dashboardStatValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  dashboardStatLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  dashboardStatSubtitle: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 4,
+  },
+  dashboardLargeStatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dashboardLargeStatLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dashboardLargeStatIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dashboardLargeStatInfo: {
+    gap: 4,
+  },
+  dashboardLargeStatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  dashboardLargeStatValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+  },
+  dashboardTrendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dashboardTrendText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  dashboardInfoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#E8F5F5',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 24,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#1B7C82',
+  },
+  dashboardInfoContent: {
+    flex: 1,
+  },
+  dashboardInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1B7C82',
+    marginBottom: 4,
+  },
+  dashboardInfoText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
   },
 });

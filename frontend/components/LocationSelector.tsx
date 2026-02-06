@@ -21,6 +21,7 @@ interface LocationData {
   house_number?: string;
   street_address?: string;
   pincode?: string;
+  phone_number?: string;
 }
 
 interface LocationSelectorProps {
@@ -54,6 +55,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [houseNumber, setHouseNumber] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [pincode, setPincode] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   useEffect(() => {
     if (visible) {
@@ -62,6 +64,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
         setHouseNumber(initialLocation.house_number || "");
         setStreetAddress(initialLocation.street_address || "");
         setPincode(initialLocation.pincode || "");
+        setPhoneNumber(initialLocation.phone_number || "");
       }
     }
   }, [visible]);
@@ -137,13 +140,18 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       return;
     }
 
-    if (!houseNumber.trim() || !streetAddress.trim() || !pincode.trim()) {
-      Alert.alert("Missing Information", "Please fill in all address fields");
+    if (!houseNumber.trim() || !streetAddress.trim() || !pincode.trim() || !phoneNumber.trim()) {
+      Alert.alert("Missing Information", "Please fill in all required fields including phone number");
       return;
     }
 
     if (pincode.length !== 6 || !/^\d+$/.test(pincode)) {
       Alert.alert("Invalid Pincode", "Please enter a valid 6-digit pincode");
+      return;
+    }
+
+    if (phoneNumber.length !== 10 || !/^\d+$/.test(phoneNumber)) {
+      Alert.alert("Invalid Phone Number", "Please enter a valid 10-digit phone number");
       return;
     }
 
@@ -154,6 +162,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       house_number: houseNumber.trim(),
       street_address: streetAddress.trim(),
       pincode: pincode.trim(),
+      phone_number: phoneNumber.trim(),
     };
 
     onSave(locationData);
@@ -166,6 +175,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
     setHouseNumber("");
     setStreetAddress("");
     setPincode("");
+    setPhoneNumber("");
     onClose();
   };
 
@@ -280,6 +290,21 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
                   onChangeText={setPincode}
                   keyboardType="numeric"
                   maxLength={6}
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={styles.label}>
+                  Phone Number <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 9876543210"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  keyboardType="phone-pad"
+                  maxLength={10}
                   placeholderTextColor="#999"
                 />
               </View>

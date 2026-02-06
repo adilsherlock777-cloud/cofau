@@ -15,6 +15,7 @@ class AddressCreate(BaseModel):
     house_number: str
     street_address: str
     pincode: str
+    phone_number: str
 
 
 class AddressResponse(BaseModel):
@@ -24,6 +25,7 @@ class AddressResponse(BaseModel):
     house_number: str
     street_address: str
     pincode: str
+    phone_number: str
 
 
 @router.post("/address", response_model=AddressResponse)
@@ -31,14 +33,18 @@ async def save_user_address(
     address_data: AddressCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Save or update user's delivery address"""
+    """Save or update user's delivery address and phone number"""
     db = get_database()
 
     # Validate pincode
     if len(address_data.pincode) != 6 or not address_data.pincode.isdigit():
         raise HTTPException(status_code=400, detail="Invalid pincode. Must be 6 digits.")
 
-    # Update user document with address
+    # Validate phone number
+    if len(address_data.phone_number) != 10 or not address_data.phone_number.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid phone number. Must be 10 digits.")
+
+    # Update user document with address and phone number
     address_doc = {
         "latitude": address_data.latitude,
         "longitude": address_data.longitude,
@@ -46,6 +52,7 @@ async def save_user_address(
         "house_number": address_data.house_number,
         "street_address": address_data.street_address,
         "pincode": address_data.pincode,
+        "phone_number": address_data.phone_number,
     }
 
     await db.users.update_one(
