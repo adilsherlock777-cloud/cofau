@@ -346,16 +346,18 @@ export default function LeaderboardScreen() {
 
     setLoadingRewardsHistory(true);
     try {
+      // Use the same endpoint as CofauWallet modal for consistency
       const response = await axios.get(
-        `${BACKEND_URL}/api/orders/rewards-history`,
+        `${BACKEND_URL}/api/wallet/balance`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setRewardsHistory(response.data.transactions || []);
-      setWalletBalance(response.data.wallet_balance || 0);
+      setRewardsHistory(response.data.recent_transactions || []);
+      setWalletBalance(response.data.balance || 0);
       setDeliveryRewardProgress(response.data.completed_deliveries || 0);
-      console.log(`💰 Fetched ${response.data.transactions?.length || 0} reward transactions`);
+      console.log(`💰 Fetched ${response.data.recent_transactions?.length || 0} reward transactions`);
+      console.log(`💰 Wallet balance: ₹${response.data.balance}, Deliveries: ${response.data.completed_deliveries}/10`);
     } catch (error) {
       console.error("Error fetching rewards history:", error);
     } finally {
@@ -2004,13 +2006,13 @@ export default function LeaderboardScreen() {
                         </View>
                       )}
                       <Text style={styles.rewardHistoryDate}>
-                        {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                        {transaction.date || (transaction.created_at ? new Date(transaction.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
-                        })}
+                        }) : 'Unknown')}
                       </Text>
                     </View>
                     <View style={styles.rewardHistoryAmount}>

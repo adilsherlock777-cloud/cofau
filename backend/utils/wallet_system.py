@@ -367,11 +367,12 @@ async def get_wallet_info(db, user_id: str) -> dict:
         return None
     
     wallet_balance = user.get("wallet_balance", 0.0)
-    
+    completed_deliveries = user.get("completed_deliveries_count", 0)
+
     # Amazon voucher threshold
     AMAZON_VOUCHER_THRESHOLD = 1000.0
     amount_needed = max(0, AMAZON_VOUCHER_THRESHOLD - wallet_balance)
-    
+
     # Delivery discount info
     DELIVERY_DISCOUNT_PER_ORDER = 25.0
     deliveries_worth = int(wallet_balance / DELIVERY_DISCOUNT_PER_ORDER)
@@ -411,6 +412,8 @@ async def get_wallet_info(db, user_id: str) -> dict:
     
     return {
         "balance": wallet_balance,
+        "completed_deliveries": completed_deliveries,
+        "deliveries_to_next_reward": 10 - completed_deliveries,
         "target_amount": AMAZON_VOUCHER_THRESHOLD,
         "amount_needed": amount_needed,
         "progress_percent": min((wallet_balance / AMAZON_VOUCHER_THRESHOLD) * 100, 100),
