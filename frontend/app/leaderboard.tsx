@@ -405,6 +405,7 @@ export default function LeaderboardScreen() {
   const handleAddReview = (order: any) => {
     setSelectedOrderForReview(order);
     setShowReviewModal(true);
+  };
 
   // Auto-refresh delivery rewards when screen comes into focus
   useFocusEffect(
@@ -414,7 +415,6 @@ export default function LeaderboardScreen() {
       }
     }, [isRestaurant, activeTab])
   );
-  };
 
   // Silent background update function that doesn't cause UI refresh
   const updateOrdersInBackground = async () => {
@@ -1967,12 +1967,8 @@ export default function LeaderboardScreen() {
                 </Text>
               </View>
             ) : (
-              <FlatList
-                data={rewardsHistory}
-                scrollEnabled={false}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item: transaction }) => (
-                  <View style={styles.rewardHistoryItem}>
+              rewardsHistory.map((transaction) => (
+                <View key={transaction.id} style={styles.rewardHistoryItem}>
                     <View style={styles.rewardHistoryIcon}>
                       <Ionicons
                         name={transaction.amount >= 100 ? "gift" : "checkmark-circle"}
@@ -2015,8 +2011,7 @@ export default function LeaderboardScreen() {
                       </Text>
                     </View>
                   </View>
-                )}
-              />
+                ))
             )}
           </>
         ) : (
