@@ -873,8 +873,10 @@ async def get_all_orders_for_partner(
                         restaurant_phone = restaurant.get("phone_number") or restaurant.get("phone")
                         restaurant_profile_name = restaurant.get("restaurant_name", restaurant_profile_name)
 
-                        # Debug: Log if restaurant phone is missing
-                        if not restaurant_phone:
+                        # Debug: Log restaurant phone status
+                        if restaurant_phone:
+                            print(f"✅ Found restaurant phone for {restaurant_profile_name}: {restaurant_phone}")
+                        else:
                             print(f"⚠️ No phone number found for restaurant {restaurant_id} ({restaurant_profile_name}) in order {order_id}")
                 except Exception as e:
                     print(f"❌ Error fetching restaurant info for order {order_id}: {e}")
@@ -888,10 +890,9 @@ async def get_all_orders_for_partner(
         price = order.get("total_price") or order.get("price")
 
         # Log what we're returning for this order
-        if customer_phone:
-            print(f"✅ Order {order_id}: Customer {customer_name} - Phone: {customer_phone}")
-        else:
-            print(f"❌ Order {order_id}: Customer {customer_name} - NO PHONE")
+        customer_phone_status = f"Customer: {customer_phone}" if customer_phone else "Customer: NO PHONE"
+        restaurant_phone_status = f"Restaurant: {restaurant_phone}" if restaurant_phone else "Restaurant: NO PHONE"
+        print(f"📞 Order {order_id}: {customer_phone_status} | {restaurant_phone_status}")
 
         order_data = {
             "order_id": order_id,
