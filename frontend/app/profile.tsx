@@ -2134,9 +2134,26 @@ const renderRestaurantProfile = () => {
     
     {/* Restaurant Name & Label */}
     <View style={restaurantStyles.restaurantInfoContainer}>
-      <Text style={restaurantStyles.restaurantName}>
-        {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
-      </Text>
+      <View style={restaurantStyles.restaurantNameRow}>
+        <Text style={restaurantStyles.restaurantName}>
+          {userData?.restaurant_name || userData?.full_name || 'Restaurant'}
+        </Text>
+        {/* Food Type Badge */}
+        {userData?.food_type && (
+          <View style={restaurantStyles.foodTypeBadgeContainer}>
+            {(userData.food_type === 'veg' || userData.food_type === 'veg_and_non_veg') && (
+              <View style={[restaurantStyles.foodTypeBadge, restaurantStyles.vegBadge]}>
+                <View style={restaurantStyles.vegDot} />
+              </View>
+            )}
+            {(userData.food_type === 'non_veg' || userData.food_type === 'veg_and_non_veg') && (
+              <View style={[restaurantStyles.foodTypeBadge, restaurantStyles.nonVegBadge]}>
+                <View style={restaurantStyles.nonVegTriangle} />
+              </View>
+            )}
+          </View>
+        )}
+      </View>
       <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
     </View>
   </View>
@@ -5625,6 +5642,47 @@ whiteInfoBox: {
       includeFontPadding: false,
       textAlignVertical: 'center',
     }),
+  },
+  // Food Type Badge Styles
+  restaurantNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  foodTypeBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  foodTypeBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vegBadge: {
+    borderColor: '#4CAF50',
+  },
+  nonVegBadge: {
+    borderColor: '#D32F2F',
+  },
+  vegDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+  },
+  nonVegTriangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#D32F2F',
   },
 });
 const styles = StyleSheet.create({

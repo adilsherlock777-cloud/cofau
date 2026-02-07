@@ -168,9 +168,12 @@ export default function LeaderboardScreen() {
   const [deliveryRewardProgress, setDeliveryRewardProgress] = useState(0); // 0-10 deliveries
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [nearbyPosts, setNearbyPosts] = useState<any[]>([]);
+  const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingRestaurants, setLoadingRestaurants] = useState(false);
   const cachedNearbyPosts = useRef<any[]>([]);
+  const cachedNearbyRestaurants = useRef<any[]>([]);
   const [postFilter, setPostFilter] = useState<string | null>(null);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filterCounts, setFilterCounts] = useState({
@@ -383,6 +386,25 @@ export default function LeaderboardScreen() {
           {
             text: userAddress ? "Update Address" : "Add Address",
             onPress: () => setShowLocationModal(true),
+          },
+        ]
+      );
+      return;
+    }
+
+    // Check if user already has an active order in progress (only for regular users)
+    if (!isRestaurant && activeOrders.length > 0) {
+      Alert.alert(
+        "Order In Progress",
+        "You already have an order in progress. Please wait for your current order to be completed before placing a new one.",
+        [
+          {
+            text: "OK",
+            style: "cancel",
+          },
+          {
+            text: "View Order",
+            onPress: () => setActiveTab("In Progress"),
           },
         ]
       );
@@ -722,7 +744,7 @@ export default function LeaderboardScreen() {
       };
 
       setUserLocation(coords);
-      fetchNearbyPosts(coords);
+      fetchNearbyPosts(coords); // Fetch nearby posts with tagged restaurants
       return coords;
     } catch (error) {
       console.log("Get location error:", error);
@@ -737,21 +759,55 @@ export default function LeaderboardScreen() {
 
     setLoadingPosts(true);
     try {
-      const url = `${API_URL}/api/map/pins?lat=${coords.latitude}&lng=${coords.longitude}&radius_km=10`;
+      // Use 3km radius for nearby posts
+      const url = `${API_URL}/api/map/pins?lat=${coords.latitude}&lng=${coords.longitude}&radius_km=3`;
 
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token || ""}` },
       });
 
-      const posts = response.data.posts || [];
-      cachedNearbyPosts.current = posts;
-      setNearbyPosts(posts);
-      calculateFilterCounts(posts);
+      const allPosts = response.data.posts || [];
+      // Filter to only show posts with tagged restaurant (orderable from Cofau restaurants)
+      const orderablePosts = allPosts.filter((post: any) => post.tagged_restaurant_id);
+
+      console.log(`📍 Found ${allPosts.length} total posts, ${orderablePosts.length} with tagged restaurants within 3km`);
+
+      cachedNearbyPosts.current = orderablePosts;
+      setNearbyPosts(orderablePosts);
+      calculateFilterCounts(orderablePosts);
     } catch (error) {
       console.log("Fetch nearby posts error:", error);
       Alert.alert("Error", "Failed to load nearby posts. Please try again.");
     } finally {
       setLoadingPosts(false);
+    }
+  };
+
+  // Fetch only onboarded restaurants (from Cofau database)
+  // Uses same endpoint as map to ensure consistency
+  const fetchNearbyRestaurants = async (location?: { latitude: number; longitude: number }) => {
+    const coords = location || userLocation;
+    if (!coords) return;
+
+    setLoadingRestaurants(true);
+    try {
+      // Use same endpoint as map - /api/map/pins with 3km radius
+      const url = `${API_URL}/api/map/pins?lat=${coords.latitude}&lng=${coords.longitude}&radius_km=3`;
+
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token || ""}` },
+      });
+
+      // Extract restaurants from the pins response (same as map view)
+      const restaurants = response.data.restaurants || [];
+      cachedNearbyRestaurants.current = restaurants;
+      setNearbyRestaurants(restaurants);
+      console.log(`📍 Found ${restaurants.length} onboarded restaurants within 3km (from pins endpoint)`);
+    } catch (error) {
+      console.log("Fetch nearby restaurants error:", error);
+      Alert.alert("Error", "Failed to load nearby restaurants. Please try again.");
+    } finally {
+      setLoadingRestaurants(false);
     }
   };
 
@@ -935,7 +991,7 @@ export default function LeaderboardScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     if (activeTab === "Near Me" && userLocation) {
-      fetchNearbyPosts();
+      fetchNearbyPosts(); // Fetch nearby posts with tagged restaurants
     } else if (activeTab === "Rewards" && !isRestaurant) {
       fetchRewardsHistory();
     } else if (activeTab === "In Progress" || activeTab === "Your Orders") {
@@ -1088,23 +1144,45 @@ export default function LeaderboardScreen() {
     );
   };
 
-  const renderRestaurantCard = (restaurant: typeof DUMMY_RESTAURANTS[0]) => {
+  // Render restaurant card for onboarded Cofau restaurants
+  const renderRestaurantCard = (restaurant: any) => {
     const isFav = favorites[restaurant.id];
+    const displayRating = restaurant.average_rating ? (restaurant.average_rating / 2).toFixed(1) : null;
+    const distanceText = restaurant.distance_km < 1
+      ? `${(restaurant.distance_km * 1000).toFixed(0)}m`
+      : `${restaurant.distance_km.toFixed(1)}km`;
 
     return (
-      <View key={restaurant.id} style={styles.restaurantCard}>
-        <Image
-          source={{
-            uri: restaurant.image,
-            cache: 'force-cache'
-          }}
-          style={styles.restaurantImage}
-          resizeMode="cover"
-        />
+      <TouchableOpacity
+        key={restaurant.id}
+        style={styles.restaurantCard}
+        onPress={() => router.push(`/profile?userId=${restaurant.id}`)}
+        activeOpacity={0.9}
+      >
+        {/* Restaurant Profile Image */}
+        {restaurant.profile_picture ? (
+          <Image
+            source={{
+              uri: fixUrl(restaurant.profile_picture),
+              cache: 'force-cache'
+            }}
+            style={styles.restaurantImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.restaurantImage, { backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }]}>
+            <Ionicons name="restaurant" size={40} color="#fff" />
+          </View>
+        )}
 
         <View style={styles.restaurantInfo}>
           <View style={styles.restaurantHeader}>
-            <Text style={styles.restaurantName}>{restaurant.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
+              {restaurant.is_verified && (
+                <Ionicons name="checkmark-circle" size={16} color="#E94A37" style={{ marginLeft: 6 }} />
+              )}
+            </View>
             <TouchableOpacity
               onPress={() => toggleFavorite(restaurant.id)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -1117,43 +1195,50 @@ export default function LeaderboardScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Bio */}
+          {restaurant.bio && (
+            <Text style={styles.cuisineText} numberOfLines={2}>{restaurant.bio}</Text>
+          )}
+
+          {/* Rating and Reviews Row */}
           <View style={styles.ratingRow}>
-            <View style={styles.starsContainer}>{renderStars(restaurant.rating)}</View>
-            <Text style={styles.ratingText}>{restaurant.rating}</Text>
-            <Text style={styles.reviewsText}>| {restaurant.reviews}+ Reviews</Text>
-          </View>
-
-          <View style={styles.distanceRow}>
-            <Text style={styles.distanceText}>{restaurant.distance}</Text>
-            <Text style={styles.dotSeparator}>·</Text>
-            <Text style={styles.deliveriesText}>{restaurant.deliveries} Deliveries</Text>
-          </View>
-
-          <View style={styles.cuisineRow}>
-            <Ionicons name="location" size={14} color="#4CAF50" />
-            <Text style={styles.cuisineText}>{restaurant.cuisine}</Text>
-          </View>
-
-          <View style={styles.deliveryRow}>
-            <View style={styles.deliveryTimeLeft}>
-              <Ionicons name="time-outline" size={16} color="#4CAF50" />
-              <Text style={styles.deliveryLabel}>Delivery Time:</Text>
-              {renderDeliveryDots()}
-            </View>
-
-            {restaurant.isAcceptingOrders ? (
-              <TouchableOpacity style={styles.acceptOrderButton}>
-                <Text style={styles.acceptOrderText}>ACCEPT ORDER</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.deliveryTimeButton}>
-                <Text style={styles.deliveryTimeText}>{restaurant.deliveryTime}</Text>
-                <Ionicons name="chevron-forward" size={16} color="#666" />
-              </TouchableOpacity>
+            {displayRating && (
+              <>
+                <Ionicons name="star" size={14} color="#FFD700" />
+                <Text style={styles.ratingText}>{displayRating}</Text>
+              </>
             )}
+            <Text style={styles.reviewsText}>
+              {restaurant.review_count > 0 ? `${restaurant.review_count} Reviews` : 'No reviews yet'}
+            </Text>
+          </View>
+
+          {/* Distance Row */}
+          <View style={styles.distanceRow}>
+            <Ionicons name="location" size={14} color="#E94A37" />
+            <Text style={styles.distanceText}>{distanceText} away</Text>
+          </View>
+
+          {/* Place Order Button */}
+          <View style={styles.deliveryRow}>
+            <TouchableOpacity
+              style={styles.acceptOrderButton}
+              onPress={() => {
+                // Create a post-like object for the OrderModal
+                const restaurantPost = {
+                  tagged_restaurant_id: restaurant.id,
+                  latitude: restaurant.latitude,
+                  longitude: restaurant.longitude,
+                  location_name: restaurant.name,
+                };
+                handleOrderClick(restaurantPost);
+              }}
+            >
+              <Text style={styles.acceptOrderText}>PLACE ORDER</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1251,12 +1336,12 @@ export default function LeaderboardScreen() {
           )}
         </View>
 
-        {/* Order Button */}
+        {/* Place Order Button */}
         <TouchableOpacity
           style={styles.vendorOrderButton}
           onPress={() => handleOrderClick(vendor.closestPost)}
         >
-          <Text style={styles.vendorOrderText}>Order Now</Text>
+          <Text style={styles.vendorOrderText}>Place Order</Text>
         </TouchableOpacity>
       </View>
     );
@@ -1393,49 +1478,12 @@ export default function LeaderboardScreen() {
       >
         {activeTab === "Near Me" ? (
           <>
-            {/* Filter Row */}
+            {/* Section Title */}
             <View style={styles.filterRow}>
-              <Text style={styles.sectionTitle}>
-                {selectedCategory === "all" ? "Nearby Food Posts" : CATEGORIES.find(c => c.id === selectedCategory)?.name}
-              </Text>
-              <TouchableOpacity
-                style={[
-                  styles.filterButton,
-                  postFilter && styles.filterButtonActive,
-                ]}
-                onPress={() => setFilterModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="filter"
-                  size={16}
-                  color={postFilter ? '#fff' : '#666'}
-                />
-                <Text
-                  style={[
-                    styles.filterButtonText,
-                    postFilter && styles.filterButtonTextActive,
-                  ]}
-                >
-                  {postFilter ?
-                    postFilter === 'topRated' ? 'Top Rated' :
-                    postFilter === 'mostLoved' ? 'Most Loved' :
-                    postFilter === 'newest' ? 'Newest' :
-                    postFilter === 'disliked' ? 'Disliked' : 'Filter'
-                    : 'Filter'}
-                </Text>
-                {postFilter && (
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      setPostFilter(null);
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Ionicons name="close-circle" size={16} color="#fff" />
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
+              <Text style={styles.sectionTitle}>Order from nearby</Text>
+              <View style={{ backgroundColor: '#FFF3E0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                <Text style={{ fontSize: 12, color: '#FF8C00', fontWeight: '600' }}>Within 3km</Text>
+              </View>
             </View>
 
             {loadingPosts ? (
@@ -1445,8 +1493,11 @@ export default function LeaderboardScreen() {
               </View>
             ) : nearbyPosts.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="location-outline" size={64} color="#CCC" />
-                <Text style={styles.emptyText}>No posts found nearby</Text>
+                <Ionicons name="restaurant-outline" size={64} color="#CCC" />
+                <Text style={styles.emptyText}>No restaurants found nearby</Text>
+                <Text style={styles.emptySubtext}>
+                  No posts from Cofau partner restaurants within 3km
+                </Text>
                 <TouchableOpacity
                   style={styles.retryButton}
                   onPress={getCurrentLocation}
@@ -1997,8 +2048,35 @@ export default function LeaderboardScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Popular nearby restaurants</Text>
-            {DUMMY_RESTAURANTS.map((restaurant) => renderRestaurantCard(restaurant))}
+            <Text style={styles.sectionTitle}>Restaurants near you (within 3km)</Text>
+            {loadingRestaurants ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF8C00" />
+                <Text style={styles.loadingText}>Finding nearby restaurants...</Text>
+              </View>
+            ) : nearbyRestaurants.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="restaurant-outline" size={64} color="#CCC" />
+                <Text style={styles.emptyText}>No restaurants found nearby</Text>
+                <Text style={styles.emptySubtext}>
+                  No Cofau restaurants within 3km of your location
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => {
+                    if (userLocation) {
+                      fetchNearbyRestaurants(userLocation);
+                    } else {
+                      getCurrentLocation();
+                    }
+                  }}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              nearbyRestaurants.map((restaurant) => renderRestaurantCard(restaurant))
+            )}
           </>
         )}
 
@@ -2366,7 +2444,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   tabsScrollView: {
-    maxHeight: Platform.OS === 'android' ? 60 : 50,
+    maxHeight: 60,
     backgroundColor: "#FFFFFF",
     flexGrow: 0, // Prevent unnecessary growth
   },

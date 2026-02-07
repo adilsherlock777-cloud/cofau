@@ -1,25 +1,33 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 
 
 class RestaurantCreate(BaseModel):
     """Schema for restaurant registration"""
-    restaurant_name: str = Field(..., min_length=3, max_length=50, description="Restaurant name (acts as username)")
+    restaurant_name: str = Field(..., min_length=3, max_length=100, description="Restaurant legal name")
     email: EmailStr
     password: str = Field(..., min_length=6)
     confirm_password: str = Field(..., min_length=6)
-    map_link: Optional[str] = None 
+    food_type: Literal['veg', 'non_veg', 'veg_and_non_veg'] = Field(..., description="Restaurant food type: veg, non_veg, or veg_and_non_veg")
+    fssai_license_number: str = Field(..., min_length=14, max_length=14, description="14-digit FSSAI License Number (mandatory)")
+    gst_number: Optional[str] = Field(None, description="GST Number (optional)")
+    map_link: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    
+    phone_number: Optional[str] = None
+    phone_verified: Optional[bool] = False
+
     class Config:
         json_schema_extra = {
             "example": {
-                "restaurant_name": "Pizza Palace",
+                "restaurant_name": "Pizza Palace Pvt Ltd",
                 "email": "contact@pizzapalace.com",
                 "password": "securepassword123",
-                "confirm_password": "securepassword123"
+                "confirm_password": "securepassword123",
+                "food_type": "veg_and_non_veg",
+                "fssai_license_number": "12345678901234",
+                "gst_number": "22AAAAA0000A1Z5"
             }
         }
 
@@ -42,12 +50,13 @@ class RestaurantResponse(BaseModel):
     phone_number: Optional[str] = None  # Added for consistency with partner dashboard checks
     address: Optional[str] = None
     cuisine_type: Optional[str] = None
+    food_type: Optional[str] = None  # veg, non_veg, or veg_and_non_veg
     posts_count: int = 0
     reviews_count: int = 0
     followers_count: int = 0
     is_verified: bool = False
     created_at: datetime
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -60,6 +69,7 @@ class RestaurantResponse(BaseModel):
                 "phone": "+1234567890",
                 "address": "123 Food Street",
                 "cuisine_type": "Italian",
+                "food_type": "veg_and_non_veg",
                 "posts_count": 0,
                 "reviews_count": 0,
                 "followers_count": 0,

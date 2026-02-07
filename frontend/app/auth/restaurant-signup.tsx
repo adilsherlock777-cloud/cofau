@@ -33,6 +33,10 @@ export default function RestaurantSignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
+  const [foodType, setFoodType] = useState<'veg' | 'non_veg' | 'veg_and_non_veg' | null>(null);
+  const [fssaiNumber, setFssaiNumber] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
+  const [hasGst, setHasGst] = useState(false);
   
   // UI states
   const [showPassword, setShowPassword] = useState(false);
@@ -241,12 +245,30 @@ const handleVerifyOtp = async () => {
   const handleSignup = async () => {
     // Basic validation
     if (!restaurantName || !email || !password || !confirmPassword) {
-      showAlert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all required fields');
       return;
     }
 
     if (restaurantName.trim().length < 3) {
-      showAlert('Error', 'Restaurant name must be at least 3 characters');
+      showAlert('Error', 'Restaurant legal name must be at least 3 characters');
+      return;
+    }
+
+    // Food type validation
+    if (!foodType) {
+      showAlert('Error', 'Please select your restaurant food type (Veg/Non-Veg)');
+      return;
+    }
+
+    // FSSAI validation
+    if (!fssaiNumber || fssaiNumber.trim().length !== 14) {
+      showAlert('Error', 'Please enter a valid 14-digit FSSAI License Number');
+      return;
+    }
+
+    // GST validation (if enabled)
+    if (hasGst && (!gstNumber || gstNumber.trim().length < 15)) {
+      showAlert('Error', 'Please enter a valid GST Number (15 characters)');
       return;
     }
 
@@ -284,17 +306,19 @@ const handleVerifyOtp = async () => {
     setLoading(true);
 
     try {
-      // CHANGE this in handleSignup:
       const response = await axios.post(`${API_URL}/restaurant/auth/signup`, {
-  restaurant_name: trimmedName,
-  email: email.trim(),
-  password: password,
-  confirm_password: confirmPassword,
-  phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,
-  phone_verified: otpVerified,
-  latitude: latitude,
-  longitude: longitude,
-});
+        restaurant_name: trimmedName,
+        email: email.trim(),
+        password: password,
+        confirm_password: confirmPassword,
+        food_type: foodType,
+        fssai_license_number: fssaiNumber.trim(),
+        gst_number: hasGst ? gstNumber.trim() : null,
+        phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,
+        phone_verified: otpVerified,
+        latitude: latitude,
+        longitude: longitude,
+      });
 
       if (response.data && response.data.access_token) {
         await AsyncStorage.setItem('token', response.data.access_token);
@@ -339,30 +363,28 @@ const handleVerifyOtp = async () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo */}
+        {/* Logo & Title */}
         <View style={styles.logoContainer}>
           <Image
             source={require('../../assets/images/icon.png')}
             style={styles.logoImage}
           />
+          <Text style={styles.title}>Restaurant Sign Up</Text>
+          <Text style={styles.subtitle}>Join Cofau as a Restaurant</Text>
         </View>
-
-        {/* Title */}
-        <Text style={styles.title}>Restaurant Sign Up</Text>
-        <Text style={styles.subtitle}>Join Cofau as a Restaurant</Text>
 
         {/* Form */}
         <View style={styles.form}>
-          {/* Restaurant Name Input */}
+          {/* Restaurant Legal Name Input */}
           <View style={styles.inputContainer}>
-            <Ionicons name="restaurant-outline" size={20} color="#999" style={styles.inputIcon} />
+            <Ionicons name="business-outline" size={20} color="#999" style={styles.inputIcon} />
             <TextInput
               style={[
                 styles.input,
                 nameAvailable === true && styles.inputSuccess,
                 nameAvailable === false && styles.inputError,
               ]}
-              placeholder="Restaurant Name"
+              placeholder="Restaurant Legal Name"
               placeholderTextColor="#999"
               value={restaurantName}
               onChangeText={handleNameChange}
@@ -404,6 +426,71 @@ const handleVerifyOtp = async () => {
             </View>
           )}
 
+          {/* Food Type Selection */}
+          <View style={styles.foodTypeSection}>
+            <Text style={styles.sectionLabel}>Food Type *</Text>
+            <View style={styles.foodTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.foodTypeOptionCompact,
+                  foodType === 'veg' && styles.foodTypeVegSelected,
+                ]}
+                onPress={() => setFoodType('veg')}
+              >
+                <View style={[styles.foodTypeIconLarge, styles.vegIcon]}>
+                  <View style={styles.vegDotLarge} />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.foodTypeOptionCompact,
+                  foodType === 'non_veg' && styles.foodTypeNonVegSelected,
+                ]}
+                onPress={() => setFoodType('non_veg')}
+              >
+                <View style={[styles.foodTypeIconLarge, styles.nonVegIcon]}>
+                  <View style={styles.nonVegTriangleLarge} />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.foodTypeOptionCompact,
+                  foodType === 'veg_and_non_veg' && styles.foodTypeBothSelected,
+                ]}
+                onPress={() => setFoodType('veg_and_non_veg')}
+              >
+                <View style={styles.foodTypeBothIconsCompact}>
+                  <View style={[styles.foodTypeIconMedium, styles.vegIcon]}>
+                    <View style={styles.vegDotMedium} />
+                  </View>
+                  <View style={[styles.foodTypeIconMedium, styles.nonVegIcon]}>
+                    <View style={styles.nonVegTriangleMedium} />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* FSSAI License Number Input (Mandatory) */}
+          <View style={styles.inputContainer}>
+            <Ionicons name="document-text-outline" size={20} color="#999" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="FSSAI License Number (14 digits) *"
+              placeholderTextColor="#999"
+              value={fssaiNumber}
+              onChangeText={(text) => setFssaiNumber(text.replace(/[^0-9]/g, '').slice(0, 14))}
+              keyboardType="number-pad"
+              maxLength={14}
+            />
+            {fssaiNumber.length === 14 && (
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.statusIcon} />
+            )}
+          </View>
+          <Text style={styles.helperText}>Enter your 14-digit FSSAI License Number (mandatory)</Text>
+
           {/* Email Input */}
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
@@ -418,32 +505,6 @@ const handleVerifyOtp = async () => {
               autoCorrect={false}
             />
           </View>
-
-          {/* Location Picker */}
-<View style={styles.locationSection}>
-  <Text style={styles.locationLabel}>
-    <Ionicons name="location-outline" size={16} color="#FF2E2E" /> Restaurant Location
-  </Text>
-  <Text style={styles.locationHelper}>
-    Tap on the map to set your restaurant's exact location
-  </Text>
-  <LocationPicker
-    onLocationSelect={(lat: number, lng: number) => {
-      setLatitude(lat);
-      setLongitude(lng);
-    }}
-  />
-  {latitude && longitude && (
-    <View style={styles.coordsConfirm}>
-      <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-      <Text style={styles.coordsText}>
-        Location set: {latitude.toFixed(4)}, {longitude.toFixed(4)}
-      </Text>
-    </View>
-  )}
-</View>
-
-
 
           {/* Phone Number Input with OTP */}
           <View style={styles.phoneContainer}>
@@ -569,6 +630,61 @@ const handleVerifyOtp = async () => {
             </TouchableOpacity>
           </View>
 
+          {/* GST Number Toggle & Input (Optional) */}
+          <View style={styles.gstSection}>
+            <TouchableOpacity
+              style={styles.gstToggle}
+              onPress={() => setHasGst(!hasGst)}
+            >
+              <View style={[styles.checkbox, hasGst && styles.checkboxChecked]}>
+                {hasGst && <Ionicons name="checkmark" size={14} color="#FFF" />}
+              </View>
+              <Text style={styles.gstToggleText}>I have a GST Number (Optional)</Text>
+            </TouchableOpacity>
+
+            {hasGst && (
+              <View style={[styles.inputContainer, { marginTop: 12 }]}>
+                <Ionicons name="receipt-outline" size={20} color="#999" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="GST Number (e.g., 22AAAAA0000A1Z5)"
+                  placeholderTextColor="#999"
+                  value={gstNumber}
+                  onChangeText={(text) => setGstNumber(text.toUpperCase().slice(0, 15))}
+                  autoCapitalize="characters"
+                  maxLength={15}
+                />
+                {gstNumber.length === 15 && (
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.statusIcon} />
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Location Picker */}
+          <View style={styles.locationSection}>
+            <Text style={styles.locationLabel}>
+              <Ionicons name="location-outline" size={16} color="#FF2E2E" /> Restaurant Location
+            </Text>
+            <Text style={styles.locationHelper}>
+              Tap on the map to set your restaurant's exact location
+            </Text>
+            <LocationPicker
+              onLocationSelect={(lat: number, lng: number) => {
+                setLatitude(lat);
+                setLongitude(lng);
+              }}
+            />
+            {latitude && longitude && (
+              <View style={styles.coordsConfirm}>
+                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                <Text style={styles.coordsText}>
+                  Location set: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                </Text>
+              </View>
+            )}
+          </View>
+
           {/* Create Account Button */}
           <TouchableOpacity
             style={[styles.buttonContainer, !otpVerified && styles.buttonDisabled]}
@@ -624,25 +740,26 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   logoImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 8,
+    marginTop: 12,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#999',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 0,
   },
   form: {
     width: '100%',
@@ -855,5 +972,126 @@ coordsText: {
     fontSize: 14,
     color: '#FF2E2E',
     fontWeight: '600',
+  },
+  // Food Type Selection Styles
+  foodTypeSection: {
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  foodTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  foodTypeOptionCompact: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFF',
+  },
+  foodTypeVegSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  foodTypeNonVegSelected: {
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFEBEE',
+  },
+  foodTypeBothSelected: {
+    borderColor: '#FF7043',
+    backgroundColor: '#FFF3E0',
+  },
+  foodTypeIconLarge: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vegIcon: {
+    borderColor: '#4CAF50',
+  },
+  nonVegIcon: {
+    borderColor: '#D32F2F',
+  },
+  vegDotLarge: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4CAF50',
+  },
+  nonVegTriangleLarge: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 14,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#D32F2F',
+  },
+  foodTypeBothIconsCompact: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  foodTypeIconMedium: {
+    width: 26,
+    height: 26,
+    borderRadius: 4,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vegDotMedium: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4CAF50',
+  },
+  nonVegTriangleMedium: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#D32F2F',
+  },
+  // GST Section Styles
+  gstSection: {
+    marginBottom: 16,
+  },
+  gstToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  checkboxChecked: {
+    backgroundColor: '#FF2E2E',
+    borderColor: '#FF2E2E',
+  },
+  gstToggleText: {
+    fontSize: 14,
+    color: '#666',
   },
 });

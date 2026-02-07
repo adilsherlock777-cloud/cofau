@@ -692,8 +692,10 @@ async def get_followers_posts_on_map(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get posts from user's followers on the map - shows ALL followers' posts worldwide.
-    Shows only posts from people the current user is following (no radius limit).
+    Get posts from user's connections on the map - shows posts worldwide.
+    Shows posts from:
+    1. People the current user is following
+    2. People who are following the current user
     """
     db = get_database()
     current_user_id = str(current_user["_id"])
@@ -708,27 +710,40 @@ async def get_followers_posts_on_map(
 
     following_ids = [follow["followingId"] for follow in following_users]
 
-    print(f"👥 User is following {len(following_ids)} users/restaurants")
-    print(f"📋 Following IDs: {following_ids[:5]}..." if len(following_ids) > 5 else f"📋 Following IDs: {following_ids}")
+    # Get list of users who are following the current user
+    followers_users = await db.follows.find({
+        "followingId": current_user_id
+    }).to_list(None)
 
-    # If not following anyone, return empty
-    if not following_ids:
-        print("⚠️  User is not following anyone")
+    follower_ids = [follow["followerId"] for follow in followers_users]
+
+    # Combine both lists and remove duplicates
+    all_connected_ids = list(set(following_ids + follower_ids))
+
+    print(f"👥 User is following {len(following_ids)} users/restaurants")
+    print(f"👥 User has {len(follower_ids)} followers")
+    print(f"👥 Total connected users (unique): {len(all_connected_ids)}")
+
+    # If no connections, return empty
+    if not all_connected_ids:
+        print("⚠️  User has no connections (not following anyone and no followers)")
         return {
             "posts": [],
-            "message": "You are not following anyone yet"
+            "message": "You have no connections yet. Follow users or get followers to see their posts here.",
+            "following_count": 0,
+            "followers_count": 0
         }
 
     posts_pins = []
 
-    # ==================== USER POSTS FROM FOLLOWERS ====================
+    # ==================== USER POSTS FROM CONNECTIONS (following + followers) ====================
     posts = await db.posts.find({
-        "user_id": {"$in": following_ids},
+        "user_id": {"$in": all_connected_ids},
         "latitude": {"$exists": True, "$ne": None},
         "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
 
-    print(f"📍 Found {len(posts)} posts from followed users with coordinates")
+    print(f"📍 Found {len(posts)} posts from connected users with coordinates")
 
     for post in posts:
         distance = calculate_distance_km(
@@ -758,17 +773,18 @@ async def get_followers_posts_on_map(
             "likes_count": post.get("likes_count", 0),
             "map_link": post.get("map_link"),
             "tagged_restaurant_id": post.get("tagged_restaurant_id"),
-            "account_type": "user"
+            "account_type": "user",
+            "created_at": post.get("created_at")
         })
 
-    # ==================== RESTAURANT POSTS FROM FOLLOWED RESTAURANTS ====================
+    # ==================== RESTAURANT POSTS FROM CONNECTED RESTAURANTS ====================
     restaurant_posts = await db.restaurant_posts.find({
-        "restaurant_id": {"$in": following_ids},
+        "restaurant_id": {"$in": all_connected_ids},
         "latitude": {"$exists": True, "$ne": None},
         "longitude": {"$exists": True, "$ne": None}
     }).to_list(None)
 
-    print(f"🍽️  Found {len(restaurant_posts)} posts from followed restaurants with coordinates")
+    print(f"🍽️  Found {len(restaurant_posts)} posts from connected restaurants with coordinates")
 
     for post in restaurant_posts:
         distance = calculate_distance_km(
@@ -798,16 +814,19 @@ async def get_followers_posts_on_map(
             "likes_count": post.get("likes_count", 0),
             "map_link": post.get("map_link"),
             "tagged_restaurant_id": post.get("restaurant_id"),
-            "account_type": "restaurant"
+            "account_type": "restaurant",
+            "created_at": post.get("created_at")
         })
 
     # Sort by distance (closest first)
     posts_pins.sort(key=lambda x: x["distance_km"])
 
-    print(f"✅ Returning {len(posts_pins)} total followers posts")
+    print(f"✅ Returning {len(posts_pins)} total connection posts")
 
     return {
         "posts": posts_pins,
         "count": len(posts_pins),
-        "following_count": len(following_ids)
+        "following_count": len(following_ids),
+        "followers_count": len(follower_ids),
+        "total_connections": len(all_connected_ids)
     }

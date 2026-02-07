@@ -319,6 +319,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
         is_following: post.is_following || false,
         tagged_restaurant: post.tagged_restaurant || null,
+        dish_name: post.dish_name || null,
       }));
 
       if (forceRefresh) {

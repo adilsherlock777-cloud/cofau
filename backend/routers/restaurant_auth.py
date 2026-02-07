@@ -140,10 +140,13 @@ async def restaurant_signup(restaurant: RestaurantCreate):
         "cover_image": None,
         "bio": None,
         "phone": None,
-        "phone_number": None,
-        "phone_verified": False,
+        "phone_number": restaurant.phone_number if hasattr(restaurant, 'phone_number') else None,
+        "phone_verified": restaurant.phone_verified if hasattr(restaurant, 'phone_verified') else False,
         "address": None,
         "cuisine_type": None,
+        "food_type": restaurant.food_type,  # veg, non_veg, or veg_and_non_veg
+        "fssai_license_number": restaurant.fssai_license_number,  # mandatory 14-digit FSSAI number
+        "gst_number": restaurant.gst_number,  # optional GST number
         "map_link": map_link,
         "latitude": latitude,
         "longitude": longitude,
@@ -270,6 +273,7 @@ async def get_restaurant_profile(current_restaurant: dict = Depends(get_current_
         "phone_number": current_restaurant.get("phone_number"),  # Include phone_number field
         "address": current_restaurant.get("address"),
         "cuisine_type": current_restaurant.get("cuisine_type"),
+        "food_type": current_restaurant.get("food_type"),  # veg, non_veg, or veg_and_non_veg
         "posts_count": current_restaurant.get("posts_count", 0),
         "reviews_count": current_restaurant.get("reviews_count", 0),
         "followers_count": current_restaurant.get("followers_count", 0),
@@ -336,6 +340,7 @@ async def update_restaurant_profile(
         "phone_number": updated_restaurant.get("phone_number"),  # Include phone_number field
         "address": updated_restaurant.get("address"),
         "cuisine_type": updated_restaurant.get("cuisine_type"),
+        "food_type": updated_restaurant.get("food_type"),  # veg, non_veg, or veg_and_non_veg
         "posts_count": updated_restaurant.get("posts_count", 0),
         "reviews_count": updated_restaurant.get("reviews_count", 0),
         "followers_count": updated_restaurant.get("followers_count", 0),

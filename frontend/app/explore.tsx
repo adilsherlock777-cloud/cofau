@@ -206,8 +206,10 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Android - ULTRA LARGE (200x200) to prevent scaling down
+  // Android - Simple marker (same style as posts)
   if (Platform.OS === 'android') {
+    const imageUrl = fixUrl(restaurant.profile_picture);
+
     return (
       <Marker
         coordinate={{
@@ -215,56 +217,41 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
           longitude: restaurant.longitude,
         }}
         onPress={() => onPress(restaurant)}
-        tracksViewChanges={tracksChanges && !imageLoaded}
+        tracksViewChanges={true}
       >
-        <View style={{
-          width: 200,
-          height: 200,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
+        <View style={{ alignItems: 'center' }}>
           <View style={{
-            width: 140,
-            height: 140,
-            borderRadius: 70,
-            backgroundColor: '#E94A37',
-            borderWidth: 6,
-            borderColor: '#FFFFFF',
-            justifyContent: 'center',
-            alignItems: 'center',
-            overflow: 'hidden',
-            elevation: 8,
+            backgroundColor: '#FFFFFF',
+            padding: 3,
+            elevation: 5,
           }}>
-            {restaurant.profile_picture ? (
+            {imageUrl ? (
               <RNImage
-                source={{ uri: fixUrl(restaurant.profile_picture) || '' }}
-                style={{ width: 128, height: 128, borderRadius: 64 }}
+                source={{ uri: imageUrl }}
+                style={{ width: 60, height: 60 }}
                 resizeMode="cover"
-                onLoad={() => setImageLoaded(true)}
               />
             ) : (
-              <View style={{ width: 128, height: 128, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center', borderRadius: 64 }}>
-                <Ionicons name="restaurant" size={52} color="#fff" />
+              <View style={{ width: 60, height: 60, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="restaurant" size={28} color="#fff" />
               </View>
             )}
           </View>
           {/* Reviews badge */}
           <View style={{
             position: 'absolute',
-            bottom: 20,
+            bottom: -8,
+            backgroundColor: '#E94A37',
+            borderRadius: 10,
+            paddingVertical: 2,
+            paddingHorizontal: 6,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: '#E94A37',
-            borderRadius: 14,
-            paddingVertical: 5,
-            paddingHorizontal: 10,
-            gap: 4,
-            borderWidth: 2,
-            borderColor: '#FFFFFF',
-            elevation: 4,
+            gap: 3,
+            elevation: 6,
           }}>
-            <Ionicons name="chatbubble" size={14} color="#fff" />
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
+            <Ionicons name="chatbubble" size={10} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
               {restaurant.review_count || 0}
             </Text>
           </View>
@@ -335,10 +322,9 @@ const PostMarker = memo(({ post, onPress }: any) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Android - Show image preview with rounded rectangle style
+  // Android - Simple marker (keep tracksViewChanges=true for reliable image loading)
   if (Platform.OS === 'android') {
     const imageUrl = post.full_thumbnail_url || post.full_image_url;
-    console.log('🖼️ Android PostMarker image URL:', imageUrl, 'for post:', post.id);
 
     return (
       <Marker
@@ -347,52 +333,18 @@ const PostMarker = memo(({ post, onPress }: any) => {
           longitude: post.longitude,
         }}
         onPress={() => onPress(post)}
-        tracksViewChanges={false}
+        tracksViewChanges={true}
       >
         <View style={{
-          alignItems: 'center',
+          backgroundColor: '#FFFFFF',
+          padding: 3,
+          elevation: 5,
         }}>
-          <View style={{
-            width: 80,
-            height: 80,
-            borderRadius: 12,
-            backgroundColor: '#F2CF68',
-            borderWidth: 3,
-            borderColor: '#FFFFFF',
-            elevation: 6,
-          }}>
-            {imageUrl ? (
-              <Image
-                source={{ uri: imageUrl }}
-                style={{ width: 74, height: 74, borderRadius: 9 }}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                onLoad={() => {
-                  console.log('✅ Android image loaded:', imageUrl);
-                  setImageLoaded(true);
-                }}
-                onError={(error: any) => {
-                  console.log('❌ Android image error:', error, 'URL:', imageUrl);
-                }}
-              />
-            ) : (
-              <View style={{ width: 74, height: 74, backgroundColor: '#F2CF68', justifyContent: 'center', alignItems: 'center', borderRadius: 9 }}>
-                <Ionicons name="image" size={32} color="#fff" />
-              </View>
-            )}
-          </View>
-          {/* Arrow pointing down */}
-          <View style={{
-            width: 0,
-            height: 0,
-            borderLeftWidth: 6,
-            borderRightWidth: 6,
-            borderTopWidth: 8,
-            borderLeftColor: 'transparent',
-            borderRightColor: 'transparent',
-            borderTopColor: '#FFFFFF',
-            marginTop: -2,
-          }} />
+          <RNImage
+            source={{ uri: imageUrl }}
+            style={{ width: 60, height: 60 }}
+            resizeMode="cover"
+          />
         </View>
       </Marker>
     );
@@ -456,73 +408,60 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     platform: Platform.OS
   });
 
-  // Android - Show single preview image with count badge (rounded rectangle style)
+  // Android - Simple marker with 2 overlapping images (keep tracksViewChanges=true)
   if (Platform.OS === 'android') {
-    const previewPost = latestPosts[0]; // Just use the first/latest post
-    const imageUrl = previewPost?.full_thumbnail_url || previewPost?.full_image_url;
+    const image1 = latestPosts[0]?.full_thumbnail_url || latestPosts[0]?.full_image_url;
+    const image2 = latestPosts[1]?.full_thumbnail_url || latestPosts[1]?.full_image_url;
 
     return (
       <Marker
         coordinate={{ latitude, longitude }}
         onPress={() => onPress(cluster)}
-        tracksViewChanges={false}
+        tracksViewChanges={true}
       >
-        <View style={{
-          alignItems: 'center',
-        }}>
-          <View style={{
-            width: 80,
-            height: 80,
-            borderRadius: 12,
-            backgroundColor: '#9C27B0',
-            borderWidth: 3,
-            borderColor: '#FFFFFF',
-            elevation: 6,
-            position: 'relative',
-          }}>
-            {imageUrl ? (
-              <Image
-                source={{ uri: imageUrl }}
-                style={{ width: 74, height: 74, borderRadius: 9 }}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                onLoad={() => setImagesLoaded(1)}
-              />
-            ) : (
-              <View style={{ width: 74, height: 74, backgroundColor: '#9C27B0', justifyContent: 'center', alignItems: 'center', borderRadius: 9 }}>
-                <Ionicons name="images" size={32} color="#fff" />
-              </View>
-            )}
-            {/* Count badge */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* Second image (behind) */}
+          {image2 && (
             <View style={{
-              position: 'absolute',
-              top: -8,
-              right: -8,
-              backgroundColor: '#E94A37',
-              borderRadius: 14,
-              width: 28,
-              height: 28,
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderWidth: 2,
-              borderColor: '#FFFFFF',
-              elevation: 8,
+              backgroundColor: '#FFFFFF',
+              padding: 2,
+              elevation: 4,
+              marginRight: -20,
             }}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>{count}</Text>
+              <RNImage
+                source={{ uri: image2 }}
+                style={{ width: 50, height: 50 }}
+                resizeMode="cover"
+              />
             </View>
-          </View>
-          {/* Arrow pointing down */}
+          )}
+          {/* First image (front) */}
           <View style={{
-            width: 0,
-            height: 0,
-            borderLeftWidth: 6,
-            borderRightWidth: 6,
-            borderTopWidth: 8,
-            borderLeftColor: 'transparent',
-            borderRightColor: 'transparent',
-            borderTopColor: '#FFFFFF',
-            marginTop: -2,
-          }} />
+            backgroundColor: '#FFFFFF',
+            padding: 2,
+            elevation: 6,
+          }}>
+            <RNImage
+              source={{ uri: image1 }}
+              style={{ width: 50, height: 50 }}
+              resizeMode="cover"
+            />
+          </View>
+          {/* Count badge */}
+          <View style={{
+            backgroundColor: '#E94A37',
+            borderRadius: 12,
+            minWidth: 24,
+            height: 24,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: 6,
+            marginLeft: -12,
+            marginTop: -30,
+            elevation: 8,
+          }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>{count}</Text>
+          </View>
         </View>
       </Marker>
     );
@@ -2343,8 +2282,8 @@ const styles = StyleSheet.create({
   likeBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", padding: 8, borderRadius: 20 },
   viewsContainer: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
   viewsText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  dishNameTag: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(233, 74, 55, 0.9)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, maxWidth: "80%" },
-  dishNameText: { color: "#fff", fontSize: 11, fontWeight: "600" },
+  dishNameTag: { position: "absolute", bottom: 6, left: 6, backgroundColor: "rgba(233, 74, 55, 0.85)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, maxWidth: "75%" },
+  dishNameText: { color: "#fff", fontSize: 9, fontWeight: "600" },
   loadingMore: { padding: 20, alignItems: "center" },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 },
   emptyStateText: { fontSize: 18, fontWeight: "600", color: "#333", marginTop: 16 },
