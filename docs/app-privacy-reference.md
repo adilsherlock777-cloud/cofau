@@ -1,188 +1,159 @@
-Apple App Store – App Privacy (Nutrition Labels)
-
-Location:
-
-App Store Connect → Your App → App Privacy
-
-Step 1: Do you collect data from this app?
-
-Answer: ✅ Yes
-
-Step 2: Data Types Collected
-✅ Contact Info
-
-Email Address
-
-Purpose: Account management
-
-Linked to user: ✅ Yes
-
-Used for tracking: ❌ No
-
-✅ User Content
-
-Photos or Videos
-
-Reviews, ratings, comments
-
-Purpose: App functionality
-
-Linked to user: ✅ Yes
-
-Used for tracking: ❌ No
-
-✅ Location
-
-Approximate Location
-
-Purpose: App functionality (location-based posts & discovery)
-
-Linked to user: ❌ No
-
-Used for tracking: ❌ No
-
-⚠️ Do NOT select “Precise Location”
-
-✅ Identifiers
-
-User ID
-
-Purpose: Account functionality
-
-Linked to user: ✅ Yes
-
-Used for tracking: ❌ No
-
-✅ Usage Data
-
-Product Interaction
-
-App Performance / Crash Data
-
-Purpose: Analytics & performance
-
-Linked to user: ❌ No
-
-Used for tracking: ❌ No
-
-Step 3: Data Used for Tracking?
-
-Answer: ❌ No
-
-This is critical. Selecting “Yes” requires ATT & extra disclosures.
-Cofau does NOT track users across apps.
-
-Step 4: Data Linked to the User?
-
-Answer: ✅ Yes (for email, content, account info)
-
-Step 5: Data Used for Third-Party Advertising?
-
-Answer: ❌ No
-
-✅ Apple Privacy Summary (What Apple Will Show)
-
-Data linked to user: Email, Photos, Content
-
-Data not linked: Usage, approximate location
-
-Tracking: ❌ No
-
-This setup is fully acceptable for social apps.
-
-🤖 Google Play Store – Data Safety
-
-Location:
-
-Play Console → App content → Data safety
-
-Step 1: Does your app collect or share data?
-
-Answer: ✅ Yes
-
-Step 2: Data Collected
-✅ Personal Info
-
-Email address
-
-Purpose: Account management
-
-Collected: ✅ Yes
-
-Shared: ❌ No
-
-✅ Photos & Videos
-
-User-uploaded media
-
-Purpose: Core app functionality
-
-Collected: ✅ Yes
-
-Shared: ❌ No
-
-✅ Location
-
-Approximate location
-
-Purpose: Location tagging & discovery
-
-Collected: ✅ Yes
-
-Shared: ❌ No
-
-✅ App Activity
-
-App interactions
-
-Performance logs
-
-Purpose: Analytics
-
-Collected: ✅ Yes
-
-Shared: ❌ No
-
-❌ Data NOT collected
-
-Do NOT select:
-
-Precise location
-
-Contacts
-
-SMS / call logs
-
-Financial info
-
-Health info
-
-Device identifiers for ads
-
-Step 3: Is all data encrypted in transit?
-
-Answer: ✅ Yes
-
-Step 4: Do users have a way to request data deletion?
-
-Answer: ✅ Yes
-(Email support is sufficient)
-
-Step 5: Is data shared with third parties?
-
-Answer: ❌ No
-
-Step 6: Is this app directed to children?
-
-Answer: ❌ No
-Target age: 13+
-
-✅ Google Play Data Safety Summary
-
-Data collected: Email, photos, approximate location
-
-Data sharing: ❌ No
-
-Encryption: ✅ Yes
-
-User control: ✅ Yes
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Cofau</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #34495e;
+            margin-top: 20px;
+        }
+        p {
+            margin: 15px 0;
+        }
+        ul {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .last-updated {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .highlight {
+            background-color: #e8f6f3;
+            padding: 15px;
+            border-left: 4px solid #1abc9c;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Privacy Policy</h1>
+<p class="last-updated">Last Updated: January 2026</p>
+
+<p>Cofau ("we", "our", "us") respects your privacy and is committed to protecting it. This Privacy Policy explains how we collect, use, store, and protect your information when you use the Cofau mobile application ("App").</p>
+
+<p>By using Cofau, you agree to the practices described in this policy.</p>
+
+<h2>1. Information We Collect</h2>
+<p>We collect only the information necessary to provide and improve our services.</p>
+
+<h3>a. Information You Provide</h3>
+<ul>
+    <li>Name or username</li>
+    <li>Email address (for account creation and login)</li>
+    <li>Profile information (profile picture, bio)</li>
+    <li>Photos and videos you upload</li>
+    <li>Ratings, reviews, comments, and likes</li>
+    <li>Location information you voluntarily add to posts</li>
+</ul>
+
+<h3>b. Information Collected Automatically</h3>
+<ul>
+    <li>Device information (device type, OS version)</li>
+    <li>App usage data (screens visited, interactions)</li>
+    <li>Log and diagnostic data for performance and error tracking</li>
+</ul>
+
+<h2>2. How We Use Your Information</h2>
+<ul>
+    <li>Create and manage your account</li>
+    <li>Display your posts, reviews, ratings, and badges</li>
+    <li>Enable discovery of food and places</li>
+    <li>Calculate scores, rankings, and achievements</li>
+    <li>Improve app performance and user experience</li>
+    <li>Ensure security and prevent misuse</li>
+</ul>
+<p><strong>We do not sell your personal data.</strong></p>
+
+<h2>3. Photos, Videos, and User-Generated Content</h2>
+<ul>
+    <li>Content you upload is visible to other users based on app features.</li>
+    <li>You retain ownership of your content.</li>
+    <li>By posting, you grant Cofau a limited license to display and distribute your content within the app.</li>
+</ul>
+
+<h2>4. Camera and Photo Library Access</h2>
+<p>Cofau requests access to allow you to capture or upload photos and videos.</p>
+<p>We do not access your camera or photos in the background.</p>
+
+<h2>5. Location Information</h2>
+<ul>
+    <li>Location access is optional and user-controlled.</li>
+    <li>We do not track precise location in the background.</li>
+</ul>
+
+<h2>6. Map Viewing and Ordering Features</h2>
+<ul>
+    <li>Cofau allows users to view places, cafes, and food locations on an interactive map.</li>
+    <li>Map features use location data only when users choose to enable location access.</li>
+    <li>Users may place orders or requests through the app where such features are available.</li>
+    <li>Orders are initiated voluntarily by users.</li>
+    <li>Cofau acts as a platform only and does not directly process or fulfill orders.</li>
+    <li>Availability, pricing, delivery time, and service quality are the responsibility of third-party providers.</li>
+</ul>
+
+<h2>7. Data Sharing</h2>
+<ul>
+    <li>When required by law</li>
+    <li>To comply with legal obligations</li>
+    <li>To protect the rights and safety of users and Cofau</li>
+</ul>
+
+<h2>8. Data Storage and Security</h2>
+<ul>
+    <li>Data is stored securely using industry-standard practices.</li>
+    <li>We use encryption and access controls.</li>
+</ul>
+
+<h2>9. Your Rights and Choices</h2>
+<ul>
+    <li>Edit or delete your profile information</li>
+    <li>Remove your posts and reviews</li>
+    <li>Request account deletion</li>
+</ul>
+
+<h2>10. Account Deletion</h2>
+<div class="highlight">
+    <p><strong>You can delete your account at any time.</strong></p>
+</div>
+
+<h2>11. Children's Privacy</h2>
+<p>Cofau is not intended for children under 13.</p>
+
+<h2>12. Changes to This Policy</h2>
+<p>Updates will be reflected with a new "Last Updated" date.</p>
+
+<h2>13. Contact Us</h2>
+<p>
+    <strong>Email:</strong> drivebay.dev@gmail.com<br>
+    <strong>Phone:</strong> 8296534353
+</p>
+
+<hr style="margin-top:40px;">
+<p style="text-align:center;color:#7f8c8d;">© 2026 Cofau. All rights reserved.</p>
+
+</body>
+</html>
