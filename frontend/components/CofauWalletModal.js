@@ -8,6 +8,8 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  TextInput,
+  Alert,
 } from "react-native";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -26,6 +28,10 @@ const CofauWalletModal = ({ visible, onClose }) => {
   const [error, setError] = useState(null);
   const [showClaimInfo, setShowClaimInfo] = useState(false);
   const [showPointsCriteria, setShowPointsCriteria] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [claimEmail, setClaimEmail] = useState("");
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimMessage, setClaimMessage] = useState(null);
   const [walletData, setWalletData] = useState({
     balance: 0,
     target_amount: 1000,
@@ -62,6 +68,41 @@ const CofauWalletModal = ({ visible, onClose }) => {
       fetchWalletData();
     }
   }, [visible, token]);
+
+  const handleClaimVoucher = async () => {
+    if (!claimEmail.trim()) {
+      Alert.alert("Error", "Please enter your email address");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(claimEmail.trim())) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    setClaimLoading(true);
+    setClaimMessage(null);
+
+    try {
+      const response = await axios.post(
+        `${BACKEND_URL}/api/wallet/claim-voucher`,
+        { email: claimEmail.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setClaimMessage({ type: "success", text: response.data.message });
+        setClaimEmail("");
+      }
+    } catch (err) {
+      const errorMessage = err.response?.data?.detail || "Failed to submit claim request";
+      setClaimMessage({ type: "error", text: errorMessage });
+    } finally {
+      setClaimLoading(false);
+    }
+  };
 
   return (
     <Modal
@@ -284,6 +325,11 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   <TouchableOpacity
                     style={styles.claimVoucherButton}
                     activeOpacity={0.8}
+                    onPress={() => {
+                      setShowClaimInfo(false);
+                      setShowEmailModal(true);
+                      setClaimMessage(null);
+                    }}
                   >
                     <Ionicons name="gift" size={18} color="#FFF" />
                     <Text style={styles.claimVoucherButtonText}>Claim Amazon Voucher</Text>
@@ -382,6 +428,96 @@ const CofauWalletModal = ({ visible, onClose }) => {
                 >
                   <Text style={styles.gotItButtonText}>Got it. Keep Earning</Text>
                 </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Email Claim Modal */}
+          {showEmailModal && (
+            <View style={styles.overlayModal}>
+              <View style={styles.emailModalContainer}>
+                <TouchableOpacity
+                  style={styles.emailModalClose}
+                  onPress={() => {
+                    setShowEmailModal(false);
+                    setClaimEmail("");
+                    setClaimMessage(null);
+                  }}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+
+                <View style={styles.emailModalIcon}>
+                  <Ionicons name="gift" size={40} color="#FF9800" />
+                </View>
+
+                <Text style={styles.emailModalTitle}>Claim Amazon Voucher</Text>
+                <Text style={styles.emailModalSubtitle}>
+                  Please type your email address to receive Amazon voucher
+                </Text>
+
+                {claimMessage && (
+                  <View style={[
+                    styles.claimMessageBox,
+                    claimMessage.type === "success" ? styles.claimMessageSuccess : styles.claimMessageError
+                  ]}>
+                    <Ionicons
+                      name={claimMessage.type === "success" ? "checkmark-circle" : "alert-circle"}
+                      size={20}
+                      color={claimMessage.type === "success" ? "#4CAF50" : "#F44336"}
+                    />
+                    <Text style={[
+                      styles.claimMessageText,
+                      claimMessage.type === "success" ? styles.claimMessageTextSuccess : styles.claimMessageTextError
+                    ]}>
+                      {claimMessage.text}
+                    </Text>
+                  </View>
+                )}
+
+                {!claimMessage?.type || claimMessage?.type === "error" ? (
+                  <>
+                    <TextInput
+                      style={styles.emailInput}
+                      placeholder="Enter your email address"
+                      placeholderTextColor="#999"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={claimEmail}
+                      onChangeText={setClaimEmail}
+                      editable={!claimLoading}
+                    />
+
+                    <TouchableOpacity
+                      style={[styles.submitButton, claimLoading && styles.submitButtonDisabled]}
+                      onPress={handleClaimVoucher}
+                      activeOpacity={0.8}
+                      disabled={claimLoading}
+                    >
+                      {claimLoading ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <>
+                          <Ionicons name="send" size={18} color="#FFF" />
+                          <Text style={styles.submitButtonText}>Submit</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.doneButton}
+                    onPress={() => {
+                      setShowEmailModal(false);
+                      setClaimEmail("");
+                      setClaimMessage(null);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.doneButtonText}>Done</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
@@ -927,6 +1063,109 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFF",
     textAlign: "center",
+  },
+  emailModalContainer: {
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 24,
+    width: "90%",
+    maxWidth: 350,
+    alignItems: "center",
+  },
+  emailModalClose: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emailModalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#FFF3E0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  emailModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#222",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  emailModalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  emailInput: {
+    width: "100%",
+    height: 50,
+    borderWidth: 1.5,
+    borderColor: "#E0E0E0",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: "#222",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 16,
+  },
+  submitButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF9800",
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 25,
+    gap: 8,
+    shadowColor: "#FF9800",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFF",
+  },
+  claimMessageBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    width: "100%",
+    gap: 10,
+  },
+  claimMessageSuccess: {
+    backgroundColor: "#E8F5E9",
+  },
+  claimMessageError: {
+    backgroundColor: "#FFEBEE",
+  },
+  claimMessageText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  claimMessageTextSuccess: {
+    color: "#2E7D32",
+  },
+  claimMessageTextError: {
+    color: "#C62828",
   },
 });
 

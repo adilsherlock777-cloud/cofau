@@ -403,6 +403,8 @@ export default function ProfileScreen() {
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
   const [expandedMenuCategories, setExpandedMenuCategories] = useState<{ [key: string]: boolean }>({});
+  const [uploadingMenuItemImage, setUploadingMenuItemImage] = useState<string | null>(null);
+  const [menuItemImages, setMenuItemImages] = useState<{ [key: string]: string }>({});
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
   const [menuUploadModalVisible, setMenuUploadModalVisible] = useState(false);
@@ -1456,6 +1458,80 @@ const removeBannerImage = async () => {
   }
 };
 
+// Menu item image upload functions
+const handleMenuItemImagePick = async (itemId: string) => {
+  try {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Photo library permission is required.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      await uploadMenuItemImage(itemId, result.assets[0].uri);
+    }
+  } catch (error) {
+    console.error('❌ Error choosing menu item photo:', error);
+    Alert.alert('Error', 'Failed to choose photo');
+  }
+};
+
+const uploadMenuItemImage = async (itemId: string, uri: string) => {
+  setUploadingMenuItemImage(itemId);
+  try {
+    console.log('📤 Uploading menu item image:', itemId, uri);
+
+    const formData = new FormData();
+    const filename = uri.split('/').pop() || 'menuitem.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+    formData.append('file', {
+      uri,
+      name: filename,
+      type,
+    } as any);
+
+    const response = await axios.post(
+      `${BACKEND_URL}/api/restaurant/menu/items/${itemId}/image`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    console.log('✅ Menu item image uploaded:', response.data);
+
+    // Update local state with new image
+    const imageUrl = fixUrl(response.data.image_url);
+    setMenuItemImages(prev => ({
+      ...prev,
+      [itemId]: imageUrl,
+    }));
+
+    // Also update the menuItems array
+    setMenuItems(prev => prev.map(item =>
+      item.id === itemId ? { ...item, image_url: imageUrl } : item
+    ));
+
+  } catch (error: any) {
+    console.error('❌ Error uploading menu item image:', error.response?.data || error.message);
+    Alert.alert('Error', 'Failed to upload image. Please try again.');
+  } finally {
+    setUploadingMenuItemImage(null);
+  }
+};
+
   const handleTakePhoto = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -1849,7 +1925,11 @@ const renderMenuByCategory = () => {
             {/* Menu Items List - Show when expanded */}
             {isExpanded && (
               <View style={styles.menuItemsList}>
-                {items.map((item, index) => (
+                {items.map((item, index) => {
+                  const itemImageUrl = menuItemImages[item.id] || fixUrl(item.image_url);
+                  const isUploadingThis = uploadingMenuItemImage === item.id;
+
+                  return (
                   <View
                     key={item.id}
                     style={[
@@ -1865,13 +1945,68 @@ const renderMenuByCategory = () => {
                         </Text>
                       )}
                     </View>
-                    {item.price && (
-                      <View style={styles.menuItemPriceContainer}>
-                        <Text style={styles.menuItemPrice}>₹{item.price}</Text>
-                      </View>
-                    )}
+
+                    {/* Photo Section - Only for own restaurant profile */}
+                    <View style={styles.menuItemRightSection}>
+                      {isOwnProfile && isRestaurantProfile && (
+                        <View style={styles.menuItemPhotoSection}>
+                          {itemImageUrl ? (
+                            <TouchableOpacity
+                              style={styles.menuItemImageContainer}
+                              onPress={() => handleMenuItemImagePick(item.id)}
+                              disabled={isUploadingThis}
+                            >
+                              <Image
+                                source={{ uri: itemImageUrl }}
+                                style={styles.menuItemImage}
+                                resizeMode="cover"
+                              />
+                              <View style={styles.menuItemImageEditIcon}>
+                                <Ionicons name="pencil" size={10} color="#fff" />
+                              </View>
+                              {isUploadingThis && (
+                                <View style={styles.menuItemImageOverlay}>
+                                  <ActivityIndicator size="small" color="#fff" />
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.menuItemAddPhotoButton}
+                              onPress={() => handleMenuItemImagePick(item.id)}
+                              disabled={isUploadingThis}
+                            >
+                              {isUploadingThis ? (
+                                <ActivityIndicator size="small" color="#FF8C00" />
+                              ) : (
+                                <>
+                                  <Ionicons name="camera-outline" size={16} color="#FF8C00" />
+                                  <Text style={styles.menuItemAddPhotoText}>Add</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Show image for non-owners if it exists */}
+                      {!isOwnProfile && itemImageUrl && (
+                        <Image
+                          source={{ uri: itemImageUrl }}
+                          style={styles.menuItemImageReadOnly}
+                          resizeMode="cover"
+                        />
+                      )}
+
+                      {item.price && (
+                        <View style={styles.menuItemPriceContainer}>
+                          <Text style={styles.menuItemPrice}>₹{item.price}</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </View>
@@ -6000,6 +6135,70 @@ favouriteGridImage: {
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  menuItemRightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  menuItemPhotoSection: {
+    marginRight: 4,
+  },
+  menuItemImageContainer: {
+    position: 'relative',
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  menuItemImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+  },
+  menuItemImageEditIcon: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
+    width: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuItemImageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  menuItemAddPhotoButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#FF8C00',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF5EB',
+  },
+  menuItemAddPhotoText: {
+    fontSize: 9,
+    color: '#FF8C00',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  menuItemImageReadOnly: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
   },
   uploadMenuButton: {
     marginTop: 20,

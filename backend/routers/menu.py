@@ -419,6 +419,71 @@ async def get_restaurant_menu(restaurant_id: str):
     )
 
 
+@router.post("/items/{item_id}/image")
+async def upload_menu_item_image(
+    item_id: str,
+    file: UploadFile = File(...),
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """
+    Upload or update an image for a specific menu item
+
+    - Accepts a single image file
+    - Updates the menu item's image_url
+    - Only the restaurant owner can upload images
+    """
+    db = get_database()
+    restaurant_id = str(current_restaurant["_id"])
+
+    # Find the item and verify ownership
+    item = await db.menu_items.find_one({
+        "_id": ObjectId(item_id),
+        "restaurant_id": restaurant_id
+    })
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    # Generate unique filename
+    file_id = str(ObjectId())
+    file_extension = Path(file.filename).suffix if file.filename else ".jpg"
+    filename = f"menuitem_{item_id}_{file_id}{file_extension}"
+    file_path = os.path.join(MENU_UPLOAD_DIR, filename)
+
+    # Delete old image if exists
+    old_image_url = item.get("image_url")
+    if old_image_url and os.path.exists(old_image_url):
+        try:
+            os.remove(old_image_url)
+        except:
+            pass
+
+    # Save new file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Update database with new image URL
+    await db.menu_items.update_one(
+        {"_id": ObjectId(item_id)},
+        {
+            "$set": {
+                "image_url": file_path,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+
+    return {
+        "message": "Image uploaded successfully",
+        "image_url": file_path,
+        "item_id": item_id
+    }
+
+
 @router.get("/stats")
 async def get_menu_stats(
     current_restaurant: dict = Depends(get_current_restaurant)

@@ -80,7 +80,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       setShowCart(false);
       setSuggestions("");
       setExpandedCategories(new Set());
-      setActiveTab(null);
+      setActiveTab(post?.tagged_restaurant_id ? 'menu' : null);
       setRestaurantPosts([]);
       setRestaurantReviews([]);
       fetchRestaurantDetails();

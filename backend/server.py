@@ -3585,7 +3585,12 @@ async def get_blocked_users(current_user: dict = Depends(get_current_user)):
         user = await db.users.find_one({"_id": blocked_object_id})
         if user:
             created_at = block.get("created_at")
-            blocked_at = created_at.isoformat() + "Z" if isinstance(created_at, datetime) else created_at
+            if isinstance(created_at, datetime):
+                blocked_at = created_at.isoformat() + "Z"
+            elif created_at is None:
+                blocked_at = None
+            else:
+                blocked_at = str(created_at)
             result.append({
                 "id": str(user["_id"]),
                 "user_id": str(user["_id"]),

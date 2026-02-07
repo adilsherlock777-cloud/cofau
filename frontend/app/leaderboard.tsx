@@ -190,6 +190,7 @@ export default function LeaderboardScreen() {
   const [completedOrders, setCompletedOrders] = useState<any[]>([]); // completed, cancelled
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [restaurantProfiles, setRestaurantProfiles] = useState<{ [key: string]: any }>({});
+  const requestedRestaurantProfiles = useRef<Set<string>>(new Set());
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedOrderForReview, setSelectedOrderForReview] = useState<any>(null);
   const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
@@ -865,6 +866,23 @@ export default function LeaderboardScreen() {
       const restaurants = response.data.restaurants || [];
       cachedNearbyRestaurants.current = restaurants;
       setNearbyRestaurants(mergeNearbyRestaurants(cachedNearbyPosts.current, restaurants));
+      if (restaurants.length > 0) {
+        const profiles: { [key: string]: any } = {};
+        await Promise.all(
+          restaurants.map(async (restaurant: any) => {
+            if (!restaurant?.id) return;
+            try {
+              const profileResponse = await axios.get(
+                `${BACKEND_URL}/api/restaurant/posts/public/profile/${restaurant.id}`
+              );
+              profiles[String(restaurant.id)] = profileResponse.data;
+            } catch (error) {
+              console.log(`Failed to fetch profile for restaurant ${restaurant.id}`);
+            }
+          })
+        );
+        setRestaurantProfiles((prev) => ({ ...prev, ...profiles }));
+      }
       console.log(`📍 Found ${restaurants.length} onboarded restaurants within 3km (from pins endpoint)`);
     } catch (error) {
       console.log("Fetch nearby restaurants error:", error);
@@ -958,6 +976,48 @@ export default function LeaderboardScreen() {
     if (post.account_type === 'restaurant') return post.user_id;
     return null;
   };
+
+  useEffect(() => {
+    if (nearbyRestaurants.length === 0 && nearbyPosts.length === 0) return;
+
+    const restaurantIds = new Set<string>();
+    nearbyRestaurants.forEach((restaurant: any) => {
+      if (restaurant?.id) restaurantIds.add(String(restaurant.id));
+    });
+    nearbyPosts.forEach((post: any) => {
+      const restaurantId = getRestaurantIdFromPost(post);
+      if (restaurantId) restaurantIds.add(String(restaurantId));
+    });
+
+    const idsToFetch = Array.from(restaurantIds).filter(
+      (id) => !restaurantProfiles[id] && !requestedRestaurantProfiles.current.has(id)
+    );
+
+    if (idsToFetch.length === 0) return;
+
+    idsToFetch.forEach((id) => requestedRestaurantProfiles.current.add(id));
+
+    const fetchProfiles = async () => {
+      const profiles: { [key: string]: any } = {};
+      await Promise.all(
+        idsToFetch.map(async (restaurantId) => {
+          try {
+            const profileResponse = await axios.get(
+              `${BACKEND_URL}/api/restaurant/posts/public/profile/${restaurantId}`
+            );
+            profiles[restaurantId] = profileResponse.data;
+          } catch (error) {
+            console.log(`Failed to fetch profile for restaurant ${restaurantId}`);
+          }
+        })
+      );
+      if (Object.keys(profiles).length > 0) {
+        setRestaurantProfiles((prev) => ({ ...prev, ...profiles }));
+      }
+    };
+
+    fetchProfiles();
+  }, [nearbyRestaurants, nearbyPosts, restaurantProfiles]);
 
   const getNearbyRestaurantCards = () => {
     const filteredPosts = getFilteredPosts();
@@ -1414,11 +1474,23 @@ export default function LeaderboardScreen() {
     const displayImages = sortedPosts.slice(0, 5);
     const extraCount = sortedPosts.length - 5;
     const hasPosts = sortedPosts.length > 0;
+    const vendorId = vendor?.id || vendor?.user_id || vendor?.restaurant_id;
+    const profile = vendorId ? restaurantProfiles[String(vendorId)] : null;
+    const reviewsCount = profile?.reviews_count;
+    const goToVendorProfile = () => {
+      if (vendorId) {
+        router.push(`/profile?userId=${vendorId}`);
+      }
+    };
 
     return (
       <View key={vendor.id} style={styles.vendorCard}>
         {/* Vendor Header */}
-        <View style={styles.vendorHeader}>
+        <TouchableOpacity
+          style={styles.vendorHeader}
+          onPress={goToVendorProfile}
+          activeOpacity={0.7}
+        >
           <View style={styles.vendorNameRow}>
             <Text style={styles.vendorName} numberOfLines={1}>
               {vendor.restaurant_name || vendor.name || vendor.full_name}
@@ -1441,17 +1513,30 @@ export default function LeaderboardScreen() {
               <Ionicons name="checkmark-circle" size={16} color="#1DA1F2" style={{ marginLeft: 4 }} />
             )}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Distance Row - Rating removed */}
-        <View style={styles.vendorMetaRow}>
+        <TouchableOpacity
+          style={styles.vendorMetaRow}
+          onPress={goToVendorProfile}
+          activeOpacity={0.7}
+        >
           {vendor.distanceKm !== Infinity && (
             <View style={styles.vendorMetaItem}>
               <Text style={styles.vendorMetaIcon}>📍</Text>
               <Text style={styles.vendorMetaText}>{formatDistance(vendor.distanceKm)} away</Text>
             </View>
           )}
-        </View>
+          {vendor.distanceKm !== Infinity && reviewsCount !== undefined && reviewsCount !== null && (
+            <Text style={styles.vendorMetaDot}>•</Text>
+          )}
+          {reviewsCount !== undefined && reviewsCount !== null && (
+            <View style={styles.vendorMetaItem}>
+              <Text style={styles.vendorMetaText}>Customer Reviews</Text>
+              <Text style={styles.vendorMetaValue}>{reviewsCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         {/* Menu Badge */}
         {vendor.hasMenu && (
@@ -2613,16 +2698,14 @@ export default function LeaderboardScreen() {
           style={styles.centerNavItem}
           onPress={() => router.push("/leaderboard")}
         >
-          {/* Gradient border wrapper - active state */}
+          {/* Gradient filled circle - active state */}
           <LinearGradient
             colors={['#FF8C00', '#E94A37']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.centerIconGradient}
+            style={styles.centerIconGradientFilled}
           >
-            <View style={styles.centerIconCircleActive}>
-              <Ionicons name="fast-food" size={22} color="#000" />
-            </View>
+            <Ionicons name="fast-food" size={22} color="#FFF" />
           </LinearGradient>
           <Text style={styles.navLabelActive}>
             {accountType === 'restaurant' ? 'ORDERS' : 'Delivery'}
@@ -2982,6 +3065,19 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  centerIconGradientFilled: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+    elevation: 8,
+    shadowColor: "#E94A37",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
     shadowRadius: 6,
   },
   centerIconCircleActive: {
@@ -3594,6 +3690,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     fontWeight: "500",
+  },
+  vendorMetaValue: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "700",
+    marginLeft: 2,
   },
   vendorMetaDot: {
     fontSize: 14,

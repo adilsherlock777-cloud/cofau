@@ -171,3 +171,121 @@ async def mark_wallet_viewed(current_user: dict = Depends(get_current_user)):
     )
 
     return {"success": True}
+
+
+@router.post("/claim-voucher")
+async def claim_amazon_voucher(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Claim Amazon voucher when wallet balance reaches 1000.
+    Sends notification email to admin with user's email.
+    """
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    import os
+
+    if current_user.get("account_type") == "restaurant":
+        raise HTTPException(status_code=400, detail="Wallet not available for restaurant accounts")
+
+    user_email = request.get("email")
+    if not user_email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    db = get_database()
+    user_id = str(current_user["_id"])
+
+    # Get user's wallet balance
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    wallet_balance = user.get("wallet_balance", 0.0)
+
+    # Check if balance is at least 1000
+    if wallet_balance < 1000:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Please complete ₹1000 and then claim your voucher. Current balance: ₹{wallet_balance}"
+        )
+
+    # Send email notification to admin
+    admin_email = "adilmb9596@gmail.com"
+    username = user.get("username", "Unknown User")
+
+    try:
+        # Create email message
+        msg = MIMEMultipart()
+        msg['From'] = os.getenv("SMTP_FROM_EMAIL", "noreply@cofau.com")
+        msg['To'] = admin_email
+        msg['Subject'] = f"Amazon Voucher Claim Request - {username}"
+
+        body = f"""
+Amazon Voucher Claim Request
+
+User Details:
+- Username: {username}
+- User Email: {user_email}
+- Wallet Balance: ₹{wallet_balance}
+- User ID: {user_id}
+
+The user has requested to claim their Amazon voucher.
+Please process this request and send the voucher to: {user_email}
+
+---
+Cofau Rewards System
+        """
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Get SMTP configuration from environment
+        smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+
+        if smtp_user and smtp_password:
+            # Send email via SMTP
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+            server.quit()
+        else:
+            # Log the request if SMTP is not configured
+            print(f"[VOUCHER CLAIM] User: {username}, Email: {user_email}, Balance: ₹{wallet_balance}")
+
+        # Record the claim in database
+        await db.voucher_claims.insert_one({
+            "user_id": user_id,
+            "username": username,
+            "user_email": user_email,
+            "wallet_balance": wallet_balance,
+            "status": "pending",
+            "created_at": datetime.utcnow()
+        })
+
+        return {
+            "success": True,
+            "message": "Your voucher claim request has been submitted! You will receive your Amazon voucher at the provided email address."
+        }
+
+    except Exception as e:
+        print(f"Error sending voucher claim email: {e}")
+        # Still record the claim even if email fails
+        await db.voucher_claims.insert_one({
+            "user_id": user_id,
+            "username": username,
+            "user_email": user_email,
+            "wallet_balance": wallet_balance,
+            "status": "pending",
+            "email_sent": False,
+            "created_at": datetime.utcnow()
+        })
+
+        return {
+            "success": True,
+            "message": "Your voucher claim request has been submitted! You will receive your Amazon voucher at the provided email address."
+        }
