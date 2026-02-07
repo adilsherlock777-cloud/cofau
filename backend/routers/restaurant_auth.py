@@ -1,14 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import datetime
+from pydantic import EmailStr
+from typing import Optional, Literal
+from uuid import uuid4
+import os
+import shutil
 from database import get_database
 from models.restaurant import RestaurantCreate, RestaurantLogin, Token, RestaurantResponse, RestaurantUpdate
 from utils.hashing import hash_password, verify_password
 from routers.map import get_coordinates_for_map_link
 from utils.jwt import create_access_token, verify_token
+from config import settings
 
 router = APIRouter(prefix="/api/restaurant/auth", tags=["Restaurant Authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/restaurant/auth/login")
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if not os.path.isabs(settings.UPLOAD_DIR):
+    UPLOAD_DIR = os.path.join(BASE_DIR, settings.UPLOAD_DIR)
+else:
+    UPLOAD_DIR = settings.UPLOAD_DIR
 
 
 async def get_current_restaurant(token: str = Depends(oauth2_scheme)):
@@ -168,6 +180,150 @@ async def restaurant_signup(restaurant: RestaurantCreate):
         "account_type": "restaurant"
     })
     
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "account_type": "restaurant"
+    }
+
+
+@router.post("/signup-with-fssai", response_model=Token)
+async def restaurant_signup_with_fssai(
+    restaurant_name: str = Form(...),
+    email: EmailStr = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    food_type: Literal['veg', 'non_veg', 'veg_and_non_veg'] = Form(...),
+    fssai_license_number: str = Form(...),
+    fssai_license_file: UploadFile = File(...),
+    gst_number: Optional[str] = Form(None),
+    map_link: Optional[str] = Form(None),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    phone_number: Optional[str] = Form(None),
+    phone_verified: Optional[bool] = Form(False),
+):
+    """Register a new restaurant with mandatory FSSAI document upload"""
+    db = get_database()
+
+    if password != confirm_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Passwords do not match"
+        )
+
+    name_normalized = restaurant_name.strip().lower().replace("  ", " ")
+
+    if len(name_normalized) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Restaurant name must be at least 3 characters"
+        )
+
+    if len(name_normalized) > 50:
+        raise HTTPException(
+            status_code=400,
+            detail="Restaurant name must be less than 50 characters"
+        )
+
+    if not fssai_license_number or len(fssai_license_number.strip()) != 14:
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter a valid 14-digit FSSAI License Number"
+        )
+
+    existing_email = await db.restaurants.find_one({"email": email})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    existing_name = await db.restaurants.find_one({
+        "restaurant_name_normalized": name_normalized
+    })
+    if existing_name:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Restaurant name '{restaurant_name}' is already taken"
+        )
+
+    allowed_types = {
+        "image/jpeg": ".jpg",
+        "image/jpg": ".jpg",
+        "image/png": ".png",
+        "application/pdf": ".pdf",
+    }
+    content_type = (fssai_license_file.content_type or "").lower()
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="FSSAI document must be a PNG, JPG, or PDF file"
+        )
+
+    ext = os.path.splitext(fssai_license_file.filename or "")[1].lower()
+    if not ext:
+        ext = allowed_types[content_type]
+
+    upload_dir = os.path.join(UPLOAD_DIR, "restaurants", "fssai")
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = f"fssai_{uuid4().hex}{ext}"
+    file_path = os.path.join(upload_dir, filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(fssai_license_file.file, buffer)
+
+    fssai_license_url = f"/api/static/uploads/restaurants/fssai/{filename}"
+
+    hashed_password = hash_password(password)
+
+    coords_lat = latitude
+    coords_long = longitude
+    map_link_value = map_link.strip() if map_link else None
+
+    if not coords_lat or not coords_long:
+        if map_link_value:
+            try:
+                coords = await get_coordinates_for_map_link(map_link_value)
+                if coords:
+                    coords_lat = coords.get("latitude")
+                    coords_long = coords.get("longitude")
+            except Exception as e:
+                print(f"Error extracting coordinates: {e}")
+
+    restaurant_doc = {
+        "restaurant_name": restaurant_name.strip(),
+        "restaurant_name_normalized": name_normalized,
+        "email": email,
+        "password_hash": hashed_password,
+        "profile_picture": None,
+        "cover_image": None,
+        "bio": None,
+        "phone": None,
+        "phone_number": phone_number,
+        "phone_verified": phone_verified,
+        "address": None,
+        "cuisine_type": None,
+        "food_type": food_type,
+        "fssai_license_number": fssai_license_number.strip(),
+        "fssai_license_document": fssai_license_url,
+        "gst_number": gst_number,
+        "map_link": map_link_value,
+        "latitude": coords_lat,
+        "longitude": coords_long,
+        "posts_count": 0,
+        "reviews_count": 0,
+        "followers_count": 0,
+        "following_count": 0,
+        "is_verified": False,
+        "account_type": "restaurant",
+        "created_at": datetime.utcnow()
+    }
+
+    await db.restaurants.insert_one(restaurant_doc)
+
+    access_token = create_access_token(data={
+        "sub": email,
+        "account_type": "restaurant"
+    })
+
     return {
         "access_token": access_token,
         "token_type": "bearer",

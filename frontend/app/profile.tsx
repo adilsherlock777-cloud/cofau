@@ -1628,7 +1628,14 @@ const removeBannerImage = async () => {
 
     setDeletingPost(true);
     try {
-      await axios.delete(`${API_URL}/posts/${selectedPostForDelete.id}`, {
+      const isRestaurantPost =
+        accountType === 'restaurant' ||
+        selectedPostForDelete?.account_type === 'restaurant';
+      const deleteEndpoint = isRestaurantPost
+        ? `${API_URL}/restaurant/posts/${selectedPostForDelete.id}`
+        : `${API_URL}/posts/${selectedPostForDelete.id}`;
+
+      await axios.delete(deleteEndpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -2892,52 +2899,55 @@ const renderRestaurantProfile = () => {
       </Modal>
 
 
-      {/* ================= EDIT PROFILE MODAL ================= */}
-<Modal
-  animationType="slide"
-  transparent={true}
-  visible={editModalVisible}
-  onRequestClose={() => setEditModalVisible(false)}
->
-  <KeyboardAvoidingView 
-    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    style={styles.modalContainer}
-  >
-    <View style={styles.modalContent}>
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Edit Profile</Text>
-        <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-          <Ionicons name="close" size={28} color="#000" />
-        </TouchableOpacity>
-      </View>
+      {/* ================= EDIT PROFILE MODAL (RESTAURANT) ================= */}
+      {accountType === 'restaurant' && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={editModalVisible}
+          onRequestClose={() => setEditModalVisible(false)}
+        >
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalContainer}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Profile</Text>
+                <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                  <Ionicons name="close" size={28} color="#000" />
+                </TouchableOpacity>
+              </View>
 
-      <Text style={styles.inputLabel}>Restaurant Name</Text>
-      <TextInput
-        style={styles.input}
-        value={editedName}
-        onChangeText={setEditedName}
-        placeholder="Enter restaurant name"
-      />
+              <Text style={styles.inputLabel}>Restaurant Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editedName}
+                onChangeText={setEditedName}
+                placeholder="Enter restaurant name"
+              />
 
-      <Text style={styles.inputLabel}>Bio</Text>
-      <TextInput
-        style={[styles.input, styles.bioInput]}
-        value={editedBio}
-        onChangeText={setEditedBio}
-        placeholder="Tell customers about your restaurant..."
-        multiline
-        numberOfLines={4}
-      />
+              <Text style={styles.editBioLabel}>Bio</Text>
+              <TextInput
+                style={[styles.input, styles.bioInput, styles.editBioInput]}
+                value={editedBio}
+                onChangeText={setEditedBio}
+                placeholder="Tell customers about your restaurant..."
+                multiline
+                numberOfLines={4}
+                maxLength={2500}
+              />
 
-      <TouchableOpacity
-        style={styles.saveButton}
-        onPress={handleUpdateProfile}
-      >
-        <Text style={styles.saveButtonText}>Save Changes</Text>
-      </TouchableOpacity>
-    </View>
-  </KeyboardAvoidingView>
-</Modal>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleUpdateProfile}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
 {/* ================= REVIEW FILTER MODAL ================= */}
 <Modal
   animationType="slide"
@@ -4289,8 +4299,15 @@ if (isRestaurantProfile) {
           <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-          <Ionicons name="person" size={20} color="#000" />
-          <Text style={styles.navLabel}>Profile</Text>
+          <LinearGradient
+            colors={['#FF8C00', '#E94A37']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.navIconGradient}
+          >
+            <Ionicons name="person" size={18} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.navLabelActive}>Profile</Text>
         </TouchableOpacity>
       </View>
 
@@ -4458,52 +4475,55 @@ if (isRestaurantProfile) {
         </View>
       </Modal>
 
-      {/* ================= EDIT PROFILE MODAL ================= */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={editModalVisible}
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
+      {/* ================= EDIT PROFILE MODAL (USER) ================= */}
+      {accountType !== 'restaurant' && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={editModalVisible}
+          onRequestClose={() => setEditModalVisible(false)}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <Ionicons name="close" size={28} color="#000" />
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalContainer}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Profile</Text>
+                <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                  <Ionicons name="close" size={28} color="#000" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.inputLabel}>Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editedName}
+                onChangeText={setEditedName}
+                placeholder="Enter your name"
+              />
+
+              <Text style={styles.editBioLabel}>Bio</Text>
+              <TextInput
+                style={[styles.input, styles.bioInput, styles.editBioInput]}
+                value={editedBio}
+                onChangeText={setEditedBio}
+                placeholder="Tell us about yourself..."
+                multiline
+                numberOfLines={4}
+                maxLength={2500}
+              />
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleUpdateProfile}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
               </TouchableOpacity>
             </View>
-
-            <Text style={styles.inputLabel}>Name</Text>
-            <TextInput
-              style={styles.input}
-              value={editedName}
-              onChangeText={setEditedName}
-              placeholder="Enter your name"
-            />
-
-            <Text style={styles.inputLabel}>Bio</Text>
-            <TextInput
-              style={[styles.input, styles.bioInput]}
-              value={editedBio}
-              onChangeText={setEditedBio}
-              placeholder="Tell us about yourself..."
-              multiline
-              numberOfLines={4}
-            />
-
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleUpdateProfile}
-            >
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
 
       {/* ================= COMPLIMENT MODAL ================= */}
       <ComplimentModal
@@ -5591,7 +5611,7 @@ whiteInfoBox: {
     fontSize: 9,
     color: '#E94A37',
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: -4,
     letterSpacing: 2,
   },
   bioSection: {
@@ -5647,12 +5667,14 @@ whiteInfoBox: {
   restaurantNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   foodTypeBadgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginTop: -2,
+    transform: [{ translateY: -10 }],
   },
   foodTypeBadge: {
     width: 20,
@@ -6489,7 +6511,9 @@ statDivider: {
   bioText: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 40,
+    lineHeight: 20,
+    fontStyle: 'italic',
+    fontWeight: '600',
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,
       textAlignVertical: 'center',
@@ -6658,6 +6682,20 @@ statDivider: {
       textAlignVertical: 'center',
     }),
   },
+  navLabelActive: {
+    fontSize: 11,
+    color: '#000',
+    marginTop: 2,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  navIconGradient: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   bottomSpacer: {
     height: 20,
@@ -6693,6 +6731,14 @@ statDivider: {
     marginBottom: 8,
     marginTop: 15,
   },
+  editBioLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    color: '#333',
+    marginBottom: 8,
+    marginTop: 15,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
@@ -6700,6 +6746,10 @@ statDivider: {
     padding: 12,
     fontSize: 16,
     backgroundColor: '#f9f9f9',
+  },
+  editBioInput: {
+    fontStyle: 'italic',
+    fontWeight: '600',
   },
   bioInput: {
     height: 100,

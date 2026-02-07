@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from bson import ObjectId
+from bson.errors import InvalidId
 import os
 import shutil
 
@@ -3574,8 +3575,17 @@ async def get_blocked_users(current_user: dict = Depends(get_current_user)):
     
     result = []
     for block in blocks:
-        user = await db.users.find_one({"_id": ObjectId(block["blocked_id"])})
+        blocked_id = block.get("blocked_id")
+        try:
+            blocked_object_id = ObjectId(blocked_id)
+        except (InvalidId, TypeError):
+            print(f"⚠️ Skipping invalid blocked user id: {blocked_id}")
+            continue
+
+        user = await db.users.find_one({"_id": blocked_object_id})
         if user:
+            created_at = block.get("created_at")
+            blocked_at = created_at.isoformat() + "Z" if isinstance(created_at, datetime) else created_at
             result.append({
                 "id": str(user["_id"]),
                 "user_id": str(user["_id"]),
@@ -3583,7 +3593,7 @@ async def get_blocked_users(current_user: dict = Depends(get_current_user)):
                 "username": user.get("username") or user.get("full_name", "Unknown"),
                 "profile_picture": user.get("profile_picture"),
                 "level": user.get("level", 1),
-                "blocked_at": block["created_at"]
+                "blocked_at": blocked_at
             })
     
     return result
@@ -3940,4 +3950,3 @@ async def delete_restaurant_account(
             status_code=500,
             detail=f"Failed to delete account: {str(e)}"
         )
-

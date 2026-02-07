@@ -17,11 +17,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Video, ResizeMode } from 'expo-av';
-import { createPost, createRestaurantPost, createMenuItem } from '../utils/api';
+import { createPost, createRestaurantPost } from '../utils/api';
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
@@ -30,21 +30,16 @@ import axios from 'axios';
 
 export default function AddPostScreen() {
   const router = useRouter();
-  const { mode } = useLocalSearchParams();  // Get mode from params
   const { showLevelUpAnimation } = useLevelAnimation();
   const auth = useAuth() as any;
   const { refreshUser, accountType } = auth;
-  
-  // Post mode (for restaurants only)
-  const [postMode, setPostMode] = useState<'post' | 'menu'>(
-    mode === 'menu' ? 'menu' : 'post'
-  );
-  const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
   const [dishName, setDishName] = useState('');  // NEW: Dish name for all posts
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [pendingMedia, setPendingMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
+  const [showMediaConfirm, setShowMediaConfirm] = useState(false);
   const [tasteRating, setTasteRating] = useState(0);
   const [valueRating, setValueRating] = useState(0);
   const [portionRating, setPortionRating] = useState(0);
@@ -134,13 +129,13 @@ const CATEGORIES = [
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: true,  // Use native free-form crop editor
+    ...(Platform.OS === 'android' ? { aspect: [4, 5] } : {}),
     quality: 0.8,
   });
 
   if (!result.canceled && result.assets[0]) {
-    // Directly use the cropped image from native editor
-    setMediaUri(result.assets[0].uri);
-    setMediaType('image');
+    setPendingMedia({ uri: result.assets[0].uri, type: 'image' });
+    setShowMediaConfirm(true);
   }
 };
 
@@ -160,13 +155,13 @@ const getAverageRating = () => {
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: true,  // Use native free-form crop editor
+    ...(Platform.OS === 'android' ? { aspect: [4, 5] } : {}),
     quality: 0.8,
   });
 
   if (!result.canceled && result.assets[0]) {
-    // Directly use the cropped image from native editor
-    setMediaUri(result.assets[0].uri);
-    setMediaType('image');
+    setPendingMedia({ uri: result.assets[0].uri, type: 'image' });
+    setShowMediaConfirm(true);
   }
 };
 
@@ -185,8 +180,8 @@ const getAverageRating = () => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setMediaUri(result.assets[0].uri);
-      setMediaType('video');
+      setPendingMedia({ uri: result.assets[0].uri, type: 'video' });
+      setShowMediaConfirm(true);
     }
   };
 
@@ -205,29 +200,40 @@ const getAverageRating = () => {
 
   const pickImageOrVideo = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        allowsEditing: true,
-        aspect: [4, 5],
-        quality: 0.8,
-        videoMaxDuration: 90,
-      });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      ...(Platform.OS === 'android' ? { aspect: [4, 5] } : {}),
+      quality: 0.8,
+      videoMaxDuration: 90,
+    });
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
-        
-        if (asset.type === 'video' || asset.uri.includes('.mp4') || asset.uri.includes('.mov')) {
-          setMediaType('video');
-        } else {
-          setMediaType('image');
-        }
-        
-        setMediaUri(asset.uri);
+        const inferredType =
+          asset.type === 'video' || asset.uri.includes('.mp4') || asset.uri.includes('.mov')
+            ? 'video'
+            : 'image';
+        setPendingMedia({ uri: asset.uri, type: inferredType });
+        setShowMediaConfirm(true);
       }
     } catch (error) {
       console.error('Error picking media:', error);
       Alert.alert('Error', 'Failed to pick media. Please try again.');
     }
+  };
+
+  const handleConfirmMedia = () => {
+    if (!pendingMedia) return;
+    setMediaUri(pendingMedia.uri);
+    setMediaType(pendingMedia.type);
+    setPendingMedia(null);
+    setShowMediaConfirm(false);
+  };
+
+  const handleCancelMedia = () => {
+    setPendingMedia(null);
+    setShowMediaConfirm(false);
   };
 
 
@@ -321,65 +327,6 @@ const handlePost = async () => {
     return;
   }
 
-  // ========== MENU ITEM MODE ==========
-  if (accountType === 'restaurant' && postMode === 'menu') {
-    if (!itemName.trim()) {
-      Alert.alert('Item Name Required', 'Please enter the item name.');
-      return;
-    }
-    if (!price.trim()) {
-      Alert.alert('Price Required', 'Please enter a price.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      let fileToUpload;
-
-      if (Platform.OS === 'web') {
-        const response = await fetch(mediaUri);
-        const blob = await response.blob();
-        const ext = mediaType === 'video' ? 'mp4' : 'jpg';
-        const filename = `menu_${Date.now()}.${ext}`;
-        fileToUpload = new File([blob], filename, {
-          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-        });
-      } else {
-        const name = mediaUri.split('/').pop() || `menu_${Date.now()}`;
-        fileToUpload = {
-          uri: mediaUri,
-          name,
-          type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-        };
-      }
-
-      const menuData = {
-        item_name: itemName.trim(),
-        price: price.trim(),
-        description: review.trim() || undefined,
-        category: categories.length > 0 ? categories.join(', ') : undefined,
-        media_type: mediaType,
-        file: fileToUpload,
-      };
-
-      console.log('📤 Creating menu item:', menuData);
-      await createMenuItem(menuData);
-
-      setLoading(false);
-      Alert.alert('Success', 'Menu item added successfully!', [
-        { text: 'OK', onPress: () => router.replace('/profile') }
-      ]);
-      return;
-
-    } catch (error: any) {
-      console.error('❌ Error creating menu item:', error);
-      setLoading(false);
-      Alert.alert('Error', error?.message || 'Failed to create menu item.');
-      return;
-    }
-  }
-
   // ========== REGULAR POST MODE ==========
   let numericRating = 0;
   
@@ -415,7 +362,7 @@ const handlePost = async () => {
     return;
   }
 
-  // Grammar check - only for regular users (not restaurants, not menu items)
+  // Grammar check - only for regular users (not restaurants)
 if (accountType !== 'restaurant') {
   const grammarResult = await checkGrammar(review.trim());
   
@@ -688,12 +635,8 @@ return (
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>
-  {accountType === 'restaurant' && postMode === 'menu'
-    ? 'Add Menu Item'
-    : accountType === 'restaurant'
-      ? 'Add Post'
-      : 'Post a Bite'}
-</Text>
+        {accountType === 'restaurant' ? 'Add Post' : 'Post a Bite'}
+      </Text>
       <View style={styles.headerRight} />
     </View>
 
@@ -703,50 +646,6 @@ return (
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
 
-      {/* Post Type Toggle - Only for Restaurants */}
-{accountType === 'restaurant' && (
-  <View style={styles.postTypeToggle}>
-    <TouchableOpacity
-      style={[
-        styles.postTypeButton,
-        postMode === 'post' && styles.postTypeButtonActive
-      ]}
-      onPress={() => setPostMode('post')}
-    >
-      <Ionicons 
-        name="image-outline" 
-        size={20} 
-        color={postMode === 'post' ? '#FFF' : '#666'} 
-      />
-      <Text style={[
-        styles.postTypeText,
-        postMode === 'post' && styles.postTypeTextActive
-      ]}>
-        Post
-      </Text>
-    </TouchableOpacity>
-    
-    <TouchableOpacity
-      style={[
-        styles.postTypeButton,
-        postMode === 'menu' && styles.postTypeButtonActive
-      ]}
-      onPress={() => setPostMode('menu')}
-    >
-      <Ionicons 
-        name="restaurant-outline" 
-        size={20} 
-        color={postMode === 'menu' ? '#FFF' : '#666'} 
-      />
-      <Text style={[
-        styles.postTypeText,
-        postMode === 'menu' && styles.postTypeTextActive
-      ]}>
-        Menu Item
-      </Text>
-    </TouchableOpacity>
-  </View>
-)}
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}
@@ -789,20 +688,6 @@ return (
           </TouchableOpacity>
         </View>
 
-
-        {/* Item Name - Only for Menu Mode */}
-{accountType === 'restaurant' && postMode === 'menu' && (
-  <View style={styles.section}>
-    <Text style={styles.sectionLabel}>Item Name *</Text>
-    <TextInput
-      style={styles.linkInput}
-      placeholder="e.g., Margherita Pizza, Chicken Biryani"
-      placeholderTextColor="#999"
-      value={itemName}
-      onChangeText={setItemName}
-    />
-  </View>
-)}
 
         {/* Rating - Only for Users */}
 {accountType !== 'restaurant' && (
@@ -896,21 +781,15 @@ return (
 
         {/* Review */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-  {accountType === 'restaurant' && postMode === 'menu'
-    ? 'Description (Optional)'
-    : accountType === 'restaurant'
-      ? 'About'
-      : 'Review'}
-</Text>
+        <Text style={styles.sectionLabel}>
+          {accountType === 'restaurant' ? 'About' : 'Review'}
+        </Text>
           <TextInput
             style={styles.reviewInput}
             placeholder={
-  accountType === 'restaurant' && postMode === 'menu'
-    ? 'Describe this dish (ingredients, taste, etc.)'
-    : accountType === 'restaurant'
-      ? 'Write about this dish...'
-      : 'Write your review...'
+              accountType === 'restaurant'
+                ? 'Write about this dish...'
+                : 'Write your review...'
 }
             placeholderTextColor="#999"
             value={review}
@@ -919,19 +798,17 @@ return (
           />
         </View>
 
-        {/* Dish Name - Mandatory for all posts except menu items */}
-        {!(accountType === 'restaurant' && postMode === 'menu') && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Dish Name *</Text>
-            <TextInput
-              style={styles.linkInput}
-              placeholder="e.g., Butter Chicken, Margherita Pizza"
-              placeholderTextColor="#999"
-              value={dishName}
-              onChangeText={setDishName}
-            />
-          </View>
-        )}
+        {/* Dish Name - Mandatory for all posts */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Dish Name *</Text>
+          <TextInput
+            style={styles.linkInput}
+            placeholder="e.g., Butter Chicken, Margherita Pizza"
+            placeholderTextColor="#999"
+            value={dishName}
+            onChangeText={setDishName}
+          />
+        </View>
 
         {/* CATEGORY - MULTI-SELECT (MANDATORY) */}
         <View style={styles.section}>
@@ -1045,7 +922,6 @@ return (
   </View>
 )}
 {/* LOCATION SECTION */}
-{!(accountType === 'restaurant' && postMode === 'menu') && (
   <View style={styles.section}>
     <Text style={styles.sectionLabel}>Location</Text>
 
@@ -1126,7 +1002,6 @@ return (
       <Ionicons name="chevron-forward" size={20} color={mapsLink ? "#FF9A4D" : "#CCC"} />
     </TouchableOpacity>
   </View>
-)}
   
 
         {/* POST BUTTON */}
@@ -1163,6 +1038,49 @@ return (
         router.push('/feed');
       }}
     />
+
+    {/* Media Confirm Modal */}
+    <Modal
+      visible={showMediaConfirm}
+      transparent
+      animationType="fade"
+      onRequestClose={handleCancelMedia}
+    >
+      <View style={styles.mediaConfirmOverlay}>
+        <View style={styles.mediaConfirmCard}>
+          <View style={styles.mediaConfirmPreview}>
+            {pendingMedia?.type === 'video' ? (
+              <Video
+                source={{ uri: pendingMedia.uri }}
+                style={styles.mediaConfirmVideo}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay={false}
+                useNativeControls={true}
+                isLooping={false}
+                isMuted={false}
+              />
+            ) : (
+              <Image source={{ uri: pendingMedia?.uri }} style={styles.mediaConfirmImage} />
+            )}
+          </View>
+
+          <View style={styles.mediaConfirmActions}>
+            <TouchableOpacity
+              style={[styles.mediaConfirmButton, styles.mediaConfirmButtonSecondary]}
+              onPress={handleCancelMedia}
+            >
+              <Text style={styles.mediaConfirmButtonSecondaryText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mediaConfirmButton, styles.mediaConfirmButtonPrimary]}
+              onPress={handleConfirmMedia}
+            >
+              <Text style={styles.mediaConfirmButtonPrimaryText}>Next</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
 
     {/* Category Selection Modal - MULTI-SELECT */}
 <Modal
@@ -1373,37 +1291,6 @@ const styles = StyleSheet.create({
     borderColor: '#E5E5E5',
   },
 
-  // Post Type Toggle Styles
-postTypeToggle: {
-  flexDirection: 'row',
-  backgroundColor: '#F0F0F0',
-  borderRadius: 12,
-  padding: 4,
-  marginHorizontal: 16,
-  marginTop: 12,
-  marginBottom: 8,
-},
-postTypeButton: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 12,
-  borderRadius: 10,
-  gap: 8,
-},
-postTypeButtonActive: {
-  backgroundColor: '#1B7C82',
-},
-postTypeText: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#666',
-},
-postTypeTextActive: {
-  color: '#FFF',
-},
-
   linkInput: {
     backgroundColor: '#FFF',
     borderRadius: 12,
@@ -1586,10 +1473,65 @@ grammarButtonPrimary: {
   backgroundColor: '#1B7C82',
   alignItems: 'center',
 },
-grammarButtonPrimaryText: {
-  color: '#FFF',
-  fontWeight: '600',
-},
+  grammarButtonPrimaryText: {
+    color: '#FFF',
+    fontWeight: '600',
+  },
+  mediaConfirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  mediaConfirmCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    width: '100%',
+    maxWidth: 420,
+  },
+  mediaConfirmPreview: {
+    width: '100%',
+    height: 320,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  mediaConfirmImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  mediaConfirmVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaConfirmActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  mediaConfirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  mediaConfirmButtonSecondary: {
+    backgroundColor: '#F0F0F0',
+  },
+  mediaConfirmButtonSecondaryText: {
+    color: '#666',
+    fontWeight: '600',
+  },
+  mediaConfirmButtonPrimary: {
+    backgroundColor: '#1B7C82',
+  },
+  mediaConfirmButtonPrimaryText: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
 taggedRestaurantInfo: {
   flexDirection: 'row',
   alignItems: 'center',

@@ -92,7 +92,7 @@ const GradientBookmark = ({ size = 18 }) => (
 /* ---------------------------------------------------------
    POST ITEM COMPONENT
 ----------------------------------------------------------*/
-function PostItem({ post, currentPostId, token, bottomInset }: any) {
+function PostItem({ post, currentPostId, token, bottomInset, accountType }: any) {
   const router = useRouter();
   const { user } = useAuth() as any;
   const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
@@ -792,7 +792,13 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
                   style: "destructive",
                   onPress: async () => {
                     try {
-                      await axios.delete(`${API_URL}/posts/${post.id}`, {
+                      const deleteEndpoint =
+                        accountType === 'restaurant' ||
+                        post.account_type === 'restaurant' ||
+                        post.is_restaurant_post
+                          ? `${API_URL}/restaurant/posts/${post.id}`
+                          : `${API_URL}/posts/${post.id}`;
+                      await axios.delete(deleteEndpoint, {
                         headers: { Authorization: `Bearer ${token}` },
                       });
                       Alert.alert("Success", "Post deleted successfully");
@@ -1166,7 +1172,7 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
 export default function PostDetailsScreen() {
   const router = useRouter();
   const { postId, profileUserId, profilePicture, profileUsername, profileLevel } = useLocalSearchParams();
-  const { token, user } = useAuth() as any;
+  const { token, user, accountType } = useAuth() as any;
   const insets = useSafeAreaInsets();
 
   const [posts, setPosts] = useState<any[]>([]);
@@ -1199,22 +1205,44 @@ export default function PostDetailsScreen() {
     if (postId && token) loadInitialPost();
   }, [postId, token]);
 
+  const normalizePostData = (data: any) => ({
+    ...data,
+    media_url: normalizeUrl(data.media_url),
+    image_url: normalizeUrl(data.image_url || data.media_url),
+    thumbnail_url: normalizeUrl(data.thumbnail_url),
+    user_profile_picture: normalizeUrl(
+      data.user_profile_picture || data.restaurant_profile_picture
+    ),
+    username: data.username || data.restaurant_name,
+    user_id: data.user_id || data.restaurant_id,
+  });
+
+  const fetchSinglePost = async (endpoint: string) => {
+    const res = await axios.get(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return normalizePostData(res.data);
+  };
+
   const loadInitialPost = async () => {
     try {
       setLoading(true);
       
       // ✅ SOLUTION: Fetch ONLY the single post first
-      const singlePostRes = await axios.get(`${API_URL}/posts/${postId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const singlePost = {
-        ...singlePostRes.data,
-        media_url: normalizeUrl(singlePostRes.data.media_url),
-        image_url: normalizeUrl(singlePostRes.data.image_url || singlePostRes.data.media_url),
-        thumbnail_url: normalizeUrl(singlePostRes.data.thumbnail_url),
-        user_profile_picture: normalizeUrl(singlePostRes.data.user_profile_picture),
-      };
+      const primaryEndpoint =
+        accountType === 'restaurant'
+          ? `${API_URL}/restaurant/posts/${postId}`
+          : `${API_URL}/posts/${postId}`;
+      let singlePost;
+      try {
+        singlePost = await fetchSinglePost(primaryEndpoint);
+      } catch (primaryError) {
+        if (accountType === 'restaurant') {
+          singlePost = await fetchSinglePost(`${API_URL}/posts/${postId}`);
+        } else {
+          throw primaryError;
+        }
+      }
       
       // Set the single post immediately - FAST LOAD!
       setPosts([singlePost]);
@@ -1242,7 +1270,9 @@ export default function PostDetailsScreen() {
       // Fetch only 5 posts initially for faster background load
       const backgroundLimit = 5;
       const endpoint = profileUserId
-  ? `${API_URL}/users/${profileUserId}/posts?limit=${backgroundLimit}&skip=0`
+  ? accountType === 'restaurant'
+    ? `${API_URL}/restaurant/posts/public/restaurant/${profileUserId}?limit=${backgroundLimit}&skip=0`
+    : `${API_URL}/users/${profileUserId}/posts?limit=${backgroundLimit}&skip=0`
   : `${API_URL}/feed?limit=${backgroundLimit}&skip=0`;
 const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -1254,10 +1284,10 @@ const res = await axios.get(endpoint, {
   image_url: normalizeUrl(p.image_url || p.media_url),
   thumbnail_url: normalizeUrl(p.thumbnail_url),
   // If coming from profile, use first post's user info for all posts
- user_profile_picture: normalizeUrl(p.user_profile_picture) || (profileUserId ? decodeURIComponent(profilePicture as string || '') : null),
-username: p.username || (profileUserId ? decodeURIComponent(profileUsername as string || '') : null),
+ user_profile_picture: normalizeUrl(p.user_profile_picture || p.restaurant_profile_picture) || (profileUserId ? decodeURIComponent(profilePicture as string || '') : null),
+username: p.username || p.restaurant_name || (profileUserId ? decodeURIComponent(profileUsername as string || '') : null),
 user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
-  user_id: p.user_id || profileUserId,
+  user_id: p.user_id || p.restaurant_id || profileUserId,
 }));
 
       // Add posts that aren't the current one
@@ -1318,7 +1348,9 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
     try {
       setLoadingMore(true);
       const endpoint = profileUserId 
-  ? `${API_URL}/users/${profileUserId}/posts?limit=${LIMIT}&skip=${skip}`
+  ? accountType === 'restaurant'
+    ? `${API_URL}/restaurant/posts/public/restaurant/${profileUserId}?limit=${LIMIT}&skip=${skip}`
+    : `${API_URL}/users/${profileUserId}/posts?limit=${LIMIT}&skip=${skip}`
   : `${API_URL}/feed?limit=${LIMIT}&skip=${skip}`;
 const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -1335,10 +1367,10 @@ const res = await axios.get(endpoint, {
   image_url: normalizeUrl(p.image_url || p.media_url),
   thumbnail_url: normalizeUrl(p.thumbnail_url),
   // If coming from profile, use first post's user info for all posts
-user_profile_picture: normalizeUrl(p.user_profile_picture) || (profileUserId ? decodeURIComponent(profilePicture as string || '') : null),
-username: p.username || (profileUserId ? decodeURIComponent(profileUsername as string || '') : null),
+user_profile_picture: normalizeUrl(p.user_profile_picture || p.restaurant_profile_picture) || (profileUserId ? decodeURIComponent(profilePicture as string || '') : null),
+username: p.username || p.restaurant_name || (profileUserId ? decodeURIComponent(profileUsername as string || '') : null),
 user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
-  user_id: p.user_id || profileUserId,
+  user_id: p.user_id || p.restaurant_id || profileUserId,
 }));
 
       const existingIds = new Set(posts.map((p: any) => p.id));
@@ -1361,6 +1393,7 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
         currentPostId={visiblePostId}
         token={token}
         bottomInset={insets.bottom}
+        accountType={accountType}
       />
     ),
     [visiblePostId, token, insets.bottom]

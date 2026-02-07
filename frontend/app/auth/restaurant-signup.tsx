@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LocationPicker from '../../components/LocationPicker';
 import axios from 'axios';
+import * as DocumentPicker from 'expo-document-picker';
 //import auth from '@react-native-firebase/auth';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
@@ -37,6 +38,7 @@ export default function RestaurantSignupScreen() {
   const [fssaiNumber, setFssaiNumber] = useState('');
   const [gstNumber, setGstNumber] = useState('');
   const [hasGst, setHasGst] = useState(false);
+  const [fssaiDocument, setFssaiDocument] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   
   // UI states
   const [showPassword, setShowPassword] = useState(false);
@@ -239,7 +241,24 @@ const handleVerifyOtp = async () => {
   // } finally {
   //   setVerifyingOtp(false);
   // }
-};
+  };
+
+  const handlePickFssaiDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets?.length) {
+        setFssaiDocument(result.assets[0]);
+      }
+    } catch (error) {
+      console.error('Error picking FSSAI document:', error);
+      showAlert('Error', 'Unable to pick document. Please try again.');
+    }
+  };
 
   // Main signup handler
   const handleSignup = async () => {
@@ -263,6 +282,11 @@ const handleVerifyOtp = async () => {
     // FSSAI validation
     if (!fssaiNumber || fssaiNumber.trim().length !== 14) {
       showAlert('Error', 'Please enter a valid 14-digit FSSAI License Number');
+      return;
+    }
+
+    if (!fssaiDocument) {
+      showAlert('Error', 'Please upload your FSSAI document');
       return;
     }
 
@@ -306,18 +330,37 @@ const handleVerifyOtp = async () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/restaurant/auth/signup`, {
-        restaurant_name: trimmedName,
-        email: email.trim(),
-        password: password,
-        confirm_password: confirmPassword,
-        food_type: foodType,
-        fssai_license_number: fssaiNumber.trim(),
-        gst_number: hasGst ? gstNumber.trim() : null,
-        phone_number: phoneNumber ? formatPhoneNumber(phoneNumber) : null,
-        phone_verified: otpVerified,
-        latitude: latitude,
-        longitude: longitude,
+      const formData = new FormData();
+      formData.append('restaurant_name', trimmedName);
+      formData.append('email', email.trim());
+      formData.append('password', password);
+      formData.append('confirm_password', confirmPassword);
+      formData.append('food_type', foodType);
+      formData.append('fssai_license_number', fssaiNumber.trim());
+      if (hasGst) {
+        formData.append('gst_number', gstNumber.trim());
+      }
+      if (phoneNumber) {
+        formData.append('phone_number', formatPhoneNumber(phoneNumber));
+      }
+      formData.append('phone_verified', otpVerified ? 'true' : 'false');
+      if (latitude !== null) {
+        formData.append('latitude', String(latitude));
+      }
+      if (longitude !== null) {
+        formData.append('longitude', String(longitude));
+      }
+
+      if (fssaiDocument) {
+        formData.append('fssai_license_file', {
+          uri: fssaiDocument.uri,
+          name: fssaiDocument.name || 'fssai-document',
+          type: fssaiDocument.mimeType || 'application/octet-stream',
+        } as any);
+      }
+
+      const response = await axios.post(`${API_URL}/restaurant/auth/signup-with-fssai`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       if (response.data && response.data.access_token) {
@@ -490,6 +533,27 @@ const handleVerifyOtp = async () => {
             )}
           </View>
           <Text style={styles.helperText}>Enter your 14-digit FSSAI License Number (mandatory)</Text>
+
+          {/* FSSAI Document Upload (Mandatory) */}
+          <View style={styles.uploadContainer}>
+            <TouchableOpacity style={styles.uploadButton} onPress={handlePickFssaiDocument}>
+              <Ionicons name="cloud-upload-outline" size={18} color="#1B7C82" />
+              <Text style={styles.uploadButtonText}>
+                {fssaiDocument ? 'Replace FSSAI Document' : 'Add FSSAI Document (PNG/JPG/PDF) *'}
+              </Text>
+            </TouchableOpacity>
+            {fssaiDocument && (
+              <View style={styles.uploadInfo}>
+                <Ionicons name="document-attach-outline" size={16} color="#666" />
+                <Text style={styles.uploadFileName} numberOfLines={1}>
+                  {fssaiDocument.name || 'Selected document'}
+                </Text>
+                <TouchableOpacity onPress={() => setFssaiDocument(null)}>
+                  <Ionicons name="close-circle" size={18} color="#FF2E2E" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
 
           {/* Email Input */}
           <View style={styles.inputContainer}>
@@ -790,13 +854,44 @@ const styles = StyleSheet.create({
     borderColor: '#F44336',
   },
   helperText: {
-  fontSize: 12,
-  color: '#999',
-  marginTop: -12,
-  marginBottom: 16,
-  marginLeft: 4,
-  fontStyle: 'italic',
-},
+    fontSize: 12,
+    color: '#999',
+    marginTop: -12,
+    marginBottom: 16,
+    marginLeft: 4,
+    fontStyle: 'italic',
+  },
+  uploadContainer: {
+    marginBottom: 16,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#1B7C82',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#F5FBFB',
+  },
+  uploadButtonText: {
+    color: '#1B7C82',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  uploadInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  uploadFileName: {
+    flex: 1,
+    fontSize: 12,
+    color: '#666',
+  },
   eyeIcon: {
     padding: 4,
   },

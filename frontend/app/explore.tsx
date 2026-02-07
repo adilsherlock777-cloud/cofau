@@ -2070,7 +2070,12 @@ return (
       {/* BOTTOM NAVIGATION */}
       <View style={styles.navBar}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}><Ionicons name="home-outline" size={20} color="#000" /><Text style={styles.navLabel}>Home</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}><Ionicons name={accountType === 'restaurant' ? "analytics" : "compass"} size={20} color="#000" /><Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}>
+          <LinearGradient colors={['#FF8C00', '#E94A37']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.navIconGradient}>
+            <Ionicons name={accountType === 'restaurant' ? "analytics" : "compass"} size={18} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push("/leaderboard")}><View style={styles.centerIconCircle}><Ionicons name="fast-food" size={22} color="#000" /></View><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}><Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" /><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}><Ionicons name="person-outline" size={20} color="#000" /><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
@@ -2290,9 +2295,12 @@ const styles = StyleSheet.create({
   navBar: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", alignItems: "center", paddingVertical: 8, paddingTop: 4, borderTopWidth: 1, borderTopColor: "#E8E8E8", backgroundColor: "#FFFFFF", elevation: 8 },
   navItem: { alignItems: "center", justifyContent: "center", paddingVertical: 4, paddingHorizontal: 12 },
   navLabel: { fontSize: 11, color: "#000", marginTop: 2, textAlign: "center", fontWeight: "500" },
-  navLabelActive: { fontSize: 11, color: "#000", marginTop: 0, textAlign: "center", fontWeight: "700" },
+  navLabelActive: { fontSize: 11, color: "#000", marginTop: 2, textAlign: "center", fontWeight: "700" },
+  navIconGradient: { width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center" },
   centerNavItem: { alignItems: "center", justifyContent: "center", paddingVertical: 8, paddingHorizontal: 12, marginTop: -30 },
   centerIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#fff", borderWidth: 2, borderColor: "#333", justifyContent: "center", alignItems: "center", marginBottom: 4, elevation: 8 },
+  centerIconGradient: { width: 56, height: 56, borderRadius: 28, justifyContent: "center", alignItems: "center", marginBottom: 4, elevation: 8 },
+  centerIconCircleInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#fff", justifyContent: "center", alignItems: "center" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: "flex-end" },
   categoryModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" },
   categoryModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#E5E5E5" },

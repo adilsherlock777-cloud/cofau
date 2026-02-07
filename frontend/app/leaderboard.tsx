@@ -767,19 +767,82 @@ export default function LeaderboardScreen() {
       });
 
       const allPosts = response.data.posts || [];
-      // Filter to only show posts with tagged restaurant (orderable from Cofau restaurants)
-      const orderablePosts = allPosts.filter((post: any) => post.tagged_restaurant_id);
+      // Get restaurants from the same API response (like explore.tsx does)
+      const restaurants = response.data.restaurants || [];
 
-      console.log(`📍 Found ${allPosts.length} total posts, ${orderablePosts.length} with tagged restaurants within 3km`);
+      // Show posts that are orderable: tagged restaurant or posted by a restaurant account
+      const orderablePosts = allPosts.filter(
+        (post: any) =>
+          post.tagged_restaurant_id ||
+          post.account_type === 'restaurant' ||
+          post.restaurant_id
+      );
 
+      console.log(
+        `📍 Found ${allPosts.length} total posts, ${orderablePosts.length} orderable (tagged or restaurant), ${restaurants.length} restaurants within 3km`
+      );
+
+      // Cache both posts and restaurants
       cachedNearbyPosts.current = orderablePosts;
+      cachedNearbyRestaurants.current = restaurants;
+
       setNearbyPosts(orderablePosts);
+      setNearbyRestaurants(mergeNearbyRestaurants(orderablePosts, restaurants));
       calculateFilterCounts(orderablePosts);
+
+      // Fetch restaurant's own posts for each restaurant and merge them
+      if (restaurants.length > 0) {
+        fetchRestaurantOwnPosts(restaurants, orderablePosts);
+      }
     } catch (error) {
       console.log("Fetch nearby posts error:", error);
       Alert.alert("Error", "Failed to load nearby posts. Please try again.");
     } finally {
       setLoadingPosts(false);
+    }
+  };
+
+  // Fetch restaurant's own posts (from their POSTS tab) and merge with customer reviews
+  const fetchRestaurantOwnPosts = async (restaurants: any[], existingPosts: any[]) => {
+    try {
+      const restaurantPostsPromises = restaurants.map(async (restaurant: any) => {
+        try {
+          const response = await axios.get(
+            `${API_URL}/api/restaurant/posts/public/restaurant/${restaurant.id}?limit=10`,
+            { headers: { Authorization: `Bearer ${token || ""}` } }
+          );
+          const posts = response.data.posts || response.data || [];
+          // Add restaurant info to each post
+          return posts.map((post: any) => ({
+            ...post,
+            restaurant_id: restaurant.id,
+            restaurant_name: restaurant.name || restaurant.restaurant_name,
+            account_type: 'restaurant',
+          }));
+        } catch (err) {
+          console.log(`Failed to fetch posts for restaurant ${restaurant.id}`);
+          return [];
+        }
+      });
+
+      const allRestaurantPosts = await Promise.all(restaurantPostsPromises);
+      const flattenedPosts = allRestaurantPosts.flat();
+
+      if (flattenedPosts.length > 0) {
+        // Merge with existing posts, avoiding duplicates
+        const existingPostIds = new Set(existingPosts.map((p: any) => p.id));
+        const newPosts = flattenedPosts.filter((p: any) => !existingPostIds.has(p.id));
+
+        if (newPosts.length > 0) {
+          const mergedPosts = [...existingPosts, ...newPosts];
+          cachedNearbyPosts.current = mergedPosts;
+          setNearbyPosts(mergedPosts);
+          setNearbyRestaurants(mergeNearbyRestaurants(mergedPosts, restaurants));
+          console.log(`📍 Added ${newPosts.length} restaurant posts to nearby posts`);
+        }
+      }
+    } catch (error) {
+      console.log("Error fetching restaurant own posts:", error);
     }
   };
 
@@ -801,7 +864,7 @@ export default function LeaderboardScreen() {
       // Extract restaurants from the pins response (same as map view)
       const restaurants = response.data.restaurants || [];
       cachedNearbyRestaurants.current = restaurants;
-      setNearbyRestaurants(restaurants);
+      setNearbyRestaurants(mergeNearbyRestaurants(cachedNearbyPosts.current, restaurants));
       console.log(`📍 Found ${restaurants.length} onboarded restaurants within 3km (from pins endpoint)`);
     } catch (error) {
       console.log("Fetch nearby restaurants error:", error);
@@ -889,66 +952,164 @@ export default function LeaderboardScreen() {
     return "Unknown Location";
   };
 
-  // Group posts by location
-  const getGroupedLocations = () => {
+  const getRestaurantIdFromPost = (post: any) => {
+    if (post.tagged_restaurant_id) return post.tagged_restaurant_id;
+    if (post.restaurant_id) return post.restaurant_id;
+    if (post.account_type === 'restaurant') return post.user_id;
+    return null;
+  };
+
+  const getNearbyRestaurantCards = () => {
     const filteredPosts = getFilteredPosts();
-    const locationMap = new Map<string, any>();
+    const restaurantsSource =
+      nearbyRestaurants.length > 0
+        ? nearbyRestaurants
+        : mergeNearbyRestaurants(filteredPosts, []);
 
-    filteredPosts.forEach((post) => {
-      const locationName = getLocationName(post);
-      const locationKey = locationName.toLowerCase().trim();
+    return restaurantsSource
+      .map((restaurant: any) => {
+        const restaurantId = String(restaurant.id);
+        const posts = filteredPosts.filter(
+          (post: any) => String(getRestaurantIdFromPost(post)) === restaurantId
+        );
 
-      if (locationMap.has(locationKey)) {
-        const location = locationMap.get(locationKey);
-        location.posts.push(post);
-        // Update average rating
-        const ratings = location.posts.filter((p: any) => p.rating).map((p: any) => p.rating);
-        location.avgRating = ratings.length > 0
+        // Show all restaurants (like map does), not just ones with posts
+        const ratings = posts.filter((post: any) => post.rating).map((post: any) => post.rating);
+        const avgRating = ratings.length > 0
           ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length
-          : 0;
-        location.reviewCount = location.posts.filter((p: any) => p.rating).length;
-        // Update closest distance
-        if (userLocation && post.latitude && post.longitude) {
-          const dist = calculateDistanceKm(
-            userLocation.latitude,
-            userLocation.longitude,
-            post.latitude,
-            post.longitude
-          );
-          if (dist < location.distanceKm) {
-            location.distanceKm = dist;
-            location.closestPost = post;
-          }
-        }
-        // Check if any post has restaurant tagged (tagged_restaurant_id means menu is available)
-        if (post.tagged_restaurant_id) {
-          location.hasMenu = true;
-        }
-      } else {
-        let distanceKm = Infinity;
-        if (userLocation && post.latitude && post.longitude) {
+          : (restaurant.average_rating ?? 0);
+        const reviewCount = ratings.length > 0 ? ratings.length : (restaurant.review_count ?? 0);
+
+        let closestPost = posts[0] || null;
+        let distanceKm = restaurant.distance_km ?? Infinity;
+
+        // Calculate distance from user location
+        if (userLocation && restaurant.latitude && restaurant.longitude) {
           distanceKm = calculateDistanceKm(
             userLocation.latitude,
             userLocation.longitude,
-            post.latitude,
-            post.longitude
+            restaurant.latitude,
+            restaurant.longitude
           );
         }
-        locationMap.set(locationKey, {
-          id: locationKey,
-          name: locationName,
-          posts: [post],
-          avgRating: post.rating || 0,
-          reviewCount: post.rating ? 1 : 0,
-          hasMenu: !!post.tagged_restaurant_id,
-          distanceKm: distanceKm,
-          closestPost: post,
-        });
-      }
+
+        // Also check post distances if available
+        if (userLocation && posts.length > 0) {
+          posts.forEach((post: any) => {
+            if (!post.latitude || !post.longitude) return;
+            const dist = calculateDistanceKm(
+              userLocation.latitude,
+              userLocation.longitude,
+              post.latitude,
+              post.longitude
+            );
+            if (dist < distanceKm) {
+              distanceKm = dist;
+              closestPost = post;
+            }
+          });
+        }
+
+        // Get restaurant profile data if available
+        const profile = restaurantProfiles[restaurantId];
+
+        return {
+          ...restaurant,
+          // Use profile data for restaurant name if available
+          restaurant_name: profile?.restaurant_name || profile?.full_name || restaurant.restaurant_name || restaurant.name || restaurant.full_name,
+          name: profile?.restaurant_name || profile?.full_name || restaurant.name || restaurant.full_name,
+          profile_picture: profile?.profile_picture || restaurant.profile_picture,
+          food_type: profile?.food_type || restaurant.food_type,
+          distance_km: distanceKm,
+          distanceKm,
+          posts,
+          closestPost,
+          avgRating,
+          reviewCount,
+          hasMenu: posts.length > 0,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
+  };
+
+  const mergeNearbyRestaurants = (posts: any[], restaurants: any[]) => {
+    const restaurantMap = new Map<string, any>();
+
+    restaurants.forEach((restaurant: any) => {
+      if (!restaurant?.id) return;
+      restaurantMap.set(String(restaurant.id), { ...restaurant });
     });
 
-    // Convert to array and sort by distance
-    return Array.from(locationMap.values()).sort((a, b) => a.distanceKm - b.distanceKm);
+    posts.forEach((post: any) => {
+      const restaurantId =
+        post.tagged_restaurant_id ||
+        post.restaurant_id ||
+        (post.account_type === 'restaurant' ? post.user_id : null);
+
+      if (!restaurantId) return;
+
+      const key = String(restaurantId);
+      const existing = restaurantMap.get(key);
+
+      let distanceKm = existing?.distance_km ?? Infinity;
+      if (
+        userLocation &&
+        post.latitude &&
+        post.longitude
+      ) {
+        const postDistance = calculateDistanceKm(
+          userLocation.latitude,
+          userLocation.longitude,
+          post.latitude,
+          post.longitude
+        );
+        distanceKm = Math.min(distanceKm, postDistance);
+      }
+
+      // Look up fetched restaurant profile for accurate name
+      const profile = restaurantProfiles[String(restaurantId)];
+      const restaurantName =
+        profile?.restaurant_name ||
+        profile?.full_name ||
+        existing?.restaurant_name ||
+        existing?.name ||
+        existing?.full_name ||
+        post.restaurant_name ||
+        post.tagged_restaurant_name ||
+        post.full_name ||
+        post.username ||
+        post.user_name ||
+        post.name ||
+        'Restaurant';
+
+      const mergedRestaurant = {
+        id: restaurantId,
+        restaurant_name: restaurantName,
+        name: restaurantName,
+        profile_picture:
+          existing?.profile_picture ||
+          post.restaurant_profile_picture ||
+          post.user_profile_picture ||
+          post.profile_picture ||
+          post.profile_picture_url ||
+          null,
+        food_type: profile?.food_type ?? existing?.food_type ?? post.food_type ?? null,
+        latitude: existing?.latitude ?? post.latitude ?? null,
+        longitude: existing?.longitude ?? post.longitude ?? null,
+        distance_km: distanceKm,
+        average_rating: existing?.average_rating ?? post.average_rating ?? null,
+        review_count: existing?.review_count ?? post.review_count ?? 0,
+        is_verified: existing?.is_verified ?? post.is_verified ?? false,
+        bio: existing?.bio ?? post.bio ?? post.restaurant_bio ?? null,
+      };
+
+      restaurantMap.set(key, mergedRestaurant);
+    });
+
+    return Array.from(restaurantMap.values()).sort(
+      (a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity)
+    );
   };
 
   // Calculate distance in km (raw number for sorting)
@@ -1178,7 +1339,9 @@ export default function LeaderboardScreen() {
         <View style={styles.restaurantInfo}>
           <View style={styles.restaurantHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
+              <Text style={styles.restaurantName} numberOfLines={1}>
+                {restaurant.restaurant_name || restaurant.name || restaurant.full_name}
+              </Text>
               {restaurant.is_verified && (
                 <Ionicons name="checkmark-circle" size={16} color="#E94A37" style={{ marginLeft: 6 }} />
               )}
@@ -1243,34 +1406,50 @@ export default function LeaderboardScreen() {
   };
 
   const renderVendorCard = (vendor: any) => {
-    const displayImages = vendor.posts.slice(0, 3);
-    const extraCount = vendor.posts.length - 3;
+    const sortedPosts = [...(vendor.posts || [])].sort((a, b) => {
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bDate - aDate;
+    });
+    const displayImages = sortedPosts.slice(0, 5);
+    const extraCount = sortedPosts.length - 5;
+    const hasPosts = sortedPosts.length > 0;
 
     return (
       <View key={vendor.id} style={styles.vendorCard}>
         {/* Vendor Header */}
         <View style={styles.vendorHeader}>
-          <Text style={styles.vendorName}>{vendor.name}</Text>
+          <View style={styles.vendorNameRow}>
+            <Text style={styles.vendorName} numberOfLines={1}>
+              {vendor.restaurant_name || vendor.name || vendor.full_name}
+            </Text>
+            {vendor.food_type && (
+              <View style={styles.foodTypeBadgeContainer}>
+                {(vendor.food_type === 'veg' || vendor.food_type === 'veg_and_non_veg') && (
+                  <View style={[styles.foodTypeBadge, styles.vegBadge]}>
+                    <View style={styles.vegDot} />
+                  </View>
+                )}
+                {(vendor.food_type === 'non_veg' || vendor.food_type === 'veg_and_non_veg') && (
+                  <View style={[styles.foodTypeBadge, styles.nonVegBadge]}>
+                    <View style={styles.nonVegTriangle} />
+                  </View>
+                )}
+              </View>
+            )}
+            {vendor.is_verified && (
+              <Ionicons name="checkmark-circle" size={16} color="#1DA1F2" style={{ marginLeft: 4 }} />
+            )}
+          </View>
         </View>
 
-        {/* Distance and Rating Row */}
+        {/* Distance Row - Rating removed */}
         <View style={styles.vendorMetaRow}>
           {vendor.distanceKm !== Infinity && (
             <View style={styles.vendorMetaItem}>
               <Text style={styles.vendorMetaIcon}>📍</Text>
               <Text style={styles.vendorMetaText}>{formatDistance(vendor.distanceKm)} away</Text>
             </View>
-          )}
-          {vendor.reviewCount > 0 && (
-            <>
-              <Text style={styles.vendorMetaDot}>•</Text>
-              <View style={styles.vendorMetaItem}>
-                <Ionicons name="star" size={14} color="#FFD700" />
-                <Text style={styles.vendorMetaText}>
-                  {(vendor.avgRating / 2).toFixed(1)} ({vendor.reviewCount})
-                </Text>
-              </View>
-            </>
           )}
         </View>
 
@@ -1282,66 +1461,134 @@ export default function LeaderboardScreen() {
           </View>
         )}
 
-        {/* Image Thumbnails Row */}
-        <View style={styles.vendorImagesRow}>
-          {displayImages.map((post: any, index: number) => (
-            <TouchableOpacity
-              key={post.id || index}
-              onPress={() => {
-                setSelectedImage(fixUrl(post.media_url || post.thumbnail_url));
-                setFullImageModal(true);
-              }}
-              activeOpacity={0.9}
-            >
-              <Image
-                source={{
-                  uri: fixUrl(post.thumbnail_url || post.media_url),
-                  cache: 'force-cache'
-                }}
-                style={styles.vendorThumbnail}
-                resizeMode="cover"
-                onError={(error) => {
-                  console.log('Image load error for:', fixUrl(post.thumbnail_url || post.media_url), error);
-                }}
-              />
-            </TouchableOpacity>
-          ))}
-          {extraCount > 0 && (
-            <TouchableOpacity
-              style={styles.extraCountContainer}
-              onPress={() => {
-                router.push({
-                  pathname: "/location-posts",
-                  params: {
-                    posts: JSON.stringify(vendor.posts),
-                    locationName: vendor.name,
-                  },
-                });
-              }}
-              activeOpacity={0.9}
-            >
-              <Image
-                source={{
-                  uri: fixUrl(vendor.posts[3]?.thumbnail_url || vendor.posts[3]?.media_url),
-                  cache: 'force-cache'
-                }}
-                style={styles.extraCountImage}
-                resizeMode="cover"
-                blurRadius={3}
-              />
-              <View style={styles.extraCountOverlay}>
-                <Text style={styles.extraCountText}>+{extraCount}</Text>
+        {/* Image Section - Show posts/reviews if available, otherwise show profile picture */}
+        {hasPosts ? (
+          <View style={{ marginTop: 8 }}>
+            {/* First row - 3 images */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              {displayImages.slice(0, 3).map((post: any, index: number) => (
+                <TouchableOpacity
+                  key={post.id || index}
+                  onPress={() => {
+                    setSelectedImage(fixUrl(post.thumbnail_url || post.media_url || post.image_url));
+                    setFullImageModal(true);
+                  }}
+                  activeOpacity={0.9}
+                  style={{ flex: 1, marginHorizontal: 2 }}
+                >
+                  <Image
+                    source={{
+                      uri: fixUrl(post.thumbnail_url || post.media_url || post.image_url),
+                      cache: 'force-cache'
+                    }}
+                    style={{ width: '100%', aspectRatio: 1, borderRadius: 8 }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* Second row - 2 images + extra count if needed */}
+            {displayImages.length > 3 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-start' }}>
+                {displayImages.slice(3, 5).map((post: any, index: number) => (
+                  <TouchableOpacity
+                    key={post.id || `row2-${index}`}
+                    onPress={() => {
+                      setSelectedImage(fixUrl(post.thumbnail_url || post.media_url || post.image_url));
+                      setFullImageModal(true);
+                    }}
+                    activeOpacity={0.9}
+                    style={{ flex: 1, marginHorizontal: 2, maxWidth: '33%' }}
+                  >
+                    <Image
+                      source={{
+                        uri: fixUrl(post.thumbnail_url || post.media_url || post.image_url),
+                        cache: 'force-cache'
+                      }}
+                      style={{ width: '100%', aspectRatio: 1, borderRadius: 8 }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+                {extraCount > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      router.push({
+                        pathname: "/location-posts",
+                        params: {
+                          posts: JSON.stringify(vendor.posts),
+                          locationName: vendor.restaurant_name || vendor.name,
+                        },
+                      });
+                    }}
+                    activeOpacity={0.9}
+                    style={{ flex: 1, marginHorizontal: 2, maxWidth: '33%' }}
+                  >
+                    <View style={{ width: '100%', aspectRatio: 1, borderRadius: 8, overflow: 'hidden' }}>
+                      <Image
+                        source={{
+                          uri: fixUrl(
+                            sortedPosts[5]?.thumbnail_url ||
+                            sortedPosts[5]?.media_url ||
+                            sortedPosts[5]?.image_url
+                          ),
+                          cache: 'force-cache'
+                        }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                        blurRadius={8}
+                      />
+                      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>+{extraCount}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                )}
               </View>
-            </TouchableOpacity>
-          )}
-        </View>
+            )}
+          </View>
+        ) : (
+          /* Restaurant without posts - show profile picture or placeholder */
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, marginTop: 8 }}>
+            {vendor.profile_picture ? (
+              <Image
+                source={{ uri: fixUrl(vendor.profile_picture) }}
+                style={{ width: 60, height: 60, borderRadius: 30, marginRight: 12 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                <Ionicons name="restaurant" size={30} color="#fff" />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, color: '#666' }}>
+                {vendor.bio || 'Visit this restaurant to see their menu'}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Place Order Button */}
         <TouchableOpacity
-          style={styles.vendorOrderButton}
-          onPress={() => handleOrderClick(vendor.closestPost)}
+          style={[styles.vendorOrderButton, { marginTop: 12 }]}
+          onPress={() => {
+            // If restaurant has posts, use closestPost; otherwise create a post-like object
+            const orderPost = vendor.closestPost
+              ? (vendor.closestPost.tagged_restaurant_id
+                  ? vendor.closestPost
+                  : { ...vendor.closestPost, tagged_restaurant_id: vendor.id })
+              : {
+                  // Create post-like object for restaurants without posts
+                  tagged_restaurant_id: vendor.id,
+                  latitude: vendor.latitude,
+                  longitude: vendor.longitude,
+                  location_name: vendor.restaurant_name || vendor.name,
+                };
+            handleOrderClick(orderPost);
+          }}
         >
-          <Text style={styles.vendorOrderText}>Place Order</Text>
+          <Text style={styles.vendorOrderText}>ORDER NOW</Text>
         </TouchableOpacity>
       </View>
     );
@@ -1506,7 +1753,7 @@ export default function LeaderboardScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              getGroupedLocations().map((location) => renderVendorCard(location))
+              getNearbyRestaurantCards().map((restaurant) => renderVendorCard(restaurant))
             )}
           </>
         ) : activeTab === "In Progress" ? (
@@ -2366,9 +2613,17 @@ export default function LeaderboardScreen() {
           style={styles.centerNavItem}
           onPress={() => router.push("/leaderboard")}
         >
-          <View style={styles.centerIconCircle}>
-            <Ionicons name="fast-food" size={22} color="#000" />
-          </View>
+          {/* Gradient border wrapper - active state */}
+          <LinearGradient
+            colors={['#FF8C00', '#E94A37']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.centerIconGradient}
+          >
+            <View style={styles.centerIconCircleActive}>
+              <Ionicons name="fast-food" size={22} color="#000" />
+            </View>
+          </LinearGradient>
           <Text style={styles.navLabelActive}>
             {accountType === 'restaurant' ? 'ORDERS' : 'Delivery'}
           </Text>
@@ -2715,6 +2970,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
+  },
+  centerIconGradient: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  centerIconCircleActive: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
   },
   navLabel: {
     fontSize: 11,
@@ -3290,6 +3566,12 @@ const styles = StyleSheet.create({
   vendorHeader: {
     marginBottom: 8,
   },
+  vendorNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
   vendorName: {
     fontSize: 18,
     fontWeight: "700",
@@ -3334,10 +3616,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#4CAF50",
   },
-  vendorImagesRow: {
-    flexDirection: "row",
+  vendorImageGrid: {
     gap: 4,
     marginBottom: 14,
+  },
+  vendorImageRow: {
+    flexDirection: "row",
+    gap: 4,
   },
   vendorThumbnail: {
     width: 85,
@@ -3370,6 +3655,41 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+  foodTypeBadgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  foodTypeBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  vegBadge: {
+    borderColor: "#4CAF50",
+  },
+  nonVegBadge: {
+    borderColor: "#D32F2F",
+  },
+  vegDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#4CAF50",
+  },
+  nonVegTriangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderBottomWidth: 7,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#D32F2F",
   },
   vendorOrderButton: {
     alignItems: "center",

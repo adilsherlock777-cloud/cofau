@@ -1014,7 +1014,14 @@ const renderPost = useCallback(
           style={styles.navItem}
           onPress={() => router.push("/feed")}
         >
-          <Ionicons name="home" size={20} color="#000" />
+          <LinearGradient
+            colors={['#FF8C00', '#E94A37']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.navIconGradient}
+          >
+            <Ionicons name="home" size={18} color="#fff" />
+          </LinearGradient>
           <Text style={styles.navLabelActive}>Home</Text>
         </TouchableOpacity>
 
@@ -1405,6 +1412,27 @@ cofauGradient: {
     shadowOpacity: 0.3,
     shadowRadius: 6,
   },
+  centerIconGradient: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  centerIconCircleInner: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   navLabel: {
     fontSize: 11,
     color: "#000",
@@ -1418,6 +1446,13 @@ cofauGradient: {
     marginTop: 2,
     textAlign: "center",
     fontWeight: "700",
+  },
+  navIconGradient: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalOverlay: {
     flex: 1,

@@ -472,7 +472,9 @@ export default function HappeningPlaces() {
               <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-              <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={20} color="#000" />
+              <LinearGradient colors={['#FF8C00', '#E94A37']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.navIconGradient}>
+                <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={18} color="#fff" />
+              </LinearGradient>
               <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
@@ -554,7 +556,14 @@ export default function HappeningPlaces() {
               style={styles.navItem}
               onPress={() => router.push('/happening')}
             >
-              <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={20} color="#000" />
+              <LinearGradient
+                colors={['#FF8C00', '#E94A37']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.navIconGradient}
+              >
+                <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={18} color="#fff" />
+              </LinearGradient>
               <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
             </TouchableOpacity>
 
@@ -804,7 +813,14 @@ export default function HappeningPlaces() {
             style={styles.navItem}
             onPress={() => router.push('/happening')}
           >
-            <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={20} color="#000" />
+            <LinearGradient
+              colors={['#FF8C00', '#E94A37']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.navIconGradient}
+            >
+              <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={18} color="#fff" />
+            </LinearGradient>
             <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
           </TouchableOpacity>
 
@@ -1279,6 +1295,14 @@ skeletonImageLarge: {
     marginTop: 2,
     textAlign: 'center',
     fontWeight: '700',
+  },
+
+  navIconGradient: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Center elevated item
