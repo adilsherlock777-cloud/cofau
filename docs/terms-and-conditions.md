@@ -1,6 +1,6 @@
 Terms & Conditions
 
-Last updated: January 2026
+Last updated: February 2026
 
 Welcome to Cofau (“App”, “we”, “our”, “us”).
 By accessing or using Cofau, you agree to be bound by these Terms & Conditions. If you do not agree, please do not use the App.
