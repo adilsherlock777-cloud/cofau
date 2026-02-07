@@ -33,11 +33,11 @@ Profile information
 
 By posting content, you agree that:
 
-You own the content or have permission to post it.
+You own the content or have permission to post it
 
-Your content does not violate any laws, copyrights, or third-party rights.
+Your content does not violate any laws, copyrights, or third-party rights
 
-Your content is not abusive, hateful, misleading, or inappropriate.
+Your content is not abusive, hateful, misleading, or inappropriate
 
 Cofau reserves the right to remove any content that violates these terms or community standards.
 
@@ -77,15 +77,37 @@ Location tagging is optional and user-controlled.
 
 Cofau does not track users in the background.
 
-Location data is used only to enhance content discovery.
+Location data is used only to enhance content discovery and user experience.
 
-8. Intellectual Property
+8. Map Viewing and Ordering Features ✅ (NEW SECTION)
+
+Cofau provides map-based features that allow users to:
+
+View places, cafes, or services on an interactive map
+
+Discover nearby locations based on user-selected preferences
+
+Place orders or requests through the app (where available)
+
+Important points:
+
+Map visibility depends on user-enabled location permissions
+
+Orders are initiated by users voluntarily
+
+Cofau acts as a platform only and does not guarantee availability, pricing, delivery time, or quality of third-party services
+
+Any disputes related to orders, payments, or fulfillment should be resolved with the respective service provider
+
+Cofau is not responsible for delays, cancellations, or issues arising from third-party providers.
+
+9. Intellectual Property
 
 Cofau branding, logos, design, and app content are owned by Cofau.
 
 You may not copy, modify, or distribute any part of the app without permission.
 
-9. Termination
+10. Termination
 
 We may suspend or terminate your access:
 
@@ -97,32 +119,32 @@ At our discretion with or without notice
 
 You may stop using the app at any time.
 
-10. Disclaimer
+11. Disclaimer
 
 Cofau is provided “as is” without warranties of any kind.
+
 We do not guarantee uninterrupted or error-free service.
 
-11. Limitation of Liability
+12. Limitation of Liability
 
 To the maximum extent permitted by law:
 
 Cofau shall not be liable for indirect or consequential damages
 
-Cofau is not responsible for user-generated content
+Cofau is not responsible for user-generated content or third-party services
 
-12. Changes to These Terms
+13. Changes to These Terms
 
 We may update these Terms from time to time.
+
 Continued use of the app means acceptance of the updated terms.
 
-13. Governing Law
+14. Governing Law
 
 These Terms are governed by the laws applicable in India, without regard to conflict of law principles.
 
-14. Contact Information
+15. Contact Information
 
 For questions regarding these Terms:
 
-Phone: 8296534353
-
-🌐 Website: GitHub Pages (this page)
+📞 Phone: 8296534353
