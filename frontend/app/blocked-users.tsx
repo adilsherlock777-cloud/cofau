@@ -28,11 +28,18 @@ export default function BlockedUsersScreen() {
   const fetchBlockedUsers = async () => {
     try {
       setLoading(true);
+      console.log('📋 Fetching blocked users...');
       const users = await getBlockedUsers();
+      console.log('✅ Blocked users fetched:', users);
       setBlockedUsers(users);
-    } catch (error) {
-      console.error('Error fetching blocked users:', error);
-      Alert.alert('Error', 'Failed to load blocked users');
+    } catch (error: any) {
+      console.error('❌ Error fetching blocked users:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      Alert.alert('Error', `Failed to load blocked users: ${error.response?.data?.detail || error.message}`);
     } finally {
       setLoading(false);
     }

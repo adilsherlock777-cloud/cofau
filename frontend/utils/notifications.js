@@ -72,16 +72,13 @@ export const markAllNotificationsAsRead = async (token) => {
 };
 
 /**
- * Format timestamp to "time ago" format
+ * Format timestamp to date format
  */
 export const formatTimeAgo = (timestamp) => {
-  const now = new Date();
-  const then = new Date(timestamp);
-  const seconds = Math.floor((now - then) / 1000);
-
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
-  return `${Math.floor(seconds / 604800)}w`;
+  const date = new Date(timestamp);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
 };

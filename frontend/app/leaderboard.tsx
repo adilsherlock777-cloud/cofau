@@ -14,6 +14,7 @@ import {
   Modal,
   TextInput,
   Linking,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -1093,7 +1094,10 @@ export default function LeaderboardScreen() {
     return (
       <View key={restaurant.id} style={styles.restaurantCard}>
         <Image
-          source={{ uri: restaurant.image }}
+          source={{
+            uri: restaurant.image,
+            cache: 'force-cache'
+          }}
           style={styles.restaurantImage}
           resizeMode="cover"
         />
@@ -1199,15 +1203,21 @@ export default function LeaderboardScreen() {
             <TouchableOpacity
               key={post.id || index}
               onPress={() => {
-                setSelectedImage(fixUrl(post.thumbnail_url || post.media_url));
+                setSelectedImage(fixUrl(post.media_url || post.thumbnail_url));
                 setFullImageModal(true);
               }}
               activeOpacity={0.9}
             >
               <Image
-                source={{ uri: fixUrl(post.thumbnail_url || post.media_url) }}
+                source={{
+                  uri: fixUrl(post.thumbnail_url || post.media_url),
+                  cache: 'force-cache'
+                }}
                 style={styles.vendorThumbnail}
                 resizeMode="cover"
+                onError={(error) => {
+                  console.log('Image load error for:', fixUrl(post.thumbnail_url || post.media_url), error);
+                }}
               />
             </TouchableOpacity>
           ))}
@@ -1226,7 +1236,10 @@ export default function LeaderboardScreen() {
               activeOpacity={0.9}
             >
               <Image
-                source={{ uri: fixUrl(vendor.posts[3]?.thumbnail_url || vendor.posts[3]?.media_url) }}
+                source={{
+                  uri: fixUrl(vendor.posts[3]?.thumbnail_url || vendor.posts[3]?.media_url),
+                  cache: 'force-cache'
+                }}
                 style={styles.extraCountImage}
                 resizeMode="cover"
                 blurRadius={3}
@@ -1355,7 +1368,7 @@ export default function LeaderboardScreen() {
                   )}
                 </LinearGradient>
               ) : (
-                <View style={styles.tabInner}>
+                <View style={[styles.tabInner, styles.tabInnerInactive]}>
                   <Text style={styles.tabText}>{tab}</Text>
                   {showBadge && (
                     <View style={styles.tabBadge}>
@@ -1602,7 +1615,7 @@ export default function LeaderboardScreen() {
                     {!isRestaurant && (
                       <TouchableOpacity
                         style={styles.supportButton}
-                        onPress={() => Linking.openURL('tel:8296534353')}
+                        onPress={() => Linking.openURL('tel:9964704777')}
                       >
                         <Ionicons name="call" size={18} color="#FFF" />
                         <Text style={styles.supportButtonText}>Contact Support</Text>
@@ -2008,7 +2021,10 @@ export default function LeaderboardScreen() {
             <Ionicons name="close-circle" size={36} color="#FFF" />
           </TouchableOpacity>
           <Image
-            source={{ uri: selectedImage || "" }}
+            source={{
+              uri: selectedImage || "",
+              cache: 'force-cache'
+            }}
             style={styles.fullImage}
             resizeMode="contain"
           />
@@ -2350,7 +2366,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   tabsScrollView: {
-    maxHeight: 50,
+    maxHeight: Platform.OS === 'android' ? 60 : 50,
     backgroundColor: "#FFFFFF",
     flexGrow: 0, // Prevent unnecessary growth
   },
@@ -2366,21 +2382,25 @@ const styles = StyleSheet.create({
   },
   tabInner: {
     paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
     gap: 6,
   },
+  tabInnerInactive: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 0,
+  },
   tabText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#666",
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#000",
   },
   activeTabText: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "bold",
     color: "#FFFFFF",
   },
   tabBadge: {
@@ -2921,8 +2941,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   fullImage: {
-    width: "100%",
-    height: "100%",
+    width: Dimensions.get("window").width,
+    height: Dimensions.get("window").height,
   },
   emptySubtext: {
     fontSize: 14,
@@ -3238,7 +3258,7 @@ const styles = StyleSheet.create({
   },
   vendorImagesRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 4,
     marginBottom: 14,
   },
   vendorThumbnail: {

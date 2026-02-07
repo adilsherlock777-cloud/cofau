@@ -2233,25 +2233,26 @@ async def search_posts(
 ):
     """
     Search posts with intelligent ranking algorithm.
-    Searches across: review_text, location_name, and username.
+    Searches across: review_text, location_name, dish_name, and username.
     """
     if not q or not q.strip():
         return []
-    
+
     db = get_database()
     query = q.strip().lower()
-    
+
     # ✅ ADD THIS: Get blocked user IDs
     blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
-    
+
     # Build MongoDB query to search across multiple fields
     search_regex = {"$regex": query, "$options": "i"}  # ✅ FIXED: Use 'query' instead of 'query_text'
-    
+
     # ✅ MODIFY THIS: Exclude blocked users from search
     search_query = {
         "$or": [
             {"review_text": search_regex},
             {"location_name": search_regex},
+            {"dish_name": search_regex},
         ]
     }
     if blocked_user_ids:
@@ -2289,14 +2290,22 @@ async def search_posts(
         score = 0
         review_text = (post.get("review_text") or "").lower()
         location_name = (post.get("location_name") or "").lower()
-        
-        # Exact match in review_text (highest score)
+        dish_name = (post.get("dish_name") or "").lower()
+
+        # Exact match in dish_name (highest priority - most specific)
+        if query in dish_name:
+            if dish_name.startswith(query):
+                score += 110  # Dish name starts with query - highest relevance
+            else:
+                score += 95   # Dish name contains query
+
+        # Exact match in review_text
         if query in review_text:
             if review_text.startswith(query) or review_text.endswith(query):
                 score += 100  # Starts or ends with query
             else:
                 score += 80   # Contains query
-        
+
         # Exact match in location_name
         if query in location_name:
             if location_name.startswith(query):

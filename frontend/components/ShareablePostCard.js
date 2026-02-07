@@ -24,27 +24,18 @@ export default function ShareablePostCard({ post, appName = "Cofau" }) {
     post.user_profile_pic
   );
 
-  // Format time ago
+  // Format date
   const getTimeAgo = (dateString) => {
-    if (!dateString) return "Just now";
+    if (!dateString) return "";
     try {
       const date = new Date(dateString);
-      const now = new Date();
-      const diffInSeconds = Math.floor((now - date) / 1000);
-
-      if (diffInSeconds < 60) return "Just now";
-      if (diffInSeconds < 3600) {
-        const minutes = Math.floor(diffInSeconds / 60);
-        return `${minutes}m`;
-      }
-      if (diffInSeconds < 86400) {
-        const hours = Math.floor(diffInSeconds / 3600);
-        return `${hours}h`;
-      }
-      const days = Math.floor(diffInSeconds / 86400);
-      return `${days}d`;
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
     } catch (e) {
-      return "Just now";
+      return "";
     }
   };
 

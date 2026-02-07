@@ -438,16 +438,11 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
   const formatTime = (timestamp: string | null | undefined): string => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const mins = Math.floor(diff / 60000);
-    const hrs = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-    if (mins < 1) return "Just now";
-    if (mins < 60) return `${mins}m ago`;
-    if (hrs < 24) return `${hrs}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
  const handleDoubleTap = () => {
   const now = Date.now();
@@ -1032,6 +1027,17 @@ function PostItem({ post, currentPostId, token, bottomInset }: any) {
     </View>
   )
 )}
+
+              {/* DISH NAME Section */}
+              {post.dish_name && (
+                <View style={styles.detailsCard}>
+                  <View style={styles.detailsCardHeader}>
+                    <Ionicons name="restaurant" size={16} color="#FFD700" />
+                    <Text style={styles.detailsCardLabel}>DISH NAME</Text>
+                  </View>
+                  <Text style={styles.detailsDishName}>{post.dish_name}</Text>
+                </View>
+              )}
 
               {/* REVIEW Section (Regular User) OR ABOUT Section (Restaurant) */}
 {post.account_type === 'restaurant' || post.is_restaurant_post ? (
@@ -1805,6 +1811,12 @@ heartAnimationContainer: {
   },
 
   detailsRatingValue: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#333",
+  },
+
+  detailsDishName: {
     fontSize: 15,
     fontWeight: "700",
     color: "#333",

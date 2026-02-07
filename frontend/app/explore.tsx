@@ -157,6 +157,11 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout }: any) =>
           <Text style={styles.viewsText}>{item.views_count > 1000 ? `${(item.views_count / 1000).toFixed(1)}K` : item.views_count}</Text>
         </View>
       )}
+      {item.dish_name && (
+        <View style={styles.dishNameTag}>
+          <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 });
@@ -1632,8 +1637,8 @@ const handleQuickCategoryPress = (category: any) => {
   } catch (err) {
     console.log('Analytics tracking error:', err);
   }
-  
-  router.push(`/restaurant/${restaurant.id}`);
+
+  router.push(`/profile?userId=${restaurant.id}`);
 };
 
   const handleViewPost = async (post: any) => {

@@ -2296,7 +2296,7 @@ const renderRestaurantProfile = () => {
 
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
-                onPress={() => router.push('/chat')}
+                onPress={() => router.push(`/chat/${userData?.id}`)}
               >
                 <LinearGradient
                   colors={['#FF2E2E', '#FF7A18']}
@@ -3916,7 +3916,12 @@ if (isRestaurantProfile) {
 </View>
         </View>
         {/* Stats Section */}
-<View style={styles.statsContainer}>
+<LinearGradient
+  colors={["#FFF5F0", "#FFE5D9"]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0 }}
+  style={styles.statsContainer}
+>
   <View style={styles.statBox}>
     <Text style={styles.statValue}>
       {userStats?.total_posts || 0}
@@ -3968,7 +3973,7 @@ if (isRestaurantProfile) {
       Compliments
     </Text>
   </View>
-</View>
+</LinearGradient>
         
 
         {/* Action Buttons with Gradient */}
@@ -4044,7 +4049,7 @@ if (isRestaurantProfile) {
               {/* Message Button */}
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
-                onPress={() => router.push('/chat')}
+                onPress={() => router.push(`/chat/${userData?.id}`)}
               >
                 <LinearGradient
                   colors={['#FF2E2E', '#FF7A18']}
@@ -5025,6 +5030,7 @@ cornerBottomLeft: {
 },
 actionButtonWrapperLight: {
   flex: 1,
+  maxWidth: 140,
   borderRadius: 20,
 },
 actionButtonLight: {
@@ -6336,19 +6342,18 @@ profilePictureContainer: {
 
 statsContainer: {
   flexDirection: 'row',
-  backgroundColor: '#fff',
   marginHorizontal: 16,
-  marginVertical: 16,
-  borderRadius: 16,
-  paddingVertical: 16,
-  paddingHorizontal: 8,
+  marginVertical: 12,
+  borderRadius: 14,
+  paddingVertical: 10,
+  paddingHorizontal: 6,
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.1,
   shadowRadius: 8,
   elevation: 4,
   alignItems: 'center',
-  justifyContent: 'space-evenly',  
+  justifyContent: 'space-evenly',
 },
 statBox: {
   flex: 1,
@@ -6358,29 +6363,31 @@ statBox: {
 },
 statDivider: {
   width: 1,
-  height: 40,
-  backgroundColor: '#D0D0D0',  
+  height: 30,
+  backgroundColor: '#D0D0D0',
   alignSelf: 'center',
 },
   statValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#666',
   },
 
   actionButtonsContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
     paddingHorizontal: 20,
     gap: 16,
     marginBottom: 8,
   },
   actionButtonWrapper: {
     flex: 1,
+    maxWidth: 140,
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 8 },

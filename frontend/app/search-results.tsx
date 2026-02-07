@@ -552,7 +552,7 @@ export default function SearchResultsScreen() {
         <Ionicons name="search" size={20} color="#777" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by name or location..."
+          placeholder="Search by dish, name, or location..."
           placeholderTextColor="#999"
           value={searchQuery}
           onChangeText={setSearchQuery}

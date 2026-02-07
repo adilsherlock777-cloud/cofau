@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${API_BASE_URL}/api`;
@@ -16,7 +17,7 @@ const api = axios.create({
 // Add request interceptor to automatically include Authorization header
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('userToken');
+    const token = await storage.getItem('userToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -30,7 +31,7 @@ api.interceptors.request.use(
 // Add request interceptor for global axios instance as well
 axios.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('userToken');
+    const token = await storage.getItem('userToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -66,9 +67,12 @@ export const createPost = async (postData) => {
     if (postData.category) {
       formData.append('category', postData.category);  // ✅ Add category
     }
+    if (postData.dish_name) {
+      formData.append('dish_name', postData.dish_name);  // ✅ Add dish name
+    }
     if (postData.tagged_restaurant_id) {                          // ← ADD THIS
       formData.append('tagged_restaurant_id', postData.tagged_restaurant_id);  // ← ADD THIS
-    }        
+    }
     if (postData.media_type) {
       formData.append('media_type', postData.media_type);
     }
@@ -98,6 +102,7 @@ export const createPost = async (postData) => {
       map_link: postData.map_link,
       location_name: postData.location_name,
       category: postData.category,
+      dish_name: postData.dish_name,
       tagged_restaurant_id: postData.tagged_restaurant_id,
       media_type: postData.media_type,
       file: postData.file?.name || postData.file?.uri || 'unknown'
@@ -507,8 +512,21 @@ export const unblockUser = async (userId) => {
 };
 
 export const getBlockedUsers = async () => {
-  const response = await axios.get(`${API_URL}/users/blocked-list`);
-  return response.data;
+  try {
+    console.log('🔍 getBlockedUsers: Calling API endpoint:', `${API_URL}/users/blocked-list`);
+    const response = await axios.get(`${API_URL}/users/blocked-list`);
+    console.log('✅ getBlockedUsers: Response received:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ getBlockedUsers: Error occurred:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+      headers: error.config?.headers
+    });
+    throw error;
+  }
 };
 
 export const createRestaurantPost = async (postData) => {
@@ -527,6 +545,9 @@ export const createRestaurantPost = async (postData) => {
     }
     if (postData.category) {
       formData.append('category', postData.category);
+    }
+    if (postData.dish_name) {
+      formData.append('dish_name', postData.dish_name);  // ✅ Add dish name for restaurant posts
     }
     if (postData.media_type) {
       formData.append('media_type', postData.media_type);
@@ -553,6 +574,7 @@ export const createRestaurantPost = async (postData) => {
       map_link: postData.map_link,
       location_name: postData.location_name,
       category: postData.category,
+      dish_name: postData.dish_name,
       media_type: postData.media_type,
     });
 

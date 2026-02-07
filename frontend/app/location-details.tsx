@@ -9,6 +9,7 @@ import {
   Dimensions,
   TextInput,
   Modal,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -134,6 +135,15 @@ export default function LocationDetailsScreen() {
     return "";
   });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  // Function to open Google Maps with location
+  const openGoogleMaps = () => {
+    const locationQuery = encodeURIComponent(decodedLocationName);
+    const url = `https://www.google.com/maps/search/?api=1&query=${locationQuery}`;
+    Linking.openURL(url).catch((err) => {
+      console.error("Failed to open Google Maps:", err);
+    });
+  };
 
   const decodedLocationName = locationName
     ? decodeURIComponent(locationName as string)
@@ -313,39 +323,27 @@ export default function LocationDetailsScreen() {
             onChangeText={setSearchQuery}
           />
           
-          {/* ✅ Category Filter Button Inside Search Bar */}
-          <TouchableOpacity 
-            style={[
-              styles.inlineFilterButton,
-              selectedCategory && selectedCategory !== 'All' && styles.inlineFilterButtonActive
-            ]}
-            onPress={() => setShowCategoryModal(true)}
+          {/* ✅ Get Directions Button Inside Search Bar */}
+          <TouchableOpacity
+            onPress={openGoogleMaps}
             activeOpacity={0.7}
+            style={styles.directionsButtonWrapper}
           >
-            <Ionicons 
-              name={selectedCategory && selectedCategory !== 'All' ? "filter" : "options-outline"} 
-              size={18} 
-              color="#FFF" 
-            />
-            <Text style={styles.inlineFilterText} numberOfLines={1}>
-              {selectedCategory && selectedCategory !== 'All' 
-                ? (selectedCategory.length > 10 
-                    ? selectedCategory.substring(0, 10) + '...' 
-                    : selectedCategory)
-                : 'Category'}
-            </Text>
-            {selectedCategory && selectedCategory !== 'All' && (
-              <TouchableOpacity
-                style={styles.clearCategoryIcon}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setSelectedCategory('');
-                }}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close-circle" size={16} color="#FFF" />
-              </TouchableOpacity>
-            )}
+            <LinearGradient
+              colors={['#FF2E2E', '#FF7A18']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.inlineFilterButton}
+            >
+              <Ionicons
+                name="navigate"
+                size={18}
+                color="#FFF"
+              />
+              <Text style={styles.inlineFilterText} numberOfLines={1}>
+                Get Directions
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -511,19 +509,21 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
 
-  // ✅ Inline filter button inside search bar
+  // ✅ Inline Get Directions button wrapper
+  directionsButtonWrapper: {
+    marginLeft: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+
+  // ✅ Inline Get Directions button inside search bar
   inlineFilterButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1B7C82",
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    marginLeft: 8,
     gap: 4,
-    borderWidth: 1,
-    borderColor: "#000",
-    minWidth: 80,
   },
   inlineFilterButtonActive: {
     backgroundColor: "#E94A37",
@@ -532,7 +532,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#FFF",
     fontWeight: "600",
-    maxWidth: 80,
   },
   clearCategoryIcon: {
     marginLeft: 2,

@@ -190,7 +190,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
     setLoadingPosts(true);
     try {
       const response = await axios.get(
-        `${BACKEND_URL}/api/restaurant/posts/public/${restaurantId}`
+        `${BACKEND_URL}/api/restaurant/posts/public/restaurant/${restaurantId}`
       );
       setRestaurantPosts(response.data || []);
     } catch (error) {
@@ -205,8 +205,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
     setLoadingReviews(true);
     try {
       const response = await axios.get(
-        `${BACKEND_URL}/api/orders/restaurant-reviews/${restaurantId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${BACKEND_URL}/api/restaurant/posts/reviews/${restaurantId}`
       );
       setRestaurantReviews(response.data || []);
     } catch (error) {
@@ -603,7 +602,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                           />
                         </TouchableOpacity>
                       )}
-                      {restaurantDetails.posts_count !== undefined && !isGoogleMapsRestaurant && (
+                      {!isGoogleMapsRestaurant && (
                         <TouchableOpacity
                           style={[styles.statItem, styles.menuStatItem, activeTab === 'posts' && styles.menuStatItemActive]}
                           onPress={() => {
@@ -620,7 +619,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                         >
                           <Ionicons name="images" size={16} color={activeTab === 'posts' ? "#FFF" : "#FF8C00"} />
                           <Text style={[styles.statText, activeTab === 'posts' && styles.statTextActive]}>
-                            {restaurantDetails.posts_count} Posts
+                            Posts {restaurantPosts.length > 0 ? `(${restaurantPosts.length})` : ""}
                           </Text>
                           <Ionicons
                             name={activeTab === 'posts' ? "chevron-up" : "chevron-down"}
@@ -629,7 +628,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                           />
                         </TouchableOpacity>
                       )}
-                      {restaurantDetails.reviews_count !== undefined && !isGoogleMapsRestaurant && (
+                      {!isGoogleMapsRestaurant && (
                         <TouchableOpacity
                           style={[styles.statItem, styles.menuStatItem, activeTab === 'reviews' && styles.menuStatItemActive]}
                           onPress={() => {
@@ -646,7 +645,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                         >
                           <Ionicons name="star" size={16} color={activeTab === 'reviews' ? "#FFF" : "#FFD700"} />
                           <Text style={[styles.statText, activeTab === 'reviews' && styles.statTextActive]}>
-                            {restaurantDetails.reviews_count} Reviews
+                            Reviews {restaurantReviews.length > 0 ? `(${restaurantReviews.length})` : ""}
                           </Text>
                           <Ionicons
                             name={activeTab === 'reviews' ? "chevron-up" : "chevron-down"}

@@ -372,17 +372,17 @@ async def search_map_pins(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Search for posts on map by keyword (category, location_name, review_text).
+    Search for posts on map by keyword (category, location_name, dish_name, review_text).
     Only returns results within the specified radius.
     """
     db = get_database()
-    
+
     if not q or not q.strip():
         return {"results": [], "query": q, "total": 0}
-    
+
     query_text = q.strip()
     search_regex = {"$regex": query_text, "$options": "i"}
-    
+
     # Search posts matching the query
     posts = await db.posts.find({
         "$and": [
@@ -390,6 +390,7 @@ async def search_map_pins(
             {"$or": [
                 {"category": search_regex},
                 {"location_name": search_regex},
+                {"dish_name": search_regex},
                 {"review_text": search_regex}
             ]}
         ]
@@ -434,6 +435,7 @@ async def search_map_pins(
                     "rating": post.get("rating"),
                     "location_name": post.get("location_name"),
                     "category": post.get("category"),
+                    "dish_name": post.get("dish_name"),
                     "review_text": post.get("review_text", ""),
                     "likes_count": post.get("likes_count", 0),
                     "comments_count": post.get("comments_count", 0),

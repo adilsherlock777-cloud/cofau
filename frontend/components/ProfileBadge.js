@@ -125,15 +125,14 @@ export default function ProfileBadge({
           </Text>
 
           {/* Close button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.closeButtonWrapper}
             onPress={() => setShowLevelInfo(false)}
           >
             <LinearGradient
-              colors={['#E94A37', '#F2CF68', '#1B7C82']}
+              colors={['#FF7A18', '#FF2E2E']}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              locations={[0, 0.35, 0.9]}
+              end={{ x: 1, y: 0 }}
               style={styles.closeButton}
             >
               <Text style={styles.closeButtonText}>Got it</Text>
@@ -161,7 +160,7 @@ export default function ProfileBadge({
         
         {/* Username below DP */}
         <Text style={styles.usernameText} numberOfLines={1}>
-          {username}
+          {username && username.length > 10 ? `${username.substring(0, 10)}...` : username}
         </Text>
       </View>
 

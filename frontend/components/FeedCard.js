@@ -81,8 +81,8 @@ function FeedCard({
 }) {
   // Add debug log HERE - inside the function
 
-  // Debug: Check if tagged_restaurant data is coming through
-  console.log('🏷️ FeedCard - Post ID:', post.id, '| Tagged Restaurant:', post.tagged_restaurant);
+  // Debug: Check if tagged_restaurant and dish_name data is coming through
+  console.log('🏷️ FeedCard - Post ID:', post.id, '| Tagged Restaurant:', post.tagged_restaurant, '| Dish Name:', post.dish_name);
 
   if (post.tagged_restaurant) {
     console.log('✅ Has tagged_restaurant:', {
@@ -91,6 +91,12 @@ function FeedCard({
     });
   } else {
     console.log('❌ No tagged_restaurant data for post', post.id);
+  }
+
+  if (post.dish_name) {
+    console.log('✅ Has dish_name:', post.dish_name);
+  } else {
+    console.log('❌ No dish_name for post', post.id);
   }
 
   const router = useRouter();
@@ -775,6 +781,15 @@ postId={post.id}
         </Text>
       </TouchableOpacity>
     ) : null}
+
+    {/* Dish Name Overlay - Bottom left */}
+    {post.dish_name ? (
+      <View style={styles.dishNameOverlay}>
+        <Text style={styles.dishNameOverlayText} numberOfLines={1}>
+          {post.dish_name}
+        </Text>
+      </View>
+    ) : null}
   </Pressable>
 )}
 
@@ -1171,6 +1186,23 @@ restaurantTagOverlay: {
 restaurantTagText: {
   color: '#FFF',
   fontSize: 12,
+  fontWeight: '600',
+},
+
+dishNameOverlay: {
+  position: 'absolute',
+  bottom: 12,
+  left: 12,
+  backgroundColor: 'rgba(233, 74, 55, 0.9)',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 8,
+  maxWidth: '60%',
+  zIndex: 20,
+},
+dishNameOverlayText: {
+  color: '#FFF',
+  fontSize: 11,
   fontWeight: '600',
 },
 
