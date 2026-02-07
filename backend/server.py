@@ -2984,6 +2984,47 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
     }
 
 
+# NOTE: This route MUST be before /api/users/{user_id} to avoid route conflict
+@app.get("/api/users/blocked-list")
+async def get_blocked_users_list(current_user: dict = Depends(get_current_user)):
+    """Get list of blocked users"""
+    db = get_database()
+
+    # Get all blocks for current user
+    blocks = await db.blocks.find({
+        "blocker_id": str(current_user["_id"])
+    }).to_list(None)
+
+    result = []
+    for block in blocks:
+        blocked_id = block.get("blocked_id")
+        try:
+            blocked_object_id = ObjectId(blocked_id)
+        except (InvalidId, TypeError):
+            print(f"⚠️ Skipping invalid blocked user id: {blocked_id}")
+            continue
+
+        user = await db.users.find_one({"_id": blocked_object_id})
+        if user:
+            created_at = block.get("created_at")
+            if isinstance(created_at, datetime):
+                blocked_at = created_at.isoformat() + "Z"
+            elif created_at is None:
+                blocked_at = None
+            else:
+                blocked_at = str(created_at)
+            result.append({
+                "id": str(user["_id"]),
+                "user_id": str(user["_id"]),
+                "full_name": user.get("full_name", "Unknown"),
+                "username": user.get("username") or user.get("full_name", "Unknown"),
+                "profile_picture": user.get("profile_picture"),
+                "level": user.get("level", 1),
+                "blocked_at": blocked_at
+            })
+
+    return result
+
 
 @app.get("/api/users/{user_id}")
 async def get_user_profile(user_id: str, current_user: dict = Depends(get_current_user)):
@@ -3563,46 +3604,6 @@ from routers import check_data
 app.include_router(check_data.router)
 
 # ==================== BLOCK USER ENDPOINTS ====================
-@app.get("/api/users/blocked-list")
-async def get_blocked_users(current_user: dict = Depends(get_current_user)):
-    """Get list of blocked users"""
-    db = get_database()
-    
-    # Get all blocks for current user
-    blocks = await db.blocks.find({
-        "blocker_id": str(current_user["_id"])
-    }).to_list(None)
-    
-    result = []
-    for block in blocks:
-        blocked_id = block.get("blocked_id")
-        try:
-            blocked_object_id = ObjectId(blocked_id)
-        except (InvalidId, TypeError):
-            print(f"⚠️ Skipping invalid blocked user id: {blocked_id}")
-            continue
-
-        user = await db.users.find_one({"_id": blocked_object_id})
-        if user:
-            created_at = block.get("created_at")
-            if isinstance(created_at, datetime):
-                blocked_at = created_at.isoformat() + "Z"
-            elif created_at is None:
-                blocked_at = None
-            else:
-                blocked_at = str(created_at)
-            result.append({
-                "id": str(user["_id"]),
-                "user_id": str(user["_id"]),
-                "full_name": user.get("full_name", "Unknown"),
-                "username": user.get("username") or user.get("full_name", "Unknown"),
-                "profile_picture": user.get("profile_picture"),
-                "level": user.get("level", 1),
-                "blocked_at": blocked_at
-            })
-    
-    return result
-
 @app.post("/api/users/{user_id}/block")
 async def block_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """Block a user - they will be hidden from all feeds"""

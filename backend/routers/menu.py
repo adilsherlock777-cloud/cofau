@@ -466,12 +466,16 @@ async def upload_menu_item_image(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Create URL path - static files are mounted at /api/static
+    # file_path is like "static/menu_uploads/..." so we need "/api/static/menu_uploads/..."
+    image_url_path = f"/api/{file_path}" if not file_path.startswith("/") else file_path
+
     # Update database with new image URL
     await db.menu_items.update_one(
         {"_id": ObjectId(item_id)},
         {
             "$set": {
-                "image_url": file_path,
+                "image_url": image_url_path,
                 "updated_at": datetime.utcnow()
             }
         }
@@ -479,7 +483,7 @@ async def upload_menu_item_image(
 
     return {
         "message": "Image uploaded successfully",
-        "image_url": file_path,
+        "image_url": image_url_path,
         "item_id": item_id
     }
 
