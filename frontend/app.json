@@ -16,6 +16,7 @@
       "supportsTablet": true,
       "buildNumber": "4",
       "bundleIdentifier": "com.cofau.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
         "googleMapsApiKey": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
       },
