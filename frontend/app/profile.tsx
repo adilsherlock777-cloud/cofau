@@ -2145,6 +2145,13 @@ const handleSendOtp = async () => {
 
   setSendingOtp(true);
   try {
+    // Sign out from any existing Firebase session first to avoid conflicts
+    try {
+      await auth().signOut();
+    } catch (signOutError) {
+      // Ignore sign out errors - user might not be signed in
+    }
+
     const formattedPhone = formatPhoneNumber(phoneNumber);
     const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
     setConfirm(confirmation);
