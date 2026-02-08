@@ -2159,12 +2159,16 @@ const handleSendOtp = async () => {
     setResendTimer(60);
     Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
   } catch (error: any) {
-    console.error('Error sending OTP:', error);
+    console.error('Error sending OTP:', error?.code, error?.message, error);
     let errorMessage = 'Failed to send OTP. Please try again.';
     if (error.code === 'auth/invalid-phone-number') {
       errorMessage = 'Invalid phone number format.';
     } else if (error.code === 'auth/too-many-requests') {
       errorMessage = 'Too many attempts. Please try again later.';
+    } else if (error.code) {
+      errorMessage = `Firebase error: ${error.code} - ${error.message}`;
+    } else {
+      errorMessage = `Error: ${error.message || 'Unknown error'}`;
     }
     Alert.alert('Error', errorMessage);
   } finally {

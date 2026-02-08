@@ -68,6 +68,16 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
                         </View>
                     )}
 
+                    {/* Dish Name Label - Bottom Left */}
+                    {post?.dish_name && (
+                        <View style={storyCardStyles.dishNameContainer}>
+                            <Ionicons name="fast-food" size={14} color="#FFF" />
+                            <Text style={storyCardStyles.dishNameText} numberOfLines={1}>
+                                {post.dish_name}
+                            </Text>
+                        </View>
+                    )}
+
                     {/* Cofau Watermark on Image */}
                     <View style={storyCardStyles.watermarkContainer}>
                         <Text style={storyCardStyles.watermarkText}>Cofau</Text>
@@ -90,7 +100,7 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
 
                     {/* Review Box */}
                     <View style={[storyCardStyles.infoBox, storyCardStyles.reviewBox]}>
-                        <Ionicons name="create" size={22} color="#1B7C82" />
+                        <Ionicons name="create" size={22} color="#FFD700" />
                         <Text style={storyCardStyles.infoBoxLabel}>Review</Text>
                         <Text style={storyCardStyles.infoBoxValue}>
                             {post?.review_text || post?.description || '-'}
@@ -219,6 +229,24 @@ const storyCardStyles = StyleSheet.create({
         width: 1,
         backgroundColor: '#E8E8E8',
         marginVertical: 8,
+    },
+    dishNameContainer: {
+        position: 'absolute',
+        bottom: 16,
+        left: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        maxWidth: '60%',
+        gap: 4,
+    },
+    dishNameText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
     },
 });
 

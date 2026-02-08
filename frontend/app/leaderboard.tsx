@@ -209,10 +209,10 @@ export default function LeaderboardScreen() {
       } else {
         fetchUserAddress();
       };
+      // Always fetch orders so activeOrders is populated for the in-progress check
+      fetchOrders();
       if (activeTab === "Near Me") {
         getCurrentLocation();
-      } else if (activeTab === "In Progress" || activeTab === "Your Orders") {
-        fetchOrders();
       } else if (activeTab === "Reviews/Complaints" && isRestaurant) {
         fetchRestaurantReviews();
       } else if (activeTab === "Rewards" && !isRestaurant) {

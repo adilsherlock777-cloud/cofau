@@ -76,7 +76,17 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
                         </MaskedView>
                     </View>
 
-                    {/* Restaurant Tag - Bottom Left */}
+                    {/* Dish Name Label - Bottom Left */}
+                    {post?.dish_name && (
+                        <View style={storyCardStyles.dishNameContainer}>
+                            <Ionicons name="fast-food" size={14} color="#FFF" />
+                            <Text style={storyCardStyles.dishNameText} numberOfLines={1}>
+                                {post.dish_name}
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Restaurant Tag - Bottom Left (above dish name) */}
                     {post?.tagged_restaurant && post.tagged_restaurant.restaurant_name && (
                         <View style={storyCardStyles.restaurantTagContainer}>
                             <Ionicons name="restaurant" size={14} color="#FFF" />
@@ -109,7 +119,7 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
                             }
                         >
                             <LinearGradient
-                                colors={["#FF2E2E", "#FF7A18"]}
+                                colors={["#FFD700", "#FFD700"]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={{ width: 20, height: 20 }}
@@ -258,6 +268,24 @@ const storyCardStyles = StyleSheet.create({
         gap: 4,
     },
     restaurantTagText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    dishNameContainer: {
+        position: 'absolute',
+        bottom: 44,
+        left: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        maxWidth: '60%',
+        gap: 4,
+    },
+    dishNameText: {
         color: '#FFF',
         fontSize: 12,
         fontWeight: '600',
