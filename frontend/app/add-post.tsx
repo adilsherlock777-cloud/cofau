@@ -21,9 +21,10 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Video, ResizeMode } from 'expo-av';
-import { createPost, createRestaurantPost } from '../utils/api';
+// createPost and createRestaurantPost replaced by UploadContext
 import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
+import { useUpload } from '../context/UploadContext';
 import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
 import PostRewardModal from '../components/PostRewardModal';
 import axios from 'axios';
@@ -33,6 +34,7 @@ export default function AddPostScreen() {
   const { showLevelUpAnimation } = useLevelAnimation();
   const auth = useAuth() as any;
   const { refreshUser, accountType } = auth;
+  const { startUpload, uploadState } = useUpload();
   const [price, setPrice] = useState('');
   const [dishName, setDishName] = useState('');  // NEW: Dish name for all posts
 
@@ -379,7 +381,11 @@ if (accountType !== 'restaurant') {
     return;
   }
 
-  setLoading(true);
+  // Check if upload is already in progress
+  if (uploadState.isUploading) {
+    Alert.alert('Upload in Progress', 'Please wait for the current upload to complete.');
+    return;
+  }
 
   try {
     let fileToUpload;
@@ -401,104 +407,52 @@ if (accountType !== 'restaurant') {
       };
     }
 
-    let result;
+    let postData;
 
     if (accountType === 'restaurant') {
-      const postData = {
+      postData = {
         price: price.trim(),
         about: review.trim(),
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
         category: categories.length > 0 ? categories.join(', ') : undefined,
-        dish_name: dishName.trim(),  // NEW: Add dish name
+        dish_name: dishName.trim(),
         file: fileToUpload,
         media_type: mediaType,
       };
-
-      console.log('📤 Sending restaurant post:', postData);
-      result = await createRestaurantPost(postData);
-      
-      setLoading(false);
-      Alert.alert('Success', 'Post created successfully!', [
-        { text: 'OK', onPress: () => router.replace('/feed') }
-      ]);
-      return;
-
     } else {
-      console.log('🏷️ Tagged restaurant object:', JSON.stringify(taggedRestaurant, null, 2));
-      console.log('🏷️ Tagged restaurant ID being sent:', taggedRestaurant?.id);
-      const postData = {
+      postData = {
         rating: numericRating,
         review_text: review.trim(),
         map_link: mapsLink.trim(),
         location_name: locationName.trim(),
         category: categories.length > 0 ? categories.join(', ') : undefined,
-        dish_name: dishName.trim(),  // NEW: Add dish name
+        dish_name: dishName.trim(),
         tagged_restaurant_id: taggedRestaurant?.id || undefined,
         file: fileToUpload,
         media_type: mediaType,
-        // User's current location for wallet validation
         user_latitude: userLocation?.latitude || null,
         user_longitude: userLocation?.longitude || null,
       };
-
-      console.log('📤 Sending user post with categories:', categories);
-      result = await createPost(postData);
     }
 
-    setLoading(false);
-    await refreshUser();
+    console.log('📤 Starting background upload...');
 
-    const oldLevel = auth?.user?.level || 1;
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Start the background upload
+    startUpload(postData, accountType || 'user').then(async (result) => {
+      if (result.success) {
+        console.log('✅ Upload completed successfully');
+        // Refresh user data to update level/points
+        await refreshUser();
+      }
+    });
 
-    const userResponse = await axios.get(
-      `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/auth/me`,
-      { headers: { Authorization: `Bearer ${auth?.token}` } }
-    );
-    const updatedUser = userResponse.data;
-    const newLevel = updatedUser?.level || oldLevel;
-
-    const leveledUp = newLevel > oldLevel;
-
-    // Check if wallet reward exists in response
-    if (result?.wallet_reward) {
-      // Show wallet reward modal
-      setRewardData(result.wallet_reward);
-      setShowRewardModal(true);
-      // Navigation happens when modal closes (see PostRewardModal onClose)
-      return;
-    }
-
-    // Fallback to old behavior if no wallet_reward in response
-    if (leveledUp) {
-      showLevelUpAnimation(newLevel);
-      setTimeout(() => router.replace('/feed'), 3000);
-      return;
-    }
-
-    let earnedPoints = 25;
-    if (oldLevel >= 5 && oldLevel <= 8) {
-      earnedPoints = 15;
-    } else if (oldLevel >= 9 && oldLevel <= 12) {
-      earnedPoints = 5;
-    }
-
-    if (earnedPoints > 0) {
-      setPointsEarned(earnedPoints);
-      setShowPointsAnimation(true);
-      setTimeout(() => {
-        setShowPointsAnimation(false);
-        router.replace('/feed');
-      }, 3000);
-    } else {
-      setTimeout(() => router.replace('/feed'), 500);
-    }
+    // Navigate to feed immediately - upload continues in background
+    router.replace('/feed');
 
   } catch (error: any) {
-    console.error('❌ Error creating post:', error);
-    setLoading(false);
-    Alert.alert('Error', error?.response?.data?.detail || 'Failed to create post.');
+    console.error('❌ Error preparing post:', error);
+    Alert.alert('Error', 'Failed to prepare post for upload.');
   }
 };
 

@@ -4,9 +4,11 @@ import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { StyleSheet, Platform } from "react-native";
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { NotificationProvider } from "../context/NotificationContext"; 
+import { NotificationProvider } from "../context/NotificationContext";
 import { LevelProvider } from "../context/LevelContext";
+import { UploadProvider } from "../context/UploadContext";
 import LevelUpAnimation from "../components/LevelUpAnimation";
+import UploadProgressIndicator from "../components/UploadProgressIndicator";
 import { useEffect } from "react";
 import { 
   setupNotificationListeners, 
@@ -70,6 +72,7 @@ function RootLayoutNav() {
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <StatusBar style={Platform.OS === "ios" ? "dark" : "auto"} />
       <Slot />
+      <UploadProgressIndicator />
       <LevelUpAnimation />
     </SafeAreaView>
   );
@@ -88,9 +91,11 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <LevelProvider>
-        <NotificationProvider>   {/* ⬅️ ADD THIS */}
-          <RootLayoutNav />
-        </NotificationProvider>   {/* ⬅️ ADD THIS */}
+        <NotificationProvider>
+          <UploadProvider>
+            <RootLayoutNav />
+          </UploadProvider>
+        </NotificationProvider>
       </LevelProvider>
     </AuthProvider>
   );

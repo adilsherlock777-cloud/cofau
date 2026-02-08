@@ -118,6 +118,8 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   const videoRef = useRef(null);
   const [lastTap, setLastTap] = useState(0);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const [showMuteIcon, setShowMuteIcon] = useState(false);
+  const muteIconOpacity = useRef(new Animated.Value(0)).current;
 
   // Animation values for Instagram-style bottom sheet
   const bottomSheetAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -461,8 +463,22 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
     setTimeout(() => setShowHeartAnimation(false), 1000);
   } else {
     // Single tap - mute/unmute video (only for videos)
-    if (isVideo) {
+    if (isVideo && shouldPlay) {
       setIsMuted(!isMuted);
+      // Show mute icon briefly (Instagram-style)
+      setShowMuteIcon(true);
+      muteIconOpacity.setValue(1);
+
+      // Fade out after 1.5 seconds
+      setTimeout(() => {
+        Animated.timing(muteIconOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowMuteIcon(false);
+        });
+      }, 1200);
     }
   }
   setLastTap(now);
@@ -690,15 +706,23 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                 </View>
               )}
 
-              {/* Mute indicator - Only show when video is playing */}
-              {!videoError && videoLoaded && shouldPlay && (
-                <View style={styles.muteIndicatorReels}>
-                  <Ionicons 
-                    name={isMuted ? "volume-mute" : "volume-high"} 
-                    size={18} 
-                    color="rgba(255,255,255,0.9)" 
-                  />
-                </View>
+              {/* Mute indicator - Instagram style: centered, appears briefly on tap */}
+              {showMuteIcon && (
+                <Animated.View
+                  style={[
+                    styles.muteIconOverlay,
+                    { opacity: muteIconOpacity }
+                  ]}
+                  pointerEvents="none"
+                >
+                  <View style={styles.muteIconContainer}>
+                    <Ionicons
+                      name={isMuted ? "volume-mute" : "volume-high"}
+                      size={40}
+                      color="#fff"
+                    />
+                  </View>
+                </Animated.View>
               )}
             </>
           ) : (
@@ -1540,16 +1564,21 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
-  muteIndicatorReels: {
+  muteIconOverlay: {
     position: "absolute",
-    top: 140,
-    right: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 18,
-    padding: 6,
-    zIndex: 50,
-    width: 36,
-    height: 36,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 60,
+  },
+
+  muteIconContainer: {
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 50,
+    padding: 20,
     justifyContent: "center",
     alignItems: "center",
   },

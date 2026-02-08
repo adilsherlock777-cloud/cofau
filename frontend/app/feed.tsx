@@ -37,6 +37,7 @@ import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { fetchUnreadCount } from "../utils/notifications";
 import { useNotifications } from "../context/NotificationContext";
+import { useUpload } from "../context/UploadContext";
 import SuggestedUsersBar from "../components/SuggestedUsersBar";
 import {
   normalizeMediaUrl,
@@ -87,6 +88,8 @@ const getPostDP = (post: any) =>
 export default function FeedScreen() {
   const router = useRouter();
   const { user, token, refreshUser, accountType } = useAuth() as any;
+  const { lastUploadTimestamp } = useUpload();
+  const lastKnownUploadRef = useRef(0);
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,16 +176,24 @@ const fetchWalletUnreadCount = async () => {
 useFocusEffect(
   React.useCallback(() => {
     refreshUnreadCount();
-    loadUnreadMessagesCount();  // ⬅️ ADD THIS
+    loadUnreadMessagesCount();
     fetchWalletUnreadCount();
     refreshUser();
     fetchOwnStory();
     if (accountType === 'restaurant') {
-      fetchRestaurantReviewsCount();  // ⬅️ ADD THIS
+      fetchRestaurantReviewsCount();
     }
-    // ...rest of code
   }, [hasInitiallyLoaded, accountType])
 );
+
+// Refresh feed when a background upload completes
+useEffect(() => {
+  if (lastUploadTimestamp > lastKnownUploadRef.current) {
+    lastKnownUploadRef.current = lastUploadTimestamp;
+    console.log('📤 Upload completed, refreshing feed...');
+    fetchFeed(true);
+  }
+}, [lastUploadTimestamp]);
 
 const loadUnreadMessagesCount = async () => {
   if (!token) return;
