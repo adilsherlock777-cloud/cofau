@@ -10,8 +10,15 @@ import shutil
 
 router = APIRouter(prefix="/api/restaurant/posts", tags=["Restaurant Posts"])
 
-# Restaurant uploads directory
-RESTAURANT_UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "restaurants")
+# Restaurant uploads directory - use absolute path to avoid path mismatches
+# Get the base directory (backend folder)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ensure UPLOAD_DIR is absolute
+if os.path.isabs(settings.UPLOAD_DIR):
+    UPLOAD_DIR_ABS = settings.UPLOAD_DIR
+else:
+    UPLOAD_DIR_ABS = os.path.join(BASE_DIR, settings.UPLOAD_DIR)
+RESTAURANT_UPLOAD_DIR = os.path.join(UPLOAD_DIR_ABS, "restaurants")
 os.makedirs(RESTAURANT_UPLOAD_DIR, exist_ok=True)
 
 

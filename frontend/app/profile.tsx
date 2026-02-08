@@ -31,8 +31,9 @@ import { sendCompliment, getFollowers } from '../utils/api';
 //import auth from '@react-native-firebase/auth';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
+import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
+const API_BACKEND_URL = BACKEND_URL;
 const API_URL = `${BACKEND_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -134,17 +135,9 @@ const getPointsNeededForNextLevel = (currentLevel: number, requiredPoints: numbe
   return 1250; // Default: 1250 points for levels 2-3
 };
 
-const fixUrl = (url?: string | null) => {
-  if (!url || url.trim() === '') return null;
-  if (url.startsWith("http")) return url;
-  url = url.replace(/\/+/g, "/");
-  // Only accept URLs with /api/ prefix (valid static file paths)
-  if (url.includes("/api/")) {
-    return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
-  }
-  // Old URLs without /api/ prefix are invalid, return null
-  return null;
-};
+// Use the universal normalizeMediaUrl from imageUrlFix.js
+// This handles all URL formats including direct filenames, legacy paths, etc.
+const fixUrl = normalizeMediaUrl;
 
 
 const fetchRestaurantPosts = async () => {
@@ -808,6 +801,17 @@ const response = await axios.get(endpoint, {
         user.user_profile_picture;
       user.profile_picture = fixUrl(rawProfilePicture);
 
+      // Normalize cover_image as well
+      const rawCoverImage =
+        user.cover_image ||
+        user.banner_image ||
+        user.cover_image_url ||
+        user.banner_image_url;
+      if (rawCoverImage) {
+        user.cover_image = fixUrl(rawCoverImage);
+        console.log(`🖼️ Cover image: raw="${rawCoverImage}" → normalized="${user.cover_image}"`);
+      }
+
       setUserData(user);
       setEditedBio(user.bio || '');
       setEditedName(
@@ -876,14 +880,23 @@ try {
     const posts = response.data || [];
     console.log(`✅ Received ${posts.length} posts`);
 
+    // Debug: Log first post to see field names
+    if (posts.length > 0) {
+      console.log('🔍 First post raw data:', JSON.stringify(posts[0], null, 2));
+    }
+
     // Check if we have more posts to load
     if (posts.length < POSTS_PER_PAGE) {
       setHasMorePosts(false);
     }
 
     const postsWithFullUrls = posts.map((post: any) => {
-      const mediaUrl = post.media_url || post.full_image_url;
+      // Try multiple possible field names for media URL (restaurant posts may use different fields)
+      const mediaUrl = post.media_url || post.full_image_url || post.image_url || post.photo_url || post.image;
       const normalizedUrl = fixUrl(mediaUrl);
+
+      // Debug: Log URL normalization for each post
+      console.log(`🖼️ Post ${post.id}: raw="${mediaUrl}" → normalized="${normalizedUrl}"`);
       const thumbnailUrl = post.thumbnail_url ? fixUrl(post.thumbnail_url) : null;
       const isVideo = 
         post.media_type === 'video' ||
@@ -2046,8 +2059,12 @@ const renderMenuByCategory = () => {
 };
 
 const renderGridWithLikes = ({ item }: { item: any }) => {
-  const mediaUrl = fixUrl(item.full_image_url || item.media_url);
+  const rawUrl = item.full_image_url || item.media_url || item.image_url;
+  const mediaUrl = fixUrl(rawUrl);
   const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
+
+  // Debug: Log URL transformation
+  console.log(`📸 Grid item ${item.id}: raw="${rawUrl}" → final="${mediaUrl}"`);
   const isVideo =
     item.media_type === 'video' ||
     mediaUrl?.toLowerCase().endsWith('.mp4') ||
@@ -2076,6 +2093,8 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
             source={{ uri: displayUrl }}
             style={styles.gridImage}
             resizeMode="cover"
+            onError={(e) => console.log(`❌ Grid image error for ${item.id}:`, displayUrl, e.nativeEvent?.error)}
+            onLoad={() => console.log(`✅ Grid image loaded: ${item.id}`)}
           />
           {/* Video Play Icon */}
           {isVideo && (

@@ -746,17 +746,22 @@ postId={post.id}
               dimensionCache.current[mediaUrl] = { width, height };
               setImageDimensions({ width, height });
             }
+            console.log("✅ Image loaded successfully:", mediaUrl);
           }}
           onError={(error) => {
             console.error("❌ Image load error in FeedCard:", mediaUrl, error);
+            console.error("❌ Post account_type:", post.account_type);
+            console.error("❌ Original post.media_url:", post.media_url);
+            console.error("❌ Original post.image_url:", post.image_url);
           }}
           onLoadStart={() => {
-            console.log("🖼️ Loading image:", mediaUrl);
+            console.log("🖼️ Loading image:", mediaUrl, "| account_type:", post.account_type);
           }}
         />
       ) : (
         <View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', aspectRatio: 0.75 }]}>
           <Ionicons name="image-outline" size={40} color="#ccc" />
+          <Text style={{ color: '#999', fontSize: 10, marginTop: 4 }}>No image</Text>
         </View>
       )
     )}

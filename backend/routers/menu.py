@@ -16,7 +16,7 @@ from models.menu import (
     PublishMenuRequest,
     MenuResponse
 )
-from utils.menu_extraction_gemini import menu_extraction_service
+from utils.menu_extraction_openai import menu_extraction_service
 from routers.restaurant_auth import get_current_restaurant
 from database import get_database
 
