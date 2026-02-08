@@ -4641,6 +4641,24 @@ if (isRestaurantProfile) {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  setPhoneNumber(userData?.phone_number || '');
+                  setPhoneModalVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="call-outline" size={24} color="#333" />
+                </View>
+                <Text style={styles.sidebarMenuText}>
+                  {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
               <View style={styles.sidebarDivider} />
 
 {/* DELETE ACCOUNT - Separate TouchableOpacity */}

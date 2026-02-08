@@ -1,14 +1,13 @@
-
 {
   "project_info": {
-    "project_number": "923129682434",
-    "project_id": "cofau-23116",
-    "storage_bucket": "cofau-23116.firebasestorage.app"
+    "project_number": "797358811494",
+    "project_id": "cofau-5508f",
+    "storage_bucket": "cofau-5508f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:923129682434:android:ab09937ec3d5716fe0651b",
+        "mobilesdk_app_id": "1:797358811494:android:0df32e4ad6cfc5d15880a7",
         "android_client_info": {
           "package_name": "com.cofau.app"
         }
@@ -16,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCcA3B_a0aKsO3JaoWpDmYJL5uVMerG4dk"
+          "current_key": "AIzaSyCfrM93jARo04MW0LBtWkESoAaEXM2wt9M"
         }
       ],
       "services": {

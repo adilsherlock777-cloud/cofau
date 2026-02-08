@@ -119,7 +119,16 @@ async def create_notification(
         try:
             print(f"🔔 Creating {notification_type} notification: {from_user_id} -> {to_user_id}")
             device_tokens = await get_user_device_tokens(to_user_id)
-            
+
+            # Check if recipient is a restaurant account
+            to_user = await db.users.find_one({"_id": ObjectId(to_user_id)})
+            is_restaurant_recipient = False
+            if not to_user:
+                to_user = await db.restaurants.find_one({"_id": ObjectId(to_user_id)})
+                if to_user:
+                    is_restaurant_recipient = True
+                    print(f"📱 Recipient is a restaurant account: {to_user_id}")
+
             if device_tokens:
                 print(f"📱 Found {len(device_tokens)} device token(s) for recipient")
                 # Prepare notification data for navigation
@@ -129,10 +138,10 @@ async def create_notification(
                     "fromUserName": from_user.get("full_name", "Someone"),
                     "notificationId": notification_id,
                 }
-                
+
                 if post_id:
                     notification_data["postId"] = post_id
-                
+
                 # Determine title based on type
                 title = "New Notification"
                 if notification_type == "message":
@@ -163,13 +172,14 @@ async def create_notification(
                     title = "Delivery Reward!"
                 elif notification_type == "reward_earned":
                     title = "Reward Earned!"
-                
+
                 await send_push_notification(
                     device_tokens=device_tokens,
                     title=title,
                     body=message,
                     data=notification_data,
-                    user_id=to_user_id
+                    user_id=to_user_id,
+                    is_restaurant=is_restaurant_recipient
                 )
             else:
                 print(f"⚠️ No device tokens found for user {to_user_id} - push notification skipped")

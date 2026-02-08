@@ -155,7 +155,8 @@ async def send_push_notification(
     title: str,
     body: str,
     data: Optional[dict] = None,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    is_restaurant: bool = False
 ):
     """
     Send push notification to devices, routing Android to FCM and iOS to Expo.
@@ -183,10 +184,18 @@ async def send_push_notification(
     
     # Get platform info from database if user_id is provided
     user_platforms = None
-    if user_id:
+    is_restaurant_account = is_restaurant  # Use passed parameter
+    if user_id and not is_restaurant:
         try:
             db = get_database()
             user = await db.users.find_one({"_id": ObjectId(user_id)})
+            if not user:
+                # Check restaurants collection if not found in users
+                user = await db.restaurants.find_one({"_id": ObjectId(user_id)})
+                if user:
+                    is_restaurant_account = True
+            if is_restaurant_account:
+                print(f"📱 Sending notification to restaurant account: {user_id}")
             if user:
                 # Get device_tokens_with_platform if it exists
                 # For now, we'll detect from token format
@@ -234,12 +243,17 @@ async def send_push_notification(
                     initialize_firebase()
                 except Exception as e:
                     print(f"⚠️ Firebase initialization warning: {str(e)}")
-                
+
+                # Use restaurant channel for restaurant accounts
+                channel_id = "restaurant" if is_restaurant_account else "default"
+                print(f"📱 Using notification channel: {channel_id} (is_restaurant: {is_restaurant_account})")
+
                 fcm_result = await send_fcm_notification(
                     device_tokens=android_tokens,
                     title=title,
                     body=body,
-                    data=data
+                    data=data,
+                    channel_id=channel_id
                 )
                 results["android"] = fcm_result
                 if fcm_result and "success" in fcm_result:

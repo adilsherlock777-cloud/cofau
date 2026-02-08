@@ -93,7 +93,8 @@ async def send_fcm_notification(
     device_tokens: List[str],
     title: str,
     body: str,
-    data: Optional[Dict] = None
+    data: Optional[Dict] = None,
+    channel_id: str = "default"
 ) -> Dict:
     """
     Send push notification to Android devices via Firebase Cloud Messaging.
@@ -128,6 +129,9 @@ async def send_fcm_notification(
     print(f"📤 Sending FCM notification to {len(valid_tokens)} Android device(s)")
     print(f"   Title: {title}")
     print(f"   Body: {body}")
+    print(f"   Channel ID: {channel_id}")
+    print(f"   Sound: default")
+    print(f"   Priority: high/max")
     
     success_count = 0
     failure_count = 0
@@ -159,7 +163,7 @@ async def send_fcm_notification(
                 android=messaging.AndroidConfig(
                     priority="high",
                     notification=messaging.AndroidNotification(
-                        channel_id="default",
+                        channel_id=channel_id,
                         sound="default",
                         priority="max",
                         vibrate_timings_millis=[0, 250, 250, 250],

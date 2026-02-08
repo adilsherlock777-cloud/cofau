@@ -45,10 +45,11 @@ Notifications.setNotificationHandler({
   },
 });
 
-// Ensure Android notification channel exists
+// Ensure Android notification channels exist
 async function ensureNotificationChannel() {
   if (Platform.OS === 'android') {
     try {
+      // Create default channel for regular users
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Default Notifications',
         importance: Notifications.AndroidImportance.MAX,
@@ -58,14 +59,27 @@ async function ensureNotificationChannel() {
         enableVibrate: true,
         showBadge: true,
       });
-      console.log('✅ Android notification channel created');
+      console.log('✅ Android default notification channel created');
+
+      // Create restaurant channel with explicit sound settings
+      await Notifications.setNotificationChannelAsync('restaurant', {
+        name: 'Restaurant Notifications',
+        description: 'Notifications for restaurant orders and updates',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#E94A37',
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+      });
+      console.log('✅ Android restaurant notification channel created');
     } catch (error) {
       console.error('❌ Failed to create notification channel:', error);
     }
   }
 }
 
-// Create channel immediately when module loads
+// Create channels immediately when module loads
 ensureNotificationChannel();
 
 /**
@@ -358,7 +372,14 @@ export function setupNotificationListeners(navigation) {
       const unsubscribeForeground = messaging().onMessage(async remoteMessage => {
         console.log('📬 FCM notification received in foreground:', remoteMessage);
         const data = remoteMessage.data;
-        
+
+        // Determine which channel to use based on notification type
+        // Restaurant notifications: new_order, order_in_progress
+        const restaurantNotificationTypes = ['new_order', 'order_in_progress'];
+        const notificationType = data?.type;
+        const channelId = restaurantNotificationTypes.includes(notificationType) ? 'restaurant' : 'default';
+        console.log(`📱 Using channel: ${channelId} for notification type: ${notificationType}`);
+
         // Show local notification when app is in foreground
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -366,7 +387,7 @@ export function setupNotificationListeners(navigation) {
             body: remoteMessage.notification?.body || '',
             data: data || {},
             sound: 'default',
-            channelId: 'default',
+            channelId: channelId,
           },
           trigger: null,
         });
@@ -467,14 +488,18 @@ export function setupNotificationListeners(navigation) {
   };
 }
 
-export async function sendLocalNotification(title, body, data = {}) {
+export async function sendLocalNotification(title, body, data = {}, isRestaurant = false) {
+  // Determine channel based on notification type or explicit flag
+  const restaurantNotificationTypes = ['new_order', 'order_in_progress'];
+  const channelId = isRestaurant || restaurantNotificationTypes.includes(data?.type) ? 'restaurant' : 'default';
+
   await Notifications.scheduleNotificationAsync({
     content: {
       title,
       body,
       data,
       sound: 'default',
-      channelId: 'default',
+      channelId: channelId,
     },
     trigger: null,
   });
