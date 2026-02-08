@@ -175,6 +175,8 @@ export const AuthProvider = ({ children }) => {
         username: username,
         email: email,
         password: password,
+        phone_number: phoneNumber,
+        phone_verified: phoneVerified,
       });
 
       const { access_token } = response.data;
@@ -256,6 +258,81 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithPhone = async (phoneNumber, loginAsRestaurant = false) => {
+    console.log('🔐 AuthContext: Starting phone login process...');
+    console.log('📱 Phone:', phoneNumber);
+    console.log('🏪 Login as Restaurant:', loginAsRestaurant);
+
+    // Determine endpoints based on account type
+    const loginEndpoint = loginAsRestaurant
+      ? `${API_URL}/api/restaurant/auth/login-phone`
+      : `${API_URL}/api/auth/login-phone`;
+
+    const meEndpoint = loginAsRestaurant
+      ? `${API_URL}/api/restaurant/auth/me`
+      : `${API_URL}/api/auth/me`;
+
+    console.log('🌐 Phone Login URL:', loginEndpoint);
+
+    try {
+      console.log('📤 Sending phone login request...');
+      const response = await axios.post(loginEndpoint, {
+        phone_number: phoneNumber,
+      });
+
+      console.log('✅ Phone login response received:', response.status);
+      const { access_token } = response.data;
+      console.log('🔑 Token received:', access_token ? 'Yes' : 'No');
+
+      // Store token and account type in storage
+      await storage.setItem('userToken', access_token);
+      const accType = loginAsRestaurant ? 'restaurant' : 'user';
+      await storage.setItem('accountType', accType);
+      console.log('💾 Token and accountType stored');
+
+      setToken(access_token);
+      setAccountType(accType);
+
+      // Set axios authorization header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      console.log('🔐 Authorization header set');
+
+      // Fetch user/restaurant info
+      console.log('👤 Fetching profile from:', meEndpoint);
+
+      try {
+        const userResponse = await axios.get(meEndpoint);
+        console.log('📥 Profile response received:', JSON.stringify(userResponse.data));
+
+        // Set user state
+        setUser(userResponse.data);
+        console.log('✅ User state set:', userResponse.data.email);
+
+        // Register for push notifications immediately after login
+        console.log('🔔 Registering for push notifications after phone login...');
+        registerForPushNotificationsAsync(access_token, accType).catch(err => {
+          console.log('⚠️ Push notification registration failed:', err);
+        });
+
+        console.log('🎉 Phone login successful! Returning success...');
+        return { success: true, user: userResponse.data };
+      } catch (meError) {
+        console.error('❌ /auth/me failed:', meError.response?.status);
+        return {
+          success: false,
+          error: 'Failed to fetch profile. Please try again.',
+        };
+      }
+    } catch (error) {
+      console.error('❌ Phone login error:', error.response?.status);
+      console.error('❌ Error data:', error.response?.data);
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Phone login failed',
+      };
+    }
+  };
+
   const logout = async () => {
     try {
       // Delete token and account type from storage
@@ -301,6 +378,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         accountType,
         login,
+        loginWithPhone,
         signup,
         restaurantSignup,
         logout,

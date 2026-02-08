@@ -19,41 +19,52 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LocationPicker from '../../components/LocationPicker';
 import axios from 'axios';
 import * as DocumentPicker from 'expo-document-picker';
-//import auth from '@react-native-firebase/auth';
+
+// Conditional Firebase import - returns null if not available (Expo Go)
+let auth: any = null;
+try {
+  auth = require('@react-native-firebase/auth').default;
+} catch (e) {
+  console.log('Firebase Auth not available (Expo Go mode)');
+}
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 const API_URL = `${API_BASE_URL}/api`;
 
 export default function RestaurantSignupScreen() {
   const router = useRouter();
-  
-  // Form states
-  const [restaurantName, setRestaurantName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Step tracking: 'phone' or 'signup'
+  const [currentStep, setCurrentStep] = useState<'phone' | 'signup'>('phone');
+
+  // Phone verification states
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
-  const [foodType, setFoodType] = useState<'veg' | 'non_veg' | 'veg_and_non_veg' | null>(null);
-  const [fssaiNumber, setFssaiNumber] = useState('');
-  const [gstNumber, setGstNumber] = useState('');
-  const [hasGst, setHasGst] = useState(false);
-  const [fssaiDocument, setFssaiDocument] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
-  
-  // UI states
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [confirm, setConfirm] = useState<any>(null);
+  const [phoneError, setPhoneError] = useState('');
+
+  // Form states
+  const [restaurantName, setRestaurantName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [foodType, setFoodType] = useState<'veg' | 'non_veg' | 'veg_and_non_veg' | null>(null);
+  const [fssaiNumber, setFssaiNumber] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
+  const [hasGst, setHasGst] = useState(false);
+  const [fssaiDocument, setFssaiDocument] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+
+  // UI states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-
-  // Firebase confirmation result
-  const [confirm, setConfirm] = useState<any>(null);
 
   // Restaurant name validation states
   const [nameError, setNameError] = useState('');
@@ -176,72 +187,73 @@ export default function RestaurantSignupScreen() {
   };
 // Send OTP
 const handleSendOtp = async () => {
-  // Firebase disabled - auto verify for now
-  Alert.alert('Info', 'Phone verification will be available soon');
-  setOtpSent(true);
-  setOtpVerified(true);
+  // Check if Firebase is available
+  if (!auth) {
+    Alert.alert('Not Available', 'Phone verification requires a built app. Please install the APK/IPA build to use phone signup.');
+    return;
+  }
 
-  // if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
-  //   Alert.alert('Error', 'Please enter a valid phone number');
-  //   return;
-  // }
+  if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+    setPhoneError('Please enter a valid 10-digit phone number');
+    return;
+  }
 
-  // setSendingOtp(true);
-  // try {
-  //   const formattedPhone = formatPhoneNumber(phoneNumber);
-  //   const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
-  //   setConfirm(confirmation);
-  //   setOtpSent(true);
-  //   setResendTimer(60);
-  //   Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
-  // } catch (error: any) {
-  //   console.error('Error sending OTP:', error);
-  //   let errorMessage = 'Failed to send OTP. Please try again.';
-  //   if (error.code === 'auth/invalid-phone-number') {
-  //     errorMessage = 'Invalid phone number format.';
-  //   } else if (error.code === 'auth/too-many-requests') {
-  //     errorMessage = 'Too many attempts. Please try again later.';
-  //   }
-  //   Alert.alert('Error', errorMessage);
-  // } finally {
-  //   setSendingOtp(false);
-  // }
+  setPhoneError('');
+  setSendingOtp(true);
+  try {
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+    setConfirm(confirmation);
+    setOtpSent(true);
+    setResendTimer(60);
+    Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
+  } catch (error: any) {
+    console.error('Error sending OTP:', error);
+    let errorMessage = 'Failed to send OTP. Please try again.';
+    if (error.code === 'auth/invalid-phone-number') {
+      errorMessage = 'Invalid phone number format.';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMessage = 'Too many attempts. Please try again later.';
+    }
+    setPhoneError(errorMessage);
+  } finally {
+    setSendingOtp(false);
+  }
 };
 
-// Verify OTP
+// Verify OTP and proceed to signup form
 const handleVerifyOtp = async () => {
-  // Firebase disabled - auto verify for now
-  setOtpVerified(true);
-  Alert.alert('Verified! ✓', 'Phone number verified successfully');
-  
-  // if (!otp || otp.length < 6) {
-  //   Alert.alert('Error', 'Please enter the 6-digit OTP');
-  //   return;
-  // }
+  if (!otp || otp.length < 6) {
+    setPhoneError('Please enter the 6-digit OTP');
+    return;
+  }
 
-  // if (!confirm) {
-  //   Alert.alert('Error', 'Please request OTP first');
-  //   return;
-  // }
+  if (!confirm) {
+    setPhoneError('Please request OTP first');
+    return;
+  }
 
-  // setVerifyingOtp(true);
-  // try {
-  //   await confirm.confirm(otp);
-  //   setOtpVerified(true);
-  //   Alert.alert('Verified! ✓', 'Phone number verified successfully');
-  // } catch (error: any) {
-  //   console.error('Error verifying OTP:', error);
-  //   let errorMessage = 'Invalid OTP. Please try again.';
-  //   if (error.code === 'auth/invalid-verification-code') {
-  //     errorMessage = 'Incorrect verification code.';
-  //   } else if (error.code === 'auth/code-expired') {
-  //     errorMessage = 'OTP has expired. Please request a new one.';
-  //   }
-  //   Alert.alert('Error', errorMessage);
-  // } finally {
-  //   setVerifyingOtp(false);
-  // }
-  };
+  setPhoneError('');
+  setVerifyingOtp(true);
+  try {
+    await confirm.confirm(otp);
+    setOtpVerified(true);
+    Alert.alert('Verified!', 'Phone number verified. Now complete your restaurant signup.', [
+      { text: 'Continue', onPress: () => setCurrentStep('signup') }
+    ]);
+  } catch (error: any) {
+    console.error('Error verifying OTP:', error);
+    let errorMessage = 'Invalid OTP. Please try again.';
+    if (error.code === 'auth/invalid-verification-code') {
+      errorMessage = 'Incorrect verification code.';
+    } else if (error.code === 'auth/code-expired') {
+      errorMessage = 'OTP has expired. Please request a new one.';
+    }
+    setPhoneError(errorMessage);
+  } finally {
+    setVerifyingOtp(false);
+  }
+};
 
   const handlePickFssaiDocument = async () => {
     try {
@@ -368,7 +380,9 @@ const handleVerifyOtp = async () => {
         await AsyncStorage.setItem('account_type', 'restaurant');
 
         // Sign out from Firebase (we only used it for OTP)
-        //await auth().signOut();
+        if (otpVerified) {
+          await auth().signOut();
+        }
 
         showAlert(
           'Account Created! 🎉',
@@ -397,6 +411,162 @@ const handleVerifyOtp = async () => {
     }
   };
 
+  // STEP 1: Phone Verification Screen
+  if (currentStep === 'phone') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../../assets/images/icon.png')}
+              style={styles.logoImage}
+            />
+            <Text style={styles.title}>Verify Phone</Text>
+            <Text style={styles.subtitle}>Enter your phone number to get started</Text>
+          </View>
+
+          {/* Phone Verification Form */}
+          <View style={styles.form}>
+            {/* Phone Number Input */}
+            <View style={[
+              styles.inputContainer,
+              phoneError ? styles.inputErrorBorder : null
+            ]}>
+              <Ionicons name="call-outline" size={20} color="#999" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number (e.g., 9876543210)"
+                placeholderTextColor="#999"
+                value={phoneNumber}
+                onChangeText={(text) => {
+                  setPhoneNumber(text);
+                  setPhoneError('');
+                }}
+                keyboardType="phone-pad"
+                editable={!otpSent}
+                maxLength={15}
+              />
+            </View>
+
+            {/* Phone Error Message */}
+            {phoneError ? (
+              <View style={styles.phoneErrorContainer}>
+                <Ionicons name="warning-outline" size={14} color="#F44336" />
+                <Text style={styles.errorText}>{phoneError}</Text>
+              </View>
+            ) : null}
+
+            {/* Send OTP Button */}
+            {!otpSent && (
+              <TouchableOpacity
+                style={styles.buttonContainer}
+                onPress={handleSendOtp}
+                activeOpacity={0.8}
+                disabled={sendingOtp || phoneNumber.replace(/\D/g, '').length < 10}
+              >
+                <LinearGradient
+                  colors={phoneNumber.replace(/\D/g, '').length < 10 ? ['#ccc', '#ccc'] : ['#FF2E2E', '#FF7A18']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.button}
+                >
+                  {sendingOtp ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.buttonText}>Send OTP</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {/* OTP Input */}
+            {otpSent && (
+              <>
+                <View style={[
+                  styles.inputContainer,
+                  phoneError ? styles.inputErrorBorder : null
+                ]}>
+                  <Ionicons name="key-outline" size={20} color="#999" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter 6-digit OTP"
+                    placeholderTextColor="#999"
+                    value={otp}
+                    onChangeText={(text) => {
+                      setOtp(text);
+                      setPhoneError('');
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+                </View>
+
+                {/* Resend OTP */}
+                <TouchableOpacity
+                  style={styles.resendContainer}
+                  onPress={handleSendOtp}
+                  disabled={resendTimer > 0 || sendingOtp}
+                >
+                  <Text style={[
+                    styles.resendText,
+                    (resendTimer > 0 || sendingOtp) && styles.resendTextDisabled
+                  ]}>
+                    {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Verify OTP Button */}
+                <TouchableOpacity
+                  style={styles.buttonContainer}
+                  onPress={handleVerifyOtp}
+                  activeOpacity={0.8}
+                  disabled={verifyingOtp || otp.length < 6}
+                >
+                  <LinearGradient
+                    colors={otp.length < 6 ? ['#ccc', '#ccc'] : ['#4CAF50', '#2E7D32']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.button}
+                  >
+                    {verifyingOtp ? (
+                      <ActivityIndicator color="#FFF" />
+                    ) : (
+                      <Text style={styles.buttonText}>Verify OTP</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* Login Link */}
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => router.push('/auth/login')}>
+                <Text style={styles.loginLink}>Login</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* User Signup Link */}
+            <View style={styles.userSignupContainer}>
+              <Text style={styles.userSignupText}>Not a restaurant? </Text>
+              <TouchableOpacity onPress={() => router.push('/auth/signup')}>
+                <Text style={styles.userSignupLink}>Sign up as User</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // STEP 2: Signup Form (after phone verification)
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -413,7 +583,14 @@ const handleVerifyOtp = async () => {
             style={styles.logoImage}
           />
           <Text style={styles.title}>Restaurant Sign Up</Text>
-          <Text style={styles.subtitle}>Join Cofau as a Restaurant</Text>
+          <Text style={styles.subtitle}>Complete your profile</Text>
+        </View>
+
+        {/* Verified Phone Badge */}
+        <View style={styles.verifiedPhoneBadge}>
+          <Ionicons name="shield-checkmark" size={18} color="#4CAF50" />
+          <Text style={styles.verifiedPhoneText}>{formatPhoneNumber(phoneNumber)}</Text>
+          <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
         </View>
 
         {/* Form */}
@@ -570,82 +747,6 @@ const handleVerifyOtp = async () => {
             />
           </View>
 
-          {/* Phone Number Input with OTP */}
-          <View style={styles.phoneContainer}>
-            <View style={[styles.inputContainer, styles.phoneInput]}>
-              <Ionicons name="call-outline" size={20} color="#999" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number (e.g., +91XXXXXXXXXX)"
-                placeholderTextColor="#999"
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                keyboardType="phone-pad"
-                editable={!otpVerified}
-              />
-              {otpVerified && (
-                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.statusIcon} />
-              )}
-            </View>
-            
-            {!otpVerified && (
-              <TouchableOpacity
-                style={[
-                  styles.otpButton,
-                  (sendingOtp || resendTimer > 0) && styles.otpButtonDisabled
-                ]}
-                onPress={handleSendOtp}
-                disabled={sendingOtp || resendTimer > 0}
-              >
-                {sendingOtp ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Text style={styles.otpButtonText}>
-                    {resendTimer > 0 ? `${resendTimer}s` : otpSent ? 'Resend' : 'Send OTP'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* OTP Input (shown after OTP is sent) */}
-          {otpSent && !otpVerified && (
-            <View style={styles.phoneContainer}>
-              <View style={[styles.inputContainer, styles.phoneInput]}>
-                <Ionicons name="key-outline" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter 6-digit OTP"
-                  placeholderTextColor="#999"
-                  value={otp}
-                  onChangeText={setOtp}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                />
-              </View>
-              
-              <TouchableOpacity
-                style={[styles.otpButton, styles.verifyButton, verifyingOtp && styles.otpButtonDisabled]}
-                onPress={handleVerifyOtp}
-                disabled={verifyingOtp}
-              >
-                {verifyingOtp ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Text style={styles.otpButtonText}>Verify</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Verified Badge */}
-          {otpVerified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="shield-checkmark" size={16} color="#4CAF50" />
-              <Text style={styles.verifiedText}>Phone number verified</Text>
-            </View>
-          )}
-
           {/* Password Input */}
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
@@ -751,7 +852,7 @@ const handleVerifyOtp = async () => {
 
           {/* Create Account Button */}
           <TouchableOpacity
-            style={[styles.buttonContainer, !otpVerified && styles.buttonDisabled]}
+            style={styles.buttonContainer}
             onPress={handleSignup}
             activeOpacity={0.8}
             disabled={loading}
@@ -1188,5 +1289,46 @@ coordsText: {
   gstToggleText: {
     fontSize: 14,
     color: '#666',
+  },
+  // Phone verification styles
+  inputErrorBorder: {
+    borderColor: '#F44336',
+  },
+  phoneErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
+    gap: 4,
+  },
+  resendContainer: {
+    alignItems: 'center',
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  resendText: {
+    fontSize: 14,
+    color: '#FF2E2E',
+    fontWeight: '500',
+  },
+  resendTextDisabled: {
+    color: '#999',
+  },
+  verifiedPhoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 24,
+    gap: 8,
+  },
+  verifiedPhoneText: {
+    fontSize: 16,
+    color: '#2E7D32',
+    fontWeight: '600',
   },
 });

@@ -363,6 +363,68 @@ async def restaurant_login(form_data: OAuth2PasswordRequestForm = Depends()):
         "account_type": "restaurant"
     }
 
+from pydantic import BaseModel
+
+class PhoneLoginRequest(BaseModel):
+    phone_number: str
+
+@router.post("/login-phone")
+async def restaurant_login_with_phone(request: PhoneLoginRequest):
+    """Login restaurant with verified phone number (after Firebase OTP verification)"""
+    db = get_database()
+
+    # Find restaurant by phone number
+    restaurant = await db.restaurants.find_one({"phone_number": request.phone_number})
+
+    if not restaurant:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No restaurant account found with this phone number. Please sign up first."
+        )
+
+    # Check if phone is verified
+    if not restaurant.get("phone_verified", False):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Phone number is not verified. Please verify during signup."
+        )
+
+    # Create access token using the restaurant's email
+    access_token = create_access_token(data={
+        "sub": restaurant["email"],
+        "account_type": "restaurant"
+    })
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "account_type": "restaurant"
+    }
+
+
+class UpdatePhoneRequest(BaseModel):
+    phone_number: str
+    phone_verified: bool = False
+
+
+@router.put("/update-phone")
+async def update_restaurant_phone(
+    request: UpdatePhoneRequest,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Update restaurant phone number"""
+    db = get_database()
+
+    await db.restaurants.update_one(
+        {"_id": current_restaurant["_id"]},
+        {"$set": {
+            "phone_number": request.phone_number,
+            "phone_verified": request.phone_verified
+        }}
+    )
+
+    return {"message": "Phone number updated successfully"}
+
 
 @router.get("/check-name")
 async def check_restaurant_name(name: str):

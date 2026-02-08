@@ -1724,12 +1724,14 @@ export default function LeaderboardScreen() {
           <Ionicons name="chevron-down" size={18} color="#333" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.walletButton}
-          onPress={() => setShowWalletModal(true)}
-        >
-          <Ionicons name="wallet-outline" size={24} color="#333" />
-        </TouchableOpacity>
+{!isRestaurant && (
+          <TouchableOpacity
+            style={styles.walletButton}
+            onPress={() => setShowWalletModal(true)}
+          >
+            <Ionicons name="wallet-outline" size={24} color="#333" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Location Selector Modal */}

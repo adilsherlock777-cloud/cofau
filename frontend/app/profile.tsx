@@ -28,8 +28,15 @@ import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
 import { MenuUploadModal } from '../components/MenuUploadModal';
 import { sendCompliment, getFollowers } from '../utils/api';
-//import auth from '@react-native-firebase/auth';
 import MaskedView from '@react-native-masked-view/masked-view';
+
+// Conditional Firebase import - returns null if not available (Expo Go)
+let auth: any = null;
+try {
+  auth = require('@react-native-firebase/auth').default;
+} catch (e) {
+  console.log('Firebase Auth not available (Expo Go mode)');
+}
 import { BlurView } from 'expo-blur';
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
 
@@ -420,7 +427,7 @@ export default function ProfileScreen() {
   const [selectedReviewForReply, setSelectedReviewForReply] = useState<any>(null);
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
-  //const [confirm, setConfirm] = useState<any>(null);
+  const [confirm, setConfirm] = useState<any>(null);
   const [updatingPhone, setUpdatingPhone] = useState(false);
   const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -1943,7 +1950,13 @@ const renderMenuByCategory = () => {
             {isExpanded && (
               <View style={styles.menuItemsList}>
                 {items.map((item, index) => {
-                  const itemImageUrl = menuItemImages[item.id] || fixUrl(item.image_url);
+                  const rawImageUrl = menuItemImages[item.id] || fixUrl(item.image_url);
+                  // Validate URL like OrderModal does
+                  const hasValidImage = rawImageUrl &&
+                    typeof rawImageUrl === 'string' &&
+                    rawImageUrl.trim() !== '' &&
+                    (rawImageUrl.startsWith('http') || rawImageUrl.includes('/api/'));
+                  const itemImageUrl = hasValidImage ? rawImageUrl : null;
                   const isUploadingThis = uploadingMenuItemImage === item.id;
 
                   return (
@@ -1965,24 +1978,25 @@ const renderMenuByCategory = () => {
 
                     {/* Photo and Price Section - Stacked vertically */}
                     <View style={styles.menuItemRightSection}>
-                      {/* Photo Section - Only for own restaurant profile */}
-                      {isOwnProfile && isRestaurantProfile && (
-                        <View style={styles.menuItemPhotoSection}>
-                          {itemImageUrl ? (
-                            <View style={styles.menuItemImageContainer}>
-                              <TouchableOpacity
-                                onPress={() => {
-                                  setFullImageUrl(itemImageUrl);
-                                  setFullImageModalVisible(true);
-                                }}
-                                activeOpacity={0.9}
-                              >
-                                <Image
-                                  source={{ uri: itemImageUrl }}
-                                  style={styles.menuItemImage}
-                                  resizeMode="cover"
-                                />
-                              </TouchableOpacity>
+                      {/* Photo Section - Always show image or placeholder */}
+                      <View style={styles.menuItemPhotoSection}>
+                        {itemImageUrl ? (
+                          <View style={styles.menuItemImageContainer}>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setFullImageUrl(itemImageUrl);
+                                setFullImageModalVisible(true);
+                              }}
+                              activeOpacity={0.9}
+                            >
+                              <Image
+                                source={{ uri: itemImageUrl }}
+                                style={styles.menuItemImage}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
+                            {/* Edit button only for own restaurant profile */}
+                            {isOwnProfile && (
                               <TouchableOpacity
                                 style={styles.menuItemImageEditIcon}
                                 onPress={() => handleMenuItemImagePick(item.id)}
@@ -1990,54 +2004,36 @@ const renderMenuByCategory = () => {
                               >
                                 <Ionicons name="pencil" size={12} color="#fff" />
                               </TouchableOpacity>
-                              {isUploadingThis && (
-                                <View style={styles.menuItemImageOverlay}>
-                                  <ActivityIndicator size="small" color="#fff" />
-                                </View>
-                              )}
-                            </View>
-                          ) : (
-                            <TouchableOpacity
-                              style={styles.menuItemAddPhotoButton}
-                              onPress={() => handleMenuItemImagePick(item.id)}
-                              disabled={isUploadingThis}
-                            >
-                              {isUploadingThis ? (
-                                <ActivityIndicator size="small" color="#FF8C00" />
-                              ) : (
-                                <>
-                                  <Ionicons name="camera-outline" size={20} color="#FF8C00" />
-                                  <Text style={styles.menuItemAddPhotoText}>Add Photo</Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      )}
-
-                      {/* Show image for non-owners if it exists, or placeholder */}
-                      {!isOwnProfile && (
-                        itemImageUrl ? (
+                            )}
+                            {isUploadingThis && (
+                              <View style={styles.menuItemImageOverlay}>
+                                <ActivityIndicator size="small" color="#fff" />
+                              </View>
+                            )}
+                          </View>
+                        ) : isOwnProfile ? (
                           <TouchableOpacity
-                            onPress={() => {
-                              setFullImageUrl(itemImageUrl);
-                              setFullImageModalVisible(true);
-                            }}
-                            activeOpacity={0.9}
+                            style={styles.menuItemNoImagePlaceholder}
+                            onPress={() => handleMenuItemImagePick(item.id)}
+                            disabled={isUploadingThis}
                           >
-                            <Image
-                              source={{ uri: itemImageUrl }}
-                              style={styles.menuItemImageReadOnly}
-                              resizeMode="cover"
-                            />
+                            {isUploadingThis ? (
+                              <ActivityIndicator size="small" color="#FF8C00" />
+                            ) : (
+                              <>
+                                <Ionicons name="restaurant-outline" size={24} color="#ccc" />
+                                <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
+                                <Text style={[styles.menuItemNoImageText, { color: '#FF8C00', marginTop: 4 }]}>Tap to add</Text>
+                              </>
+                            )}
                           </TouchableOpacity>
                         ) : (
                           <View style={styles.menuItemNoImagePlaceholder}>
-                            <Ionicons name="restaurant-outline" size={20} color="#ccc" />
+                            <Ionicons name="restaurant-outline" size={24} color="#ccc" />
                             <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
                           </View>
-                        )
-                      )}
+                        )}
+                      </View>
 
                       {/* Price below image */}
                       {item.price && (
@@ -2136,9 +2132,37 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
 };
 
 const handleSendOtp = async () => {
-  Alert.alert('Info', 'Phone verification will be available soon');
-  setOtpSent(true);
-  setOtpVerified(true);
+  // Check if Firebase is available
+  if (!auth) {
+    Alert.alert('Not Available', 'Phone verification requires a built app. Please install the APK/IPA build to update phone number.');
+    return;
+  }
+
+  if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+    Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+    return;
+  }
+
+  setSendingOtp(true);
+  try {
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+    setConfirm(confirmation);
+    setOtpSent(true);
+    setResendTimer(60);
+    Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
+  } catch (error: any) {
+    console.error('Error sending OTP:', error);
+    let errorMessage = 'Failed to send OTP. Please try again.';
+    if (error.code === 'auth/invalid-phone-number') {
+      errorMessage = 'Invalid phone number format.';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMessage = 'Too many attempts. Please try again later.';
+    }
+    Alert.alert('Error', errorMessage);
+  } finally {
+    setSendingOtp(false);
+  }
 };
 
 const handleVerifyAndUpdatePhone = async () => {
@@ -2146,28 +2170,41 @@ const handleVerifyAndUpdatePhone = async () => {
     Alert.alert('Error', 'Please enter 6-digit OTP');
     return;
   }
+
+  if (!confirm) {
+    Alert.alert('Error', 'Please request OTP first');
+    return;
+  }
+
   setVerifyingOtp(true);
   try {
     await confirm.confirm(otp);
-    
-    // Update phone in backend
+
+    // Update phone in backend - use different endpoint for restaurant
     const formattedPhone = formatPhoneNumber(phoneNumber);
+    const updateEndpoint = accountType === 'restaurant'
+      ? `${API_URL}/restaurant/auth/update-phone`
+      : `${API_URL}/auth/users/update-phone`;
+
     await axios.put(
-      `${API_URL}/users/update-phone`,
+      updateEndpoint,
       { phone_number: formattedPhone, phone_verified: true },
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    
-    //await auth().signOut();
+
     Alert.alert('Success', 'Phone number updated!');
     setPhoneModalVisible(false);
     resetPhoneModal();
     fetchProfileData();
   } catch (error: any) {
-    console.error('Error:', error);
-    Alert.alert('Error', error.code === 'auth/invalid-verification-code' 
-      ? 'Invalid OTP' 
-      : 'Failed to update phone');
+    console.error('Error verifying OTP:', error);
+    let errorMessage = 'Failed to update phone';
+    if (error.code === 'auth/invalid-verification-code') {
+      errorMessage = 'Invalid OTP. Please try again.';
+    } else if (error.code === 'auth/code-expired') {
+      errorMessage = 'OTP has expired. Please request a new one.';
+    }
+    Alert.alert('Error', errorMessage);
   } finally {
     setVerifyingOtp(false);
   }
@@ -2177,7 +2214,7 @@ const resetPhoneModal = () => {
   setPhoneNumber('');
   setOtp('');
   setOtpSent(false);
-  //setConfirm(null);
+  setConfirm(null);
   setResendTimer(0);
 };
 
@@ -6218,15 +6255,15 @@ favouriteGridImage: {
   },
   menuItemImageContainer: {
     position: 'relative',
-    width: 75,
-    height: 75,
-    borderRadius: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   menuItemImage: {
-    width: 75,
-    height: 75,
-    borderRadius: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
   },
   menuItemImageEditIcon: {
     position: 'absolute',
@@ -6248,12 +6285,12 @@ favouriteGridImage: {
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 12,
   },
   menuItemAddPhotoButton: {
-    width: 75,
-    height: 75,
-    borderRadius: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#FF8C00',
     borderStyle: 'dashed',
@@ -6268,15 +6305,15 @@ favouriteGridImage: {
     marginTop: 4,
   },
   menuItemImageReadOnly: {
-    width: 75,
-    height: 75,
-    borderRadius: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
     marginBottom: 4,
   },
   menuItemNoImagePlaceholder: {
-    width: 75,
-    height: 75,
-    borderRadius: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
     backgroundColor: '#f8f8f8',
     justifyContent: 'center',
     alignItems: 'center',

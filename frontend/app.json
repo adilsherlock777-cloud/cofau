@@ -91,11 +91,15 @@
       [
         "@react-native-firebase/app",
         {
+          "ios": {
+            "googleServicesFile": "./GoogleService-Info.plist"
+          },
           "android": {
             "googleServicesFile": "./google-services.json"
           }
         }
       ],
+      "@react-native-firebase/auth",
       "./plugins/withAndroidManifestFix.js"
     ],
     "updates": {

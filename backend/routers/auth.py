@@ -126,7 +126,7 @@ async def signup(user: UserCreate):
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Login user"""
     db = get_database()
-    
+
     # Find user
     user = await db.users.find_one({"email": form_data.username})
     if not user:
@@ -134,17 +134,46 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
-    
+
     # Verify password
     if not verify_password(form_data.password, user["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
-    
+
     # Create access token
     access_token = create_access_token(data={"sub": user["email"]})
-    
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+class PhoneLoginRequest(BaseModel):
+    phone_number: str
+
+@router.post("/login-phone", response_model=Token)
+async def login_with_phone(request: PhoneLoginRequest):
+    """Login user with verified phone number (after Firebase OTP verification)"""
+    db = get_database()
+
+    # Find user by phone number
+    user = await db.users.find_one({"phone_number": request.phone_number})
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No account found with this phone number. Please sign up first."
+        )
+
+    # Check if phone is verified
+    if not user.get("phone_verified", False):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Phone number is not verified. Please verify during signup."
+        )
+
+    # Create access token using the user's email
+    access_token = create_access_token(data={"sub": user["email"]})
+
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/forgot-password")
