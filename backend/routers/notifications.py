@@ -5,6 +5,7 @@ from typing import List
 from pydantic import BaseModel
 from database import get_database
 from routers.auth import get_current_user
+from routers.restaurant_auth import get_current_restaurant
 from utils.push_notifications import send_push_notification, get_user_device_tokens, register_device_token
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
@@ -336,10 +337,50 @@ async def register_device(
         tokens = await get_user_device_tokens(user_id)
         token_count = len(tokens)
         print(f"✅ Device token registration completed. User now has {token_count} device token(s)")
-        
+
         return {
             "success": True,
             "message": "Device registered successfully",
+            "tokenCount": token_count
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to register device token. Please try again."
+        )
+
+
+@router.post("/restaurant/register-device")
+async def register_restaurant_device(
+    request: DeviceTokenRequest,
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """Register device token for restaurant push notifications"""
+    restaurant_id = str(current_restaurant["_id"])
+
+    if not request.deviceToken:
+        raise HTTPException(status_code=400, detail="Device token is required")
+
+    print(f"📱 Registering device token for restaurant {restaurant_id}")
+    print(f"   Restaurant name: {current_restaurant.get('restaurant_name', 'Unknown')}")
+    print(f"   Platform: {request.platform}")
+    print(f"   Token: {request.deviceToken[:50]}...")
+
+    success = await register_device_token(
+        user_id=restaurant_id,
+        device_token=request.deviceToken,
+        platform=request.platform
+    )
+
+    if success:
+        # Verify the token was actually stored
+        tokens = await get_user_device_tokens(restaurant_id)
+        token_count = len(tokens)
+        print(f"✅ Device token registration completed. Restaurant now has {token_count} device token(s)")
+
+        return {
+            "success": True,
+            "message": "Device registered successfully for restaurant",
             "tokenCount": token_count
         }
     else:

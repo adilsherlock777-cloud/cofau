@@ -72,6 +72,8 @@ export const OrderModal: React.FC<OrderModalProps> = ({
   const [restaurantReviews, setRestaurantReviews] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [fullImageModalVisible, setFullImageModalVisible] = useState(false);
+  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -688,15 +690,26 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                             {restaurantPosts.map((postItem: any) => (
                               <View key={postItem.id} style={styles.postCard}>
                                 {postItem.media_url && (
-                                  <Image
-                                    source={{
-                                      uri: postItem.media_url.startsWith('http')
+                                  <TouchableOpacity
+                                    onPress={() => {
+                                      const imageUrl = postItem.media_url.startsWith('http')
                                         ? postItem.media_url
-                                        : `${BACKEND_URL}${postItem.media_url}`
+                                        : `${BACKEND_URL}${postItem.media_url}`;
+                                      setFullImageUrl(imageUrl);
+                                      setFullImageModalVisible(true);
                                     }}
-                                    style={styles.postImage}
-                                    resizeMode="cover"
-                                  />
+                                    activeOpacity={0.9}
+                                  >
+                                    <Image
+                                      source={{
+                                        uri: postItem.media_url.startsWith('http')
+                                          ? postItem.media_url
+                                          : `${BACKEND_URL}${postItem.media_url}`
+                                      }}
+                                      style={styles.postImage}
+                                      resizeMode="cover"
+                                    />
+                                  </TouchableOpacity>
                                 )}
                                 {postItem.description && (
                                   <Text style={styles.postDescription} numberOfLines={2}>
@@ -809,11 +822,25 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                                       const qtyInCart = getItemQuantityInCart(item.id);
                                       return (
                                         <View key={item.id} style={styles.menuItem}>
-                                          {item.media_url && (
-                                            <Image
-                                              source={{ uri: item.media_url.startsWith('http') ? item.media_url : `${BACKEND_URL}${item.media_url}` }}
-                                              style={styles.menuItemImage}
-                                            />
+                                          {item.media_url && item.media_url.trim() !== '' && (item.media_url.startsWith('http') || item.media_url.includes('/api/')) ? (
+                                            <TouchableOpacity
+                                              onPress={() => {
+                                                const imageUrl = item.media_url.startsWith('http') ? item.media_url : `${BACKEND_URL}${item.media_url}`;
+                                                setFullImageUrl(imageUrl);
+                                                setFullImageModalVisible(true);
+                                              }}
+                                              activeOpacity={0.9}
+                                            >
+                                              <Image
+                                                source={{ uri: item.media_url.startsWith('http') ? item.media_url : `${BACKEND_URL}${item.media_url}` }}
+                                                style={styles.menuItemImage}
+                                              />
+                                            </TouchableOpacity>
+                                          ) : (
+                                            <View style={styles.menuItemNoImagePlaceholder}>
+                                              <Ionicons name="restaurant-outline" size={18} color="#ccc" />
+                                              <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
+                                            </View>
                                           )}
                                           <View style={styles.menuItemInfo}>
                                             <Text style={styles.menuItemName}>{item.item_name}</Text>
@@ -964,6 +991,25 @@ export const OrderModal: React.FC<OrderModalProps> = ({
             </ScrollView>
           )}
         </View>
+
+        {/* Full Image Viewer Overlay */}
+        {fullImageModalVisible && (
+          <View style={styles.fullImageModalContainer}>
+            <TouchableOpacity
+              style={styles.fullImageCloseButton}
+              onPress={() => setFullImageModalVisible(false)}
+            >
+              <Ionicons name="close-circle" size={36} color="#fff" />
+            </TouchableOpacity>
+            {fullImageUrl && (
+              <Image
+                source={{ uri: fullImageUrl }}
+                style={styles.fullImageView}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        )}
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -1656,5 +1702,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#888",
     fontStyle: "italic",
+  },
+  fullImageModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullImageCloseButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
+  fullImageView: {
+    width: "90%",
+    height: "70%",
+  },
+  menuItemNoImagePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    backgroundColor: "#f8f8f8",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  menuItemNoImageText: {
+    fontSize: 8,
+    color: "#999",
+    textAlign: "center",
+    marginTop: 2,
   },
 });

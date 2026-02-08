@@ -35,7 +35,8 @@ function RootLayoutNav() {
  useEffect(() => {
     if (isAuthenticated && token) {
       console.log('🔔 Attempting to register push notifications...');
-      registerForPushNotificationsAsync(token)
+      console.log(`   Account type: ${accountType || 'user'}`);
+      registerForPushNotificationsAsync(token, accountType || 'user')
         .then((pushToken) => {
           if (pushToken) {
             console.log('✅ Push token obtained:', pushToken);
@@ -47,7 +48,7 @@ function RootLayoutNav() {
           console.error('❌ Push registration error:', error);
         });
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, accountType]);
 
   useEffect(() => {
     if (loading) return;

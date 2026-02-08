@@ -191,8 +191,11 @@ async def claim_amazon_voucher(
         raise HTTPException(status_code=400, detail="Wallet not available for restaurant accounts")
 
     user_email = request.get("email")
+    user_phone = request.get("phone")
     if not user_email:
         raise HTTPException(status_code=400, detail="Email is required")
+    if not user_phone:
+        raise HTTPException(status_code=400, detail="Phone number is required")
 
     db = get_database()
     user_id = str(current_user["_id"])
@@ -228,11 +231,13 @@ Amazon Voucher Claim Request
 User Details:
 - Username: {username}
 - User Email: {user_email}
+- Phone Number: {user_phone}
 - Wallet Balance: ₹{wallet_balance}
 - User ID: {user_id}
 
 The user has requested to claim their Amazon voucher.
 Please process this request and send the voucher to: {user_email}
+Contact phone: {user_phone}
 
 ---
 Cofau Rewards System
@@ -255,13 +260,14 @@ Cofau Rewards System
             server.quit()
         else:
             # Log the request if SMTP is not configured
-            print(f"[VOUCHER CLAIM] User: {username}, Email: {user_email}, Balance: ₹{wallet_balance}")
+            print(f"[VOUCHER CLAIM] User: {username}, Email: {user_email}, Phone: {user_phone}, Balance: ₹{wallet_balance}")
 
         # Record the claim in database
         await db.voucher_claims.insert_one({
             "user_id": user_id,
             "username": username,
             "user_email": user_email,
+            "user_phone": user_phone,
             "wallet_balance": wallet_balance,
             "status": "pending",
             "created_at": datetime.utcnow()
@@ -279,6 +285,7 @@ Cofau Rewards System
             "user_id": user_id,
             "username": username,
             "user_email": user_email,
+            "user_phone": user_phone,
             "wallet_balance": wallet_balance,
             "status": "pending",
             "email_sent": False,

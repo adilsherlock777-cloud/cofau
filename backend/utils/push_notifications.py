@@ -253,33 +253,41 @@ async def send_push_notification(
 
 async def get_user_device_tokens(user_id: str) -> List[str]:
     """
-    Get all device tokens for a user
-    
+    Get all device tokens for a user or restaurant
+
     Args:
-        user_id: User ID
-        
+        user_id: User ID or Restaurant ID
+
     Returns:
         List of device tokens
     """
     try:
         db = get_database()
+
+        # First try to find in users collection
         user = await db.users.find_one({"_id": ObjectId(user_id)})
-        
+
+        # If not found in users, check restaurants collection
         if not user:
-            print(f"⚠️ User {user_id} not found when retrieving device tokens")
+            user = await db.restaurants.find_one({"_id": ObjectId(user_id)})
+            if user:
+                print(f"📱 Found restaurant account for {user_id}")
+
+        if not user:
+            print(f"⚠️ User/Restaurant {user_id} not found when retrieving device tokens")
             return []
-        
-        # Get device tokens from user document
+
+        # Get device tokens from user/restaurant document
         device_tokens = user.get("device_tokens", [])
-        
+
         # Filter out None/empty tokens and ensure they're strings
         valid_tokens = [str(token) for token in device_tokens if token and str(token).strip()]
-        
+
         if valid_tokens:
-            print(f"📱 Found {len(valid_tokens)} device token(s) for user {user_id}")
+            print(f"📱 Found {len(valid_tokens)} device token(s) for user/restaurant {user_id}")
         else:
-            print(f"⚠️ No valid device tokens found for user {user_id}")
-        
+            print(f"⚠️ No valid device tokens found for user/restaurant {user_id}")
+
         return valid_tokens
     except Exception as e:
         print(f"❌ Error getting device tokens for user {user_id}: {str(e)}")
@@ -290,33 +298,42 @@ async def get_user_device_tokens(user_id: str) -> List[str]:
 
 async def register_device_token(user_id: str, device_token: str, platform: str = "unknown"):
     """
-    Register a device token for a user.
-    IMPORTANT: Removes token from other users first to prevent duplicate notifications.
-    
+    Register a device token for a user or restaurant.
+    IMPORTANT: Removes token from other users/restaurants first to prevent duplicate notifications.
+
     Args:
-        user_id: User ID
+        user_id: User ID or Restaurant ID
         device_token: Device push token (Expo for iOS, FCM for Android)
         platform: Platform (ios, android, web)
-        
+
     Returns:
         bool: True if token was successfully registered
     """
     if not device_token:
         print(f"⚠️ Empty device token provided for user {user_id}")
         return False
-    
+
     db = get_database()
-    
+
     try:
-        # Verify user exists first
+        # First check if this is a regular user
         user = await db.users.find_one({"_id": ObjectId(user_id)})
+        is_restaurant = False
+
+        # If not found in users, check restaurants collection
         if not user:
-            print(f"❌ User {user_id} not found when registering device token")
+            user = await db.restaurants.find_one({"_id": ObjectId(user_id)})
+            if user:
+                is_restaurant = True
+                print(f"📱 Registering device token for restaurant account: {user_id}")
+
+        if not user:
+            print(f"❌ User/Restaurant {user_id} not found when registering device token")
             return False
-        
+
         # Normalize platform
         platform_lower = platform.lower() if platform else "unknown"
-        
+
         # Auto-detect platform from token if not provided
         if platform_lower == "unknown":
             if device_token.startswith("ExponentPushToken["):
@@ -325,40 +342,52 @@ async def register_device_token(user_id: str, device_token: str, platform: str =
             elif FIREBASE_FCM_AVAILABLE and is_fcm_token and is_fcm_token(device_token):
                 platform_lower = "android"
                 print(f"🔍 Auto-detected platform as Android from token format")
-        
-        # ✅ IMPORTANT: Remove this token from ALL other users first
+
+        # ✅ IMPORTANT: Remove this token from ALL other users AND restaurants first
         # This prevents the same device from receiving notifications for multiple accounts
-        remove_result = await db.users.update_many(
+        remove_result_users = await db.users.update_many(
             {
-                "_id": {"$ne": ObjectId(user_id)},  # All users EXCEPT current user
+                "_id": {"$ne": ObjectId(user_id)},
                 "device_tokens": device_token
             },
             {"$pull": {"device_tokens": device_token}}
         )
-        
-        if remove_result.modified_count > 0:
-            print(f"🧹 Removed device token from {remove_result.modified_count} other user(s)")
-        
-        # Now add token to current user's device_tokens array (avoid duplicates)
-        result = await db.users.update_one(
+
+        remove_result_restaurants = await db.restaurants.update_many(
+            {
+                "_id": {"$ne": ObjectId(user_id)},
+                "device_tokens": device_token
+            },
+            {"$pull": {"device_tokens": device_token}}
+        )
+
+        total_removed = remove_result_users.modified_count + remove_result_restaurants.modified_count
+        if total_removed > 0:
+            print(f"🧹 Removed device token from {total_removed} other account(s)")
+
+        # Now add token to the correct collection
+        collection = db.restaurants if is_restaurant else db.users
+        collection_name = "restaurants" if is_restaurant else "users"
+
+        result = await collection.update_one(
             {"_id": ObjectId(user_id)},
             {
                 "$addToSet": {"device_tokens": device_token},
                 "$set": {"last_device_platform": platform_lower}
             }
         )
-        
+
         if result.matched_count > 0:
             if result.modified_count > 0:
-                print(f"✅ Device token registered for user {user_id} (platform: {platform_lower})")
+                print(f"✅ Device token registered for {collection_name[:-1]} {user_id} (platform: {platform_lower})")
                 print(f"   Token: {device_token[:50]}...")
             else:
-                print(f"ℹ️ Device token already registered for user {user_id}")
+                print(f"ℹ️ Device token already registered for {collection_name[:-1]} {user_id}")
             return True
         else:
-            print(f"❌ Failed to register device token - user not found: {user_id}")
+            print(f"❌ Failed to register device token - {collection_name[:-1]} not found: {user_id}")
             return False
-            
+
     except Exception as e:
         print(f"❌ Error registering device token for user {user_id}: {str(e)}")
         import traceback

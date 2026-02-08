@@ -162,7 +162,7 @@ export const unlikePost = async (postId, accountType) => {
 /**
  * Add a comment to a post
  */
-export const addComment = async (postId, commentText, accountType) => {
+export const addComment = async (postId, commentText, token, accountType) => {
   try {
     // Use different endpoint for restaurant posts
     const endpoint = accountType === 'restaurant'
@@ -175,6 +175,7 @@ export const addComment = async (postId, commentText, accountType) => {
     const response = await axios.post(endpoint, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
     return response.data;
@@ -678,4 +679,3 @@ export const deleteMenuItem = async (itemId: string): Promise<any> => {
 
   return response.json();
 };
-

@@ -39,6 +39,9 @@ const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${BACKEND}/api`;
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
+const SHEET_HEIGHT_RATIO = 0.5;
+const SHEET_OPEN_TOP = SCREEN_HEIGHT * (1 - SHEET_HEIGHT_RATIO);
+const MEDIA_SHRINK_SCALE = 1;
 
 /* ---------------------------------------------------------
    🔥 UNIVERSAL URL NORMALIZER
@@ -135,13 +138,13 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       // Show bottom sheet - slide up from bottom
       Animated.parallel([
         Animated.spring(bottomSheetAnim, {
-          toValue: SCREEN_HEIGHT * 0.5, // Half screen height
+          toValue: SHEET_OPEN_TOP,
           useNativeDriver: true,
           tension: 50,
           friction: 8,
         }),
         Animated.timing(mediaScaleAnim, {
-          toValue: 0.65, // Shrink to 65%
+          toValue: MEDIA_SHRINK_SCALE,
           duration: 300,
           useNativeDriver: true,
         }),
@@ -184,13 +187,13 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       onPanResponderMove: (evt, gestureState) => {
         // Only allow dragging down
         if (gestureState.dy > 0) {
-          const newValue = SCREEN_HEIGHT * 0.5 + gestureState.dy;
+          const newValue = SHEET_OPEN_TOP + gestureState.dy;
           bottomSheetAnim.setValue(newValue);
 
           // Scale media proportionally as sheet is dragged
-          const dragProgress = gestureState.dy / (SCREEN_HEIGHT * 0.5);
-          const scale = 0.65 + (0.35 * dragProgress);
-          mediaScaleAnim.setValue(Math.min(1, scale));
+          const dragProgress = gestureState.dy / SHEET_OPEN_TOP;
+          const scale = MEDIA_SHRINK_SCALE;
+          mediaScaleAnim.setValue(scale);
 
           const opacity = 0.3 * (1 - dragProgress);
           backdropOpacity.setValue(Math.max(0, opacity));
@@ -204,13 +207,13 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
           // Otherwise, snap back to half screen
           Animated.parallel([
             Animated.spring(bottomSheetAnim, {
-              toValue: SCREEN_HEIGHT * 0.5,
+              toValue: SHEET_OPEN_TOP,
               useNativeDriver: true,
               tension: 50,
               friction: 8,
             }),
             Animated.timing(mediaScaleAnim, {
-              toValue: 0.65,
+              toValue: MEDIA_SHRINK_SCALE,
               duration: 200,
               useNativeDriver: true,
             }),
@@ -867,15 +870,23 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       {/* Location */}
       <View style={styles.glassInfoItem}>
         <Ionicons name="location" size={12} color="#FFD700" />
-        <Text style={styles.glassInfoText} numberOfLines={1}>
-          {post.location_name || "N/A"}
+        <Text
+          style={styles.glassInfoText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {(post.location_name || "N/A").slice(0, 15)}
         </Text>
       </View>
       
       {/* Username */}
       <View style={styles.glassInfoItem}>
         <Ionicons name="person" size={12} color="#FFD700" />
-        <Text style={styles.glassInfoText} numberOfLines={1}>
+        <Text
+          style={styles.glassInfoText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {post.username || "N/A"}
         </Text>
       </View>
@@ -980,9 +991,9 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                   <Text style={styles.detailsActionText}>{likesCount}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.detailsActionBtn}
-                  onPress={() => setShowComments(!showComments)}
+                  onPress={() => setShowComments(true)}
                 >
                   <Ionicons name="chatbubble-outline" size={18} color="#000" />
                   <Text style={styles.detailsActionText}>{post.comments_count || comments.length}</Text>
@@ -1096,13 +1107,28 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                 </TouchableOpacity>
               )}
 
-              {/* Comments Section */}
-              {showComments && (
-                <View style={styles.detailsCommentsSection}>
-                  <Text style={styles.detailsCommentsTitle}>
+              <View style={{ height: 100 }} />
+            </ScrollView>
+
+            {/* Comments Overlay - full screen inside sheet */}
+            {showComments && (
+              <View style={styles.commentsOverlay}>
+                <View style={styles.commentsHeader}>
+                  <Text style={styles.commentsHeaderTitle}>
                     Comments ({comments.length})
                   </Text>
+                  <TouchableOpacity
+                    style={styles.commentsCloseButton}
+                    onPress={() => setShowComments(false)}
+                  >
+                    <Ionicons name="close" size={22} color="#000" />
+                  </TouchableOpacity>
+                </View>
 
+                <ScrollView
+                  style={styles.commentsList}
+                  showsVerticalScrollIndicator={false}
+                >
                   {comments.length === 0 ? (
                     <Text style={styles.noComments}>No comments yet</Text>
                   ) : (
@@ -1123,31 +1149,29 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                       </View>
                     ))
                   )}
+                </ScrollView>
 
-                  <View style={styles.commentInputContainer}>
-                    <TextInput
-                      value={commentText}
-                      onChangeText={setCommentText}
-                      placeholder="Add a comment…"
-                      style={styles.commentInput}
-                    />
-                    <TouchableOpacity
-                      style={[styles.sendButton, !commentText.trim() && { backgroundColor: "#ccc" }]}
-                      disabled={!commentText.trim() || submittingComment}
-                      onPress={handleSubmitComment}
-                    >
-                      {submittingComment ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Ionicons name="send" size={20} color="#fff" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                <View style={styles.commentInputContainer}>
+                  <TextInput
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    placeholder="Add a comment…"
+                    style={styles.commentInput}
+                  />
+                  <TouchableOpacity
+                    style={[styles.sendButton, !commentText.trim() && { backgroundColor: "#ccc" }]}
+                    disabled={!commentText.trim() || submittingComment}
+                    onPress={handleSubmitComment}
+                  >
+                    {submittingComment ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="send" size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
                 </View>
-              )}
-
-              <View style={{ height: 100 }} />
-            </ScrollView>
+              </View>
+            )}
           </Animated.View>
         </>
        </Animated.View>
@@ -1688,12 +1712,15 @@ heartAnimationContainer: {
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    minWidth: 0,
   },
 
   glassInfoText: {
     color: "#FFF",
     fontSize: 14,
     fontWeight: "600",
+    flexShrink: 1,
+    minWidth: 0,
   },
 
   glassChevronContainer: {
@@ -1718,7 +1745,7 @@ heartAnimationContainer: {
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.5,
+    height: SCREEN_HEIGHT * SHEET_HEIGHT_RATIO,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     overflow: "hidden",
@@ -1894,6 +1921,47 @@ heartAnimationContainer: {
     fontSize: 14,
   },
 
+  commentsOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.98)",
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    zIndex: 5,
+  },
+
+  commentsHeader: {
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#EFEFEF",
+  },
+
+  commentsHeaderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#000",
+  },
+
+  commentsCloseButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  commentsList: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+
   commentItem: {
     flexDirection: "row",
     marginBottom: 20,
@@ -1931,6 +1999,7 @@ heartAnimationContainer: {
     alignItems: "center",
     marginTop: 16,
     paddingTop: 16,
+    paddingHorizontal: 16,
     borderTopWidth: 0.5,
     borderColor: "#DBDBDB",
   },

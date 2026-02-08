@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 
@@ -22,6 +23,7 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.co
 
 const CofauWalletModal = ({ visible, onClose }) => {
   const { token } = useAuth();
+  const router = useRouter();
 
   // State variables
   const [loading, setLoading] = useState(true);
@@ -29,9 +31,12 @@ const CofauWalletModal = ({ visible, onClose }) => {
   const [showClaimInfo, setShowClaimInfo] = useState(false);
   const [showPointsCriteria, setShowPointsCriteria] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [claimEmail, setClaimEmail] = useState("");
+  const [claimPhone, setClaimPhone] = useState("");
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimMessage, setClaimMessage] = useState(null);
+  const [transactionsVersion, setTransactionsVersion] = useState(0);
   const [walletData, setWalletData] = useState({
     balance: 0,
     target_amount: 1000,
@@ -44,6 +49,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
     },
     recent_transactions: [],
   });
+  const transactionsScrollRef = React.useRef(null);
 
   const fetchWalletData = async () => {
     try {
@@ -75,10 +81,22 @@ const CofauWalletModal = ({ visible, onClose }) => {
       return;
     }
 
+    if (!claimPhone.trim()) {
+      Alert.alert("Error", "Please enter your phone number");
+      return;
+    }
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(claimEmail.trim())) {
       Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    // Basic phone validation (at least 10 digits)
+    const phoneDigits = claimPhone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      Alert.alert("Error", "Please enter a valid phone number (at least 10 digits)");
       return;
     }
 
@@ -88,13 +106,23 @@ const CofauWalletModal = ({ visible, onClose }) => {
     try {
       const response = await axios.post(
         `${BACKEND_URL}/api/wallet/claim-voucher`,
-        { email: claimEmail.trim() },
+        {
+          email: claimEmail.trim(),
+          phone: claimPhone.trim()
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (response.data.success) {
         setClaimMessage({ type: "success", text: response.data.message });
         setClaimEmail("");
+        setClaimPhone("");
+        await fetchWalletData();
+        setTransactionsVersion((prev) => prev + 1);
+        setShowAllTransactions(true);
+        if (transactionsScrollRef.current) {
+          transactionsScrollRef.current.scrollTo({ y: 0, animated: false });
+        }
       }
     } catch (err) {
       const errorMessage = err.response?.data?.detail || "Failed to submit claim request";
@@ -202,7 +230,10 @@ const CofauWalletModal = ({ visible, onClose }) => {
                 </Text>
                 <TouchableOpacity
                   style={styles.claimButtonActive}
-                  onPress={() => setShowClaimInfo(true)}
+                  onPress={() => {
+                    setShowEmailModal(true);
+                    setClaimMessage(null);
+                  }}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="gift" size={14} color="#FFF" />
@@ -236,19 +267,32 @@ const CofauWalletModal = ({ visible, onClose }) => {
                 </View>
               ))}
 
-              <TouchableOpacity style={styles.viewAllButton} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.viewAllButton}
+                activeOpacity={0.7}
+                onPress={() => setShowAllTransactions(true)}
+              >
                 <Text style={styles.viewAllText}>View All Transactions</Text>
               </TouchableOpacity>
 
               {/* Add Post Earn Reward Box */}
-              <LinearGradient
-                colors={["#FF8C42", "#FFA726"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+              <TouchableOpacity
                 style={styles.earnRewardBox}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (onClose) onClose();
+                  router.push("/add-post");
+                }}
               >
-                <Text style={styles.earnRewardText}>UPLOAD POST & EARN REWARDS</Text>
-              </LinearGradient>
+                <LinearGradient
+                  colors={["#FF8C42", "#FFA726"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.earnRewardBoxGradient}
+                >
+                  <Text style={styles.earnRewardText}>UPLOAD POST & EARN REWARDS</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
             </ScrollView>
           )}
@@ -432,6 +476,44 @@ const CofauWalletModal = ({ visible, onClose }) => {
             </View>
           )}
 
+          {/* All Transactions Modal */}
+          {showAllTransactions && (
+            <View style={styles.overlayModal}>
+              <View style={styles.transactionsContainer}>
+                <View style={styles.transactionsHeader}>
+                  <Text style={styles.transactionsTitle}>Transaction History</Text>
+                  <TouchableOpacity
+                    style={styles.transactionsCloseButton}
+                    onPress={() => setShowAllTransactions(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close" size={22} color="#000" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  key={transactionsVersion}
+                  ref={transactionsScrollRef}
+                  style={styles.transactionsList}
+                  contentContainerStyle={{ paddingBottom: 16 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {walletData.recent_transactions.length === 0 ? (
+                    <Text style={styles.noTransactionsText}>No transactions yet</Text>
+                  ) : (
+                    walletData.recent_transactions.map((transaction) => (
+                      <View key={transaction.id} style={styles.transactionRow}>
+                        <Text style={styles.transactionDate}>{transaction.date}</Text>
+                        <Text style={styles.transactionAmount}>+₹{transaction.amount}</Text>
+                        <Text style={styles.transactionDesc}>{transaction.description}</Text>
+                      </View>
+                    ))
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
           {/* Email Claim Modal */}
           {showEmailModal && (
             <View style={styles.overlayModal}>
@@ -441,6 +523,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   onPress={() => {
                     setShowEmailModal(false);
                     setClaimEmail("");
+                    setClaimPhone("");
                     setClaimMessage(null);
                   }}
                 >
@@ -453,7 +536,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
 
                 <Text style={styles.emailModalTitle}>Claim Amazon Voucher</Text>
                 <Text style={styles.emailModalSubtitle}>
-                  Please type your email address to receive Amazon voucher
+                  Please enter your email address and phone number to receive Amazon voucher
                 </Text>
 
                 {claimMessage && (
@@ -489,6 +572,16 @@ const CofauWalletModal = ({ visible, onClose }) => {
                       editable={!claimLoading}
                     />
 
+                    <TextInput
+                      style={styles.emailInput}
+                      placeholder="Enter your phone number"
+                      placeholderTextColor="#999"
+                      keyboardType="phone-pad"
+                      value={claimPhone}
+                      onChangeText={setClaimPhone}
+                      editable={!claimLoading}
+                    />
+
                     <TouchableOpacity
                       style={[styles.submitButton, claimLoading && styles.submitButtonDisabled]}
                       onPress={handleClaimVoucher}
@@ -511,6 +604,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     onPress={() => {
                       setShowEmailModal(false);
                       setClaimEmail("");
+                      setClaimPhone("");
                       setClaimMessage(null);
                     }}
                     activeOpacity={0.8}
@@ -895,16 +989,55 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FF7A18",
   },
-  earnRewardBox: {
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 15,
+  transactionsContainer: {
+    width: "100%",
+    maxHeight: SCREEN_HEIGHT * 0.8,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  transactionsHeader: {
+    height: 52,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
+  },
+  transactionsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#222",
+  },
+  transactionsCloseButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  transactionsList: {
+    paddingHorizontal: 16,
+  },
+  noTransactionsText: {
+    textAlign: "center",
+    color: "#8E8E8E",
+    marginTop: 24,
+    fontSize: 14,
+  },
+  earnRewardBox: {
+    marginTop: 15,
+    borderRadius: 12,
+    overflow: "hidden",
     shadowColor: "#FF7A18",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+  },
+  earnRewardBoxGradient: {
+    padding: 16,
+    alignItems: "center",
   },
   earnRewardText: {
     fontSize: 18,

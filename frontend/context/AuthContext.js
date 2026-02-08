@@ -49,11 +49,12 @@ export const AuthProvider = ({ children }) => {
 
           // Register for push notifications (works even without navigation)
           console.log('🔔 Registering for push notifications on app startup...');
-          registerForPushNotificationsAsync(storedToken).catch(err => {
+          console.log(`   Account type: ${storedAccountType || 'user'}`);
+          registerForPushNotificationsAsync(storedToken, storedAccountType || 'user').catch(err => {
             console.log('⚠️ Push notification registration failed:', err);
             setTimeout(() => {
               console.log('🔄 Retrying push notification registration...');
-              registerForPushNotificationsAsync(storedToken).catch(() => {});
+              registerForPushNotificationsAsync(storedToken, storedAccountType || 'user').catch(() => {});
             }, 3000);
           });
         } catch (error) {
@@ -137,11 +138,12 @@ export const AuthProvider = ({ children }) => {
 
         // Register for push notifications immediately after login
         console.log('🔔 Registering for push notifications after login...');
-        registerForPushNotificationsAsync(access_token).catch(err => {
+        console.log(`   Account type: ${accType}`);
+        registerForPushNotificationsAsync(access_token, accType).catch(err => {
           console.log('⚠️ Push notification registration failed:', err);
           setTimeout(() => {
             console.log('🔄 Retrying push notification registration...');
-            registerForPushNotificationsAsync(access_token).catch(() => {});
+            registerForPushNotificationsAsync(access_token, accType).catch(() => {});
           }, 3000);
         });
 
@@ -192,11 +194,11 @@ export const AuthProvider = ({ children }) => {
 
       // Register for push notifications immediately after signup
       console.log('🔔 Registering for push notifications after signup...');
-      registerForPushNotificationsAsync(access_token).catch(err => {
+      registerForPushNotificationsAsync(access_token, 'user').catch(err => {
         console.log('⚠️ Push notification registration failed:', err);
         setTimeout(() => {
           console.log('🔄 Retrying push notification registration...');
-          registerForPushNotificationsAsync(access_token).catch(() => {});
+          registerForPushNotificationsAsync(access_token, 'user').catch(() => {});
         }, 3000);
       });
 
@@ -236,8 +238,12 @@ export const AuthProvider = ({ children }) => {
 
       // Register for push notifications
       console.log('🔔 Registering for push notifications after restaurant signup...');
-      registerForPushNotificationsAsync(access_token).catch(err => {
+      registerForPushNotificationsAsync(access_token, 'restaurant').catch(err => {
         console.log('⚠️ Push notification registration failed:', err);
+        setTimeout(() => {
+          console.log('🔄 Retrying push notification registration...');
+          registerForPushNotificationsAsync(access_token, 'restaurant').catch(() => {});
+        }, 3000);
       });
 
       return { success: true };

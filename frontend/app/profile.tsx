@@ -135,13 +135,15 @@ const getPointsNeededForNextLevel = (currentLevel: number, requiredPoints: numbe
 };
 
 const fixUrl = (url?: string | null) => {
-  if (!url) return null;
+  if (!url || url.trim() === '') return null;
   if (url.startsWith("http")) return url;
   url = url.replace(/\/+/g, "/");
-  if (url.startsWith("/api/")) {
-    return `${BACKEND_URL}${url}`;
+  // Only accept URLs with /api/ prefix (valid static file paths)
+  if (url.includes("/api/")) {
+    return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
   }
-  return `${BACKEND_URL}${url.startsWith("/") ? url : "/" + url}`;
+  // Old URLs without /api/ prefix are invalid, return null
+  return null;
 };
 
 
@@ -405,6 +407,8 @@ export default function ProfileScreen() {
   const [expandedMenuCategories, setExpandedMenuCategories] = useState<{ [key: string]: boolean }>({});
   const [uploadingMenuItemImage, setUploadingMenuItemImage] = useState<string | null>(null);
   const [menuItemImages, setMenuItemImages] = useState<{ [key: string]: string }>({});
+  const [fullImageModalVisible, setFullImageModalVisible] = useState(false);
+  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
   const [menuUploadModalVisible, setMenuUploadModalVisible] = useState(false);
@@ -1946,30 +1950,39 @@ const renderMenuByCategory = () => {
                       )}
                     </View>
 
-                    {/* Photo Section - Only for own restaurant profile */}
+                    {/* Photo and Price Section - Stacked vertically */}
                     <View style={styles.menuItemRightSection}>
+                      {/* Photo Section - Only for own restaurant profile */}
                       {isOwnProfile && isRestaurantProfile && (
                         <View style={styles.menuItemPhotoSection}>
                           {itemImageUrl ? (
-                            <TouchableOpacity
-                              style={styles.menuItemImageContainer}
-                              onPress={() => handleMenuItemImagePick(item.id)}
-                              disabled={isUploadingThis}
-                            >
-                              <Image
-                                source={{ uri: itemImageUrl }}
-                                style={styles.menuItemImage}
-                                resizeMode="cover"
-                              />
-                              <View style={styles.menuItemImageEditIcon}>
-                                <Ionicons name="pencil" size={10} color="#fff" />
-                              </View>
+                            <View style={styles.menuItemImageContainer}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setFullImageUrl(itemImageUrl);
+                                  setFullImageModalVisible(true);
+                                }}
+                                activeOpacity={0.9}
+                              >
+                                <Image
+                                  source={{ uri: itemImageUrl }}
+                                  style={styles.menuItemImage}
+                                  resizeMode="cover"
+                                />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.menuItemImageEditIcon}
+                                onPress={() => handleMenuItemImagePick(item.id)}
+                                disabled={isUploadingThis}
+                              >
+                                <Ionicons name="pencil" size={12} color="#fff" />
+                              </TouchableOpacity>
                               {isUploadingThis && (
                                 <View style={styles.menuItemImageOverlay}>
                                   <ActivityIndicator size="small" color="#fff" />
                                 </View>
                               )}
-                            </TouchableOpacity>
+                            </View>
                           ) : (
                             <TouchableOpacity
                               style={styles.menuItemAddPhotoButton}
@@ -1980,8 +1993,8 @@ const renderMenuByCategory = () => {
                                 <ActivityIndicator size="small" color="#FF8C00" />
                               ) : (
                                 <>
-                                  <Ionicons name="camera-outline" size={16} color="#FF8C00" />
-                                  <Text style={styles.menuItemAddPhotoText}>Add</Text>
+                                  <Ionicons name="camera-outline" size={20} color="#FF8C00" />
+                                  <Text style={styles.menuItemAddPhotoText}>Add Photo</Text>
                                 </>
                               )}
                             </TouchableOpacity>
@@ -1989,15 +2002,31 @@ const renderMenuByCategory = () => {
                         </View>
                       )}
 
-                      {/* Show image for non-owners if it exists */}
-                      {!isOwnProfile && itemImageUrl && (
-                        <Image
-                          source={{ uri: itemImageUrl }}
-                          style={styles.menuItemImageReadOnly}
-                          resizeMode="cover"
-                        />
+                      {/* Show image for non-owners if it exists, or placeholder */}
+                      {!isOwnProfile && (
+                        itemImageUrl ? (
+                          <TouchableOpacity
+                            onPress={() => {
+                              setFullImageUrl(itemImageUrl);
+                              setFullImageModalVisible(true);
+                            }}
+                            activeOpacity={0.9}
+                          >
+                            <Image
+                              source={{ uri: itemImageUrl }}
+                              style={styles.menuItemImageReadOnly}
+                              resizeMode="cover"
+                            />
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={styles.menuItemNoImagePlaceholder}>
+                            <Ionicons name="restaurant-outline" size={20} color="#ccc" />
+                            <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
+                          </View>
+                        )
                       )}
 
+                      {/* Price below image */}
                       {item.price && (
                         <View style={styles.menuItemPriceContainer}>
                           <Text style={styles.menuItemPrice}>₹{item.price}</Text>
@@ -3429,6 +3458,30 @@ const renderRestaurantProfile = () => {
         })}
       </ScrollView>
     </View>
+  </View>
+</Modal>
+
+{/* ================= FULL IMAGE VIEWER MODAL ================= */}
+<Modal
+  animationType="fade"
+  transparent={true}
+  visible={fullImageModalVisible}
+  onRequestClose={() => setFullImageModalVisible(false)}
+>
+  <View style={styles.fullImageModalContainer}>
+    <TouchableOpacity
+      style={styles.fullImageCloseButton}
+      onPress={() => setFullImageModalVisible(false)}
+    >
+      <Ionicons name="close-circle" size={36} color="#fff" />
+    </TouchableOpacity>
+    {fullImageUrl && (
+      <Image
+        source={{ uri: fullImageUrl }}
+        style={styles.fullImageView}
+        resizeMode="contain"
+      />
+    )}
   </View>
 </Modal>
 
@@ -6137,33 +6190,33 @@ favouriteGridImage: {
     color: '#FFFFFF',
   },
   menuItemRightSection: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   menuItemPhotoSection: {
-    marginRight: 4,
+    marginBottom: 4,
   },
   menuItemImageContainer: {
     position: 'relative',
-    width: 50,
-    height: 50,
-    borderRadius: 8,
+    width: 75,
+    height: 75,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   menuItemImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
+    width: 75,
+    height: 75,
+    borderRadius: 10,
   },
   menuItemImageEditIcon: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
+    bottom: 4,
+    right: 4,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 10,
-    width: 18,
-    height: 18,
+    borderRadius: 12,
+    width: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -6176,12 +6229,12 @@ favouriteGridImage: {
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
   },
   menuItemAddPhotoButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
+    width: 75,
+    height: 75,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#FF8C00',
     borderStyle: 'dashed',
@@ -6190,15 +6243,50 @@ favouriteGridImage: {
     backgroundColor: '#FFF5EB',
   },
   menuItemAddPhotoText: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#FF8C00',
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 4,
   },
   menuItemImageReadOnly: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
+    width: 75,
+    height: 75,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  menuItemNoImagePlaceholder: {
+    width: 75,
+    height: 75,
+    borderRadius: 10,
+    backgroundColor: '#f8f8f8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  menuItemNoImageText: {
+    fontSize: 9,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  fullImageModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImageCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
+  fullImageView: {
+    width: '90%',
+    height: '70%',
   },
   uploadMenuButton: {
     marginTop: 20,

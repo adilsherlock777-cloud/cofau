@@ -130,7 +130,7 @@ async function getExpoPushToken() {
   }
 }
 
-export async function registerForPushNotificationsAsync(token, retryCount = 0) {
+export async function registerForPushNotificationsAsync(token, accountType = 'user', retryCount = 0) {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000;
 
@@ -143,6 +143,8 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
     console.log('⚠️ No auth token provided for push notification registration');
     return null;
   }
+
+  console.log(`📱 Registering push notifications for account type: ${accountType}`);
 
   try {
     // Ensure channel exists before registering (Android)
@@ -227,14 +229,21 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
 
     console.log(`📱 ${Platform.OS === 'android' ? 'FCM' : 'Expo'} Token obtained:`, deviceToken.substring(0, 50) + '...');
 
-    // Register token with backend
+    // Register token with backend - use correct endpoint based on account type
     if (token && deviceToken) {
       let registered = false;
-      
+
+      // Use restaurant endpoint for restaurant accounts
+      const registerEndpoint = accountType === 'restaurant'
+        ? `${API_URL}/notifications/restaurant/register-device`
+        : `${API_URL}/notifications/register-device`;
+
+      console.log(`📱 Using registration endpoint: ${registerEndpoint}`);
+
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
           const response = await axios.post(
-            `${API_URL}/notifications/register-device`,
+            registerEndpoint,
             {
               deviceToken: deviceToken,
               platform: platform,
@@ -244,9 +253,10 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
               timeout: 10000,
             }
           );
-          
+
           if (response.data?.success) {
             console.log('✅ Device token registered with backend successfully');
+            console.log(`   Account type: ${accountType}`);
             console.log(`   Platform: ${platform}`);
             console.log(`   Token count: ${response.data.tokenCount || 1}`);
             registered = true;
@@ -255,7 +265,7 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
         } catch (error) {
           const status = error.response?.status;
           const isLastAttempt = attempt === MAX_RETRIES;
-          
+
           if (status === 401) {
             console.log('⚠️ Push notification registration failed - user not authenticated');
             break;
@@ -276,7 +286,7 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
       if (!registered && retryCount < MAX_RETRIES) {
         console.log(`🔄 Retrying token registration in ${RETRY_DELAY * 2}ms...`);
         setTimeout(() => {
-          registerForPushNotificationsAsync(token, retryCount + 1);
+          registerForPushNotificationsAsync(token, accountType, retryCount + 1);
         }, RETRY_DELAY * 2);
       }
     }
@@ -284,14 +294,14 @@ export async function registerForPushNotificationsAsync(token, retryCount = 0) {
     return deviceToken;
   } catch (error) {
     console.error('❌ Error registering for push notifications:', error);
-    
+
     if (retryCount < MAX_RETRIES) {
       console.log(`🔄 Retrying push notification registration in ${RETRY_DELAY * 2}ms...`);
       setTimeout(() => {
-        registerForPushNotificationsAsync(token, retryCount + 1);
+        registerForPushNotificationsAsync(token, accountType, retryCount + 1);
       }, RETRY_DELAY * 2);
     }
-    
+
     return null;
   }
 }
@@ -355,7 +365,8 @@ export function setupNotificationListeners(navigation) {
             title: remoteMessage.notification?.title || 'New Notification',
             body: remoteMessage.notification?.body || '',
             data: data || {},
-            sound: true,
+            sound: 'default',
+            channelId: 'default',
           },
           trigger: null,
         });
@@ -462,7 +473,8 @@ export async function sendLocalNotification(title, body, data = {}) {
       title,
       body,
       data,
-      sound: true,
+      sound: 'default',
+      channelId: 'default',
     },
     trigger: null,
   });
