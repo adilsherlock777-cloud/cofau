@@ -25,7 +25,25 @@ import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost } from "../utils/api";
-import MapView, { Marker, PROVIDER_GOOGLE, Callout } from "react-native-maps";
+let MapView: any;
+let Marker: any;
+let PROVIDER_GOOGLE: any;
+let Callout: any;
+try {
+  const maps = require("react-native-maps");
+  MapView = maps.default;
+  Marker = maps.Marker;
+  PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE;
+  Callout = maps.Callout;
+} catch {
+  // react-native-maps not available (e.g. Expo Go)
+  MapView = ({ children, ...props }: any) => {
+    const { View: V, Text: T } = require("react-native");
+    return <V style={[props.style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}><T>Maps require a development build</T></V>;
+  };
+  Marker = View;
+  Callout = View;
+}
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from "expo-location";
 
@@ -1077,7 +1095,7 @@ export default function ExploreScreen() {
   const { user, token, accountType } = auth;
 
   const scrollViewRef = useRef<ScrollView>(null);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<typeof MapView>(null);
   const videoPositions = useRef<Map<string, { top: number; height: number }>>(new Map());
   const cachedMapPosts = useRef<any[]>([]);
   const cachedFollowersPosts = useRef<any[]>([]);

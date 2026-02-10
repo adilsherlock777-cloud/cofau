@@ -31,12 +31,18 @@ import { sendCompliment, getFollowers } from '../utils/api';
 import MaskedView from '@react-native-masked-view/masked-view';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
-let auth: any = null;
+let firebaseAuthModule: any = null;
 try {
-  auth = require('@react-native-firebase/auth').default;
+  firebaseAuthModule = require('@react-native-firebase/auth').default;
 } catch (e) {
   console.log('Firebase Auth not available (Expo Go mode)');
 }
+
+// Helper to get Firebase auth instance (handles both function and object exports)
+const getFirebaseAuth = () => {
+  if (!firebaseAuthModule) return null;
+  return typeof firebaseAuthModule === 'function' ? firebaseAuthModule() : firebaseAuthModule;
+};
 import { BlurView } from 'expo-blur';
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
 
@@ -416,6 +422,8 @@ export default function ProfileScreen() {
   const [reviewFilter, setReviewFilter] = useState<string | null>(null);
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [phoneUpdateStep, setPhoneUpdateStep] = useState<'verify_old' | 'enter_new' | 'verify_new'>('verify_old');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [otp, setOtp] = useState('');
@@ -1950,13 +1958,15 @@ const renderMenuByCategory = () => {
             {isExpanded && (
               <View style={styles.menuItemsList}>
                 {items.map((item, index) => {
-                  const rawImageUrl = menuItemImages[item.id] || fixUrl(item.image_url);
-                  // Validate URL like OrderModal does
-                  const hasValidImage = rawImageUrl &&
-                    typeof rawImageUrl === 'string' &&
-                    rawImageUrl.trim() !== '' &&
-                    (rawImageUrl.startsWith('http') || rawImageUrl.includes('/api/'));
-                  const itemImageUrl = hasValidImage ? rawImageUrl : null;
+                  // Check raw image_url BEFORE fixUrl (like OrderModal does)
+                  const rawUrl = menuItemImages[item.id] || item.image_url;
+                  const hasValidImage = rawUrl &&
+                    typeof rawUrl === 'string' &&
+                    rawUrl.trim() !== '' &&
+                    rawUrl.trim().toLowerCase() !== 'none' &&
+                    rawUrl.trim().toLowerCase() !== 'null' &&
+                    (rawUrl.startsWith('http') || rawUrl.includes('/api/') || rawUrl.includes('.'));
+                  const itemImageUrl = hasValidImage ? (menuItemImages[item.id] || fixUrl(item.image_url)) : null;
                   const isUploadingThis = uploadingMenuItemImage === item.id;
 
                   return (
@@ -1993,6 +2003,18 @@ const renderMenuByCategory = () => {
                                 source={{ uri: itemImageUrl }}
                                 style={styles.menuItemImage}
                                 resizeMode="cover"
+                                onError={() => {
+                                  // Image failed to load - remove from valid images
+                                  setMenuItemImages(prev => {
+                                    const updated = { ...prev };
+                                    delete updated[item.id];
+                                    return updated;
+                                  });
+                                  // Clear image_url on the item so placeholder shows
+                                  setMenuItems(prev => prev.map(mi =>
+                                    mi.id === item.id ? { ...mi, image_url: null } : mi
+                                  ));
+                                }}
                               />
                             </TouchableOpacity>
                             {/* Edit button only for own restaurant profile */}
@@ -2131,14 +2153,16 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
   return phone.startsWith('+') ? phone : `+${cleaned}`;
 };
 
-const handleSendOtp = async () => {
-  // Check if Firebase is available
-  if (!auth) {
+// Send OTP to a phone number
+const handleSendOtp = async (targetPhone?: string) => {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) {
     Alert.alert('Not Available', 'Phone verification requires a built app. Please install the APK/IPA build to update phone number.');
     return;
   }
 
-  if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+  const phoneToVerify = targetPhone || (phoneUpdateStep === 'verify_new' ? newPhoneNumber : phoneNumber);
+  if (!phoneToVerify || phoneToVerify.replace(/\D/g, '').length < 10) {
     Alert.alert('Error', 'Please enter a valid 10-digit phone number');
     return;
   }
@@ -2147,13 +2171,13 @@ const handleSendOtp = async () => {
   try {
     // Sign out from any existing Firebase session first to avoid conflicts
     try {
-      await auth().signOut();
+      await firebaseAuth.signOut();
     } catch (signOutError) {
-      // Ignore sign out errors - user might not be signed in
+      // Ignore sign out errors
     }
 
-    const formattedPhone = formatPhoneNumber(phoneNumber);
-    const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+    const formattedPhone = formatPhoneNumber(phoneToVerify);
+    const confirmation = await firebaseAuth.signInWithPhoneNumber(formattedPhone);
     setConfirm(confirmation);
     setOtpSent(true);
     setResendTimer(60);
@@ -2176,7 +2200,8 @@ const handleSendOtp = async () => {
   }
 };
 
-const handleVerifyAndUpdatePhone = async () => {
+// Verify OTP - handles both old phone verification and new phone verification
+const handleVerifyOtp = async () => {
   if (!otp || otp.length < 6) {
     Alert.alert('Error', 'Please enter 6-digit OTP');
     return;
@@ -2191,27 +2216,43 @@ const handleVerifyAndUpdatePhone = async () => {
   try {
     await confirm.confirm(otp);
 
-    // Update phone in backend - use different endpoint for restaurant
-    const formattedPhone = formatPhoneNumber(phoneNumber);
-    const updateEndpoint = accountType === 'restaurant'
-      ? `${API_URL}/restaurant/auth/update-phone`
-      : `${API_URL}/auth/users/update-phone`;
+    if (phoneUpdateStep === 'verify_old') {
+      // Old phone verified, move to enter new number
+      Alert.alert('Verified!', 'Current phone verified. Now enter your new phone number.');
+      setPhoneUpdateStep('enter_new');
+      setOtp('');
+      setOtpSent(false);
+      setConfirm(null);
+      setResendTimer(0);
+    } else if (phoneUpdateStep === 'verify_new') {
+      // New phone verified, save to backend
+      const formattedPhone = formatPhoneNumber(newPhoneNumber);
+      const updateEndpoint = accountType === 'restaurant'
+        ? `${API_URL}/restaurant/auth/update-phone`
+        : `${API_URL}/auth/users/update-phone`;
 
-    await axios.put(
-      updateEndpoint,
-      { phone_number: formattedPhone, phone_verified: true },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      await axios.put(
+        updateEndpoint,
+        { phone_number: formattedPhone, phone_verified: true },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    Alert.alert('Success', 'Phone number updated!');
-    setPhoneModalVisible(false);
-    resetPhoneModal();
-    fetchProfileData();
+      // Sign out from Firebase after updating
+      const firebaseAuth = getFirebaseAuth();
+      if (firebaseAuth) {
+        try { await firebaseAuth.signOut(); } catch (e) {}
+      }
+
+      Alert.alert('Success', 'Phone number updated successfully!');
+      setPhoneModalVisible(false);
+      resetPhoneModal();
+      fetchProfileData();
+    }
   } catch (error: any) {
     console.error('Error verifying OTP:', error);
-    let errorMessage = 'Failed to update phone';
+    let errorMessage = 'Invalid OTP. Please try again.';
     if (error.code === 'auth/invalid-verification-code') {
-      errorMessage = 'Invalid OTP. Please try again.';
+      errorMessage = 'Incorrect verification code.';
     } else if (error.code === 'auth/code-expired') {
       errorMessage = 'OTP has expired. Please request a new one.';
     }
@@ -2221,12 +2262,31 @@ const handleVerifyAndUpdatePhone = async () => {
   }
 };
 
+// Send OTP to new phone and move to verify_new step
+const handleSendOtpToNewPhone = async () => {
+  if (!newPhoneNumber || newPhoneNumber.replace(/\D/g, '').length < 10) {
+    Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+    return;
+  }
+
+  // Check if new number is same as old
+  if (formatPhoneNumber(newPhoneNumber) === userData?.phone_number) {
+    Alert.alert('Error', 'New phone number cannot be the same as your current number.');
+    return;
+  }
+
+  setPhoneUpdateStep('verify_new');
+  await handleSendOtp(newPhoneNumber);
+};
+
 const resetPhoneModal = () => {
   setPhoneNumber('');
+  setNewPhoneNumber('');
   setOtp('');
   setOtpSent(false);
   setConfirm(null);
   setResendTimer(0);
+  setPhoneUpdateStep('verify_old');
 };
 
 const renderRestaurantProfile = () => {
@@ -3037,7 +3097,8 @@ const renderRestaurantProfile = () => {
   style={styles.sidebarMenuItem}
   onPress={() => {
     setSettingsModalVisible(false);
-    setPhoneNumber(userData?.phone_number || '');
+    resetPhoneModal();
+    setPhoneUpdateStep(userData?.phone_number ? 'verify_old' : 'verify_new');
     setPhoneModalVisible(true);
   }}
   activeOpacity={0.7}
@@ -3358,86 +3419,242 @@ const renderRestaurantProfile = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Current Phone */}
+      {/* Step indicator */}
       {userData?.phone_number && (
-        <View style={{ marginBottom: 16 }}>
-          <Text style={styles.inputLabel}>Current Phone</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 16, color: '#666' }}>{userData.phone_number}</Text>
-            {userData?.phone_verified && (
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={{ marginLeft: 8 }} />
-            )}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 16, gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: phoneUpdateStep === 'verify_old' ? '#FF2E2E' : '#4CAF50', justifyContent: 'center', alignItems: 'center' }}>
+              {phoneUpdateStep === 'verify_old' ? <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>1</Text> : <Ionicons name="checkmark" size={14} color="#fff" />}
+            </View>
+            <Text style={{ fontSize: 12, color: '#666' }}>Verify Old</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color="#ccc" style={{ alignSelf: 'center' }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: phoneUpdateStep === 'enter_new' ? '#FF2E2E' : phoneUpdateStep === 'verify_new' ? '#4CAF50' : '#ccc', justifyContent: 'center', alignItems: 'center' }}>
+              {phoneUpdateStep === 'verify_new' ? <Ionicons name="checkmark" size={14} color="#fff" /> : <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>2</Text>}
+            </View>
+            <Text style={{ fontSize: 12, color: '#666' }}>New Number</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color="#ccc" style={{ alignSelf: 'center' }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: phoneUpdateStep === 'verify_new' ? '#FF2E2E' : '#ccc', justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>3</Text>
+            </View>
+            <Text style={{ fontSize: 12, color: '#666' }}>Verify New</Text>
           </View>
         </View>
       )}
 
-      {/* New Phone Input */}
-      <Text style={styles.inputLabel}>
-        {userData?.phone_number ? 'New Phone Number' : 'Phone Number'}
-      </Text>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <TextInput
-          style={[styles.input, { flex: 1 }]}
-          placeholder="+91 9876543210"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-          keyboardType="phone-pad"
-          editable={true}
-        />
-        {!otpSent && (
+      {/* STEP: Verify Old Phone */}
+      {phoneUpdateStep === 'verify_old' && userData?.phone_number && (
+        <>
+          <View style={{ marginBottom: 16 }}>
+            <Text style={styles.inputLabel}>Current Phone</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#333', fontWeight: '600' }}>{userData.phone_number}</Text>
+              {userData?.phone_verified && (
+                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={{ marginLeft: 8 }} />
+              )}
+            </View>
+          </View>
+
+          {!otpSent && (
+            <TouchableOpacity
+              style={{ backgroundColor: sendingOtp ? '#ccc' : '#FF2E2E', paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}
+              onPress={() => handleSendOtp(userData.phone_number)}
+              disabled={sendingOtp}
+            >
+              {sendingOtp ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Send OTP to Current Number</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {otpSent && (
+            <>
+              <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP sent to {userData.phone_number}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="6-digit OTP"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleSendOtp(userData.phone_number)}
+                disabled={resendTimer > 0}
+                style={{ alignSelf: 'center', marginTop: 12 }}
+              >
+                <Text style={{ color: resendTimer > 0 ? '#999' : '#FF2E2E', fontWeight: '600' }}>
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+                onPress={handleVerifyOtp}
+                disabled={verifyingOtp}
+              >
+                {verifyingOtp ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Verify Current Phone</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+        </>
+      )}
+
+      {/* STEP: Enter New Phone Number */}
+      {phoneUpdateStep === 'enter_new' && (
+        <>
+          <View style={{ marginBottom: 16, backgroundColor: '#E8F5E9', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+            <Text style={{ color: '#2E7D32', fontSize: 14 }}>Current phone verified</Text>
+          </View>
+
+          <Text style={styles.inputLabel}>Enter New Phone Number</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="+91 9876543210"
+            value={newPhoneNumber}
+            onChangeText={setNewPhoneNumber}
+            keyboardType="phone-pad"
+            maxLength={15}
+          />
+
           <TouchableOpacity
-            style={{
-              backgroundColor: sendingOtp ? '#ccc' : '#4dd0e1',
-              paddingHorizontal: 16,
-              borderRadius: 10,
-              justifyContent: 'center',
-            }}
-            onPress={handleSendOtp}
+            style={{ backgroundColor: sendingOtp ? '#ccc' : '#FF2E2E', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 16 }}
+            onPress={handleSendOtpToNewPhone}
             disabled={sendingOtp}
           >
             {sendingOtp ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={{ color: '#fff', fontWeight: '600' }}>Send OTP</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Send OTP to New Number</Text>
             )}
           </TouchableOpacity>
-        )}
-      </View>
+        </>
+      )}
 
-      {/* OTP Input */}
-      {otpSent && (
+      {/* STEP: Verify New Phone */}
+      {phoneUpdateStep === 'verify_new' && (
         <>
-          <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="6-digit OTP"
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="number-pad"
-            maxLength={6}
-          />
-          
-          <TouchableOpacity
-            onPress={handleSendOtp}
-            disabled={resendTimer > 0}
-            style={{ alignSelf: 'center', marginTop: 12 }}
-          >
-            <Text style={{ color: resendTimer > 0 ? '#999' : '#4dd0e1', fontWeight: '600' }}>
-              {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-            </Text>
-          </TouchableOpacity>
+          <View style={{ marginBottom: 16, backgroundColor: '#E8F5E9', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+            <Text style={{ color: '#2E7D32', fontSize: 14 }}>Verifying new number: {formatPhoneNumber(newPhoneNumber)}</Text>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
-            onPress={handleVerifyAndUpdatePhone}
-            disabled={verifyingOtp}
-          >
-            {verifyingOtp ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.saveButtonText}>Verify & Update</Text>
+          {otpSent && (
+            <>
+              <Text style={styles.inputLabel}>Enter OTP sent to {formatPhoneNumber(newPhoneNumber)}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="6-digit OTP"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleSendOtp(newPhoneNumber)}
+                disabled={resendTimer > 0}
+                style={{ alignSelf: 'center', marginTop: 12 }}
+              >
+                <Text style={{ color: resendTimer > 0 ? '#999' : '#FF2E2E', fontWeight: '600' }}>
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+                onPress={handleVerifyOtp}
+                disabled={verifyingOtp}
+              >
+                {verifyingOtp ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Verify & Update Phone</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+        </>
+      )}
+
+      {/* STEP: Add Phone (no existing phone) */}
+      {!userData?.phone_number && (
+        <>
+          <Text style={styles.inputLabel}>Phone Number</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="+91 9876543210"
+              value={newPhoneNumber}
+              onChangeText={setNewPhoneNumber}
+              keyboardType="phone-pad"
+              editable={!otpSent}
+              maxLength={15}
+            />
+            {!otpSent && (
+              <TouchableOpacity
+                style={{ backgroundColor: sendingOtp ? '#ccc' : '#FF2E2E', paddingHorizontal: 16, borderRadius: 10, justifyContent: 'center' }}
+                onPress={() => {
+                  setPhoneUpdateStep('verify_new');
+                  handleSendOtp(newPhoneNumber);
+                }}
+                disabled={sendingOtp}
+              >
+                {sendingOtp ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Send OTP</Text>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
+
+          {otpSent && phoneUpdateStep === 'verify_new' && (
+            <>
+              <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="6-digit OTP"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleSendOtp(newPhoneNumber)}
+                disabled={resendTimer > 0}
+                style={{ alignSelf: 'center', marginTop: 12 }}
+              >
+                <Text style={{ color: resendTimer > 0 ? '#999' : '#FF2E2E', fontWeight: '600' }}>
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+                onPress={handleVerifyOtp}
+                disabled={verifyingOtp}
+              >
+                {verifyingOtp ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Verify & Add Phone</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </>
       )}
     </View>
@@ -4656,7 +4873,8 @@ if (isRestaurantProfile) {
                 style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
-                  setPhoneNumber(userData?.phone_number || '');
+                  resetPhoneModal();
+                  setPhoneUpdateStep(userData?.phone_number ? 'verify_old' : 'verify_new');
                   setPhoneModalVisible(true);
                 }}
                 activeOpacity={0.7}
@@ -5112,7 +5330,7 @@ if (isRestaurantProfile) {
           </View>
         </View>
       </Modal>
-      {/* ================= PHONE NUMBER MODAL ================= */}
+      {/* ================= PHONE NUMBER MODAL (USER) ================= */}
 <Modal
   animationType="slide"
   transparent={true}
@@ -5139,86 +5357,242 @@ if (isRestaurantProfile) {
         </TouchableOpacity>
       </View>
 
-      {/* Current Phone */}
+      {/* Step indicator for change phone */}
       {userData?.phone_number && (
-        <View style={{ marginBottom: 16 }}>
-          <Text style={styles.inputLabel}>Current Phone</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 16, color: '#666' }}>{userData.phone_number}</Text>
-            {userData?.phone_verified && (
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={{ marginLeft: 8 }} />
-            )}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 16, gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: phoneUpdateStep === 'verify_old' ? '#FF2E2E' : '#4CAF50', justifyContent: 'center', alignItems: 'center' }}>
+              {phoneUpdateStep === 'verify_old' ? <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>1</Text> : <Ionicons name="checkmark" size={14} color="#fff" />}
+            </View>
+            <Text style={{ fontSize: 12, color: '#666' }}>Verify Old</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color="#ccc" style={{ alignSelf: 'center' }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: phoneUpdateStep === 'enter_new' ? '#FF2E2E' : phoneUpdateStep === 'verify_new' ? '#4CAF50' : '#ccc', justifyContent: 'center', alignItems: 'center' }}>
+              {phoneUpdateStep === 'verify_new' ? <Ionicons name="checkmark" size={14} color="#fff" /> : <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>2</Text>}
+            </View>
+            <Text style={{ fontSize: 12, color: '#666' }}>New Number</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color="#ccc" style={{ alignSelf: 'center' }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: phoneUpdateStep === 'verify_new' ? '#FF2E2E' : '#ccc', justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>3</Text>
+            </View>
+            <Text style={{ fontSize: 12, color: '#666' }}>Verify New</Text>
           </View>
         </View>
       )}
 
-      {/* New Phone Input */}
-      <Text style={styles.inputLabel}>
-        {userData?.phone_number ? 'New Phone Number' : 'Phone Number'}
-      </Text>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <TextInput
-          style={[styles.input, { flex: 1 }]}
-          placeholder="+91 9876543210"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-          keyboardType="phone-pad"
-          editable={!otpSent}
-        />
-        {!otpSent && (
+      {/* STEP: Verify Old Phone */}
+      {phoneUpdateStep === 'verify_old' && userData?.phone_number && (
+        <>
+          <View style={{ marginBottom: 16 }}>
+            <Text style={styles.inputLabel}>Current Phone</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#333', fontWeight: '600' }}>{userData.phone_number}</Text>
+              {userData?.phone_verified && (
+                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={{ marginLeft: 8 }} />
+              )}
+            </View>
+          </View>
+
+          {!otpSent && (
+            <TouchableOpacity
+              style={{ backgroundColor: sendingOtp ? '#ccc' : '#FF2E2E', paddingVertical: 14, borderRadius: 10, alignItems: 'center' }}
+              onPress={() => handleSendOtp(userData.phone_number)}
+              disabled={sendingOtp}
+            >
+              {sendingOtp ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Send OTP to Current Number</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {otpSent && (
+            <>
+              <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP sent to {userData.phone_number}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="6-digit OTP"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleSendOtp(userData.phone_number)}
+                disabled={resendTimer > 0}
+                style={{ alignSelf: 'center', marginTop: 12 }}
+              >
+                <Text style={{ color: resendTimer > 0 ? '#999' : '#FF2E2E', fontWeight: '600' }}>
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+                onPress={handleVerifyOtp}
+                disabled={verifyingOtp}
+              >
+                {verifyingOtp ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Verify Current Phone</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+        </>
+      )}
+
+      {/* STEP: Enter New Phone Number */}
+      {phoneUpdateStep === 'enter_new' && (
+        <>
+          <View style={{ marginBottom: 16, backgroundColor: '#E8F5E9', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+            <Text style={{ color: '#2E7D32', fontSize: 14 }}>Current phone verified</Text>
+          </View>
+
+          <Text style={styles.inputLabel}>Enter New Phone Number</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="+91 9876543210"
+            value={newPhoneNumber}
+            onChangeText={setNewPhoneNumber}
+            keyboardType="phone-pad"
+            maxLength={15}
+          />
+
           <TouchableOpacity
-            style={{
-              backgroundColor: sendingOtp ? '#ccc' : '#4dd0e1',
-              paddingHorizontal: 16,
-              borderRadius: 10,
-              justifyContent: 'center',
-            }}
-            onPress={handleSendOtp}
+            style={{ backgroundColor: sendingOtp ? '#ccc' : '#FF2E2E', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 16 }}
+            onPress={handleSendOtpToNewPhone}
             disabled={sendingOtp}
           >
             {sendingOtp ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={{ color: '#fff', fontWeight: '600' }}>Send OTP</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Send OTP to New Number</Text>
             )}
           </TouchableOpacity>
-        )}
-      </View>
+        </>
+      )}
 
-      {/* OTP Input */}
-      {otpSent && (
+      {/* STEP: Verify New Phone */}
+      {phoneUpdateStep === 'verify_new' && userData?.phone_number && (
         <>
-          <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="6-digit OTP"
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="number-pad"
-            maxLength={6}
-          />
-          
-          <TouchableOpacity
-            onPress={handleSendOtp}
-            disabled={resendTimer > 0}
-            style={{ alignSelf: 'center', marginTop: 12 }}
-          >
-            <Text style={{ color: resendTimer > 0 ? '#999' : '#4dd0e1', fontWeight: '600' }}>
-              {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-            </Text>
-          </TouchableOpacity>
+          <View style={{ marginBottom: 16, backgroundColor: '#E8F5E9', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+            <Text style={{ color: '#2E7D32', fontSize: 14 }}>Verifying new number: {formatPhoneNumber(newPhoneNumber)}</Text>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
-            onPress={handleVerifyAndUpdatePhone}
-            disabled={verifyingOtp}
-          >
-            {verifyingOtp ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.saveButtonText}>Verify & Update</Text>
+          {otpSent && (
+            <>
+              <Text style={styles.inputLabel}>Enter OTP sent to {formatPhoneNumber(newPhoneNumber)}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="6-digit OTP"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleSendOtp(newPhoneNumber)}
+                disabled={resendTimer > 0}
+                style={{ alignSelf: 'center', marginTop: 12 }}
+              >
+                <Text style={{ color: resendTimer > 0 ? '#999' : '#FF2E2E', fontWeight: '600' }}>
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+                onPress={handleVerifyOtp}
+                disabled={verifyingOtp}
+              >
+                {verifyingOtp ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Verify & Update Phone</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+        </>
+      )}
+
+      {/* STEP: Add Phone (no existing phone) */}
+      {!userData?.phone_number && (
+        <>
+          <Text style={styles.inputLabel}>Phone Number</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="+91 9876543210"
+              value={newPhoneNumber}
+              onChangeText={setNewPhoneNumber}
+              keyboardType="phone-pad"
+              editable={!otpSent}
+              maxLength={15}
+            />
+            {!otpSent && (
+              <TouchableOpacity
+                style={{ backgroundColor: sendingOtp ? '#ccc' : '#FF2E2E', paddingHorizontal: 16, borderRadius: 10, justifyContent: 'center' }}
+                onPress={() => {
+                  setPhoneUpdateStep('verify_new');
+                  handleSendOtp(newPhoneNumber);
+                }}
+                disabled={sendingOtp}
+              >
+                {sendingOtp ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Send OTP</Text>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
+
+          {otpSent && phoneUpdateStep === 'verify_new' && (
+            <>
+              <Text style={[styles.inputLabel, { marginTop: 16 }]}>Enter OTP</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="6-digit OTP"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleSendOtp(newPhoneNumber)}
+                disabled={resendTimer > 0}
+                style={{ alignSelf: 'center', marginTop: 12 }}
+              >
+                <Text style={{ color: resendTimer > 0 ? '#999' : '#FF2E2E', fontWeight: '600' }}>
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, verifyingOtp && { opacity: 0.7 }]}
+                onPress={handleVerifyOtp}
+                disabled={verifyingOtp}
+              >
+                {verifyingOtp ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Verify & Add Phone</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </>
       )}
     </View>

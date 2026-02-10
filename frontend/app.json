@@ -75,6 +75,12 @@
         }
       ],
       [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash.png",

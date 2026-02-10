@@ -9,9 +9,24 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+let MapView: any;
+let Marker: any;
+let PROVIDER_GOOGLE: any;
+try {
+  const maps = require("react-native-maps");
+  MapView = maps.default;
+  Marker = maps.Marker;
+  PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE;
+} catch {
+  MapView = ({ children, style, ...props }: any) => {
+    const { View: V, Text: T } = require("react-native");
+    return <V style={[style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}><T>Maps require a development build</T></V>;
+  };
+  Marker = View;
+}
 import * as Location from "expo-location";
 
 interface LocationData {
