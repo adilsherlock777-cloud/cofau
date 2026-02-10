@@ -14,7 +14,6 @@ import {
   LayoutChangeEvent,
   Platform,
   Alert,
-  Image as RNImage,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -36,11 +35,11 @@ try {
   PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE;
   Callout = maps.Callout;
 } catch {
-  // react-native-maps not available (e.g. Expo Go)
-  MapView = ({ children, ...props }: any) => {
-    const { View: V, Text: T } = require("react-native");
-    return <V style={[props.style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}><T>Maps require a development build</T></V>;
-  };
+  MapView = ({ children, style, ...props }: any) => (
+    <View style={[style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
+      <Text>Maps not available in Expo Go</Text>
+    </View>
+  );
   Marker = View;
   Callout = View;
 }
@@ -224,7 +223,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Android - Simple marker (same style as posts)
+  // Android - Use expo-image for reliable rendering inside map markers
   if (Platform.OS === 'android') {
     const imageUrl = fixUrl(restaurant.profile_picture);
 
@@ -235,7 +234,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
           longitude: restaurant.longitude,
         }}
         onPress={() => onPress(restaurant)}
-        tracksViewChanges={true}
+        tracksViewChanges={tracksChanges && !imageLoaded}
       >
         <View style={{ alignItems: 'center' }}>
           <View style={{
@@ -244,10 +243,15 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
             elevation: 5,
           }}>
             {imageUrl ? (
-              <RNImage
+              <Image
                 source={{ uri: imageUrl }}
                 style={{ width: 60, height: 60 }}
-                resizeMode="cover"
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => {
+                  setImageLoaded(true);
+                  setTracksChanges(false);
+                }}
               />
             ) : (
               <View style={{ width: 60, height: 60, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
@@ -340,7 +344,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Android - Simple marker (keep tracksViewChanges=true for reliable image loading)
+  // Android - Use expo-image for reliable rendering inside map markers
   if (Platform.OS === 'android') {
     const imageUrl = post.full_thumbnail_url || post.full_image_url;
 
@@ -351,17 +355,22 @@ const PostMarker = memo(({ post, onPress }: any) => {
           longitude: post.longitude,
         }}
         onPress={() => onPress(post)}
-        tracksViewChanges={true}
+        tracksViewChanges={tracksChanges && !imageLoaded}
       >
         <View style={{
           backgroundColor: '#FFFFFF',
           padding: 3,
           elevation: 5,
         }}>
-          <RNImage
+          <Image
             source={{ uri: imageUrl }}
             style={{ width: 60, height: 60 }}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            onLoad={() => {
+              setImageLoaded(true);
+              setTracksChanges(false);
+            }}
           />
         </View>
       </Marker>
@@ -426,7 +435,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     platform: Platform.OS
   });
 
-  // Android - Simple marker with 2 overlapping images (keep tracksViewChanges=true)
+  // Android - Use expo-image for reliable rendering inside map markers
   if (Platform.OS === 'android') {
     const image1 = latestPosts[0]?.full_thumbnail_url || latestPosts[0]?.full_image_url;
     const image2 = latestPosts[1]?.full_thumbnail_url || latestPosts[1]?.full_image_url;
@@ -435,7 +444,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
       <Marker
         coordinate={{ latitude, longitude }}
         onPress={() => onPress(cluster)}
-        tracksViewChanges={true}
+        tracksViewChanges={tracksChanges}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {/* Second image (behind) */}
@@ -446,10 +455,12 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
               elevation: 4,
               marginRight: -20,
             }}>
-              <RNImage
+              <Image
                 source={{ uri: image2 }}
                 style={{ width: 50, height: 50 }}
-                resizeMode="cover"
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => setImagesLoaded(prev => prev + 1)}
               />
             </View>
           )}
@@ -459,10 +470,15 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
             padding: 2,
             elevation: 6,
           }}>
-            <RNImage
+            <Image
               source={{ uri: image1 }}
               style={{ width: 50, height: 50 }}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              onLoad={() => {
+                setImagesLoaded(prev => prev + 1);
+                setTracksChanges(false);
+              }}
             />
           </View>
           {/* Count badge */}
@@ -667,7 +683,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
         <MapView
           ref={mapRef}
           style={styles.map}
-          provider={PROVIDER_GOOGLE}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           initialRegion={{
             latitude: userLocation.latitude,
             longitude: userLocation.longitude,

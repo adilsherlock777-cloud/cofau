@@ -1,18 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-let MapView;
-let Marker;
+let MapView: any;
+let Marker: any;
 try {
   const maps = require('react-native-maps');
   MapView = maps.default;
   Marker = maps.Marker;
 } catch {
-  MapView = ({ children, style, ...props }) => {
-    const { View: V, Text: T } = require('react-native');
-    return React.createElement(V, { style: [style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }] },
-      React.createElement(T, null, 'Maps require a development build'));
-  };
-  Marker = require('react-native').View;
+  MapView = ({ children, style, ...props }: any) => (
+    <View style={[style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
+      <Text>Maps not available in Expo Go</Text>
+    </View>
+  );
+  Marker = View;
 }
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';

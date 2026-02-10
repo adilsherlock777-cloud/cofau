@@ -17,11 +17,11 @@ def get_create_notification():
 
 
 # Wallet reward amounts
-WALLET_REWARD_FULL = 10.0
-WALLET_REWARD_REDUCED = 5.0
+WALLET_REWARD_PER_POST = 10.0  # ₹10 per post (max 2 per week)
 WALLET_FIRST_POST_BONUS = 50.0  # First post bonus for new users
 POINTS_PER_POST = 25
-LOCATION_RADIUS_KM = 1.0  # User must be within 1km of restaurant
+MAX_REWARDED_POSTS_PER_WEEK = 2  # Only first 2 posts per week earn rewards
+AMAZON_VOUCHER_THRESHOLD = 500.0  # Threshold to claim Amazon voucher
 
 
 class WalletRewardResult:
@@ -85,14 +85,12 @@ async def calculate_wallet_reward(
     user_longitude: float = None
 ) -> WalletRewardResult:
     """
-    Calculate wallet reward for a post based on validation checks.
+    Calculate wallet reward for a post.
 
-    Checks:
-    1. First post? → ₹50 bonus (no other checks)
-    2. Location valid (user near restaurant)?
-    3. Already earned wallet today?
-    4. Posted at this restaurant this week?
-    5. Review meets quality (30+ chars)?
+    Rules:
+    1. First post ever → ₹50 bonus (no other checks)
+    2. Subsequent posts → ₹10 per post, max 2 rewarded posts per week
+    3. 3rd, 4th, 5th+ posts in a week → ₹0
 
     Returns WalletRewardResult with earned amount and details.
     """
@@ -102,7 +100,6 @@ async def calculate_wallet_reward(
     # =========================================
     # CHECK 1: Is this user's FIRST POST EVER?
     # =========================================
-    # Check this FIRST so new users always get their ₹50 bonus
     total_posts = await db.posts.count_documents({"user_id": user_id})
     print(f"🔍 First post check: user {user_id} has {total_posts} posts")
 
@@ -111,7 +108,6 @@ async def calculate_wallet_reward(
 
     if is_first_post:
         print(f"🎉 First post detected! Giving ₹{WALLET_FIRST_POST_BONUS} bonus")
-        # First post bonus - no other checks required!
         return WalletRewardResult(
             wallet_earned=WALLET_FIRST_POST_BONUS,
             points_earned=POINTS_PER_POST,
@@ -122,9 +118,8 @@ async def calculate_wallet_reward(
         )
 
     # =========================================
-    # CHECK 0: Is wallet enabled for this user?
+    # CHECK 2: Is wallet enabled for this user?
     # =========================================
-    # For subsequent posts, check if wallet is enabled
     wallet_enabled = user.get("wallet_enabled", False)
 
     if not wallet_enabled:
@@ -138,126 +133,41 @@ async def calculate_wallet_reward(
         )
 
     # =========================================
-    # From here, normal checks for subsequent posts
+    # CHECK 3: How many rewarded posts this week?
     # =========================================
-    checks = {
-        "location_valid": False,
-        "not_earned_today": False,
-        "not_posted_here_this_week": False,
-        "quality_met": False,
-    }
+    # Count wallet transactions for posts this week (not including first post bonus)
+    now = datetime.utcnow()
+    # Get start of current week (Monday)
+    days_since_monday = now.weekday()
+    week_start = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # =========================================
-    # CHECK 2: Location Valid (User near restaurant)
-    # =========================================
-    post_latitude = post_data.get("latitude")
-    post_longitude = post_data.get("longitude")
+    rewarded_posts_this_week = await db.wallet_transactions.count_documents({
+        "user_id": user_id,
+        "type": "earned",
+        "created_at": {"$gte": week_start},
+        "description": {"$not": {"$regex": "first post|First Post|delivery|Delivery", "$options": "i"}}
+    })
 
-    if user_latitude and user_longitude and post_latitude and post_longitude:
-        distance = calculate_distance_km(
-            user_latitude, user_longitude,
-            post_latitude, post_longitude
-        )
-        checks["location_valid"] = distance <= LOCATION_RADIUS_KM
+    print(f"📊 User {user_id} has {rewarded_posts_this_week} rewarded posts this week (max {MAX_REWARDED_POSTS_PER_WEEK})")
 
-        if not checks["location_valid"]:
-            return WalletRewardResult(
-                wallet_earned=0.0,
-                points_earned=POINTS_PER_POST,
-                reason="location_not_valid",
-                checks_passed=checks,
-                message="Post Uploaded!",
-                tip="Visit the restaurant to earn wallet rewards!"
-            )
-    else:
-        # If location data missing, fail this check
-        checks["location_valid"] = False
+    if rewarded_posts_this_week >= MAX_REWARDED_POSTS_PER_WEEK:
         return WalletRewardResult(
             wallet_earned=0.0,
             points_earned=POINTS_PER_POST,
-            reason="location_missing",
-            checks_passed=checks,
+            reason="weekly_limit_reached",
+            checks_passed={"weekly_limit_reached": True},
             message="Post Uploaded!",
-            tip="Enable location to earn wallet rewards!"
+            tip="You've earned your max rewards this week. Post again next week to earn more!"
         )
 
     # =========================================
-    # CHECK 3: Already earned wallet today?
+    # ALL CHECKS PASSED - Give ₹10 reward
     # =========================================
-    last_earn_date = user.get("last_wallet_earn_date")
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-
-    if last_earn_date is None:
-        checks["not_earned_today"] = True
-    elif isinstance(last_earn_date, datetime):
-        checks["not_earned_today"] = last_earn_date < today_start
-    else:
-        checks["not_earned_today"] = True
-
-    if not checks["not_earned_today"]:
-        return WalletRewardResult(
-            wallet_earned=0.0,
-            points_earned=POINTS_PER_POST,
-            reason="already_earned_today",
-            checks_passed=checks,
-            message="Post Uploaded!",
-            tip="You've earned today's wallet reward. Come back tomorrow!"
-        )
-
-    # =========================================
-    # CHECK 4: Posted at this restaurant this week?
-    # =========================================
-    location_name = post_data.get("location_name", "").strip()
-    tagged_restaurant_id = post_data.get("tagged_restaurant_id")
-    location_identifier = tagged_restaurant_id or location_name
-
-    if location_identifier:
-        one_week_ago = datetime.utcnow() - timedelta(days=7)
-
-        query = {
-            "user_id": user_id,
-            "created_at": {"$gte": one_week_ago}
-        }
-
-        if tagged_restaurant_id:
-            query["restaurant_id"] = tagged_restaurant_id
-        else:
-            query["location_name"] = location_name
-
-        recent_post = await db.user_restaurant_posts.find_one(query)
-        checks["not_posted_here_this_week"] = recent_post is None
-    else:
-        checks["not_posted_here_this_week"] = True
-
-    # =========================================
-    # CHECK 5: Review quality (30+ chars)
-    # =========================================
-    review_text = post_data.get("review_text", "").strip()
-    checks["quality_met"] = len(review_text) >= 30
-
-    if not checks["quality_met"]:
-        return WalletRewardResult(
-            wallet_earned=0.0,
-            points_earned=POINTS_PER_POST,
-            reason="quality_not_met",
-            checks_passed=checks,
-            message="Post Uploaded!",
-            tip="Write at least 30 characters to earn wallet rewards!"
-        )
-
-    # =========================================
-    # ALL CHECKS PASSED - Calculate reward
-    # =========================================
-    if checks["not_posted_here_this_week"]:
-        wallet_amount = WALLET_REWARD_FULL  # ₹10
-    else:
-        wallet_amount = WALLET_REWARD_REDUCED  # ₹5 for repeat
-
     return WalletRewardResult(
-        wallet_earned=wallet_amount,
+        wallet_earned=WALLET_REWARD_PER_POST,
         points_earned=POINTS_PER_POST,
-        reason="all_checks_passed",
-        checks_passed=checks,
+        reason="post_reward",
+        checks_passed={"weekly_posts": rewarded_posts_this_week + 1},
         message="Post Uploaded!",
         tip=""
     )
@@ -369,8 +279,6 @@ async def get_wallet_info(db, user_id: str) -> dict:
     wallet_balance = user.get("wallet_balance", 0.0)
     completed_deliveries = user.get("completed_deliveries_count", 0)
 
-    # Amazon voucher threshold
-    AMAZON_VOUCHER_THRESHOLD = 1000.0
     amount_needed = max(0, AMAZON_VOUCHER_THRESHOLD - wallet_balance)
 
     # Delivery discount info

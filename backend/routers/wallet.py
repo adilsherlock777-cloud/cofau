@@ -179,8 +179,8 @@ async def claim_amazon_voucher(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Claim Amazon voucher when wallet balance reaches 1000.
-    Sends notification email to admin with user's email.
+    Claim Amazon voucher when wallet balance reaches 500.
+    Deducts ₹500 from wallet and sends notification email to admin.
     """
     import smtplib
     from email.mime.text import MIMEText
@@ -207,11 +207,11 @@ async def claim_amazon_voucher(
 
     wallet_balance = user.get("wallet_balance", 0.0)
 
-    # Check if balance is at least 1000
-    if wallet_balance < 1000:
+    # Check if balance is at least 500
+    if wallet_balance < 500:
         raise HTTPException(
             status_code=400,
-            detail=f"Please complete ₹1000 and then claim your voucher. Current balance: ₹{wallet_balance}"
+            detail=f"Please complete ₹500 and then claim your voucher. Current balance: ₹{wallet_balance}"
         )
 
     # Send email notification to admin
@@ -269,13 +269,29 @@ Cofau Rewards System
             "user_email": user_email,
             "user_phone": user_phone,
             "wallet_balance": wallet_balance,
+            "amount_deducted": 500.0,
             "status": "pending",
+            "created_at": datetime.utcnow()
+        })
+
+        # Deduct ₹500 from wallet balance
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$inc": {"wallet_balance": -500.0}}
+        )
+
+        # Record the deduction as a wallet transaction
+        await db.wallet_transactions.insert_one({
+            "user_id": user_id,
+            "amount": -500.0,
+            "type": "voucher_claim",
+            "description": "Amazon voucher claimed",
             "created_at": datetime.utcnow()
         })
 
         return {
             "success": True,
-            "message": "Your voucher claim request has been submitted! You will receive your Amazon voucher at the provided email address."
+            "message": "Congratulations! You will receive your voucher soon. Check your mail inbox."
         }
 
     except Exception as e:
@@ -287,12 +303,27 @@ Cofau Rewards System
             "user_email": user_email,
             "user_phone": user_phone,
             "wallet_balance": wallet_balance,
+            "amount_deducted": 500.0,
             "status": "pending",
             "email_sent": False,
             "created_at": datetime.utcnow()
         })
 
+        # Still deduct ₹500 even if email fails
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$inc": {"wallet_balance": -500.0}}
+        )
+
+        await db.wallet_transactions.insert_one({
+            "user_id": user_id,
+            "amount": -500.0,
+            "type": "voucher_claim",
+            "description": "Amazon voucher claimed",
+            "created_at": datetime.utcnow()
+        })
+
         return {
             "success": True,
-            "message": "Your voucher claim request has been submitted! You will receive your Amazon voucher at the provided email address."
+            "message": "Congratulations! You will receive your voucher soon. Check your mail inbox."
         }

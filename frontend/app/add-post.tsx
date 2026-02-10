@@ -22,16 +22,12 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Video, ResizeMode } from 'expo-av';
 // createPost and createRestaurantPost replaced by UploadContext
-import { useLevelAnimation } from '../context/LevelContext';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
-import PointsEarnedAnimation from '../components/PointsEarnedAnimation';
-import PostRewardModal from '../components/PostRewardModal';
 import axios from 'axios';
 
 export default function AddPostScreen() {
   const router = useRouter();
-  const { showLevelUpAnimation } = useLevelAnimation();
   const auth = useAuth() as any;
   const { refreshUser, accountType } = auth;
   const { startUpload, uploadState } = useUpload();
@@ -53,10 +49,6 @@ export default function AddPostScreen() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [showPointsAnimation, setShowPointsAnimation] = useState(false);
-  const [pointsEarned, setPointsEarned] = useState(0);
-  const [showRewardModal, setShowRewardModal] = useState(false);
-  const [rewardData, setRewardData] = useState(null);
 
   // User location state
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -983,16 +975,6 @@ return (
       </ScrollView>
     </KeyboardAvoidingView>
 
-    {/* Points Earned Animation */}
-    <PointsEarnedAnimation
-      visible={showPointsAnimation}
-      pointsEarned={pointsEarned}
-      onClose={() => {
-        setShowPointsAnimation(false);
-        router.push('/feed');
-      }}
-    />
-
     {/* Media Confirm Modal */}
     <Modal
       visible={showMediaConfirm}
@@ -1144,17 +1126,6 @@ return (
     </View>
   </View>
 </Modal>
-
-{/* Post Reward Modal */}
-<PostRewardModal
-  visible={showRewardModal}
-  onClose={() => {
-    setShowRewardModal(false);
-    setRewardData(null);
-    router.replace('/feed');
-  }}
-  rewardData={rewardData}
-/>
 
   </View>
 );

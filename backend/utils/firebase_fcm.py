@@ -94,7 +94,7 @@ async def send_fcm_notification(
     title: str,
     body: str,
     data: Optional[Dict] = None,
-    channel_id: str = "default"
+    channel_id: str = "default_v3"
 ) -> Dict:
     """
     Send push notification to Android devices via Firebase Cloud Messaging.
@@ -164,10 +164,12 @@ async def send_fcm_notification(
                     priority="high",
                     notification=messaging.AndroidNotification(
                         channel_id=channel_id,
+                        default_sound=True,
                         sound="default",
                         priority="max",
-                        vibrate_timings_millis=[0, 250, 250, 250],
+                        default_vibrate_timings=True,
                         visibility="public",
+                        notification_count=1,
                     ),
                 ),
             )

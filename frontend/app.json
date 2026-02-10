@@ -17,9 +17,6 @@
       "buildNumber": "4",
       "bundleIdentifier": "com.cofau.app",
       "googleServicesFile": "./GoogleService-Info.plist", 
-      "config": {
-               "googleMapsApiKey": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
-       },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Cofau needs photo library access to let you upload photos and videos of your food and dining experiences to share in your restaurant reviews.",
         "NSCameraUsageDescription": "Cofau needs camera access to let you capture photos and videos of your food and dining experiences to share in your restaurant reviews.",
@@ -74,12 +71,7 @@
           }
         }
       ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
-        }
-      ],
+      "react-native-maps",
       [
         "expo-splash-screen",
         {
@@ -95,7 +87,7 @@
           "icon": "./assets/images/icon.png",
           "color": "#4dd0e1",
           "sounds": [],
-          "defaultChannel": "default_v2"
+          "defaultChannel": "default_v3"
         }
       ],
       [

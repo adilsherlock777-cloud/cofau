@@ -245,7 +245,8 @@ async def send_push_notification(
                     print(f"⚠️ Firebase initialization warning: {str(e)}")
 
                 # Use restaurant channel for restaurant accounts
-                channel_id = "restaurant" if is_restaurant_account else "default"
+                # Channel IDs must match frontend pushNotifications.js channel IDs
+                channel_id = "restaurant_v3" if is_restaurant_account else "default_v3"
                 print(f"📱 Using notification channel: {channel_id} (is_restaurant: {is_restaurant_account})")
 
                 fcm_result = await send_fcm_notification(

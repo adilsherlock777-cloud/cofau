@@ -39,8 +39,8 @@ const CofauWalletModal = ({ visible, onClose }) => {
   const [transactionsVersion, setTransactionsVersion] = useState(0);
   const [walletData, setWalletData] = useState({
     balance: 0,
-    target_amount: 1000,
-    amount_needed: 1000,
+    target_amount: 500,
+    amount_needed: 500,
     progress_percent: 0,
     can_claim_voucher: false,
     delivery_discount: {
@@ -117,12 +117,17 @@ const CofauWalletModal = ({ visible, onClose }) => {
         setClaimMessage({ type: "success", text: response.data.message });
         setClaimEmail("");
         setClaimPhone("");
+        // Reset wallet display to 0 after successful claim
+        setWalletData(prev => ({
+          ...prev,
+          balance: 0,
+          amount_needed: 500,
+          progress_percent: 0,
+          can_claim_voucher: false,
+        }));
+        // Refresh from backend to get actual remaining balance
         await fetchWalletData();
         setTransactionsVersion((prev) => prev + 1);
-        setShowAllTransactions(true);
-        if (transactionsScrollRef.current) {
-          transactionsScrollRef.current.scrollTo({ y: 0, animated: false });
-        }
       }
     } catch (err) {
       const errorMessage = err.response?.data?.detail || "Failed to submit claim request";
@@ -404,7 +409,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   <View style={styles.noteBox}>
                     <MaterialIcons name="info" size={20} color="#FF7A18" />
                     <Text style={styles.noteText}>
-                      Earn rewards by posting quality reviews at restaurants!
+                      Earn rewards by posting reviews on Cofau!
                     </Text>
                   </View>
 
@@ -417,42 +422,26 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
 
                   <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>📍</Text>
+                    <Text style={styles.pointEmoji}>💰</Text>
                     <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>Location Verified</Text>
-                      <Text style={styles.pointDesc}>You must be within 1 km of the restaurant to earn rewards</Text>
+                      <Text style={styles.pointTitle}>₹10 Per Post</Text>
+                      <Text style={styles.pointDesc}>Earn ₹10 for every post you upload</Text>
                     </View>
                   </View>
 
                   <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>📝</Text>
+                    <Text style={styles.pointEmoji}>📅</Text>
                     <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>Quality Review</Text>
-                      <Text style={styles.pointDesc}>Write at least 30 characters in your review to qualify for rewards</Text>
+                      <Text style={styles.pointTitle}>2 Posts Per Week</Text>
+                      <Text style={styles.pointDesc}>Earn rewards on up to 2 posts per week. 3rd post onwards won't earn wallet rewards</Text>
                     </View>
                   </View>
 
                   <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>⏰</Text>
+                    <Text style={styles.pointEmoji}>🎁</Text>
                     <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>Once Per Day</Text>
-                      <Text style={styles.pointDesc}>You can earn wallet rewards once per day. Come back tomorrow for more!</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>🏪</Text>
-                    <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>New Restaurant</Text>
-                      <Text style={styles.pointDesc}>Earn ₹10 for posting at a new restaurant (first time this week)</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>🔄</Text>
-                    <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>Repeat Visit</Text>
-                      <Text style={styles.pointDesc}>Earn ₹5 for posting at the same restaurant again within a week</Text>
+                      <Text style={styles.pointTitle}>Amazon Voucher</Text>
+                      <Text style={styles.pointDesc}>Reach ₹500 to claim your Amazon voucher!</Text>
                     </View>
                   </View>
 

@@ -14,13 +14,20 @@ if (Platform.OS === 'android') {
     // Initialize Firebase App first (required for messaging)
     firebaseApp = require('@react-native-firebase/app').default;
     messaging = require('@react-native-firebase/messaging').default;
-    
+
     // Verify Firebase is initialized
     if (!firebaseApp.apps().length) {
       console.warn('⚠️ Firebase App not initialized. Make sure google-services.json is configured.');
       messaging = null;
     } else {
       console.log('✅ Firebase Messaging initialized for Android');
+
+      // Register background message handler - critical for sound/banner when app is killed
+      messaging().setBackgroundMessageHandler(async remoteMessage => {
+        console.log('📬 FCM background message received:', remoteMessage);
+        // The notification display is handled by FCM automatically for notification+data messages.
+        // This handler ensures the app processes the data payload in the background.
+      });
     }
   } catch (error) {
     console.warn('⚠️ Firebase Messaging not available:', error.message);
@@ -46,18 +53,21 @@ Notifications.setNotificationHandler({
 });
 
 // Channel IDs - versioned to force fresh creation when settings change
-// Bump version suffix if you need to change channel settings (Android caches them)
-const DEFAULT_CHANNEL_ID = 'default_v2';
-const RESTAURANT_CHANNEL_ID = 'restaurant_v2';
+// Bump version suffix if you need to change channel settings (Android caches them permanently)
+// v3: Fix missing sound and heads-up banner on Android
+const DEFAULT_CHANNEL_ID = 'default_v3';
+const RESTAURANT_CHANNEL_ID = 'restaurant_v3';
 
 // Ensure Android notification channels exist
 async function ensureNotificationChannel() {
   if (Platform.OS === 'android') {
     try {
-      // Delete old channels that may have stale/broken settings
+      // Delete old channels that have stale/cached settings (Android never updates existing channels)
       try {
         await Notifications.deleteNotificationChannelAsync('default');
         await Notifications.deleteNotificationChannelAsync('restaurant');
+        await Notifications.deleteNotificationChannelAsync('default_v2');
+        await Notifications.deleteNotificationChannelAsync('restaurant_v2');
       } catch (e) {
         // Old channels may not exist, that's fine
       }
@@ -70,11 +80,14 @@ async function ensureNotificationChannel() {
         lightColor: '#E94A37',
         sound: 'default',
         enableVibrate: true,
+        enableLights: true,
         showBadge: true,
+        bypassDnd: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
-      console.log('✅ Android default notification channel created');
+      console.log('✅ Android default notification channel created (v3)');
 
-      // Create restaurant channel with explicit sound settings
+      // Create restaurant channel
       await Notifications.setNotificationChannelAsync(RESTAURANT_CHANNEL_ID, {
         name: 'Restaurant Notifications',
         description: 'Notifications for restaurant orders and updates',
@@ -83,9 +96,12 @@ async function ensureNotificationChannel() {
         lightColor: '#E94A37',
         sound: 'default',
         enableVibrate: true,
+        enableLights: true,
         showBadge: true,
+        bypassDnd: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
-      console.log('✅ Android restaurant notification channel created');
+      console.log('✅ Android restaurant notification channel created (v3)');
     } catch (error) {
       console.error('❌ Failed to create notification channel:', error);
     }

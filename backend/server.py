@@ -245,20 +245,21 @@ from fastapi import Request, HTTPException
 import mimetypes
 
 @app.get("/api/static/uploads/{filename:path}")
-async def serve_media_file(filename: str, request: Request):
+async def serve_media_file(filename: str, request: Request, w: int = None):
     """
     Serve media files (images/videos) with proper headers for iOS compatibility.
     Supports range requests for video streaming on iOS.
+    Optional ?w=300 parameter to serve resized images for thumbnails/grids.
     """
     import os
     from pathlib import Path
-    
+
     file_path = os.path.join(settings.UPLOAD_DIR, filename)
-    
+
     # Check if file exists
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
-    
+
     # Determine content type
     content_type, _ = mimetypes.guess_type(file_path)
     if not content_type:
@@ -272,10 +273,55 @@ async def serve_media_file(filename: str, request: Request):
             content_type = 'image/png'
         else:
             content_type = 'application/octet-stream'
-    
+
+    # If ?w= is provided and it's an image, serve a resized version
+    if w and content_type and content_type.startswith('image/'):
+        try:
+            from PIL import Image as PILImage
+            import io
+
+            # Clamp width to reasonable range
+            w = max(50, min(w, 1200))
+
+            # Check for cached thumbnail
+            name, ext = os.path.splitext(filename)
+            thumb_filename = f"{name}_w{w}{ext}"
+            thumb_path = os.path.join(settings.UPLOAD_DIR, thumb_filename)
+
+            if os.path.exists(thumb_path):
+                return FileResponse(
+                    thumb_path,
+                    media_type=content_type,
+                    headers={'Cache-Control': 'public, max-age=31536000'},
+                )
+
+            # Generate resized image
+            img = PILImage.open(file_path)
+            if img.width > w:
+                ratio = w / img.width
+                new_height = int(img.height * ratio)
+                img = img.resize((w, new_height), PILImage.LANCZOS)
+
+            # Save cached thumbnail to disk
+            if content_type == 'image/png':
+                img.save(thumb_path, 'PNG', optimize=True)
+            else:
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+                img.save(thumb_path, 'JPEG', quality=80, optimize=True)
+
+            return FileResponse(
+                thumb_path,
+                media_type=content_type,
+                headers={'Cache-Control': 'public, max-age=31536000'},
+            )
+        except Exception as e:
+            print(f"⚠️ Thumbnail generation failed, serving original: {e}")
+            # Fall through to serve original
+
     # Check if it's a video file
     is_video = content_type.startswith('video/')
-    
+
     # For video files, support range requests (required for iOS)
     if is_video:
         file_size = os.path.getsize(file_path)
