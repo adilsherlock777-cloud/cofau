@@ -55,8 +55,9 @@ GMSServices.provideAPIKey("AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE")
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
 // @generated begin @react-native-firebase/auth-openURL - expo prebuild (DO NOT MODIFY)
-    if Auth.auth().canHandle(url) {
-      // Firebase Auth handled this URL (phone auth reCAPTCHA callback)
+    if url.host?.lowercased() == "firebaseauth" {
+      // Firebase Auth phone auth reCAPTCHA callback - let Firebase handle it
+      Auth.auth().canHandle(url)
       return true
     }
 // @generated end @react-native-firebase/auth-openURL
