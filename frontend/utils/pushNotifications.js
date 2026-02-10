@@ -45,12 +45,25 @@ Notifications.setNotificationHandler({
   },
 });
 
+// Channel IDs - versioned to force fresh creation when settings change
+// Bump version suffix if you need to change channel settings (Android caches them)
+const DEFAULT_CHANNEL_ID = 'default_v2';
+const RESTAURANT_CHANNEL_ID = 'restaurant_v2';
+
 // Ensure Android notification channels exist
 async function ensureNotificationChannel() {
   if (Platform.OS === 'android') {
     try {
+      // Delete old channels that may have stale/broken settings
+      try {
+        await Notifications.deleteNotificationChannelAsync('default');
+        await Notifications.deleteNotificationChannelAsync('restaurant');
+      } catch (e) {
+        // Old channels may not exist, that's fine
+      }
+
       // Create default channel for regular users
-      await Notifications.setNotificationChannelAsync('default', {
+      await Notifications.setNotificationChannelAsync(DEFAULT_CHANNEL_ID, {
         name: 'Default Notifications',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
@@ -62,7 +75,7 @@ async function ensureNotificationChannel() {
       console.log('✅ Android default notification channel created');
 
       // Create restaurant channel with explicit sound settings
-      await Notifications.setNotificationChannelAsync('restaurant', {
+      await Notifications.setNotificationChannelAsync(RESTAURANT_CHANNEL_ID, {
         name: 'Restaurant Notifications',
         description: 'Notifications for restaurant orders and updates',
         importance: Notifications.AndroidImportance.MAX,
@@ -377,7 +390,7 @@ export function setupNotificationListeners(navigation) {
         // Restaurant notifications: new_order, order_in_progress
         const restaurantNotificationTypes = ['new_order', 'order_in_progress'];
         const notificationType = data?.type;
-        const channelId = restaurantNotificationTypes.includes(notificationType) ? 'restaurant' : 'default';
+        const channelId = restaurantNotificationTypes.includes(notificationType) ? RESTAURANT_CHANNEL_ID : DEFAULT_CHANNEL_ID;
         console.log(`📱 Using channel: ${channelId} for notification type: ${notificationType}`);
 
         // Show local notification when app is in foreground
@@ -491,7 +504,7 @@ export function setupNotificationListeners(navigation) {
 export async function sendLocalNotification(title, body, data = {}, isRestaurant = false) {
   // Determine channel based on notification type or explicit flag
   const restaurantNotificationTypes = ['new_order', 'order_in_progress'];
-  const channelId = isRestaurant || restaurantNotificationTypes.includes(data?.type) ? 'restaurant' : 'default';
+  const channelId = isRestaurant || restaurantNotificationTypes.includes(data?.type) ? RESTAURANT_CHANNEL_ID : DEFAULT_CHANNEL_ID;
 
   await Notifications.scheduleNotificationAsync({
     content: {

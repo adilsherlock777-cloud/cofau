@@ -31,18 +31,13 @@ import { sendCompliment, getFollowers } from '../utils/api';
 import MaskedView from '@react-native-masked-view/masked-view';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
-let firebaseAuthModule: any = null;
+// Named differently from useAuth()'s 'auth' to avoid shadowing
+let firebaseAuth: any = null;
 try {
-  firebaseAuthModule = require('@react-native-firebase/auth').default;
+  firebaseAuth = require('@react-native-firebase/auth').default;
 } catch (e) {
   console.log('Firebase Auth not available (Expo Go mode)');
 }
-
-// Helper to get Firebase auth instance (handles both function and object exports)
-const getFirebaseAuth = () => {
-  if (!firebaseAuthModule) return null;
-  return typeof firebaseAuthModule === 'function' ? firebaseAuthModule() : firebaseAuthModule;
-};
 import { BlurView } from 'expo-blur';
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
 
@@ -2153,9 +2148,8 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
   return phone.startsWith('+') ? phone : `+${cleaned}`;
 };
 
-// Send OTP to a phone number
+// Send OTP to a phone number (same pattern as signup.tsx)
 const handleSendOtp = async (targetPhone?: string) => {
-  const firebaseAuth = getFirebaseAuth();
   if (!firebaseAuth) {
     Alert.alert('Not Available', 'Phone verification requires a built app. Please install the APK/IPA build to update phone number.');
     return;
@@ -2169,15 +2163,8 @@ const handleSendOtp = async (targetPhone?: string) => {
 
   setSendingOtp(true);
   try {
-    // Sign out from any existing Firebase session first to avoid conflicts
-    try {
-      await firebaseAuth.signOut();
-    } catch (signOutError) {
-      // Ignore sign out errors
-    }
-
     const formattedPhone = formatPhoneNumber(phoneToVerify);
-    const confirmation = await firebaseAuth.signInWithPhoneNumber(formattedPhone);
+    const confirmation = await firebaseAuth().signInWithPhoneNumber(formattedPhone);
     setConfirm(confirmation);
     setOtpSent(true);
     setResendTimer(60);
@@ -2238,9 +2225,8 @@ const handleVerifyOtp = async () => {
       );
 
       // Sign out from Firebase after updating
-      const firebaseAuth = getFirebaseAuth();
       if (firebaseAuth) {
-        try { await firebaseAuth.signOut(); } catch (e) {}
+        try { await firebaseAuth().signOut(); } catch (e) {}
       }
 
       Alert.alert('Success', 'Phone number updated successfully!');
@@ -4360,7 +4346,8 @@ if (isRestaurantProfile) {
   profilePicture={userData.profile_picture}
   username={userData.full_name || userData.username}
   level={userData.level || 1}
-  dpSize={78}
+  dpSize={95}
+  badgeSize={140}
   isOwnProfile={isOwnProfile}
   cameraIcon={
     isOwnProfile ? (
@@ -4378,6 +4365,38 @@ if (isRestaurantProfile) {
     ) : null
   }
 />
+      </View>
+
+      {/* Bio inside card */}
+      <View style={styles.bioInsideCard}>
+        <Text style={styles.bioText}>
+          {userData.bio || 'No bio yet. Add one by editing your profile!'}
+        </Text>
+      </View>
+
+      {/* Divider below bio */}
+      <View style={styles.cardDivider} />
+
+      {/* Stats inside card */}
+      <View style={styles.statsInsideCard}>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{userStats?.total_posts || 0}</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Posts</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <TouchableOpacity
+          style={styles.statBox}
+          onPress={() => { if (userData?.id) { setFollowersModalVisible(true); fetchFollowers(); } }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>People</Text>
+        </TouchableOpacity>
+        <View style={styles.statDivider} />
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{complimentsCount}</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Compliments</Text>
+        </View>
       </View>
 
     </BlurView>
@@ -4389,7 +4408,8 @@ if (isRestaurantProfile) {
   profilePicture={userData.profile_picture}
   username={userData.full_name || userData.username}
   level={userData.level || 1}
-  dpSize={78}
+  dpSize={95}
+  badgeSize={140}
   isOwnProfile={isOwnProfile}
   cameraIcon={
     isOwnProfile ? (
@@ -4409,71 +4429,42 @@ if (isRestaurantProfile) {
 />
       </View>
 
-      
+      {/* Bio inside card */}
+      <View style={styles.bioInsideCard}>
+        <Text style={styles.bioText}>
+          {userData.bio || 'No bio yet. Add one by editing your profile!'}
+        </Text>
+      </View>
+
+      {/* Divider below bio */}
+      <View style={styles.cardDivider} />
+
+      {/* Stats inside card */}
+      <View style={styles.statsInsideCard}>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{userStats?.total_posts || 0}</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Posts</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <TouchableOpacity
+          style={styles.statBox}
+          onPress={() => { if (userData?.id) { setFollowersModalVisible(true); fetchFollowers(); } }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>People</Text>
+        </TouchableOpacity>
+        <View style={styles.statDivider} />
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{complimentsCount}</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Compliments</Text>
+        </View>
+      </View>
+
     </View>
   )}
 </View>
         </View>
-        {/* Stats Section */}
-<LinearGradient
-  colors={["#FFF5F0", "#FFE5D9"]}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 0 }}
-  style={styles.statsContainer}
->
-  <View style={styles.statBox}>
-    <Text style={styles.statValue}>
-      {userStats?.total_posts || 0}
-    </Text>
-    <Text
-      style={styles.statLabel}
-      allowFontScaling={false}
-      maxFontSizeMultiplier={1}
-    >
-      Posts
-    </Text>
-  </View>
-
-  <View style={styles.statDivider} />
-
-  <TouchableOpacity
-    style={styles.statBox}
-    onPress={() => {
-      if (userData?.id) {
-        setFollowersModalVisible(true);
-        fetchFollowers();
-      }
-    }}
-    activeOpacity={0.7}
-  >
-    <Text style={styles.statValue}>
-      {userStats?.followers_count || 0}
-    </Text>
-    <Text
-      style={styles.statLabel}
-      allowFontScaling={false}
-      maxFontSizeMultiplier={1}
-    >
-      People
-    </Text>
-  </TouchableOpacity>
-
-  <View style={styles.statDivider} />
-
-  <View style={styles.statBox}>
-    <Text style={styles.statValue}>
-      {complimentsCount}
-    </Text>
-    <Text
-      style={styles.statLabel}
-      allowFontScaling={false}
-      maxFontSizeMultiplier={1}
-    >
-      Compliments
-    </Text>
-  </View>
-</LinearGradient>
-        
 
         {/* Action Buttons with Gradient */}
         <View style={styles.actionButtonsContainer}>
@@ -4591,13 +4582,6 @@ if (isRestaurantProfile) {
               </TouchableOpacity>
             </>
           )}
-        </View>
-
-        {/* Bio Section */}
-        <View style={styles.bioSection}>
-          <Text style={styles.bioText}>
-            {userData.bio || 'No bio yet. Add one by editing your profile!'}
-          </Text>
         </View>
 
        {/* Tab Navigation */}
@@ -7105,38 +7089,56 @@ header: {
   },
 
  profileCardWrapper: {
-  marginHorizontal: 55,       // Change from 60 to 40
+  marginHorizontal: 16,
   marginTop: -40,
-  marginBottom: 2,
-  borderRadius: 25,
+  marginBottom: 8,
+  borderRadius: 20,
   overflow: 'hidden',
   borderWidth: 1,
-  borderColor: "#fff",
-  shadowColor: "#000",
+  borderColor: '#FF5C5C',
+  shadowColor: '#000',
   shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.15,
+  shadowOpacity: 0.1,
   shadowRadius: 8,
-  elevation: 8,
+  elevation: 4,
 },
  profileCard: {
   borderRadius: 20,
-  paddingVertical: 10,        // Change from 65 to 50
-  paddingHorizontal: 10,      // Change from 30 to 20
-  paddingLeft: 30,            // Change from 60 to 20
-  paddingRight: 30,           // Change from -100 to 20
+  paddingVertical: 6,
+  paddingHorizontal: 20,
   justifyContent: 'center',
-  alignItems: 'center',       // Add this
+  alignItems: 'center',
   position: 'relative',
-  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  borderWidth: 1,
-  borderColor: 'rgba(200, 200, 200, 0.2)',
+  backgroundColor: '#fff',
 },
 
 profileCardAndroid: {
-  backgroundColor: 'rgba(255, 255, 255, 1)',
+  backgroundColor: '#fff',
+},
+bioInsideCard: {
+  paddingHorizontal: 0,
+  paddingTop: 14,
+  paddingBottom: 2,
+  alignSelf: 'stretch',
+  alignItems: 'flex-start',
+},
+cardDivider: {
+  height: 1.5,
+  backgroundColor: '#CCCCCC',
+  marginHorizontal: 0,
+  marginTop: 4,
+  marginBottom: 2,
+  alignSelf: 'stretch',
+},
+statsInsideCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-evenly',
+  paddingVertical: 4,
+  paddingHorizontal: 6,
 },
 profilePictureContainer: {
-  top: '8%',
+  top: 0,
   alignItems: 'center',
   justifyContent: 'center',
 },
@@ -7255,9 +7257,9 @@ statDivider: {
     marginBottom: 4,
   },
   bioText: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 16,
     fontStyle: 'italic',
     fontWeight: '600',
     ...(Platform.OS === 'android' && {

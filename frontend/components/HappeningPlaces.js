@@ -76,17 +76,24 @@ const SkeletonLoader = () => (
   </View>
 );
 
-// Video Thumbnail Component with autoplay
+// Video Thumbnail Component with autoplay - lazy loads video only when needed
 const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayout, videoId }) => {
   const videoRef = useRef(null);
   const [isActuallyPlaying, setIsActuallyPlaying] = useState(false);
+  const [hasBeenVisible, setHasBeenVisible] = useState(false);
+
+  // Only mount the Video component once shouldPlay becomes true
+  useEffect(() => {
+    if (shouldPlay && !hasBeenVisible) {
+      setHasBeenVisible(true);
+    }
+  }, [shouldPlay, hasBeenVisible]);
 
   useEffect(() => {
     const controlVideo = async () => {
       if (!videoRef.current) return;
       try {
         if (shouldPlay) {
-          // iOS requires loading the video first
           const status = await videoRef.current.getStatusAsync();
           if (!status.isLoaded) {
             await videoRef.current.loadAsync(
@@ -104,28 +111,33 @@ const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayo
         console.log("Video control error:", e);
       }
     };
-    controlVideo();
-  }, [shouldPlay, videoUrl]);
+    if (hasBeenVisible) {
+      controlVideo();
+    }
+  }, [shouldPlay, videoUrl, hasBeenVisible]);
 
   return (
     <View style={style} onLayout={(e) => onLayout && onLayout(videoId, e)}>
-      <Video
-        ref={videoRef}
-        source={{ uri: videoUrl }}
-        style={StyleSheet.absoluteFill}
-        resizeMode={ResizeMode.COVER}
-        isLooping
-        isMuted={true}
-        useNativeControls={false}
-        shouldPlay={false}
-        posterSource={{ uri: thumbnailUrl }}
-        usePoster={true}
-        onPlaybackStatusUpdate={(status) => {
-          if (status.isLoaded) setIsActuallyPlaying(status.isPlaying);
-        }}
-      />
-      
-      {/* Thumbnail - hide when video is playing */}
+      {/* Only mount Video component after it should play at least once */}
+      {hasBeenVisible && (
+        <Video
+          ref={videoRef}
+          source={{ uri: videoUrl }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          isLooping
+          isMuted={true}
+          useNativeControls={false}
+          shouldPlay={false}
+          posterSource={{ uri: thumbnailUrl }}
+          usePoster={true}
+          onPlaybackStatusUpdate={(status) => {
+            if (status.isLoaded) setIsActuallyPlaying(status.isPlaying);
+          }}
+        />
+      )}
+
+      {/* Thumbnail - show when video is not playing (or not yet loaded) */}
       {!isActuallyPlaying && thumbnailUrl && (
         <Image
           source={{ uri: thumbnailUrl }}
@@ -134,7 +146,7 @@ const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayo
           placeholder={{ blurhash: BLUR_HASH }}
         />
       )}
-      
+
       {/* Play icon - hide when playing */}
       {!isActuallyPlaying && (
         <View style={styles.videoPlayIcon}>
@@ -169,11 +181,21 @@ export default function HappeningPlaces() {
   // HELPER FUNCTIONS
   // ============================================
 
-  const fixUrl = (url) => {
+  const fixUrl = (url, { thumbnail = false } = {}) => {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
-    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
-    return `${API_BASE_URL}${cleanUrl}`;
+    let fullUrl;
+    if (url.startsWith('http')) {
+      fullUrl = url;
+    } else {
+      const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+      fullUrl = `${API_BASE_URL}${cleanUrl}`;
+    }
+    // Append ?w=300 for grid thumbnails to load smaller images
+    if (thumbnail && !isVideoFile(url)) {
+      const separator = fullUrl.includes('?') ? '&' : '?';
+      return `${fullUrl}${separator}w=300`;
+    }
+    return fullUrl;
   };
 
   const formatUploadCount = (count) => {
@@ -318,7 +340,7 @@ export default function HappeningPlaces() {
   // ============================================
 
   const renderMediaItem = (imageUrl, imgIndex, imagesData, thumbnails, locationKey) => {
-    const fixedUrl = fixUrl(imageUrl);
+    const fixedUrl = fixUrl(imageUrl, { thumbnail: true });
     const imageData = imagesData[imgIndex] || {};
     const thumbnailUrl = imageData.thumbnail_url
       ? fixUrl(imageData.thumbnail_url)
@@ -354,6 +376,7 @@ export default function HappeningPlaces() {
             contentFit="cover"
             placeholder={{ blurhash: BLUR_HASH }}
             transition={300}
+            cachePolicy="disk"
             onError={(error) => {
               console.error("❌ Image load error in HappeningPlaces:", fixedUrl, error);
             }}
@@ -714,10 +737,10 @@ export default function HappeningPlaces() {
                                   if (thumbnailUrl) {
                                     displayUrl = thumbnailUrl;
                                   } else {
-                                    displayUrl = fixUrl(images[4]);
+                                    displayUrl = fixUrl(images[4], { thumbnail: true });
                                   }
                                 } else {
-                                  displayUrl = fixUrl(images[4]);
+                                  displayUrl = fixUrl(images[4], { thumbnail: true });
                                 }
 
                                 if (!displayUrl) return null;

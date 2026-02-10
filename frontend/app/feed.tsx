@@ -38,6 +38,9 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { fetchUnreadCount } from "../utils/notifications";
 import { useNotifications } from "../context/NotificationContext";
 import { useUpload } from "../context/UploadContext";
+import { useLevelAnimation } from "../context/LevelContext";
+import PointsEarnedAnimation from "../components/PointsEarnedAnimation";
+import PostRewardModal from "../components/PostRewardModal";
 import SuggestedUsersBar from "../components/SuggestedUsersBar";
 import {
   normalizeMediaUrl,
@@ -88,8 +91,16 @@ const getPostDP = (post: any) =>
 export default function FeedScreen() {
   const router = useRouter();
   const { user, token, refreshUser, accountType } = useAuth() as any;
-  const { lastUploadTimestamp } = useUpload();
+  const { lastUploadTimestamp, lastUploadResult } = useUpload();
+  const { showLevelUpAnimation } = useLevelAnimation();
   const lastKnownUploadRef = useRef(0);
+  const previousLevelRef = useRef(user?.level || 1);
+
+  // Post upload animation states
+  const [showPointsAnimation, setShowPointsAnimation] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardData, setRewardData] = useState<any>(null);
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,6 +136,13 @@ const handleMuteToggle = useCallback((newMuteState: boolean) => {
     globalMuteState = newMuteState;
     setIsMuted(newMuteState);
   }, []);
+
+// Keep previous level ref in sync with user data
+useEffect(() => {
+  if (user?.level) {
+    previousLevelRef.current = user.level;
+  }
+}, [user?.level]);
 
 useEffect(() => {
   if (!hasInitiallyLoaded) {
@@ -186,12 +204,46 @@ useFocusEffect(
   }, [hasInitiallyLoaded, accountType])
 );
 
-// Refresh feed when a background upload completes
+// Refresh feed and show animations when a background upload completes
 useEffect(() => {
   if (lastUploadTimestamp > lastKnownUploadRef.current) {
+    const prevLevel = previousLevelRef.current;
     lastKnownUploadRef.current = lastUploadTimestamp;
     console.log('📤 Upload completed, refreshing feed...');
     fetchFeed(true);
+
+    // Show animations based on upload result
+    if (lastUploadResult) {
+      const data = lastUploadResult;
+
+      // Wallet reward takes priority - show it first
+      if (data.wallet_reward && data.wallet_reward.wallet_earned > 0) {
+        setRewardData(data.wallet_reward);
+        setShowRewardModal(true);
+      }
+
+      // Check for level-up
+      if (data.level_update) {
+        const newLevel = data.level_update.level || 1;
+        if (newLevel > prevLevel) {
+          // Delay level-up animation if wallet modal is showing
+          const levelDelay = (data.wallet_reward?.wallet_earned > 0) ? 4500 : 0;
+          setTimeout(() => {
+            showLevelUpAnimation(newLevel);
+          }, levelDelay);
+        }
+        // Update the stored level
+        previousLevelRef.current = data.level_update.level || prevLevel;
+
+        // Show points earned GIF (after wallet modal if present)
+        const pointsDelay = (data.wallet_reward?.wallet_earned > 0) ? 4500 : 0;
+        const earnedPoints = data.level_update.points || 25;
+        setTimeout(() => {
+          setPointsEarned(earnedPoints);
+          setShowPointsAnimation(true);
+        }, pointsDelay);
+      }
+    }
   }
 }, [lastUploadTimestamp]);
 
@@ -1121,6 +1173,23 @@ const renderPost = useCallback(
       <CofauWalletModal
         visible={showWalletModal}
         onClose={() => setShowWalletModal(false)}
+      />
+
+      {/* Post Reward Modal (wallet earned) */}
+      <PostRewardModal
+        visible={showRewardModal}
+        onClose={() => {
+          setShowRewardModal(false);
+          setRewardData(null);
+        }}
+        rewardData={rewardData}
+      />
+
+      {/* Points Earned GIF Animation */}
+      <PointsEarnedAnimation
+        visible={showPointsAnimation}
+        pointsEarned={pointsEarned}
+        onClose={() => setShowPointsAnimation(false)}
       />
     </View>
   );

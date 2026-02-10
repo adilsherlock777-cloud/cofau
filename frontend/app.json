@@ -95,7 +95,7 @@
           "icon": "./assets/images/icon.png",
           "color": "#4dd0e1",
           "sounds": [],
-          "defaultChannel": "default"
+          "defaultChannel": "default_v2"
         }
       ],
       [
