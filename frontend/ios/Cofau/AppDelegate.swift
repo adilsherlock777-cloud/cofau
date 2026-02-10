@@ -1,5 +1,6 @@
 import Expo
 import FirebaseCore
+import FirebaseAuth
 import React
 import ReactAppDependencyProvider
 
@@ -54,12 +55,34 @@ GMSServices.provideAPIKey("AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE")
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
 // @generated begin @react-native-firebase/auth-openURL - expo prebuild (DO NOT MODIFY)
-    if url.host?.lowercased() == "firebaseauth" {
-      // invocations for Firebase Auth are handled elsewhere and should not be forwarded to Expo Router
-      return false
+    if Auth.auth().canHandle(url) {
+      // Firebase Auth handled this URL (phone auth reCAPTCHA callback)
+      return true
     }
 // @generated end @react-native-firebase/auth-openURL
     return super.application(app, open: url, options: options) || RCTLinkingManager.application(app, open: url, options: options)
+  }
+
+  // Forward APNs token to Firebase Auth (required for phone auth silent push verification)
+  public override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+    super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+
+  // Forward remote notifications to Firebase Auth (phone auth silent push)
+  public override func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    if Auth.auth().canHandleNotification(userInfo) {
+      completionHandler(.noData)
+      return
+    }
+    super.application(application, didReceiveRemoteNotification: userInfo, fetchCompletionHandler: completionHandler)
   }
 
   // Universal Links

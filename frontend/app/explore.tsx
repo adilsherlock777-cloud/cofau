@@ -384,8 +384,13 @@ const PostMarker = memo(({ post, onPress }: any) => {
         latitude: post.latitude,
         longitude: post.longitude,
       }}
-      onPress={() => onPress(post)}
+      onPress={(e: any) => {
+        e?.stopPropagation?.();
+        onPress(post);
+      }}
       tracksViewChanges={tracksChanges && !imageLoaded}
+      zIndex={post.id ? parseInt(String(post.id).replace(/\D/g, '').slice(-6) || '1', 10) : 1}
+      stopPropagation={true}
     >
       <View style={styles.postMarkerContainer}>
         <View style={styles.postMarkerBubble}>
@@ -505,8 +510,13 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
   return (
     <Marker
       coordinate={{ latitude, longitude }}
-      onPress={() => onPress(cluster)}
+      onPress={(e: any) => {
+        e?.stopPropagation?.();
+        onPress(cluster);
+      }}
       tracksViewChanges={tracksChanges}
+      zIndex={1000 + count}
+      stopPropagation={true}
     >
       <View style={styles.clusterMarkerContainer}>
         {/* Preview Images */}
@@ -586,13 +596,14 @@ const MapViewComponent = memo(({
   selectedCategory,
 }: any) => {
 
-  // Group posts by location
+  // Group posts by location — use toFixed(3) (~111m) so nearby posts cluster
+  // instead of overlapping as separate markers (which blocks taps on iOS)
   const { singlePosts, clusters } = React.useMemo(() => {
     const groups = new Map<string, any[]>();
 
     posts.forEach((post: any) => {
       if (post.latitude && post.longitude) {
-        const key = `${post.latitude.toFixed(5)},${post.longitude.toFixed(5)}`;
+        const key = `${post.latitude.toFixed(3)},${post.longitude.toFixed(3)}`;
         if (!groups.has(key)) {
           groups.set(key, []);
         }
@@ -2698,13 +2709,13 @@ postMarkerContainer: {
   alignItems: 'center',
 },
 postMarkerBubble: {
-  width: 80,  // Increased from 65
-  height: 80, // Increased from 65
-  borderRadius: 10,
+  width: 56,
+  height: 56,
+  borderRadius: 8,
   backgroundColor: '#F2CF68',
   justifyContent: 'center',
   alignItems: 'center',
-  borderWidth: 3,
+  borderWidth: 2.5,
   borderColor: '#fff',
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
@@ -2713,14 +2724,14 @@ postMarkerBubble: {
   elevation: 5,
 },
 postMarkerImage: {
-  width: 74,
-  height: 74,
-  borderRadius: 7,
+  width: 50,
+  height: 50,
+  borderRadius: 6,
 },
 postMarkerPlaceholder: {
-  width: 74,
-  height: 74,
-  borderRadius: 7,
+  width: 50,
+  height: 50,
+  borderRadius: 6,
   justifyContent: 'center',
   alignItems: 'center',
   backgroundColor: '#F2CF68',

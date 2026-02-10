@@ -93,7 +93,7 @@ export default function FeedScreen() {
   const { user, token, refreshUser, accountType } = useAuth() as any;
   const { lastUploadTimestamp, lastUploadResult } = useUpload();
   const { showLevelUpAnimation } = useLevelAnimation();
-  const lastKnownUploadRef = useRef(0);
+  const lastKnownUploadRef = useRef(lastUploadTimestamp);
   const previousLevelRef = useRef(user?.level || 1);
 
   // Post upload animation states

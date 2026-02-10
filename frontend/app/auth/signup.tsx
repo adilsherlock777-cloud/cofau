@@ -120,12 +120,22 @@ export default function SignupScreen() {
       setResendTimer(60);
       Alert.alert('OTP Sent', `Verification code sent to ${formattedPhone}`);
     } catch (error: any) {
-      console.error('Error sending OTP:', error);
+      console.error('Error sending OTP:', error?.code, error?.message, error);
       let errorMessage = 'Failed to send OTP. Please try again.';
       if (error.code === 'auth/invalid-phone-number') {
         errorMessage = 'Invalid phone number format.';
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = 'Too many attempts. Please try again later.';
+      } else if (error.code === 'auth/missing-client-identifier') {
+        errorMessage = 'Phone auth not configured. Please check APNs setup.';
+      } else if (error.code === 'auth/app-not-authorized') {
+        errorMessage = 'This app is not authorized for phone auth. Check Firebase console settings.';
+      } else if (error.code === 'auth/captcha-check-failed') {
+        errorMessage = 'reCAPTCHA verification failed. Please try again.';
+      } else if (error.code) {
+        errorMessage = `Firebase error: ${error.code}`;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       setPhoneError(errorMessage);
     } finally {

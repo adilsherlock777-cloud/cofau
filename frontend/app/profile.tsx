@@ -2176,6 +2176,12 @@ const handleSendOtp = async (targetPhone?: string) => {
       errorMessage = 'Invalid phone number format.';
     } else if (error.code === 'auth/too-many-requests') {
       errorMessage = 'Too many attempts. Please try again later.';
+    } else if (error.code === 'auth/missing-client-identifier') {
+      errorMessage = 'Phone auth not configured. Please check APNs setup.';
+    } else if (error.code === 'auth/app-not-authorized') {
+      errorMessage = 'This app is not authorized for phone auth. Check Firebase console settings.';
+    } else if (error.code === 'auth/captcha-check-failed') {
+      errorMessage = 'reCAPTCHA verification failed. Please try again.';
     } else if (error.code) {
       errorMessage = `Firebase error: ${error.code} - ${error.message}`;
     } else {

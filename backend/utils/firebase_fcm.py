@@ -3,6 +3,7 @@ Firebase Cloud Messaging (FCM) service for Android push notifications.
 This module handles sending push notifications to Android devices via Firebase.
 iOS devices continue to use Expo Push Notifications.
 """
+import asyncio
 import os
 from typing import List, Optional, Dict
 from dotenv import load_dotenv
@@ -50,7 +51,7 @@ def initialize_firebase():
         pass
     
     # Hardcoded path - no environment variable needed
-    cred_path = "/root/backend/backend/secrets/cofau-23116-firebase-adminsdk-fbsvc-ed3d669985.json"
+    cred_path = "/root/backend/backend/secrets/cofau-5508f-firebase-adminsdk-fbsvc-ee7de2890e.json"
     
     # Verify file exists
     if not os.path.exists(cred_path):
@@ -174,8 +175,8 @@ async def send_fcm_notification(
                 ),
             )
             
-            # Send the message
-            response = messaging.send(message)
+            # Send the message (run in thread to avoid blocking the async event loop)
+            response = await asyncio.to_thread(messaging.send, message)
             print(f"✅ FCM notification sent successfully: {response}")
             success_count += 1
             

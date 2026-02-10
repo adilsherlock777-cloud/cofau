@@ -154,12 +154,33 @@ async def create_restaurant_post(
         map_link = map_link.strip()
         if not map_link.startswith("http"):
             map_link = "https://" + map_link
-        if "google.com/maps" in map_link or "goo.gl/maps" in map_link:
+        if "google.com/maps" in map_link or "goo.gl/maps" in map_link or "maps.app" in map_link:
             clean_map_link = map_link
-    
+
+    # Extract coordinates from map link so the post appears on the map
+    latitude = None
+    longitude = None
+    if clean_map_link:
+        try:
+            from routers.map import get_coordinates_for_map_link
+            coords = await get_coordinates_for_map_link(clean_map_link)
+            if coords:
+                latitude = coords.get("latitude")
+                longitude = coords.get("longitude")
+                print(f"📍 Restaurant post coordinates extracted: {latitude}, {longitude}")
+        except Exception as e:
+            print(f"⚠️ Error extracting coordinates for restaurant post: {e}")
+
+    # If no map_link coordinates, fall back to the restaurant's own coordinates
+    if latitude is None or longitude is None:
+        latitude = current_restaurant.get("latitude")
+        longitude = current_restaurant.get("longitude")
+        if latitude and longitude:
+            print(f"📍 Using restaurant location: {latitude}, {longitude}")
+
     # Media URL for restaurant posts
     media_url = f"/api/static/uploads/restaurants/{filename}"
-    
+
     # Create restaurant post document
     post_doc = {
         "restaurant_id": str(current_restaurant["_id"]),
@@ -172,6 +193,8 @@ async def create_restaurant_post(
         "about": about.strip(),
         "map_link": clean_map_link,
         "location_name": location_name.strip() if location_name else None,
+        "latitude": latitude,
+        "longitude": longitude,
         "category": category.strip() if category else None,
         "dish_name": dish_name.strip() if dish_name else None,
         "likes_count": 0,

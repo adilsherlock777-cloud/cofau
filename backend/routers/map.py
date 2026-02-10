@@ -676,11 +676,54 @@ async def batch_geocode_posts(
         else:
             failed += 1
     
+    # Also process restaurant_posts that have map_link but no coordinates
+    restaurant_posts = await db.restaurant_posts.find({
+        "map_link": {"$exists": True, "$ne": None, "$ne": ""},
+        "latitude": {"$exists": False}
+    }).limit(limit).to_list(limit)
+
+    rp_processed = 0
+    rp_success = 0
+    rp_failed = 0
+
+    for post in restaurant_posts:
+        coords = await get_coordinates_for_map_link(post.get("map_link"))
+        rp_processed += 1
+
+        if coords and coords.get("latitude") and coords.get("longitude"):
+            await db.restaurant_posts.update_one(
+                {"_id": post["_id"]},
+                {"$set": {
+                    "latitude": coords["latitude"],
+                    "longitude": coords["longitude"],
+                    "coordinates_updated_at": datetime.utcnow()
+                }}
+            )
+            rp_success += 1
+        else:
+            # Fall back to the restaurant's own coordinates
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+            if restaurant and restaurant.get("latitude") and restaurant.get("longitude"):
+                await db.restaurant_posts.update_one(
+                    {"_id": post["_id"]},
+                    {"$set": {
+                        "latitude": restaurant["latitude"],
+                        "longitude": restaurant["longitude"],
+                        "coordinates_updated_at": datetime.utcnow()
+                    }}
+                )
+                rp_success += 1
+            else:
+                rp_failed += 1
+
     return {
         "processed": processed,
         "success": success,
         "failed": failed,
-        "message": f"Geocoded {success} out of {processed} posts"
+        "restaurant_posts_processed": rp_processed,
+        "restaurant_posts_success": rp_success,
+        "restaurant_posts_failed": rp_failed,
+        "message": f"Geocoded {success}/{processed} user posts, {rp_success}/{rp_processed} restaurant posts"
     }
 
 

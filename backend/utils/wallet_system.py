@@ -120,7 +120,7 @@ async def calculate_wallet_reward(
     # =========================================
     # CHECK 2: Is wallet enabled for this user?
     # =========================================
-    wallet_enabled = user.get("wallet_enabled", False)
+    wallet_enabled = user.get("wallet_enabled", True)
 
     if not wallet_enabled:
         return WalletRewardResult(
