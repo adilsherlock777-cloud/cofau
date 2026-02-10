@@ -1,0 +1,7 @@
+{
+  "expo": {
+    "ios": {
+      "useFrameworks": "static"
+    }
+  }
+}
