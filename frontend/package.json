@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.1",
   "scripts": {
-    "postinstall": "node ./scripts/patch-expo-maps.js && node ./scripts/patch-rnfb-messaging.js",
+    "postinstall": "node ./scripts/patch-expo-maps.js",
     "android": "expo run:android",
     "ios": "expo run:ios"
   },
