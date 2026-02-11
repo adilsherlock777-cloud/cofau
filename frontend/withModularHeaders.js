@@ -68,6 +68,13 @@ module.exports = function withModularHeaders(config) {
         );
       }
 
+      // Remove RNFBMessaging pod - only used on Android, causes clang module
+      // import conflicts on iOS with use_frameworks! :linkage => :static
+      podfile = podfile
+        .split("\n")
+        .filter((line) => !line.includes("RNFBMessaging"))
+        .join("\n");
+
       fs.writeFileSync(podfilePath, podfile);
       return config;
     },
