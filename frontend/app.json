@@ -109,6 +109,7 @@
         }
       ],
       "@react-native-firebase/auth",
+      "@react-native-firebase/messaging",
       "./plugins/withAndroidManifestFix.js",
       "expo-router"
     ],
