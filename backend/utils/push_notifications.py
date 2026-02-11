@@ -69,9 +69,11 @@ async def send_expo_push_notification(
         messages.append(message)
     
     try:
-        print(f"📤 Sending Expo push notification to {len(messages)} iOS device(s)")
+        print(f"📤 Sending Expo push notification to {len(messages)} device(s)")
         print(f"   Title: {title}")
         print(f"   Body: {body}")
+        for i, t in enumerate(valid_tokens):
+            print(f"   Token [{i}]: {t[:60]}...")
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -86,13 +88,17 @@ async def send_expo_push_notification(
             )
             response.raise_for_status()
             response_data = response.json()
-            print(f"✅ Expo push notification sent successfully to {len(messages)} iOS device(s)")
+            print(f"✅ Expo push notification sent successfully to {len(messages)} device(s)")
+            print(f"   Full response: {response_data}")
             
-            # Log any errors from Expo
+            # Log all receipt statuses from Expo
             if "data" in response_data:
-                for receipt in response_data.get("data", []):
-                    if receipt.get("status") == "error":
-                        print(f"⚠️ Expo push error: {receipt.get('message', 'Unknown error')}")
+                for i, receipt in enumerate(response_data.get("data", [])):
+                    status = receipt.get("status", "unknown")
+                    print(f"   Receipt [{i}]: status={status}, id={receipt.get('id', 'N/A')}")
+                    if status == "error":
+                        print(f"   ⚠️ Expo push error: {receipt.get('message', 'Unknown error')}")
+                        print(f"      Details: {receipt.get('details', {})}")
             
             return response_data
     except httpx.HTTPStatusError as e:
