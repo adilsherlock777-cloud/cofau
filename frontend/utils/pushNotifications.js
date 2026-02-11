@@ -148,13 +148,9 @@ async function getFCMToken() {
 }
 
 /**
- * Get Expo push token for iOS devices
+ * Get Expo push token (iOS primarily, Android as fallback)
  */
 async function getExpoPushToken() {
-  if (Platform.OS === 'android') {
-    return null;
-  }
-
   try {
     const expoPushToken = await Notifications.getExpoPushTokenAsync({
       projectId: Constants.expoConfig?.extra?.eas?.projectId,
