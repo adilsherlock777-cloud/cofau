@@ -69,6 +69,7 @@ export default function AddPostScreen() {
   const [originalReview, setOriginalReview] = useState('');
   const [correctedReview, setCorrectedReview] = useState('');
   const [grammarLoading, setGrammarLoading] = useState(false);
+  const [grammarChecked, setGrammarChecked] = useState(false);
 
 
 // Categories list with emojis
@@ -94,7 +95,8 @@ const CATEGORIES = [
   { id: 'punjabi-style', name: 'Punjabi Style', emoji: '🧈' },
   { id: 'bengali-style', name: 'Bengali Style', emoji: '🐟' },
   { id: 'odia-style', name: 'Odia Style', emoji: '🍚' },
-  { id: 'gujarati-style', name: 'Gujurati Style', emoji: '🥣' },
+  { id: 'gujarati-style', name: 'Gujarati Style', emoji: '🥣' },
+  { id: 'maharashtrian-style', name: 'Maharashtrian Style', emoji: '🍢' },
   { id: 'rajasthani-style', name: 'Rajasthani Style', emoji: '🏜️' },
   { id: 'mangaluru-style', name: 'Mangaluru Style', emoji: '🦀' },
   { id: 'goan', name: 'Goan', emoji: '🏖️' },
@@ -288,8 +290,15 @@ const handleGrammarConfirm = (useCorrected: boolean) => {
     setReview(correctedReview);
   }
   setShowGrammarModal(false);
-
+  setGrammarChecked(true);
 };
+
+// Auto-submit after grammar confirmation
+React.useEffect(() => {
+  if (grammarChecked) {
+    handlePost();
+  }
+}, [grammarChecked]);
 
 // ------------------------------ GET USER LOCATION ------------------------------
 
@@ -356,10 +365,10 @@ const handlePost = async () => {
     return;
   }
 
-  // Grammar check - only for regular users (not restaurants)
-if (accountType !== 'restaurant') {
+  // Grammar check - only for regular users (not restaurants), skip if already checked
+if (accountType !== 'restaurant' && !grammarChecked) {
   const grammarResult = await checkGrammar(review.trim());
-  
+
   if (grammarResult.was_changed) {
     setOriginalReview(review.trim());
     setCorrectedReview(grammarResult.corrected);
@@ -1710,7 +1719,7 @@ mapsButtonTextDisabled: {
     backgroundColor: '#F9F9F9',
   },
   categoryItemSelected: {
-    backgroundColor: '#F9F9F9',
+    backgroundColor: '#E94A37',
     borderWidth: 2,
     borderColor: '#F2CF68',
   },
@@ -1720,7 +1729,7 @@ mapsButtonTextDisabled: {
   },
   categoryItemTextSelected: {
     fontWeight: '600',
-    color: '#4ECDC4',
+    color: '#fff',
   },
   
   // Modal Footer

@@ -101,6 +101,8 @@ export default function FeedScreen() {
   const [pointsEarned, setPointsEarned] = useState(0);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardData, setRewardData] = useState<any>(null);
+  const pendingPointsRef = useRef<number | null>(null);
+  const pendingLevelUpRef = useRef<number | null>(null);
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,14 +212,16 @@ useEffect(() => {
     const prevLevel = previousLevelRef.current;
     lastKnownUploadRef.current = lastUploadTimestamp;
     console.log('📤 Upload completed, refreshing feed...');
+    console.log('📤 Upload result:', JSON.stringify(lastUploadResult));
     fetchFeed(true);
 
     // Show animations based on upload result
     if (lastUploadResult) {
       const data = lastUploadResult;
+      const hasWalletReward = data.wallet_reward && data.wallet_reward.wallet_earned > 0;
 
       // Wallet reward takes priority - show it first
-      if (data.wallet_reward && data.wallet_reward.wallet_earned > 0) {
+      if (hasWalletReward) {
         setRewardData(data.wallet_reward);
         setShowRewardModal(true);
       }
@@ -226,26 +230,29 @@ useEffect(() => {
       if (data.level_update) {
         const newLevel = data.level_update.level || 1;
         if (newLevel > prevLevel) {
-          // Delay level-up animation if wallet modal is showing
-          const levelDelay = (data.wallet_reward?.wallet_earned > 0) ? 4500 : 0;
-          setTimeout(() => {
+          if (!hasWalletReward) {
             showLevelUpAnimation(newLevel);
-          }, levelDelay);
+          } else {
+            pendingLevelUpRef.current = newLevel;
+          }
         }
         // Update the stored level
         previousLevelRef.current = data.level_update.level || prevLevel;
 
-        // Show points earned GIF (after wallet modal if present)
-        const pointsDelay = (data.wallet_reward?.wallet_earned > 0) ? 4500 : 0;
         const earnedPoints = data.level_update.pointsEarned || 25;
-        setTimeout(() => {
+        console.log('📤 Points earned for GIF:', earnedPoints);
+
+        if (!hasWalletReward) {
           setPointsEarned(earnedPoints);
           setShowPointsAnimation(true);
-        }, pointsDelay);
+        } else {
+          // Store pending points to show after reward modal closes
+          pendingPointsRef.current = earnedPoints;
+        }
       }
     }
   }
-}, [lastUploadTimestamp]);
+}, [lastUploadTimestamp, lastUploadResult]);
 
 const loadUnreadMessagesCount = async () => {
   if (!token) return;
@@ -1181,6 +1188,17 @@ const renderPost = useCallback(
         onClose={() => {
           setShowRewardModal(false);
           setRewardData(null);
+          // Show pending level-up animation
+          if (pendingLevelUpRef.current !== null) {
+            showLevelUpAnimation(pendingLevelUpRef.current);
+            pendingLevelUpRef.current = null;
+          }
+          // Show pending points GIF
+          if (pendingPointsRef.current !== null) {
+            setPointsEarned(pendingPointsRef.current);
+            setShowPointsAnimation(true);
+            pendingPointsRef.current = null;
+          }
         }}
         rewardData={rewardData}
       />
