@@ -19,9 +19,6 @@ module.exports = function withModularHeaders(config) {
         "FirebaseAuth",
         "FirebaseAuthInterop",
         "FirebaseAppCheckInterop",
-        "FirebaseMessaging",
-        "FirebaseMessagingInterop",
-        "FirebaseCoreExtension",
         "FirebaseInstallations",
         "GoogleUtilities",
         "RecaptchaInterop",
@@ -70,6 +67,13 @@ module.exports = function withModularHeaders(config) {
           `post_install do |installer|${buildSettingsFix}`
         );
       }
+
+      // Remove RNFBMessaging pod - only used on Android, causes clang module
+      // import conflicts on iOS with use_frameworks! :linkage => :static
+      podfile = podfile
+        .split("\n")
+        .filter((line) => !line.includes("RNFBMessaging"))
+        .join("\n");
 
       fs.writeFileSync(podfilePath, podfile);
       return config;

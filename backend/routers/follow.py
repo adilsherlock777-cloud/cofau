@@ -61,21 +61,32 @@ async def follow_user(user_id: str, current_user: dict = Depends(get_current_use
     return {"message": "Followed successfully", "isFollowing": True}
 
 
+@router.delete("/{user_id}/follow")
+async def unfollow_user_delete(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Unfollow a user (DELETE method)"""
+    return await _unfollow_user(user_id, current_user)
+
+
 @router.post("/{user_id}/unfollow")
 async def unfollow_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """Unfollow a user"""
+    return await _unfollow_user(user_id, current_user)
+
+
+async def _unfollow_user(user_id: str, current_user: dict):
+    """Shared unfollow logic"""
     db = get_database()
     current_user_id = str(current_user["_id"])
-    
+
     # Delete follow relationship
     result = await db.follows.delete_one({
         "followerId": current_user_id,
         "followingId": user_id
     })
-    
+
     if result.deleted_count == 0:
         return {"message": "Not following", "isFollowing": False}
-    
+
     # Update follower counts
     await db.users.update_one(
         {"_id": current_user["_id"]},
@@ -85,7 +96,7 @@ async def unfollow_user(user_id: str, current_user: dict = Depends(get_current_u
         {"_id": ObjectId(user_id)},
         {"$inc": {"followers_count": -1}}
     )
-    
+
     return {"message": "Unfollowed successfully", "isFollowing": False}
 
 
