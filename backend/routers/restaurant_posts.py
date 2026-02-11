@@ -4,6 +4,7 @@ from bson import ObjectId
 from database import get_database
 from routers.restaurant_auth import get_current_restaurant
 from routers.auth import get_current_user as get_current_user_optional
+from routers.notifications import create_notification
 from config import settings
 import os
 import shutil
@@ -1223,8 +1224,8 @@ async def follow_restaurant_public(
     })
     
     if existing_follow:
-        raise HTTPException(status_code=400, detail="Already following this restaurant")
-    
+        return {"message": "Already following", "isFollowing": True}
+
     # Create follow record
     follow_doc = {
         "followerId": user_id,
@@ -1233,16 +1234,30 @@ async def follow_restaurant_public(
         "created_at": datetime.utcnow()
     }
     await db.follows.insert_one(follow_doc)
-    
+
     # Update restaurant's followers count
     await db.restaurants.update_one(
         {"_id": ObjectId(restaurant_id)},
         {"$inc": {"followers_count": 1}}
     )
-    
+
+    # Update follower's following count
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$inc": {"following_count": 1}}
+    )
+
+    # Send push notification to restaurant
+    await create_notification(
+        db=db,
+        notification_type="follow",
+        from_user_id=user_id,
+        to_user_id=restaurant_id
+    )
+
     print(f"✅ User {user_id} followed restaurant {restaurant_id}")
-    
-    return {"message": "Successfully followed restaurant"}
+
+    return {"message": "Successfully followed restaurant", "isFollowing": True}
 
 
 @router.delete("/follow/{restaurant_id}")
@@ -1266,17 +1281,23 @@ async def unfollow_restaurant_public(
     })
     
     if result.deleted_count == 0:
-        raise HTTPException(status_code=400, detail="Not following this restaurant")
-    
+        return {"message": "Not following", "isFollowing": False}
+
     # Update restaurant's followers count
     await db.restaurants.update_one(
         {"_id": ObjectId(restaurant_id)},
         {"$inc": {"followers_count": -1}}
     )
-    
+
+    # Update follower's following count
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$inc": {"following_count": -1}}
+    )
+
     print(f"✅ User {user_id} unfollowed restaurant {restaurant_id}")
-    
-    return {"message": "Successfully unfollowed restaurant"}
+
+    return {"message": "Successfully unfollowed restaurant", "isFollowing": False}
 
 # ==================== LIKES FOR REGULAR USERS ====================
 
