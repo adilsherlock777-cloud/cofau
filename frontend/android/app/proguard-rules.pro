@@ -11,4 +11,15 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
+# Google Maps / Google Play Services (react-native-maps)
+-keep class com.google.android.gms.maps.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.android.gms.location.** { *; }
+-keep class com.google.android.gms.dynamic.** { *; }
+-dontwarn com.google.android.gms.**
+
+# react-native-maps
+-keep class com.airbnb.android.react.maps.** { *; }
+-dontwarn com.airbnb.android.react.maps.**
+
 # Add any project specific keep options here:

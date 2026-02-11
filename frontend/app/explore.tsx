@@ -26,13 +26,11 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost } from "../utils/api";
 let MapView: any;
 let Marker: any;
-let PROVIDER_GOOGLE: any;
 let Callout: any;
 try {
   const maps = require("react-native-maps");
   MapView = maps.default;
   Marker = maps.Marker;
-  PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE;
   Callout = maps.Callout;
 } catch {
   MapView = ({ children, style, ...props }: any) => (
@@ -362,16 +360,22 @@ const PostMarker = memo(({ post, onPress }: any) => {
           padding: 3,
           elevation: 5,
         }}>
-          <Image
-            source={{ uri: imageUrl }}
-            style={{ width: 60, height: 60 }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            onLoad={() => {
-              setImageLoaded(true);
-              setTracksChanges(false);
-            }}
-          />
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={{ width: 60, height: 60 }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              onLoad={() => {
+                setImageLoaded(true);
+                setTracksChanges(false);
+              }}
+            />
+          ) : (
+            <View style={{ width: 60, height: 60, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="image" size={24} color="#fff" />
+            </View>
+          )}
         </View>
       </Marker>
     );
@@ -475,16 +479,22 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
             padding: 2,
             elevation: 6,
           }}>
-            <Image
-              source={{ uri: image1 }}
-              style={{ width: 50, height: 50 }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              onLoad={() => {
-                setImagesLoaded(prev => prev + 1);
-                setTracksChanges(false);
-              }}
-            />
+            {image1 ? (
+              <Image
+                source={{ uri: image1 }}
+                style={{ width: 50, height: 50 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => {
+                  setImagesLoaded(prev => prev + 1);
+                  setTracksChanges(false);
+                }}
+              />
+            ) : (
+              <View style={{ width: 50, height: 50, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="image" size={20} color="#fff" />
+              </View>
+            )}
           </View>
           {/* Count badge */}
           <View style={{
@@ -581,11 +591,38 @@ const LocationButton = memo(({ onPress }: { onPress: () => void }) => (
   </TouchableOpacity>
 ));
 
-const MapViewComponent = memo(({ 
-  userLocation, 
-  restaurants, 
-  posts, 
-  onRestaurantPress, 
+// Error boundary to prevent map crashes from killing the app (Android)
+class MapErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any, info: any) {
+    console.log('MapErrorBoundary caught:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Ionicons name="map-outline" size={48} color="#999" />
+          <Text style={{ color: '#666', fontSize: 16, marginTop: 12, textAlign: 'center' }}>
+            Map couldn't load. Please restart the app.
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const MapViewComponent = memo(({
+  userLocation,
+  restaurants,
+  posts,
+  onRestaurantPress,
   onPostPress,
   onClusterPress,
   isLoading,
@@ -595,6 +632,14 @@ const MapViewComponent = memo(({
   onCenterLocation,
   selectedCategory,
 }: any) => {
+  // Delay map mount on Android to let Google Play Services initialize
+  const [mapReady, setMapReady] = React.useState(Platform.OS !== 'android');
+  React.useEffect(() => {
+    if (Platform.OS === 'android') {
+      const timer = setTimeout(() => setMapReady(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Group posts by location — use toFixed(3) (~111m) so nearby posts cluster
   // instead of overlapping as separate markers (which blocks taps on iOS)
@@ -695,11 +740,11 @@ const getCategoryEmoji = (categoryName: string | null) => {
 
   return (
     <View style={styles.mapContainer}>
-      {userLocation ? (
+      {userLocation && mapReady ? (
+        <MapErrorBoundary>
         <MapView
           ref={mapRef}
           style={styles.map}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           initialRegion={{
             latitude: userLocation.latitude,
             longitude: userLocation.longitude,
@@ -741,6 +786,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
             />
           ))}
         </MapView>
+        </MapErrorBoundary>
       ) : (
         <View style={styles.mapLoadingContainer}>
           <ActivityIndicator size="large" color="#4dd0e1" />

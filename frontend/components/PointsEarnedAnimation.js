@@ -29,8 +29,7 @@ export default function PointsEarnedAnimation({ visible, pointsEarned, onClose }
     } else if (pointsEarned === 15) {
       return require('../assets/animations/15.gif');
     } else if (pointsEarned === 5) {
-      // For 5 points (Influencer level), use 15.gif as fallback or create a 5.gif later
-      return require('../assets/animations/15.gif');
+      return require('../assets/animations/5.gif');
     }
     // Default fallback - use 25 points GIF
     return require('../assets/animations/25.gif');

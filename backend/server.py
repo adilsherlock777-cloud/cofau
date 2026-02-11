@@ -39,7 +39,7 @@ from routers.menu import router as menu_router
 from utils.wallet_system import calculate_wallet_reward, process_wallet_reward, WalletRewardResult
 
 # Import utils
-from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count
+from utils.level_system import calculate_level, add_post_points, calculateUserLevelAfterPost, recalculate_points_from_post_count, get_points_for_level
 from utils.moderation import check_image_moderation, save_moderation_result
 from utils.scheduler import start_scheduler, stop_scheduler
 from utils.location_matcher import normalize_location_name, find_similar_location, get_location_suggestions
@@ -1055,7 +1055,13 @@ async def create_post(
     # ======================================================
     user_id = str(current_user["_id"])
     total_posts_count = await db.posts.count_documents({"user_id": user_id})
+    # Get the user's level BEFORE this post to determine points earned
+    user_level_before_post = current_user.get("level", 1)
+    points_earned_for_post = get_points_for_level(user_level_before_post)
+
     level_update = recalculate_points_from_post_count(total_posts_count)
+    # Add pointsEarned so the frontend knows which GIF to show
+    level_update["pointsEarned"] = points_earned_for_post
 
     await db.users.update_one(
         {"_id": current_user["_id"]},

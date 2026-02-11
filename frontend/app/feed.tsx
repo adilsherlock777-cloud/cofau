@@ -237,7 +237,7 @@ useEffect(() => {
 
         // Show points earned GIF (after wallet modal if present)
         const pointsDelay = (data.wallet_reward?.wallet_earned > 0) ? 4500 : 0;
-        const earnedPoints = data.level_update.points || 25;
+        const earnedPoints = data.level_update.pointsEarned || 25;
         setTimeout(() => {
           setPointsEarned(earnedPoints);
           setShowPointsAnimation(true);
