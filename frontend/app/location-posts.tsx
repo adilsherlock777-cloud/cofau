@@ -28,7 +28,7 @@ export default function LocationPostsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const posts = JSON.parse(params.posts as string || "[]").sort(
-    (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    (a: any, b: any) => (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
   );
   const locationName = params.locationName as string || "Posts at this location";
 

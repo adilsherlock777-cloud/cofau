@@ -16,8 +16,12 @@ module.exports = function withModularHeaders(config) {
       const modularHeadersDeps = [
         "FirebaseCore",
         "FirebaseCoreInternal",
+        "FirebaseAuth",
         "FirebaseAuthInterop",
         "FirebaseAppCheckInterop",
+        "FirebaseMessaging",
+        "FirebaseMessagingInterop",
+        "FirebaseInstallations",
         "GoogleUtilities",
         "RecaptchaInterop",
         "GoogleMaps",

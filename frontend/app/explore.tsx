@@ -422,7 +422,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
 
   // Get latest 3 posts (sorted by newest first)
   const latestPosts = [...posts]
-    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .sort((a: any, b: any) => (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime()))
     .slice(0, 3);
 
   // Stop tracking after images load or timeout
@@ -619,7 +619,7 @@ const MapViewComponent = memo(({
 
       // Sort posts within each group by latest uploaded first
       groupPosts.sort((a: any, b: any) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
       );
 
       if (groupPosts.length === 1) {
@@ -1596,7 +1596,7 @@ const handleQuickCategoryPress = (category: any) => {
   const handleClusterPress = (cluster: any) => {
   // Sort posts by latest uploaded first
   const sortedPosts = [...cluster.posts].sort((a: any, b: any) =>
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
   );
   router.push({
     pathname: "/location-posts",
