@@ -420,8 +420,8 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
   const [tracksChanges, setTracksChanges] = useState(true);
   const { posts, latitude, longitude, count } = cluster;
 
-  // Get latest 3 posts
-  const latestPosts = posts
+  // Get latest 3 posts (sorted by newest first)
+  const latestPosts = [...posts]
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 3);
 
@@ -616,6 +616,11 @@ const MapViewComponent = memo(({
 
     groups.forEach((groupPosts, key) => {
       const [lat, lng] = key.split(',').map(Number);
+
+      // Sort posts within each group by latest uploaded first
+      groupPosts.sort((a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
       if (groupPosts.length === 1) {
         singlePosts.push(groupPosts[0]);
@@ -848,8 +853,8 @@ const RestaurantDetailModal = memo(({ visible, restaurant, onClose, onViewProfil
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{restaurant.average_rating || "N/A"}</Text>
-              <Text style={styles.statLabel}>Avg Rating</Text>
+              <Text style={styles.statNumber}>{restaurant.review_count || 0}</Text>
+              <Text style={styles.statLabel}>Total Posts</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
@@ -1589,10 +1594,14 @@ const handleQuickCategoryPress = (category: any) => {
   };
 
   const handleClusterPress = (cluster: any) => {
+  // Sort posts by latest uploaded first
+  const sortedPosts = [...cluster.posts].sort((a: any, b: any) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
   router.push({
     pathname: "/location-posts",
     params: {
-      posts: JSON.stringify(cluster.posts),
+      posts: JSON.stringify(sortedPosts),
       locationName: cluster.locationName,
     },
   });

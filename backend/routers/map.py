@@ -309,7 +309,8 @@ async def get_map_pins(
                 "likes_count": post.get("likes_count", 0),
                 "map_link": post.get("map_link"),
                 "tagged_restaurant_id": post.get("tagged_restaurant_id"),
-                "account_type": "user"
+                "account_type": "user",
+                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
             })
     
     # ==================== RESTAURANT POSTS ====================
@@ -348,7 +349,8 @@ async def get_map_pins(
                 "likes_count": post.get("likes_count", 0),
                 "map_link": post.get("map_link"),
                 "price": post.get("price"),
-                "account_type": "restaurant"
+                "account_type": "restaurant",
+                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
             })
     
     # Sort by distance
