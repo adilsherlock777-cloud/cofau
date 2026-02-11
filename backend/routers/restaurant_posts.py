@@ -1299,6 +1299,28 @@ async def unfollow_restaurant_public(
 
     return {"message": "Successfully unfollowed restaurant", "isFollowing": False}
 
+
+@router.get("/follow/{restaurant_id}/status")
+async def get_restaurant_follow_status(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user_optional)
+):
+    """Check if current user is following a restaurant"""
+    db = get_database()
+
+    if not current_user:
+        return {"isFollowing": False, "isSelf": False}
+
+    user_id = str(current_user.get("_id") or current_user.get("id"))
+
+    follow = await db.follows.find_one({
+        "followerId": user_id,
+        "followingId": restaurant_id,
+        "followingType": "restaurant"
+    })
+
+    return {"isFollowing": follow is not None, "isSelf": False}
+
 # ==================== LIKES FOR REGULAR USERS ====================
 
 @router.post("/public/{post_id}/like")

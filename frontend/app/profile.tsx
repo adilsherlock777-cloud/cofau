@@ -27,7 +27,7 @@ import UserAvatar from '../components/UserAvatar';
 import ProfileBadge from '../components/ProfileBadge';
 import ComplimentModal from '../components/ComplimentModal';
 import { MenuUploadModal } from '../components/MenuUploadModal';
-import { sendCompliment, getFollowers } from '../utils/api';
+import { sendCompliment, getFollowers, followUser, unfollowUser } from '../utils/api';
 import MaskedView from '@react-native-masked-view/masked-view';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
@@ -1031,12 +1031,13 @@ const loadMorePosts = () => {
     if (!userData?.id || !token) return;
 
     try {
-      const response = await axios.get(
-        `${API_URL}/users/${userData.id}/follow-status`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const isRestaurant = isRestaurantProfile || userData?.account_type === 'restaurant';
+      const endpoint = isRestaurant
+        ? `${API_URL}/restaurant/posts/follow/${userData.id}/status`
+        : `${API_URL}/users/${userData.id}/follow-status`;
+      const response = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setIsFollowing(response.data.isFollowing);
     } catch (err) {
       console.error('❌ Error fetching follow status:', err);
@@ -1060,14 +1061,12 @@ const loadMorePosts = () => {
     }));
 
     try {
-      const endpoint = isFollowing ? 'unfollow' : 'follow';
-      await axios.post(
-        `${API_URL}/users/${userData.id}/${endpoint}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const accountType = (isRestaurantProfile || userData?.account_type === 'restaurant') ? 'restaurant' : 'user';
+      if (isFollowing) {
+        await unfollowUser(userData.id, accountType);
+      } else {
+        await followUser(userData.id, accountType);
+      }
 
       console.log(`✅ ${isFollowing ? 'Unfollowed' : 'Followed'} successfully`);
     } catch (err) {
@@ -1146,14 +1145,11 @@ const loadMorePosts = () => {
     }));
 
     try {
-      const endpoint = currentStatus ? 'unfollow' : 'follow';
-      await axios.post(
-        `${API_URL}/users/${followerId}/${endpoint}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      if (currentStatus) {
+        await unfollowUser(followerId, 'user');
+      } else {
+        await followUser(followerId, 'user');
+      }
 
       console.log(`✅ ${currentStatus ? 'Unfollowed' : 'Followed'} follower successfully`);
     } catch (err) {
