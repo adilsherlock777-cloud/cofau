@@ -6,7 +6,10 @@ iOS devices continue to use Expo Push Notifications.
 import asyncio
 import os
 from typing import List, Optional, Dict
+
 from dotenv import load_dotenv
+
+from database import get_database
 
 load_dotenv()
 
@@ -182,10 +185,45 @@ async def send_fcm_notification(
             
         except messaging.UnregisteredError:
             print(f"⚠️ FCM token is unregistered (device may have uninstalled app): {token[:50]}...")
+            # Proactively remove this stale token from all users/restaurants so we never
+            # try to send to it again. This keeps the database clean over time.
+            try:
+                db = get_database()
+                users_result = await db.users.update_many(
+                    {"device_tokens": token},
+                    {"$pull": {"device_tokens": token}},
+                )
+                restaurants_result = await db.restaurants.update_many(
+                    {"device_tokens": token},
+                    {"$pull": {"device_tokens": token}},
+                )
+                total_removed = users_result.modified_count + restaurants_result.modified_count
+                if total_removed > 0:
+                    print(f"🧹 Removed unregistered FCM token from {total_removed} account(s)")
+            except Exception as db_error:
+                print(f"⚠️ Failed to remove unregistered FCM token from database: {db_error}")
+
             failure_count += 1
             errors.append(f"Token {token[:50]}... is unregistered")
         except messaging.InvalidArgumentError as e:
             print(f"❌ Invalid FCM token: {token[:50]}... - {str(e)}")
+            # Invalid tokens should also be purged so we don't keep retrying them.
+            try:
+                db = get_database()
+                users_result = await db.users.update_many(
+                    {"device_tokens": token},
+                    {"$pull": {"device_tokens": token}},
+                )
+                restaurants_result = await db.restaurants.update_many(
+                    {"device_tokens": token},
+                    {"$pull": {"device_tokens": token}},
+                )
+                total_removed = users_result.modified_count + restaurants_result.modified_count
+                if total_removed > 0:
+                    print(f"🧹 Removed invalid FCM token from {total_removed} account(s)")
+            except Exception as db_error:
+                print(f"⚠️ Failed to remove invalid FCM token from database: {db_error}")
+
             failure_count += 1
             errors.append(f"Invalid token {token[:50]}...: {str(e)}")
         except Exception as e:

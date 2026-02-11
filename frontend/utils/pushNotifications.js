@@ -8,9 +8,12 @@ import Constants from 'expo-constants';
 let messaging = null;
 let firebaseApp = null;
 
+// Store last known auth token/account type so we can re-register on FCM token refresh
+let lastAuthToken = null;
+let lastAccountType = 'user';
+
 if (Platform.OS === 'android') {
   try {
-
     // Initialize Firebase App first (required for messaging)
     firebaseApp = require('@react-native-firebase/app').default;
     messaging = require('@react-native-firebase/messaging').default;
@@ -182,6 +185,11 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
     console.log('⚠️ No auth token provided for push notification registration');
     return null;
   }
+
+  // Remember the latest auth token/account type so we can re-register
+  // when Firebase refreshes the FCM token in the background.
+  lastAuthToken = token;
+  lastAccountType = accountType || 'user';
 
   console.log(`📱 Registering push notifications for account type: ${accountType}`);
 
@@ -471,6 +479,23 @@ export function setupNotificationListeners(navigation) {
             }, 1000);
           }
         });
+
+      // Listen for FCM token refresh events and re-register the new token
+      messaging().onTokenRefresh(async newToken => {
+        console.log('🔄 FCM token refreshed:', newToken.substring(0, 50) + '...');
+
+        if (!lastAuthToken) {
+          console.log('⚠️ No auth token available for token refresh registration. Skipping backend update.');
+          return;
+        }
+
+        try {
+          console.log('🔔 Re-registering refreshed FCM token with backend...');
+          await registerForPushNotificationsAsync(lastAuthToken, lastAccountType || 'user');
+        } catch (error) {
+          console.error('❌ Error re-registering refreshed FCM token:', error);
+        }
+      });
 
       console.log('✅ FCM notification listeners set up for Android');
     } catch (error) {
