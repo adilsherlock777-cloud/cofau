@@ -21,6 +21,7 @@ module.exports = function withModularHeaders(config) {
         "FirebaseAppCheckInterop",
         "FirebaseMessaging",
         "FirebaseMessagingInterop",
+        "FirebaseCoreExtension",
         "FirebaseInstallations",
         "GoogleUtilities",
         "RecaptchaInterop",
@@ -58,6 +59,9 @@ module.exports = function withModularHeaders(config) {
           config.build_settings['OTHER_CFLAGS'] = '$(inherited) -Wno-error -Wno-non-modular-include-in-framework-module -Wno-error=non-modular-include-in-framework-module'
           config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "$(PODS_ROOT)/Headers/Public" "$(PODS_ROOT)/Headers/Public/React-Core" "$(PODS_TARGET_SRCROOT)/ios/AirMaps"'
           config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+        end
+        if target.name.start_with?('RNFB')
+          config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "$(PODS_ROOT)/Headers/Public" "$(PODS_ROOT)/Headers/Public/React-Core"'
         end
       end
     end`;
