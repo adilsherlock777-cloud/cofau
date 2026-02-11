@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { BlurView } from 'expo-blur';
 import * as Location from 'expo-location';
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import { Platform } from 'react-native';
 import { SalesDashboard } from './SalesDashboard';
 
 export const options = {
@@ -172,6 +173,9 @@ export default function HappeningPlaces() {
   const [locationError, setLocationError] = useState(null);
   const [visibleCards, setVisibleCards] = useState(3); // Initially show 3 cards
 
+  // Track if initial load has happened to prevent duplicate fetch
+  const hasInitiallyLoaded = useRef(false);
+
   // Video autoplay state
   const videoPositions = useRef(new Map());
   const [scrollY, setScrollY] = useState(0);
@@ -229,8 +233,26 @@ export default function HappeningPlaces() {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) return null;
 
+      // On Android, try last known position first for instant result
+      if (Platform.OS === 'android') {
+        try {
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown) {
+            const coords = {
+              latitude: lastKnown.coords.latitude,
+              longitude: lastKnown.coords.longitude,
+            };
+            setUserLocation(coords);
+            setLocationError(null);
+            return coords;
+          }
+        } catch (e) {
+          console.log("Last known position unavailable:", e);
+        }
+      }
+
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Platform.OS === 'android' ? Location.Accuracy.Low : Location.Accuracy.Balanced,
       });
 
       const coords = {
@@ -390,26 +412,20 @@ export default function HappeningPlaces() {
   // EFFECTS
   // ============================================
 
-  useEffect(() => {
-    if (token) {
-      getCurrentLocation().then((coords) => {
-        if (coords) {
-          fetchTopLocations(coords);
-        } else {
-          fetchTopLocations();
-        }
-      });
-    }
-  }, [token]);
-
   useFocusEffect(
     React.useCallback(() => {
       if (token) {
-        console.log('🔄 HappeningPlaces screen focused - refreshing locations');
-        
-        if (userLocation) {
-          fetchTopLocations(userLocation);
+        if (hasInitiallyLoaded.current) {
+          // Subsequent focus: use cached location, skip GPS wait
+          console.log('🔄 HappeningPlaces screen focused - refreshing locations');
+          if (userLocation) {
+            fetchTopLocations(userLocation);
+          } else {
+            fetchTopLocations();
+          }
         } else {
+          // First load: get location then fetch
+          hasInitiallyLoaded.current = true;
           getCurrentLocation().then((coords) => {
             if (coords) {
               fetchTopLocations(coords);
