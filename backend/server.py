@@ -1748,21 +1748,41 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
     await db.likes.delete_many({"post_id": post_id})
     await db.comments.delete_many({"post_id": post_id})
     await db.saved_posts.delete_many({"post_id": post_id})
-    
+
     # Delete the post
     result = await db.posts.delete_one({"_id": ObjectId(post_id)})
-    
+
     if result.deleted_count == 0:
         raise HTTPException(status_code=400, detail="Failed to delete post")
-    
+
+    user_id = str(current_user["_id"])
+
+    # Deduct ₹25 from wallet on any post deletion
+    wallet_deducted = 0.0
+    if current_user.get("account_type") != "restaurant":
+        deduct_amount = 25.0
+        await db.users.update_one(
+            {"_id": current_user["_id"]},
+            {"$inc": {"wallet_balance": -deduct_amount}}
+        )
+        await db.wallet_transactions.insert_one({
+            "user_id": user_id,
+            "amount": -deduct_amount,
+            "type": "deducted",
+            "description": "Post deleted",
+            "post_id": post_id,
+            "created_at": datetime.utcnow()
+        })
+        wallet_deducted = deduct_amount
+        print(f"💸 Deducted ₹{deduct_amount} from user {user_id} wallet for deleted post {post_id}")
+
     # Recalculate user points based on remaining posts
     # Formula: total_points = number_of_posts × 25
-    user_id = str(current_user["_id"])
     remaining_posts_count = await db.posts.count_documents({"user_id": user_id})
-    
+
     # Recalculate level and points
     level_update = recalculate_points_from_post_count(remaining_posts_count)
-    
+
     # Update user's level and points
     await db.users.update_one(
         {"_id": current_user["_id"]},
@@ -1775,12 +1795,13 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
             "title": level_update["title"]
         }}
     )
-    
+
     print(f"✅ Points recalculated for user {user_id}: {remaining_posts_count} posts × 25 = {level_update['total_points']} points, Level {level_update['level']}")
-    
+
     return {
         "message": "Post deleted successfully",
-        "level_update": level_update
+        "level_update": level_update,
+        "wallet_deducted": wallet_deducted
     }
 
 @app.get("/api/users/{user_id}/saved-posts")

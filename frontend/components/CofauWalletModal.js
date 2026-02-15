@@ -267,7 +267,9 @@ const CofauWalletModal = ({ visible, onClose }) => {
               {walletData.recent_transactions.slice(0, 5).map((transaction) => (
                 <View key={transaction.id} style={styles.transactionRow}>
                   <Text style={styles.transactionDate}>{transaction.date}</Text>
-                  <Text style={styles.transactionAmount}>+₹{transaction.amount}</Text>
+                  <Text style={[styles.transactionAmount, transaction.amount < 0 && styles.transactionAmountDeducted]}>
+                    {transaction.amount < 0 ? `-₹${Math.abs(transaction.amount)}` : `+₹${transaction.amount}`}
+                  </Text>
                   <Text style={styles.transactionDesc}>{transaction.description}</Text>
                 </View>
               ))}
@@ -493,7 +495,9 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     walletData.recent_transactions.map((transaction) => (
                       <View key={transaction.id} style={styles.transactionRow}>
                         <Text style={styles.transactionDate}>{transaction.date}</Text>
-                        <Text style={styles.transactionAmount}>+₹{transaction.amount}</Text>
+                        <Text style={[styles.transactionAmount, transaction.amount < 0 && styles.transactionAmountDeducted]}>
+                          {transaction.amount < 0 ? `-₹${Math.abs(transaction.amount)}` : `+₹${transaction.amount}`}
+                        </Text>
                         <Text style={styles.transactionDesc}>{transaction.description}</Text>
                       </View>
                     ))
@@ -962,6 +966,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#4CAF50",
     width: 55,
+  },
+  transactionAmountDeducted: {
+    color: "#E94A37",
   },
   transactionDesc: {
     fontSize: 13,
