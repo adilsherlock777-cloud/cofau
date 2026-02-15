@@ -390,7 +390,7 @@ export function setupNotificationListeners(navigation) {
           navigation?.push(`/profile?userId=${data.fromUserId}`);
         } else {
           console.log('   Unknown notification type, navigating to feed');
-          navigation?.push('/feed');
+          navigation?.push('/(tabs)/feed');
         }
       } catch (error) {
         console.error('❌ Error navigating from notification:', error);
@@ -446,7 +446,7 @@ export function setupNotificationListeners(navigation) {
             } else if (data?.type === 'compliment' && data?.fromUserId) {
               navigation?.push(`/profile?userId=${data.fromUserId}`);
             } else {
-              navigation?.push('/feed');
+              navigation?.push('/(tabs)/feed');
             }
           } catch (error) {
             console.error('❌ Error navigating from FCM notification:', error);

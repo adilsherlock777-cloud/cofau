@@ -61,7 +61,7 @@ function RootLayoutNav() {
     if (!isAuthenticated && !inAuthGroup && !inShareGroup) {
       router.replace("/auth/login");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace(accountType === 'restaurant' ? "/leaderboard" : "/feed");
+      router.replace(accountType === 'restaurant' ? "/(tabs)/leaderboard" : "/(tabs)/feed");
     }
   }, [isAuthenticated, loading, segments, accountType]);
 

@@ -259,31 +259,6 @@ const LargeStatCard = ({
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-          <Ionicons name="compass-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Explore</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
-          <View style={styles.centerIconCircle}>
-            <Ionicons name="fast-food" size={22} color="#000" />
-          </View>
-          <Text style={styles.navLabel}>Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-          <Ionicons name="analytics-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Sales</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-          <Ionicons name="person" size={20} color="#000" />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }

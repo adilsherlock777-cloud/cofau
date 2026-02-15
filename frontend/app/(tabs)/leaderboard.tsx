@@ -19,11 +19,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { LocationSelector } from "../components/LocationSelector";
-import { WalletBalanceModal } from "../components/WalletBalanceModal";
-import { OrderModal } from "../components/OrderModal";
-import { ReviewModal } from "../components/ReviewModal";
-import { useAuth } from "../context/AuthContext";
+import { LocationSelector } from "../../components/LocationSelector";
+import { WalletBalanceModal } from "../../components/WalletBalanceModal";
+import { OrderModal } from "../../components/OrderModal";
+import { ReviewModal } from "../../components/ReviewModal";
+import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 import * as Location from "expo-location";
 
@@ -2678,60 +2678,6 @@ export default function LeaderboardScreen() {
         </Modal>
       )}
 
-      {/* Bottom Navigation */}
-      <View style={styles.navBar}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/feed")}
-        >
-          <Ionicons name="home-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/explore")}
-        >
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.centerNavItem}
-          onPress={() => router.push("/leaderboard")}
-        >
-          {/* Gradient filled circle - active state */}
-          <LinearGradient
-            colors={['#FF8C00', '#E94A37']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.centerIconGradientFilled}
-          >
-            <Ionicons name="fast-food" size={22} color="#FFF" />
-          </LinearGradient>
-          <Text style={styles.navLabelActive}>
-            {accountType === 'restaurant' ? 'ORDERS' : 'Delivery'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/happening")}
-        >
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>
-            {accountType === 'restaurant' ? 'Sales' : 'Happening'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/profile")}
-        >
-          <Ionicons name="person-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }

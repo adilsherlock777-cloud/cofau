@@ -17,13 +17,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 import { Image } from "expo-image";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
-import { likePost, unlikePost } from "../utils/api";
+import { likePost, unlikePost } from "../../utils/api";
 let MapView: any;
 let Marker: any;
 let Callout: any;
@@ -2170,19 +2170,6 @@ return (
         </>
       )}
 
-      {/* BOTTOM NAVIGATION */}
-      <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/feed")}><Ionicons name="home-outline" size={20} color="#000" /><Text style={styles.navLabel}>Home</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/explore")}>
-          <LinearGradient colors={['#FF8C00', '#E94A37']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.navIconGradient}>
-            <Ionicons name={accountType === 'restaurant' ? "analytics" : "compass"} size={18} color="#fff" />
-          </LinearGradient>
-          <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push("/leaderboard")}><View style={styles.centerIconCircle}><Ionicons name="fast-food" size={22} color="#000" /></View><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/happening")}><Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" /><Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/profile")}><Ionicons name="person-outline" size={20} color="#000" /><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
-      </View>
 
       {/* CATEGORY MODAL - Hidden for restaurant users */}
       {accountType !== 'restaurant' && (

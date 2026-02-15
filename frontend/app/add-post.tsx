@@ -449,7 +449,7 @@ if (accountType !== 'restaurant' && !grammarChecked) {
     });
 
     // Navigate to feed immediately - upload continues in background
-    router.replace('/feed');
+    router.replace('/(tabs)/feed');
 
   } catch (error: any) {
     console.error('❌ Error preparing post:', error);

@@ -27,31 +27,32 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useNavigation } from "expo-router";
+import { useFeedRefresh } from "./_layout";
 import axios from "axios";
-import { useAuth } from "../context/AuthContext";
-import FeedCard from "../components/FeedCard";
-import UserAvatar from "../components/UserAvatar";
-import StoriesBar from "../components/StoriesBar";
+import { useAuth } from "../../context/AuthContext";
+import FeedCard from "../../components/FeedCard";
+import UserAvatar from "../../components/UserAvatar";
+import StoriesBar from "../../components/StoriesBar";
 import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { fetchUnreadCount } from "../utils/notifications";
-import { useNotifications } from "../context/NotificationContext";
-import { useUpload } from "../context/UploadContext";
-import { useLevelAnimation } from "../context/LevelContext";
-import PointsEarnedAnimation from "../components/PointsEarnedAnimation";
-import PostRewardModal from "../components/PostRewardModal";
-import SuggestedUsersBar from "../components/SuggestedUsersBar";
+import { fetchUnreadCount } from "../../utils/notifications";
+import { useNotifications } from "../../context/NotificationContext";
+import { useUpload } from "../../context/UploadContext";
+import { useLevelAnimation } from "../../context/LevelContext";
+import PointsEarnedAnimation from "../../components/PointsEarnedAnimation";
+import PostRewardModal from "../../components/PostRewardModal";
+import SuggestedUsersBar from "../../components/SuggestedUsersBar";
 import {
   normalizeMediaUrl,
   normalizeProfilePicture,
   BACKEND_URL,
-} from "../utils/imageUrlFix";
+} from "../../utils/imageUrlFix";
 
 // ⭐ ADD THIS IMPORT - adjust path based on where you place the file
-import { FeedSkeleton } from "../components/FeedSkeleton";
-import MysteryBoxIcon from "../components/MysteryBoxIcon";
-import CofauWalletModal from "../components/CofauWalletModal";
+import { FeedSkeleton } from "../../components/FeedSkeleton";
+import MysteryBoxIcon from "../../components/MysteryBoxIcon";
+import CofauWalletModal from "../../components/CofauWalletModal";
 
 const BACKEND = BACKEND_URL;
 let globalMuteState = true;
@@ -132,6 +133,11 @@ export default function FeedScreen() {
 
   const POSTS_PER_PAGE = 30;
   const VISIBILITY_THRESHOLD = 0.2;
+
+  // Register double-tap Home tab handler: scroll to top + refresh
+  const { register: registerFeedRefresh } = useFeedRefresh();
+  const navigation = useNavigation();
+  const fetchFeedRef = useRef<((forceRefresh?: boolean) => void) | null>(null);
 
   // Handle mute toggle
 const handleMuteToggle = useCallback((newMuteState: boolean) => {
@@ -410,6 +416,20 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
       setLoadingMore(false);
     }
   };
+
+  // Keep fetchFeed ref updated and register the Home tab double-tap handler
+  fetchFeedRef.current = fetchFeed;
+  useEffect(() => {
+    registerFeedRefresh(() => {
+      if (navigation.isFocused()) {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        setRefreshing(true);
+        setHasInitiallyLoaded(false);
+        fetchFeedRef.current?.(true);
+        setHasInitiallyLoaded(true);
+      }
+    });
+  }, []);
 
   // Track post positions
   const handlePostLayout = useCallback((postId: string, event: any) => {
@@ -1078,61 +1098,6 @@ const renderPost = useCallback(
   updateCellsBatchingPeriod={50}
 />
 
-      {/* ================= BOTTOM TABS ================= */}
-      <View style={styles.navBar}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/feed")}
-        >
-          <LinearGradient
-            colors={['#FF8C00', '#E94A37']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.navIconGradient}
-          >
-            <Ionicons name="home" size={18} color="#fff" />
-          </LinearGradient>
-          <Text style={styles.navLabelActive}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/explore")}
-        >
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.centerNavItem}
-          onPress={() => router.push("/leaderboard")}
-        >
-          <View style={styles.centerIconCircle}>
-            <Ionicons name="fast-food" size={22} color="#000" />
-          </View>
-          <Text style={styles.navLabel}>
-            {accountType === 'restaurant' ? 'Orders' : 'Delivery'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/happening")}
-        >
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>
-            {accountType === 'restaurant' ? 'Sales' : 'Happening'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/profile")}
-        >
-          <Ionicons name="person-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Post a Bite/Bite Stories Modal */}
 <Modal

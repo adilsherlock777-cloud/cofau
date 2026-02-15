@@ -424,8 +424,8 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   <View style={styles.pointItem}>
                     <Text style={styles.pointEmoji}>💰</Text>
                     <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>₹10 Per Post</Text>
-                      <Text style={styles.pointDesc}>Earn ₹10 for every post you upload</Text>
+                      <Text style={styles.pointTitle}>₹25 Per Post</Text>
+                      <Text style={styles.pointDesc}>Earn ₹25 for every post you upload</Text>
                     </View>
                   </View>
 

@@ -791,7 +791,7 @@ postId={post.id}
     {post.dish_name ? (
       <View style={styles.dishNameOverlay}>
         <Text style={styles.dishNameOverlayText} numberOfLines={1}>
-          {post.dish_name}
+          {post.dish_name.toUpperCase()}
         </Text>
       </View>
     ) : null}

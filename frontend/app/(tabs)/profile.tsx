@@ -21,13 +21,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { useAuth } from '../context/AuthContext';
-import LevelBadge from '../components/LevelBadge';
-import UserAvatar from '../components/UserAvatar';
-import ProfileBadge from '../components/ProfileBadge';
-import ComplimentModal from '../components/ComplimentModal';
-import { MenuUploadModal } from '../components/MenuUploadModal';
-import { sendCompliment, getFollowers, followUser, unfollowUser } from '../utils/api';
+import { useAuth } from '../../context/AuthContext';
+import LevelBadge from '../../components/LevelBadge';
+import UserAvatar from '../../components/UserAvatar';
+import ProfileBadge from '../../components/ProfileBadge';
+import ComplimentModal from '../../components/ComplimentModal';
+import { MenuUploadModal } from '../../components/MenuUploadModal';
+import { sendCompliment, getFollowers, followUser, unfollowUser } from '../../utils/api';
 import MaskedView from '@react-native-masked-view/masked-view';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
@@ -39,7 +39,7 @@ try {
   console.log('Firebase Auth not available (Expo Go mode)');
 }
 import { BlurView } from 'expo-blur';
-import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
+import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
 
 const API_BACKEND_URL = BACKEND_URL;
 const API_URL = `${BACKEND_URL}/api`;
@@ -456,11 +456,11 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (token && userData) {
-        console.log('🔄 Profile screen focused - refreshing posts');
+      if (token && userData && userPosts.length === 0) {
+        console.log('🔄 Profile screen focused - loading posts (first time)');
         fetchUserPosts();
       }
-    }, [token, userData, activeTab])
+    }, [token, userData])
   );
 
  useEffect(() => {
@@ -2954,31 +2954,6 @@ const renderRestaurantProfile = () => {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
-          <View style={styles.centerIconCircle}>
-            <Ionicons name="fast-food" size={22} color="#000" />
-          </View>
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-          <Ionicons name="person" size={20} color="#000" />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* ================= MENU UPLOAD MODAL ================= */}
       {console.log('🔍 Menu Upload Modal Visible State Changed:', menuUploadModalVisible)}
@@ -4227,30 +4202,6 @@ if (loading) {
           <Ionicons name="alert-circle-outline" size={64} color="#999" />
           <Text style={styles.errorText}>Unable to load profile.</Text>
         </View>
-        <View style={styles.navBar}>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-            <Ionicons name="home-outline" size={28} color="#000" />
-            <Text style={styles.navLabel}>Home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-            <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={28} color="#000" />
-            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
-            <View style={styles.centerIconCircle}>
-              <Ionicons name="fast-food" size={28} color="#000" />
-            </View>
-            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-            <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={28} color="#000" />
-            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-            <Ionicons name="person" size={28} color="#000" />
-            <Text style={styles.navLabel}>Profile</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     );
   }
@@ -4736,38 +4687,6 @@ if (isRestaurantProfile) {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Bottom Navigation - Matching feed.tsx */}
-      <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-          <Ionicons name="home-outline" size={20} color="#000" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
-          <View style={styles.centerIconCircle}>
-            <Ionicons name="fast-food" size={22} color="#000" />
-          </View>
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={20} color="#000" />
-          <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-          <LinearGradient
-            colors={['#FF8C00', '#E94A37']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.navIconGradient}
-          >
-            <Ionicons name="person" size={18} color="#fff" />
-          </LinearGradient>
-          <Text style={styles.navLabelActive}>Profile</Text>
-        </TouchableOpacity>
-      </View>
 
 
       {/* ================= SIDEBAR MENU MODAL ================= */}

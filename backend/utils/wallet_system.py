@@ -17,7 +17,7 @@ def get_create_notification():
 
 
 # Wallet reward amounts
-WALLET_REWARD_PER_POST = 10.0  # ₹10 per post (max 2 per week)
+WALLET_REWARD_PER_POST = 25.0  # ₹25 per post (max 2 per week)
 WALLET_FIRST_POST_BONUS = 50.0  # First post bonus for new users
 POINTS_PER_POST = 25
 MAX_REWARDED_POSTS_PER_WEEK = 2  # Only first 2 posts per week earn rewards
@@ -89,7 +89,7 @@ async def calculate_wallet_reward(
 
     Rules:
     1. First post ever → ₹50 bonus (no other checks)
-    2. Subsequent posts → ₹10 per post, max 2 rewarded posts per week
+    2. Subsequent posts → ₹25 per post, max 2 rewarded posts per week
     3. 3rd, 4th, 5th+ posts in a week → ₹0
 
     Returns WalletRewardResult with earned amount and details.
@@ -161,7 +161,7 @@ async def calculate_wallet_reward(
         )
 
     # =========================================
-    # ALL CHECKS PASSED - Give ₹10 reward
+    # ALL CHECKS PASSED - Give ₹25 reward
     # =========================================
     return WalletRewardResult(
         wallet_earned=WALLET_REWARD_PER_POST,

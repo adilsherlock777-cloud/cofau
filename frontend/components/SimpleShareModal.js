@@ -73,7 +73,7 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
                         <View style={storyCardStyles.dishNameContainer}>
                             <Ionicons name="fast-food" size={14} color="#FFF" />
                             <Text style={storyCardStyles.dishNameText} numberOfLines={1}>
-                                {post.dish_name}
+                                {post.dish_name.toUpperCase()}
                             </Text>
                         </View>
                     )}

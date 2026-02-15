@@ -200,7 +200,7 @@ const handlePostStory = async () => {
 
     console.log('✅ Story uploaded:', response.data);
 
-    router.replace('/feed');
+    router.replace('/(tabs)/feed');
   } catch (error: any) {
     console.error('❌ Error uploading story:', error.response?.data || error.message);
     Alert.alert('Error', error.response?.data?.detail || 'Failed to upload story');

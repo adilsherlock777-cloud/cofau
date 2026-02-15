@@ -55,7 +55,7 @@ export default function VerifyScreen() {
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/feed'),
+            onPress: () => router.replace('/(tabs)/feed'),
           },
         ]
       );

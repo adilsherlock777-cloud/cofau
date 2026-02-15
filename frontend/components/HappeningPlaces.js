@@ -494,33 +494,6 @@ export default function HappeningPlaces() {
             <SkeletonLoader />
           </ScrollView>
           
-          {/* Bottom Navigation */}
-          <View style={styles.navBar}>
-            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-              <Ionicons name="home-outline" size={20} color="#000" />
-              <Text style={styles.navLabel}>Home</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/explore')}>
-              <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
-              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.centerNavItem} onPress={() => router.push('/leaderboard')}>
-              <View style={styles.centerIconCircle}>
-                <Ionicons name="fast-food" size={22} color="#000" />
-              </View>
-              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/happening')}>
-              <LinearGradient colors={['#FF8C00', '#E94A37']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.navIconGradient}>
-                <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={18} color="#fff" />
-              </LinearGradient>
-              <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-              <Ionicons name="person-outline" size={20} color="#000" />
-              <Text style={styles.navLabel}>Profile</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </>
     );
@@ -563,57 +536,6 @@ export default function HappeningPlaces() {
             <SalesDashboard token={token || ""} />
           </ScrollView>
 
-          {/* Bottom Navigation */}
-          <View style={styles.navBar}>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => router.push('/feed')}
-            >
-              <Ionicons name="home-outline" size={20} color="#000" />
-              <Text style={styles.navLabel}>Home</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => router.push('/explore')}
-            >
-              <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
-              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.centerNavItem}
-              onPress={() => router.push('/leaderboard')}
-            >
-              <View style={styles.centerIconCircle}>
-                <Ionicons name="fast-food" size={22} color="#000" />
-              </View>
-              <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => router.push('/happening')}
-            >
-              <LinearGradient
-                colors={['#FF8C00', '#E94A37']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.navIconGradient}
-              >
-                <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={18} color="#fff" />
-              </LinearGradient>
-              <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => router.push('/profile')}
-            >
-              <Ionicons name="person-outline" size={20} color="#000" />
-              <Text style={styles.navLabel}>Profile</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </>
     );
@@ -820,57 +742,6 @@ export default function HappeningPlaces() {
           )}
         </ScrollView>
 
-        {/* Bottom Navigation */}
-        <View style={styles.navBar}>
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => router.push('/feed')}
-          >
-            <Ionicons name="home-outline" size={20} color="#000" />
-            <Text style={styles.navLabel}>Home</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => router.push('/explore')}
-          >
-            <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "compass-outline"} size={20} color="#000" />
-            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Dashboard' : 'Explore'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.centerNavItem}
-            onPress={() => router.push('/leaderboard')}
-          >
-            <View style={styles.centerIconCircle}>
-              <Ionicons name="fast-food" size={22} color="#000" />
-            </View>
-            <Text style={styles.navLabel}>{accountType === 'restaurant' ? 'Orders' : 'Delivery'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => router.push('/happening')}
-          >
-            <LinearGradient
-              colors={['#FF8C00', '#E94A37']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.navIconGradient}
-            >
-              <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={18} color="#fff" />
-            </LinearGradient>
-            <Text style={styles.navLabelActive}>{accountType === 'restaurant' ? 'Sales' : 'Happening'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => router.push('/profile')}
-          >
-            <Ionicons name="person-outline" size={20} color="#000" />
-            <Text style={styles.navLabel}>Profile</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </>
   );

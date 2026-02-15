@@ -100,17 +100,17 @@ export default function NotificationsScreen() {
     // Wallet and reward notifications
     else if (type === 'wallet_reward' || type === 'delivery_completed_reward' || type === 'reward_earned') {
       // Route to the leaderboard screen which shows Delivery/Rewards
-      router.push('/leaderboard');
+      router.push('/(tabs)/leaderboard');
     }
     // Order notifications for customers
     else if (type === 'order_preparing' || type === 'order_in_progress' || type === 'order_completed') {
       // Route to leaderboard which shows orders/delivery for customers
-      router.push('/leaderboard');
+      router.push('/(tabs)/leaderboard');
     }
     // Order notifications for restaurants
     else if (type === 'new_order') {
       // Route to leaderboard which shows orders for restaurants
-      router.push('/leaderboard');
+      router.push('/(tabs)/leaderboard');
     }
     // Fallback: if no specific route, go to feed
     else {

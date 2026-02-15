@@ -388,7 +388,7 @@ const handleVerifyOtp = async () => {
           'Account Created! 🎉',
           'Welcome to Cofau! Your restaurant account has been created.',
           () => {
-            router.replace('/feed');
+            router.replace('/(tabs)/feed');
           }
         );
       } else {
