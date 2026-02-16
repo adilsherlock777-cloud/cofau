@@ -287,6 +287,44 @@ async def android_asset_links():
         media_type="application/json"
     )
 
+@app.get("/download")
+async def download_redirect(request: Request):
+    """Redirects to App Store or Play Store based on device"""
+    from fastapi.responses import RedirectResponse
+    user_agent = request.headers.get("user-agent", "").lower()
+
+    APP_STORE_URL = "https://apps.apple.com/app/cofau/id6758019920"
+    PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.cofau.app"
+
+    if any(x in user_agent for x in ["iphone", "ipad", "ipod", "macintosh"]):
+        return RedirectResponse(url=APP_STORE_URL)
+    elif "android" in user_agent:
+        return RedirectResponse(url=PLAY_STORE_URL)
+    else:
+        # Desktop or unknown — show a page with both links
+        html = """<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Download Cofau</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f8f9fa; display:flex; justify-content:center; align-items:center; min-height:100vh;">
+            <div style="text-align:center; padding:40px 20px;">
+                <div style="width:80px; height:80px; background:#4dd0e1; border-radius:20px; margin:0 auto 20px; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-size:40px; color:white; font-weight:bold; font-style:italic;">C</span>
+                </div>
+                <h1 style="color:#333; margin:0 0 8px;">Download Cofau</h1>
+                <p style="color:#888; font-size:16px; margin:0 0 32px;">Discover and share amazing food experiences</p>
+                <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
+                    <a href=\"""" + APP_STORE_URL + """\" style="display:inline-block; background:#000; color:white; text-decoration:none; padding:14px 28px; border-radius:12px; font-weight:600; font-size:16px;">App Store</a>
+                    <a href=\"""" + PLAY_STORE_URL + """\" style="display:inline-block; background:#34a853; color:white; text-decoration:none; padding:14px 28px; border-radius:12px; font-weight:600; font-size:16px;">Google Play</a>
+                </div>
+            </div>
+        </body>
+        </html>"""
+        return HTMLResponse(content=html)
+
 @app.get("/api/static/uploads/{filename:path}")
 async def serve_media_file(filename: str, request: Request, w: int = None):
     """
