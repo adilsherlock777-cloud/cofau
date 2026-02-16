@@ -123,12 +123,12 @@ async def get_nearby_areas(
         db = get_database()
         cache_key = _cache_key(latitude, longitude, radius_km)
 
-        # Check cache first
+        # Check cache first (only use cache if it has > 5 areas, otherwise re-fetch)
         cached = await db.areas_cache.find_one({
             "cache_key": cache_key,
             "expires_at": {"$gt": datetime.utcnow()},
         })
-        if cached:
+        if cached and len(cached.get("areas", [])) > 5:
             # Recalculate distances from the user's exact position
             areas = cached["areas"]
             for area in areas:
@@ -139,21 +139,48 @@ async def get_nearby_areas(
             areas.sort(key=lambda a: a.get("distance_km") or 9999)
             return {"success": True, "areas": areas, "cached": True}
 
-        # Not cached — call Google Places API
-        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        # Not cached — use Google Places Text Search API
+        # Text Search returns many more results for Indian areas than Nearby Search
+        text_search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 
         all_areas = []
         seen = set()
 
-        for place_type in ["sublocality", "neighborhood", "locality"]:
+        # First, reverse-geocode to get the city name for better search queries
+        city_name = ""
+        try:
+            geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+            async with httpx.AsyncClient() as client:
+                geo_resp = await client.get(geocode_url, params={
+                    "latlng": f"{latitude},{longitude}",
+                    "key": GOOGLE_MAPS_API_KEY,
+                    "result_type": "locality",
+                })
+                geo_data = geo_resp.json()
+            if geo_data.get("status") == "OK" and geo_data.get("results"):
+                for component in geo_data["results"][0].get("address_components", []):
+                    if "locality" in component.get("types", []):
+                        city_name = component.get("long_name", "")
+                        break
+        except Exception:
+            pass
+
+        # Search queries that return area/locality names for Indian cities
+        search_queries = [
+            f"areas in {city_name}" if city_name else "areas nearby",
+            f"localities in {city_name}" if city_name else "localities nearby",
+            f"neighbourhoods in {city_name}" if city_name else "neighbourhoods nearby",
+        ]
+
+        for query in search_queries:
             params = {
+                "query": query,
                 "location": f"{latitude},{longitude}",
                 "radius": radius_km * 1000,
-                "type": place_type,
                 "key": GOOGLE_MAPS_API_KEY,
             }
             async with httpx.AsyncClient() as client:
-                resp = await client.get(url, params=params)
+                resp = await client.get(text_search_url, params=params)
                 data = resp.json()
 
             if data.get("status") == "OK":
@@ -161,12 +188,27 @@ async def get_nearby_areas(
                     name = place.get("name", "").strip()
                     if not name or name.lower() in seen:
                         continue
+
+                    # Filter out non-area results (businesses, restaurants, etc.)
+                    place_types = place.get("types", [])
+                    area_types = {
+                        "sublocality", "sublocality_level_1", "sublocality_level_2",
+                        "neighborhood", "locality", "political",
+                        "administrative_area_level_3", "administrative_area_level_4",
+                    }
+                    if not any(t in area_types for t in place_types):
+                        continue
+
                     seen.add(name.lower())
 
                     loc = place.get("geometry", {}).get("location", {})
                     plat = loc.get("lat")
                     plng = loc.get("lng")
                     dist = round(_haversine(latitude, longitude, plat, plng), 1) if plat and plng else None
+
+                    # Skip if outside the requested radius
+                    if dist is not None and dist > radius_km:
+                        continue
 
                     all_areas.append({
                         "name": name,
