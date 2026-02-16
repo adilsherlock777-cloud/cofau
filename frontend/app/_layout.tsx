@@ -10,8 +10,9 @@ import { UploadProvider } from "../context/UploadContext";
 import LevelUpAnimation from "../components/LevelUpAnimation";
 import UploadProgressIndicator from "../components/UploadProgressIndicator";
 import { useEffect } from "react";
-import { 
-  setupNotificationListeners, 
+import * as Linking from "expo-linking";
+import {
+  setupNotificationListeners,
   registerForPushNotificationsAsync  // ⬅️ ADD THIS IMPORT
 } from "../utils/pushNotifications";
 
@@ -24,6 +25,39 @@ function RootLayoutNav() {
   const [fontsLoaded] = useFonts({
     Lobster: require("../assets/fonts/Lobster-Regular.ttf"),
   });
+
+  // ✅ Deep link handling — open shared posts directly
+  useEffect(() => {
+    function handleDeepLink(event: { url: string }) {
+      const url = event.url;
+      let postId: string | null = null;
+
+      // Handle cofau://post/{postId}
+      if (url.startsWith("cofau://post/")) {
+        postId = url.replace("cofau://post/", "").split("?")[0];
+      }
+      // Handle https://api.cofau.com/share/{postId}
+      else if (url.includes("/share/")) {
+        const parts = url.split("/share/");
+        if (parts[1]) {
+          postId = parts[1].split("?")[0];
+        }
+      }
+
+      if (postId && isAuthenticated) {
+        router.push(`/post-details/${postId}`);
+      }
+    }
+
+    // Handle URL that launched the app
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    // Handle URLs while app is already open
+    const subscription = Linking.addEventListener("url", handleDeepLink);
+    return () => subscription.remove();
+  }, [isAuthenticated, router]);
 
   // ✅ Effects MUST come before conditional returns
   useEffect(() => {

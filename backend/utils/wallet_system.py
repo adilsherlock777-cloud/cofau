@@ -100,11 +100,12 @@ async def calculate_wallet_reward(
     # =========================================
     # CHECK 1: Is this user's FIRST POST EVER?
     # =========================================
-    total_posts = await db.posts.count_documents({"user_id": user_id})
-    print(f"🔍 First post check: user {user_id} has {total_posts} posts")
+    # Use wallet_transactions history instead of post count to prevent
+    # users from deleting all posts and re-claiming the first post bonus
+    has_any_wallet_history = await db.wallet_transactions.count_documents({"user_id": user_id, "type": "earned"})
+    print(f"🔍 First post check: user {user_id} has {has_any_wallet_history} wallet transactions")
 
-    # total_posts = 1 means this is their first post (post already inserted in DB before wallet calc)
-    is_first_post = total_posts == 1
+    is_first_post = has_any_wallet_history == 0
 
     if is_first_post:
         print(f"🎉 First post detected! Giving ₹{WALLET_FIRST_POST_BONUS} bonus")

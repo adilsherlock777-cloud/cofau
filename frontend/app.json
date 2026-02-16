@@ -17,6 +17,7 @@
       "buildNumber": "4",
       "bundleIdentifier": "com.cofau.app",
       "googleServicesFile": "./GoogleService-Info.plist", 
+      "associatedDomains": ["applinks:api.cofau.com"],
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Cofau needs photo library access to let you upload photos and videos of your food and dining experiences to share in your restaurant reviews.",
         "NSCameraUsageDescription": "Cofau needs camera access to let you capture photos and videos of your food and dining experiences to share in your restaurant reviews.",
@@ -35,6 +36,20 @@
       "versionCode": 5,
       "googleServicesFile": "./google-services.json",
       "useNextNotificationsApi": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "api.cofau.com",
+              "pathPrefix": "/share"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"

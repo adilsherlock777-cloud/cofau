@@ -173,6 +173,14 @@ export default function HappeningPlaces() {
   const [locationError, setLocationError] = useState(null);
   const [visibleCards, setVisibleCards] = useState(3); // Initially show 3 cards
 
+  // Dropdown state for "SELECT YOUR FOOD SPOT"
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [selectedArea, setSelectedArea] = useState('All'); // 'All' or an area object
+  const [nearbyAreas, setNearbyAreas] = useState([]); // Real area/locality names
+  const [areasLoading, setAreasLoading] = useState(false);
+  const [areaPosts, setAreaPosts] = useState([]); // Posts for selected area
+  const [areaPostsLoading, setAreaPostsLoading] = useState(false);
+
   // Track if initial load has happened to prevent duplicate fetch
   const hasInitiallyLoaded = useRef(false);
 
@@ -346,6 +354,56 @@ export default function HappeningPlaces() {
     }
   }, [calculateVisibleVideos]);
 
+  // Fetch nearby area/locality names from Google Places
+  const fetchNearbyAreas = async (coords) => {
+    if (!token || !coords) return;
+    try {
+      setAreasLoading(true);
+      const response = await axios.get(
+        `${API_URL}/places/nearby-areas?latitude=${coords.latitude}&longitude=${coords.longitude}&radius_km=50`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data?.success) {
+        setNearbyAreas(response.data.areas || []);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching nearby areas:', error.message);
+    } finally {
+      setAreasLoading(false);
+    }
+  };
+
+  // Fetch posts within a selected area's radius
+  const fetchAreaPosts = async (area) => {
+    if (!token || !area?.latitude || !area?.longitude) {
+      setAreaPosts([]);
+      return;
+    }
+    try {
+      setAreaPostsLoading(true);
+      const response = await axios.get(
+        `${API_URL}/places/area-posts?latitude=${area.latitude}&longitude=${area.longitude}&radius_km=5`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setAreaPosts(response.data?.posts || []);
+    } catch (error) {
+      console.error('❌ Error fetching area posts:', error.message);
+      setAreaPosts([]);
+    } finally {
+      setAreaPostsLoading(false);
+    }
+  };
+
+  const handleAreaSelect = (area) => {
+    setSelectedArea(area);
+    setDropdownOpen(false);
+    if (area === 'All') {
+      setAreaPosts([]);
+    } else {
+      fetchAreaPosts(area);
+    }
+  };
+
   const handleLocationPress = (location) => {
     setPlayingVideos([]);
     const locationName = location.location || location.location_name;
@@ -424,11 +482,12 @@ export default function HappeningPlaces() {
             fetchTopLocations();
           }
         } else {
-          // First load: get location then fetch
+          // First load: get location then fetch + fetch nearby areas
           hasInitiallyLoaded.current = true;
           getCurrentLocation().then((coords) => {
             if (coords) {
               fetchTopLocations(coords);
+              fetchNearbyAreas(coords);
             } else {
               fetchTopLocations();
             }
@@ -583,8 +642,154 @@ export default function HappeningPlaces() {
             </BlurView>
           </View>
 
+          {/* SELECT YOUR FOOD SPOT Dropdown */}
+          <View style={styles.dropdownWrapper}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setDropdownOpen(!dropdownOpen)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="restaurant" size={18} color="#E94A37" />
+              <Text style={styles.dropdownButtonText} numberOfLines={1}>
+                {selectedArea === 'All' ? 'SELECT YOUR FOOD SPOT' : selectedArea.name}
+              </Text>
+              <Ionicons
+                name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color="#666"
+              />
+            </TouchableOpacity>
+
+            {dropdownOpen && (
+              <View style={styles.dropdownList}>
+                {/* All option */}
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownItem,
+                    selectedArea === 'All' && styles.dropdownItemActive,
+                  ]}
+                  onPress={() => handleAreaSelect('All')}
+                >
+                  <Ionicons name="grid" size={16} color={selectedArea === 'All' ? '#E94A37' : '#666'} />
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      selectedArea === 'All' && styles.dropdownItemTextActive,
+                    ]}
+                  >
+                    All Places
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Area / locality names from Google Places */}
+                <ScrollView
+                  style={styles.dropdownScroll}
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {areasLoading ? (
+                    <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                      <ActivityIndicator size="small" color="#E94A37" />
+                      <Text style={{ fontSize: 12, color: '#999', marginTop: 6 }}>Loading nearby areas...</Text>
+                    </View>
+                  ) : nearbyAreas.length === 0 ? (
+                    <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#999' }}>No areas found nearby</Text>
+                    </View>
+                  ) : (
+                    nearbyAreas.map((area, idx) => {
+                      const isSelected = selectedArea !== 'All' && selectedArea.name === area.name;
+                      return (
+                        <TouchableOpacity
+                          key={idx}
+                          style={[
+                            styles.dropdownItem,
+                            isSelected && styles.dropdownItemActive,
+                          ]}
+                          onPress={() => handleAreaSelect(area)}
+                        >
+                          <Ionicons
+                            name="location"
+                            size={16}
+                            color={isSelected ? '#E94A37' : '#999'}
+                          />
+                          <Text
+                            style={[
+                              styles.dropdownItemText,
+                              isSelected && styles.dropdownItemTextActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {area.name}
+                          </Text>
+                          {area.distance_km != null && (
+                            <Text style={styles.dropdownDistance}>
+                              {area.distance_km} km
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* Area Posts Grid - shown when a specific area is selected */}
+          {selectedArea !== 'All' && (
+            <View style={styles.areaPostsSection}>
+              <Text style={styles.areaPostsTitle}>
+                Posts in {selectedArea.name}
+              </Text>
+              {areaPostsLoading ? (
+                <ActivityIndicator size="large" color="#E94A37" style={{ marginVertical: 30 }} />
+              ) : areaPosts.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="images-outline" size={48} color="#CCC" />
+                  <Text style={styles.emptyTitle}>No posts yet</Text>
+                </View>
+              ) : (
+                <View style={styles.areaPostsGrid}>
+                  {areaPosts.map((post, idx) => {
+                    const mediaUrl = post.media_url || post.image_url;
+                    const isVideo = post.media_type === 'video' || isVideoFile(mediaUrl);
+                    const displayUrl = isVideo
+                      ? fixUrl(post.thumbnail_url || mediaUrl, { thumbnail: true })
+                      : fixUrl(mediaUrl, { thumbnail: true });
+
+                    if (!displayUrl) return null;
+
+                    return (
+                      <TouchableOpacity
+                        key={post.id || idx}
+                        style={styles.areaPostItem}
+                        activeOpacity={0.8}
+                        onPress={() => handleLocationPress({ location: post.location_name || selectedArea.name })}
+                      >
+                        <Image
+                          source={{ uri: displayUrl }}
+                          style={styles.areaPostImage}
+                          contentFit="cover"
+                          placeholder={{ blurhash: BLUR_HASH }}
+                          transition={200}
+                          cachePolicy="disk"
+                        />
+                        {isVideo && (
+                          <View style={styles.areaPostVideoIcon}>
+                            <Ionicons name="play-circle" size={20} color="#fff" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Empty State */}
-          {topLocations.length === 0 && (
+          {topLocations.length === 0 && selectedArea === 'All' && (
             <View style={styles.emptyState}>
               <Ionicons
                 name="location-outline"
@@ -601,8 +806,8 @@ export default function HappeningPlaces() {
             </View>
           )}
 
-          {/* Location Cards */}
-          {topLocations.slice(0, visibleCards).map((location, index) => {
+          {/* Location Cards - only show when "All" is selected */}
+          {selectedArea === 'All' && topLocations.slice(0, visibleCards).map((location, index) => {
             const images = location.images || [];
             const thumbnails = location.thumbnails || [];
             const imagesData = location.images_data || [];
@@ -723,7 +928,7 @@ export default function HappeningPlaces() {
           })}
 
           {/* Load More Button */}
-          {visibleCards < topLocations.length && (
+          {selectedArea === 'All' && visibleCards < topLocations.length && (
             <TouchableOpacity
               style={styles.loadMoreButton}
               onPress={() => setVisibleCards(prev => Math.min(prev + 3, topLocations.length))}
@@ -1266,5 +1471,112 @@ skeletonImageLarge: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+
+  // Dropdown styles
+  dropdownWrapper: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    zIndex: 100,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 10,
+  },
+  dropdownButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  dropdownList: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  dropdownScroll: {
+    maxHeight: 250,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#F0F0F0',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#FFF5F0',
+  },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+  },
+  dropdownItemTextActive: {
+    color: '#E94A37',
+    fontWeight: '600',
+  },
+  dropdownDistance: {
+    fontSize: 12,
+    color: '#999',
+  },
+
+  // Area Posts Grid styles
+  areaPostsSection: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  areaPostsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
+  },
+  areaPostsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+  },
+  areaPostItem: {
+    width: (Dimensions.get('window').width - 46) / 3,
+    height: (Dimensions.get('window').width - 46) / 3,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 0.5,
+    borderColor: '#E0E0E0',
+  },
+  areaPostImage: {
+    width: '100%',
+    height: '100%',
+  },
+  areaPostVideoIcon: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 12,
   },
 });

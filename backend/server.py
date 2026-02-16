@@ -240,9 +240,52 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 # iOS requires proper headers and range request support
 # This route must be defined BEFORE the static mount
 # ======================================================
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi import Request, HTTPException
 import mimetypes
+import json
+
+# ======================================================
+# UNIVERSAL LINKS & APP LINKS (Deep Linking)
+# ======================================================
+@app.get("/.well-known/apple-app-site-association")
+async def apple_app_site_association():
+    """Serves apple-app-site-association for iOS Universal Links"""
+    aasa = {
+        "applinks": {
+            "apps": [],
+            "details": [
+                {
+                    "appID": "FBN9A288DV.com.cofau.app",
+                    "paths": ["/share/*"]
+                }
+            ]
+        }
+    }
+    return Response(
+        content=json.dumps(aasa),
+        media_type="application/json"
+    )
+
+@app.get("/.well-known/assetlinks.json")
+async def android_asset_links():
+    """Serves assetlinks.json for Android App Links"""
+    asset_links = [
+        {
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+                "namespace": "android_app",
+                "package_name": "com.cofau.app",
+                "sha256_cert_fingerprints": [
+                    "1D:DD:C9:56:6C:B1:53:82:C6:27:8A:FD:10:00:D2:60:1D:9B:39:89:35:10:E1:E2:15:E7:CE:59:33:E4:EB:24"
+                ]
+            }
+        }
+    ]
+    return Response(
+        content=json.dumps(asset_links),
+        media_type="application/json"
+    )
 
 @app.get("/api/static/uploads/{filename:path}")
 async def serve_media_file(filename: str, request: Request, w: int = None):
@@ -3594,7 +3637,7 @@ async def report_post(
     return {"message": "Post reported successfully"} 
     
 @app.get("/share/{post_id}", response_class=HTMLResponse)
-async def share_preview(post_id: str):
+async def share_preview(request: Request, post_id: str):
     db = get_database()
     post = await db.posts.find_one({"_id": ObjectId(post_id)})
 
@@ -3602,40 +3645,67 @@ async def share_preview(post_id: str):
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
 
     BASE_URL = "https://api.cofau.com"
+    DEEP_LINK_URL = f"cofau://post/{post_id}"
+    APP_STORE_URL = "https://apps.apple.com/app/cofau/id6758019920"
+    PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.cofau.app"
 
     title = post.get("review_text", "Cofau Post")
     rating = post.get("rating", 0)
     location = post.get("location_name", "")
     description = f"Rated {rating}/10 {('- ' + location) if location else ''} on Cofau!"
 
-    # Use media_url (full resolution) first, then image_url, then thumbnail_url
-    # For videos, prefer thumbnail_url for better preview
     media_type = post.get("media_type", "image")
-    
     if media_type == "video":
-        # For videos, use thumbnail_url if available, otherwise media_url
         image_url = post.get("thumbnail_url") or post.get("media_url") or post.get("image_url", "")
     else:
-        # For images, use media_url (full resolution) first
         image_url = post.get("media_url") or post.get("image_url", "")
-    
-    # Ensure full URL
+
     if image_url and not image_url.startswith("http"):
         image_url = f"{BASE_URL}{image_url}"
 
-    # Use larger dimensions for better preview quality
-    # 1920x1080 is optimal for high-quality previews on WhatsApp and Instagram
     image_width = "1920"
     image_height = "1080"
 
-    html = f"""
-    <!DOCTYPE html>
+    # Detect bots/crawlers — they get OG meta tags only
+    user_agent = request.headers.get("user-agent", "").lower()
+    is_bot = any(bot in user_agent for bot in [
+        "facebookexternalhit", "facebot", "twitterbot", "whatsapp",
+        "linkedinbot", "slackbot", "telegrambot", "pinterest",
+        "googlebot", "bingbot", "yandex", "applebot"
+    ])
+
+    if is_bot:
+        # Bots get clean OG meta tags for preview cards
+        html = f"""<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>{title}</title>
+            <meta property="og:title" content="{title}" />
+            <meta property="og:description" content="{description}" />
+            <meta property="og:image" content="{image_url}" />
+            <meta property="og:image:secure_url" content="{image_url}" />
+            <meta property="og:image:type" content="image/jpeg" />
+            <meta property="og:url" content="{BASE_URL}/share/{post_id}" />
+            <meta property="og:type" content="article" />
+            <meta property="og:site_name" content="Cofau" />
+            <meta property="og:image:width" content="{image_width}" />
+            <meta property="og:image:height" content="{image_height}" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="{title}" />
+            <meta name="twitter:description" content="{description}" />
+            <meta name="twitter:image" content="{image_url}" />
+        </head>
+        <body></body>
+        </html>"""
+        return HTMLResponse(content=html)
+
+    # Real users get smart redirect — tries deep link, falls back to store
+    html = f"""<!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
         <title>{title}</title>
-
-        <!-- Open Graph Meta Tags - Enhanced for larger previews -->
         <meta property="og:title" content="{title}" />
         <meta property="og:description" content="{description}" />
         <meta property="og:image" content="{image_url}" />
@@ -3644,31 +3714,48 @@ async def share_preview(post_id: str):
         <meta property="og:url" content="{BASE_URL}/share/{post_id}" />
         <meta property="og:type" content="article" />
         <meta property="og:site_name" content="Cofau" />
-
-        <!-- Increased dimensions for larger previews -->
         <meta property="og:image:width" content="{image_width}" />
         <meta property="og:image:height" content="{image_height}" />
-
-        <!-- Twitter Card (helps with previews) -->
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="{title}" />
         <meta name="twitter:description" content="{description}" />
         <meta name="twitter:image" content="{image_url}" />
-        <meta name="twitter:image:width" content="{image_width}" />
-        <meta name="twitter:image:height" content="{image_height}" />
-
-        <!-- Additional meta for better compatibility -->
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
-    <body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #f5f5f5;">
-        <div style="max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <h2 style="margin-top: 0; color: #333;">{title}</h2>
-            <p style="color: #666; margin: 10px 0;">{description}</p>
-            <img src="{image_url}" style="width: 100%; max-width: 800px; height: auto; border-radius: 8px; margin-top: 20px;" alt="{title}" />
+    <body style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f8f9fa; display:flex; justify-content:center; align-items:center; min-height:100vh;">
+        <div style="text-align:center; padding:40px 20px;">
+            <div style="width:80px; height:80px; background:#4dd0e1; border-radius:20px; margin:0 auto 20px; display:flex; align-items:center; justify-content:center;">
+                <span style="font-size:40px; color:white; font-weight:bold; font-style:italic;">C</span>
+            </div>
+            <h2 style="color:#333; margin:0 0 8px;">Opening in Cofau...</h2>
+            <p style="color:#888; font-size:14px; margin:0 0 24px;">If the app doesn't open automatically:</p>
+            <a id="store-link" href="#" style="display:inline-block; background:#4dd0e1; color:white; text-decoration:none; padding:14px 32px; border-radius:12px; font-weight:600; font-size:16px;">
+                Download Cofau
+            </a>
         </div>
+        <script>
+            (function() {{
+                var deepLink = "{DEEP_LINK_URL}";
+                var ua = navigator.userAgent || '';
+                var isIOS = /iPhone|iPad|iPod/i.test(ua);
+                var isAndroid = /Android/i.test(ua);
+                var storeUrl = isIOS ? "{APP_STORE_URL}" : "{PLAY_STORE_URL}";
+
+                document.getElementById('store-link').href = storeUrl;
+
+                // Try to open the app via deep link
+                window.location.href = deepLink;
+
+                // If app didn't open after 1.5s, redirect to store
+                setTimeout(function() {{
+                    if (!document.hidden) {{
+                        window.location.href = storeUrl;
+                    }}
+                }}, 1500);
+            }})();
+        </script>
     </body>
-    </html>
-    """
+    </html>"""
 
     return HTMLResponse(content=html)
 
