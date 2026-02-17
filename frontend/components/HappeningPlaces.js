@@ -180,6 +180,10 @@ export default function HappeningPlaces() {
   const [areasLoading, setAreasLoading] = useState(false);
   const [areaPosts, setAreaPosts] = useState([]); // Posts for selected area
   const [areaPostsLoading, setAreaPostsLoading] = useState(false);
+  const [areaSearchQuery, setAreaSearchQuery] = useState('');
+  const [areaSearchResults, setAreaSearchResults] = useState([]);
+  const [areaSearching, setAreaSearching] = useState(false);
+  const searchTimerRef = useRef(null);
 
   // Track if initial load has happened to prevent duplicate fetch
   const hasInitiallyLoaded = useRef(false);
@@ -360,7 +364,7 @@ export default function HappeningPlaces() {
     try {
       setAreasLoading(true);
       const response = await axios.get(
-        `${API_URL}/places/nearby-areas?latitude=${coords.latitude}&longitude=${coords.longitude}&radius_km=5`,
+        `${API_URL}/places/nearby-areas?latitude=${coords.latitude}&longitude=${coords.longitude}&radius_km=50`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data?.success) {
@@ -397,11 +401,42 @@ export default function HappeningPlaces() {
   const handleAreaSelect = (area) => {
     setSelectedArea(area);
     setDropdownOpen(false);
+    setAreaSearchQuery('');
+    setAreaSearchResults([]);
     if (area === 'All') {
       setAreaPosts([]);
     } else {
       fetchAreaPosts(area);
     }
+  };
+
+  // Debounced search for areas within 50km
+  const searchAreas = (text) => {
+    setAreaSearchQuery(text);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!text || text.length < 2) {
+      setAreaSearchResults([]);
+      setAreaSearching(false);
+      return;
+    }
+    setAreaSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const coords = userLocation;
+        if (!coords || !token) return;
+        const response = await axios.get(
+          `${API_URL}/places/search-areas?query=${encodeURIComponent(text)}&latitude=${coords.latitude}&longitude=${coords.longitude}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.data?.success) {
+          setAreaSearchResults(response.data.areas || []);
+        }
+      } catch (err) {
+        console.error('Area search error:', err.message);
+      } finally {
+        setAreaSearching(false);
+      }
+    }, 400);
   };
 
   const handleLocationPress = (location) => {
@@ -662,64 +697,51 @@ export default function HappeningPlaces() {
 
             {dropdownOpen && (
               <View style={styles.dropdownList}>
-                {/* All option */}
-                <TouchableOpacity
-                  style={[
-                    styles.dropdownItem,
-                    selectedArea === 'All' && styles.dropdownItemActive,
-                  ]}
-                  onPress={() => handleAreaSelect('All')}
-                >
-                  <Ionicons name="grid" size={16} color={selectedArea === 'All' ? '#E94A37' : '#666'} />
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      selectedArea === 'All' && styles.dropdownItemTextActive,
-                    ]}
-                  >
-                    All Places
-                  </Text>
-                </TouchableOpacity>
+                {/* Search bar */}
+                <View style={styles.areaSearchBar}>
+                  <Ionicons name="search" size={16} color="#999" />
+                  <TextInput
+                    style={styles.areaSearchInput}
+                    placeholder="Search area name..."
+                    placeholderTextColor="#999"
+                    value={areaSearchQuery}
+                    onChangeText={searchAreas}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  {areaSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => { setAreaSearchQuery(''); setAreaSearchResults([]); }}>
+                      <Ionicons name="close-circle" size={18} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-                {/* Area / locality names from Google Places */}
-                <ScrollView
-                  style={styles.dropdownScroll}
-                  nestedScrollEnabled={true}
-                  showsVerticalScrollIndicator={true}
-                >
-                  {areasLoading ? (
-                    <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                      <ActivityIndicator size="small" color="#E94A37" />
-                      <Text style={{ fontSize: 12, color: '#999', marginTop: 6 }}>Loading nearby areas...</Text>
-                    </View>
-                  ) : nearbyAreas.length === 0 ? (
-                    <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13, color: '#999' }}>No areas found nearby</Text>
-                    </View>
-                  ) : (
-                    nearbyAreas.map((area, idx) => {
-                      const isSelected = selectedArea !== 'All' && selectedArea.name === area.name;
-                      return (
+                {/* Show search results when searching, otherwise show normal list */}
+                {areaSearchQuery.length >= 2 ? (
+                  <ScrollView
+                    style={styles.dropdownScroll}
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {areaSearching ? (
+                      <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                        <ActivityIndicator size="small" color="#E94A37" />
+                        <Text style={{ fontSize: 12, color: '#999', marginTop: 6 }}>Searching...</Text>
+                      </View>
+                    ) : areaSearchResults.length === 0 ? (
+                      <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 13, color: '#999' }}>No areas found within 50km</Text>
+                      </View>
+                    ) : (
+                      areaSearchResults.map((area, idx) => (
                         <TouchableOpacity
-                          key={idx}
-                          style={[
-                            styles.dropdownItem,
-                            isSelected && styles.dropdownItemActive,
-                          ]}
+                          key={`search-${idx}`}
+                          style={styles.dropdownItem}
                           onPress={() => handleAreaSelect(area)}
                         >
-                          <Ionicons
-                            name="location"
-                            size={16}
-                            color={isSelected ? '#E94A37' : '#999'}
-                          />
-                          <Text
-                            style={[
-                              styles.dropdownItemText,
-                              isSelected && styles.dropdownItemTextActive,
-                            ]}
-                            numberOfLines={1}
-                          >
+                          <Ionicons name="location" size={16} color="#999" />
+                          <Text style={styles.dropdownItemText} numberOfLines={1}>
                             {area.name}
                           </Text>
                           {area.distance_km != null && (
@@ -728,10 +750,84 @@ export default function HappeningPlaces() {
                             </Text>
                           )}
                         </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </ScrollView>
+                      ))
+                    )}
+                  </ScrollView>
+                ) : (
+                  <>
+                    {/* All option */}
+                    <TouchableOpacity
+                      style={[
+                        styles.dropdownItem,
+                        selectedArea === 'All' && styles.dropdownItemActive,
+                      ]}
+                      onPress={() => handleAreaSelect('All')}
+                    >
+                      <Ionicons name="grid" size={16} color={selectedArea === 'All' ? '#E94A37' : '#666'} />
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          selectedArea === 'All' && styles.dropdownItemTextActive,
+                        ]}
+                      >
+                        All Places
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Area / locality names from Google Places */}
+                    <ScrollView
+                      style={styles.dropdownScroll}
+                      nestedScrollEnabled={true}
+                      showsVerticalScrollIndicator={true}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {areasLoading ? (
+                        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                          <ActivityIndicator size="small" color="#E94A37" />
+                          <Text style={{ fontSize: 12, color: '#999', marginTop: 6 }}>Loading nearby areas...</Text>
+                        </View>
+                      ) : nearbyAreas.length === 0 ? (
+                        <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, color: '#999' }}>No areas found nearby</Text>
+                        </View>
+                      ) : (
+                        nearbyAreas.map((area, idx) => {
+                          const isSelected = selectedArea !== 'All' && selectedArea.name === area.name;
+                          return (
+                            <TouchableOpacity
+                              key={idx}
+                              style={[
+                                styles.dropdownItem,
+                                isSelected && styles.dropdownItemActive,
+                              ]}
+                              onPress={() => handleAreaSelect(area)}
+                            >
+                              <Ionicons
+                                name="location"
+                                size={16}
+                                color={isSelected ? '#E94A37' : '#999'}
+                              />
+                              <Text
+                                style={[
+                                  styles.dropdownItemText,
+                                  isSelected && styles.dropdownItemTextActive,
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {area.name}
+                              </Text>
+                              {area.distance_km != null && (
+                                <Text style={styles.dropdownDistance}>
+                                  {area.distance_km} km
+                                </Text>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })
+                      )}
+                    </ScrollView>
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -1541,6 +1637,21 @@ skeletonImageLarge: {
   dropdownDistance: {
     fontSize: 12,
     color: '#999',
+  },
+  areaSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    gap: 8,
+  },
+  areaSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    paddingVertical: 6,
   },
 
   // Area Posts Grid styles

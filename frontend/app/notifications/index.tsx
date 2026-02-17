@@ -9,7 +9,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext'; // ⬅️ ADD THIS
@@ -150,6 +150,8 @@ const renderNotification = ({ item }: { item: any }) => {
     return item.message.replace(item.fromUserName, '').trim();
   };
 
+  const isRewardNotification = item.type === 'wallet_reward' || item.type === 'delivery_completed_reward' || item.type === 'reward_earned';
+
   return (
     <TouchableOpacity
       style={[styles.notificationItem, isUnread && styles.unreadNotification]}
@@ -171,17 +173,18 @@ const renderNotification = ({ item }: { item: any }) => {
         <Text style={styles.timeAgo}>{formatTimeAgo(item.createdAt)}</Text>
       </View>
 
-      {/* Post thumbnail - only render if URL exists and is valid */}
-      {item.postThumbnail ? (
-        <Image 
-          source={{ uri: item.postThumbnail }} 
+      {/* Right side: Amazon icon for reward notifications, post thumbnail for others */}
+      {isRewardNotification ? (
+        <View style={styles.amazonThumbnail}>
+          <FontAwesome5 name="amazon" size={22} color="#FF9800" />
+        </View>
+      ) : item.postThumbnail ? (
+        <Image
+          source={{ uri: item.postThumbnail }}
           style={styles.postThumbnail}
           resizeMode="cover"
         />
-      ) : null}
-
-      {/* Unread indicator - only show if no thumbnail */}
-      {isUnread && !item.postThumbnail ? (
+      ) : isUnread ? (
         <View style={styles.unreadDot} />
       ) : null}
     </TouchableOpacity>
@@ -275,6 +278,15 @@ const styles = StyleSheet.create({
   },
   unreadNotification: {
     backgroundColor: '#E3F2FD',
+  },
+  amazonThumbnail: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#FFF3E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
   },
   notificationContent: {
     flex: 1,

@@ -15,7 +15,7 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -217,13 +217,10 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
                 </View>
 
-                {/* Amazon Gift Box */}
+                {/* Amazon Icon */}
                 <View style={styles.giftBoxContainer}>
                   <View style={styles.giftBox}>
-                    <Ionicons name="gift" size={24} color="#FF9800" />
-                    <View style={styles.amazonSmile}>
-                      <Text style={styles.amazonSmileText}>⌒</Text>
-                    </View>
+                    <FontAwesome5 name="amazon" size={26} color="#FF9800" />
                   </View>
                 </View>
               </View>
@@ -432,6 +429,14 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
 
                   <View style={styles.pointItem}>
+                    <Text style={styles.pointEmoji}>🍔</Text>
+                    <View style={styles.pointContent}>
+                      <Text style={styles.pointTitle}>Delivery Rewards</Text>
+                      <Text style={styles.pointDesc}>₹10/- for every delivery completed. Earn ₹50/- Bonus for completing 10 delivery orders!</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.pointItem}>
                     <Text style={styles.pointEmoji}>📅</Text>
                     <View style={styles.pointContent}>
                       <Text style={styles.pointTitle}>2 Posts Per Week</Text>
@@ -440,7 +445,9 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
 
                   <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>🎁</Text>
+                    <View style={styles.pointAmazonIcon}>
+                      <FontAwesome5 name="amazon" size={22} color="#FF9800" />
+                    </View>
                     <View style={styles.pointContent}>
                       <Text style={styles.pointTitle}>Amazon Voucher</Text>
                       <Text style={styles.pointDesc}>Reach ₹500 to claim your Amazon voucher!</Text>
@@ -1161,6 +1168,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginRight: 12,
     marginTop: 2,
+  },
+  pointAmazonIcon: {
+    width: 30,
+    marginRight: 12,
+    marginTop: 2,
+    alignItems: "center",
   },
   pointContent: {
     flex: 1,

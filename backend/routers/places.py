@@ -112,22 +112,23 @@ def _cache_key(lat: float, lng: float, radius_km: int) -> str:
 async def get_nearby_areas(
     latitude: float = Query(..., description="User latitude"),
     longitude: float = Query(..., description="User longitude"),
-    radius_km: int = Query(5, description="Search radius in km"),
+    radius_km: int = Query(50, description="Search radius in km"),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Get nearby area/locality names by reverse-geocoding a grid of points
-    around the user's location. This finds ACTUAL nearby sublocalities
-    (like Swiggy/Zomato) instead of searching for 'popular areas' citywide.
+    Get nearby area/locality names by reverse-geocoding concentric rings
+    of points around the user's location (up to 50km).
     """
+    import asyncio
+
     try:
         db = get_database()
         cache_key = _cache_key(latitude, longitude, radius_km)
 
-        # Check cache first (v3 = reverse-geocode grid version)
+        # Check cache first (v4 = 50km concentric rings version)
         cached = await db.areas_cache.find_one({
             "cache_key": cache_key,
-            "version": "v3",
+            "version": "v4",
             "expires_at": {"$gt": datetime.utcnow()},
         })
         if cached:
@@ -140,33 +141,34 @@ async def get_nearby_areas(
             areas.sort(key=lambda a: a.get("distance_km") or 9999)
             return {"success": True, "areas": areas, "cached": True}
 
-        # Not cached — reverse-geocode at multiple points around the user
-        # This discovers actual nearby sublocalities/neighborhoods
+        # Not cached — reverse-geocode concentric rings around the user
         geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
 
-        # Generate grid points: center + 8 surrounding points at ~2km spacing
-        # Plus 4 more at ~4km for broader coverage
-        offsets_deg = []
-        for km_step in [0, 0.018, 0.036]:  # ~0km, ~2km, ~4km in degrees
-            if km_step == 0:
-                offsets_deg.append((0, 0))
-            else:
-                for dlat in [-km_step, 0, km_step]:
-                    for dlng in [-km_step, 0, km_step]:
-                        if dlat == 0 and dlng == 0:
-                            continue
-                        offsets_deg.append((dlat, dlng))
+        # 1 degree ≈ 111km, so 1km ≈ 0.009 degrees
+        # Concentric rings: center, then rings at 2km, 5km, 10km, 20km, 35km, 50km
+        # Inner rings (2-5km): 8 directions (N, NE, E, SE, S, SW, W, NW)
+        # Outer rings (10-50km): 4 directions (N, E, S, W) to save API calls
+        directions_8 = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
+        directions_4 = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 
-        # Reverse-geocode all points in parallel
-        import asyncio
+        offsets_deg = [(0, 0)]  # center point
+        ring_configs = [
+            (0.018, directions_8),   # ~2km, 8 directions
+            (0.045, directions_8),   # ~5km, 8 directions
+            (0.09, directions_4),    # ~10km, 4 directions
+            (0.18, directions_4),    # ~20km, 4 directions
+            (0.315, directions_4),   # ~35km, 4 directions
+            (0.45, directions_4),    # ~50km, 4 directions
+        ]
+        for km_deg, directions in ring_configs:
+            for dlat_dir, dlng_dir in directions:
+                offsets_deg.append((km_deg * dlat_dir, km_deg * dlng_dir))
+
         all_areas = []
         seen = set()
-
-        # Types we want to extract from address components
-        target_types = {"sublocality_level_1", "sublocality", "neighborhood", "locality"}
+        target_types = {"sublocality_level_1", "sublocality", "neighborhood"}
 
         async def reverse_geocode_point(dlat, dlng):
-            """Reverse geocode a single point and extract area names."""
             point_lat = latitude + dlat
             point_lng = longitude + dlng
             results = []
@@ -175,10 +177,9 @@ async def get_nearby_areas(
                     resp = await client.get(geocode_url, params={
                         "latlng": f"{point_lat},{point_lng}",
                         "key": GOOGLE_MAPS_API_KEY,
-                        "result_type": "sublocality|neighborhood|locality",
+                        "result_type": "sublocality|neighborhood",
                     }, timeout=10)
                     data = resp.json()
-
                 if data.get("status") == "OK":
                     for result in data.get("results", []):
                         for component in result.get("address_components", []):
@@ -186,13 +187,11 @@ async def get_nearby_areas(
                             if comp_types & target_types:
                                 name = component.get("long_name", "").strip()
                                 if name:
-                                    # Get this result's location
                                     loc = result.get("geometry", {}).get("location", {})
                                     results.append({
                                         "name": name,
                                         "latitude": loc.get("lat"),
                                         "longitude": loc.get("lng"),
-                                        "is_locality": "locality" in comp_types,
                                     })
             except Exception:
                 pass
@@ -204,9 +203,7 @@ async def get_nearby_areas(
 
         for results in results_list:
             for area_info in results:
-                name = area_info["name"]
-                name_lower = name.lower()
-
+                name_lower = area_info["name"].lower()
                 if name_lower in seen:
                     continue
                 seen.add(name_lower)
@@ -215,16 +212,11 @@ async def get_nearby_areas(
                 alng = area_info.get("longitude")
                 dist = round(_haversine(latitude, longitude, alat, alng), 1) if alat and alng else None
 
-                # Skip the city-level name (e.g. "Bengaluru") — we want sublocalities
-                if area_info.get("is_locality") and dist and dist > 2:
-                    continue
-
-                # Skip if too far from the user
                 if dist is not None and dist > radius_km:
                     continue
 
                 all_areas.append({
-                    "name": name,
+                    "name": area_info["name"],
                     "latitude": alat,
                     "longitude": alng,
                     "distance_km": dist,
@@ -237,7 +229,7 @@ async def get_nearby_areas(
             {"cache_key": cache_key},
             {"$set": {
                 "cache_key": cache_key,
-                "version": "v3",
+                "version": "v4",
                 "areas": all_areas,
                 "created_at": datetime.utcnow(),
                 "expires_at": datetime.utcnow() + timedelta(hours=AREAS_CACHE_HOURS),
@@ -249,6 +241,73 @@ async def get_nearby_areas(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch nearby areas: {str(e)}")
+
+
+@router.get("/search-areas")
+async def search_areas(
+    query: str = Query(..., min_length=2, description="Area name to search"),
+    latitude: float = Query(..., description="User latitude"),
+    longitude: float = Query(..., description="User longitude"),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Search for areas by name using Google Places Autocomplete,
+    restricted to 50km radius from the user's location.
+    """
+    try:
+        autocomplete_url = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(autocomplete_url, params={
+                "input": query,
+                "location": f"{latitude},{longitude}",
+                "radius": 50000,  # 50km in meters
+                "strictbounds": "true",
+                "types": "(regions)",
+                "key": GOOGLE_MAPS_API_KEY,
+            }, timeout=10)
+            data = resp.json()
+
+        if data.get("status") != "OK":
+            return {"success": True, "areas": []}
+
+        # For each prediction, get lat/lng via Place Details
+        details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+        areas = []
+
+        for prediction in data.get("predictions", [])[:8]:
+            place_id = prediction.get("place_id")
+            name = prediction.get("structured_formatting", {}).get("main_text", "")
+            if not place_id or not name:
+                continue
+            try:
+                async with httpx.AsyncClient() as client:
+                    det_resp = await client.get(details_url, params={
+                        "place_id": place_id,
+                        "fields": "geometry",
+                        "key": GOOGLE_MAPS_API_KEY,
+                    }, timeout=10)
+                    det_data = det_resp.json()
+                if det_data.get("status") == "OK":
+                    loc = det_data["result"].get("geometry", {}).get("location", {})
+                    alat = loc.get("lat")
+                    alng = loc.get("lng")
+                    if alat and alng:
+                        dist = round(_haversine(latitude, longitude, alat, alng), 1)
+                        if dist <= 50:
+                            areas.append({
+                                "name": name,
+                                "latitude": alat,
+                                "longitude": alng,
+                                "distance_km": dist,
+                            })
+            except Exception:
+                continue
+
+        areas.sort(key=lambda a: a.get("distance_km") or 9999)
+        return {"success": True, "areas": areas}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to search areas: {str(e)}")
 
 
 @router.get("/area-posts")

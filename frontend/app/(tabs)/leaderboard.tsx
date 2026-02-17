@@ -2302,7 +2302,7 @@ export default function LeaderboardScreen() {
             <View style={styles.rewardsInfoNote}>
               <Ionicons name="information-circle" size={20} color="#FF8C00" />
               <Text style={styles.rewardsInfoNoteText}>
-                Every delivery gives you a reward of ₹10/-
+                ₹10/- for every delivery completed. Earn ₹50/- Bonus for completing 10 delivery orders!
               </Text>
             </View>
 
@@ -2337,9 +2337,9 @@ export default function LeaderboardScreen() {
                 <View key={transaction.id} style={styles.rewardHistoryItem}>
                     <View style={styles.rewardHistoryIcon}>
                       <Ionicons
-                        name={transaction.amount >= 100 ? "gift" : "checkmark-circle"}
+                        name={transaction.amount >= 50 ? "gift" : "checkmark-circle"}
                         size={24}
-                        color={transaction.amount >= 100 ? "#4CAF50" : "#FF8C00"}
+                        color={transaction.amount >= 50 ? "#4CAF50" : "#FF8C00"}
                       />
                     </View>
                     <View style={styles.rewardHistoryContent}>
@@ -2371,7 +2371,7 @@ export default function LeaderboardScreen() {
                     <View style={styles.rewardHistoryAmount}>
                       <Text style={[
                         styles.rewardHistoryAmountText,
-                        transaction.amount >= 100 && styles.rewardHistoryBigAmount
+                        transaction.amount >= 50 && styles.rewardHistoryBigAmount
                       ]}>
                         +₹{transaction.amount}
                       </Text>

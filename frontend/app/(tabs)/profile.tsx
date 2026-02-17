@@ -1932,14 +1932,14 @@ const renderMenuByCategory = () => {
               activeOpacity={0.7}
             >
               <View style={styles.menuCategoryHeaderLeft}>
-                <Ionicons name="menu" size={20} color="#FF8C00" />
+                <Ionicons name="menu" size={16} color="#FF8C00" />
                 <Text style={styles.menuCategoryName}>{category}</Text>
               </View>
               <View style={styles.menuCategoryHeaderRight}>
                 <Text style={styles.menuItemCount}>({items.length})</Text>
                 <Ionicons
                   name={isExpanded ? "chevron-up" : "chevron-down"}
-                  size={20}
+                  size={16}
                   color="#666"
                 />
               </View>
@@ -2015,7 +2015,7 @@ const renderMenuByCategory = () => {
                                 onPress={() => handleMenuItemImagePick(item.id)}
                                 disabled={isUploadingThis}
                               >
-                                <Ionicons name="pencil" size={12} color="#fff" />
+                                <Ionicons name="pencil" size={10} color="#fff" />
                               </TouchableOpacity>
                             )}
                             {isUploadingThis && (
@@ -2034,15 +2034,15 @@ const renderMenuByCategory = () => {
                               <ActivityIndicator size="small" color="#FF8C00" />
                             ) : (
                               <>
-                                <Ionicons name="restaurant-outline" size={24} color="#ccc" />
+                                <Ionicons name="restaurant-outline" size={18} color="#ccc" />
                                 <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
-                                <Text style={[styles.menuItemNoImageText, { color: '#FF8C00', marginTop: 4 }]}>Tap to add</Text>
+                                <Text style={[styles.menuItemNoImageText, { color: '#FF8C00', marginTop: 2 }]}>Tap to add</Text>
                               </>
                             )}
                           </TouchableOpacity>
                         ) : (
                           <View style={styles.menuItemNoImagePlaceholder}>
-                            <Ionicons name="restaurant-outline" size={24} color="#ccc" />
+                            <Ionicons name="restaurant-outline" size={18} color="#ccc" />
                             <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
                           </View>
                         )}
@@ -6461,9 +6461,9 @@ favouriteGridImage: {
 
   // Menu Tab Styles
   menuCategorySection: {
-    marginBottom: 16,
+    marginBottom: 10,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -6475,8 +6475,8 @@ favouriteGridImage: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     backgroundColor: '#FAFAFA',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
@@ -6487,10 +6487,10 @@ favouriteGridImage: {
     flex: 1,
   },
   menuCategoryName: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginLeft: 10,
+    marginLeft: 8,
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,
       textAlignVertical: 'center',
@@ -6499,22 +6499,22 @@ favouriteGridImage: {
   menuCategoryHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   menuItemCount: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
     color: '#999',
   },
   menuItemsList: {
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   menuItemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F5F5F5',
   },
@@ -6523,64 +6523,64 @@ favouriteGridImage: {
   },
   menuItemInfo: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
   },
   menuItemName: {
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 4,
+    marginBottom: 2,
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,
       textAlignVertical: 'center',
     }),
   },
   menuItemDescription: {
-    fontSize: 13,
+    fontSize: 10,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 14,
   },
   menuItemPriceContainer: {
     backgroundColor: '#E94A37',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#E94A37',
   },
   menuItemPrice: {
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   menuItemRightSection: {
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   menuItemPhotoSection: {
-    marginBottom: 4,
+    marginBottom: 2,
   },
   menuItemImageContainer: {
     position: 'relative',
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: 65,
+    height: 65,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   menuItemImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: 65,
+    height: 65,
+    borderRadius: 8,
   },
   menuItemImageEditIcon: {
     position: 'absolute',
-    bottom: 4,
-    right: 4,
+    bottom: 3,
+    right: 3,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    width: 22,
-    height: 22,
+    borderRadius: 9,
+    width: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -6596,9 +6596,9 @@ favouriteGridImage: {
     borderRadius: 12,
   },
   menuItemAddPhotoButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: 65,
+    height: 65,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: '#FF8C00',
     borderStyle: 'dashed',
@@ -6607,34 +6607,34 @@ favouriteGridImage: {
     backgroundColor: '#FFF5EB',
   },
   menuItemAddPhotoText: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#FF8C00',
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 2,
   },
   menuItemImageReadOnly: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    marginBottom: 4,
+    width: 65,
+    height: 65,
+    borderRadius: 8,
+    marginBottom: 2,
   },
   menuItemNoImagePlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: 65,
+    height: 65,
+    borderRadius: 8,
     backgroundColor: '#f8f8f8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
     borderWidth: 1,
     borderColor: '#eee',
   },
   menuItemNoImageText: {
-    fontSize: 9,
+    fontSize: 7,
     color: '#999',
     textAlign: 'center',
-    marginTop: 4,
-    paddingHorizontal: 4,
+    marginTop: 2,
+    paddingHorizontal: 2,
   },
   fullImageModalContainer: {
     flex: 1,

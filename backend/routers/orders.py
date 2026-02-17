@@ -463,9 +463,9 @@ async def update_restaurant_order_status(
 
                     # Check if user reached 10 deliveries
                     if completed_deliveries >= 10:
-                        # Add ₹100 to wallet
+                        # Add ₹50 bonus to wallet for completing 10 deliveries
                         current_balance = user.get("wallet_balance", 0.0)
-                        new_balance = current_balance + 100.0
+                        new_balance = current_balance + 50.0
 
                         await db.users.update_one(
                             {"_id": ObjectId(user_id)},
@@ -480,28 +480,28 @@ async def update_restaurant_order_status(
                         # Create wallet transaction
                         transaction_doc = {
                             "user_id": user_id,
-                            "amount": 100.0,
+                            "amount": 50.0,
                             "type": "earning",
-                            "description": "Earned for completing 10 deliveries",
+                            "description": "Bonus earned for completing 10 deliveries",
                             "created_at": now
                         }
                         await db.wallet_transactions.insert_one(transaction_doc)
 
-                        print(f"🎉 User {user_id} earned ₹100 for completing 10 deliveries! Balance: ₹{new_balance}")
+                        print(f"🎉 User {user_id} earned ₹50 bonus for completing 10 deliveries! Balance: ₹{new_balance}")
 
-                        # Send push notification for ₹100 reward
+                        # Send push notification for ₹50 bonus reward
                         try:
                             await create_notification(
                                 db=db,
                                 notification_type="reward_earned",
                                 from_user_id=user_id,
                                 to_user_id=user_id,
-                                message=f"🎉 Congratulations! You've earned ₹100 for completing 10 deliveries! Your wallet balance is now ₹{new_balance}",
+                                message=f"🎉 Congratulations! You've earned ₹50 bonus for completing 10 deliveries! Your wallet balance is now ₹{new_balance}",
                                 send_push=True
                             )
-                            print(f"✅ Sent ₹100 reward notification to user {user_id}")
+                            print(f"✅ Sent ₹50 bonus reward notification to user {user_id}")
                         except Exception as e:
-                            print(f"⚠️ Error sending ₹100 reward notification: {e}")
+                            print(f"⚠️ Error sending ₹50 bonus reward notification: {e}")
                     else:
                         # Add ₹10 to wallet and increment the counter
                         current_balance = user.get("wallet_balance", 0.0)
@@ -718,9 +718,9 @@ async def update_order_status(
 
                     # Check if user reached 10 deliveries
                     if completed_deliveries >= 10:
-                        # Add ₹100 to wallet
+                        # Add ₹50 bonus to wallet for completing 10 deliveries
                         current_balance = user.get("wallet_balance", 0.0)
-                        new_balance = current_balance + 100.0
+                        new_balance = current_balance + 50.0
 
                         await db.users.update_one(
                             {"_id": ObjectId(user_id)},
@@ -735,28 +735,28 @@ async def update_order_status(
                         # Create wallet transaction
                         transaction_doc = {
                             "user_id": user_id,
-                            "amount": 100.0,
+                            "amount": 50.0,
                             "type": "earning",
-                            "description": "Earned for completing 10 deliveries",
+                            "description": "Bonus earned for completing 10 deliveries",
                             "created_at": now
                         }
                         await db.wallet_transactions.insert_one(transaction_doc)
 
-                        print(f"🎉 User {user_id} earned ₹100 for completing 10 deliveries! Balance: ₹{new_balance}")
+                        print(f"🎉 User {user_id} earned ₹50 bonus for completing 10 deliveries! Balance: ₹{new_balance}")
 
-                        # Send push notification for ₹100 reward
+                        # Send push notification for ₹50 bonus reward
                         try:
                             await create_notification(
                                 db=db,
                                 notification_type="reward_earned",
                                 from_user_id=user_id,
                                 to_user_id=user_id,
-                                message=f"🎉 Congratulations! You've earned ₹100 for completing 10 deliveries! Your wallet balance is now ₹{new_balance}",
+                                message=f"🎉 Congratulations! You've earned ₹50 bonus for completing 10 deliveries! Your wallet balance is now ₹{new_balance}",
                                 send_push=True
                             )
-                            print(f"✅ Sent ₹100 reward notification to user {user_id}")
+                            print(f"✅ Sent ₹50 bonus reward notification to user {user_id}")
                         except Exception as e:
-                            print(f"⚠️ Error sending ₹100 reward notification: {e}")
+                            print(f"⚠️ Error sending ₹50 bonus reward notification: {e}")
                     else:
                         # Add ₹10 to wallet and increment the counter
                         current_balance = user.get("wallet_balance", 0.0)
@@ -1136,9 +1136,9 @@ async def update_order_status_partner(
 
                 # Check if user reached 10 deliveries
                 if completed_deliveries >= 10:
-                    # Add ₹100 to wallet
+                    # Add ₹50 bonus to wallet for completing 10 deliveries
                     current_balance = user.get("wallet_balance", 0.0)
-                    new_balance = current_balance + 100.0
+                    new_balance = current_balance + 50.0
 
                     await db.users.update_one(
                         {"_id": ObjectId(user_id)},
@@ -1154,28 +1154,28 @@ async def update_order_status_partner(
                     transaction_doc = {
                         "user_id": user_id,
                         "order_id": order_id,
-                        "amount": 100.0,
+                        "amount": 50.0,
                         "type": "earning",
-                        "description": "Delivery reward - 10 deliveries completed",
+                        "description": "Bonus earned for completing 10 deliveries",
                         "created_at": now
                     }
                     await db.wallet_transactions.insert_one(transaction_doc)
 
-                    print(f"🎉 User {user_id} earned ₹100 for completing 10 deliveries! Balance: ₹{new_balance}")
+                    print(f"🎉 User {user_id} earned ₹50 bonus for completing 10 deliveries! Balance: ₹{new_balance}")
 
-                    # Send push notification for ₹100 reward
+                    # Send push notification for ₹50 bonus reward
                     try:
                         await create_notification(
                             db=db,
                             notification_type="reward_earned",
                             from_user_id=user_id,
                             to_user_id=user_id,
-                            message=f"🎉 Congratulations! You've earned ₹100 for completing 10 deliveries! Your wallet balance is now ₹{new_balance}",
+                            message=f"🎉 Congratulations! You've earned ₹50 bonus for completing 10 deliveries! Your wallet balance is now ₹{new_balance}",
                             send_push=True
                         )
-                        print(f"✅ Sent ₹100 reward notification to user {user_id}")
+                        print(f"✅ Sent ₹50 bonus reward notification to user {user_id}")
                     except Exception as e:
-                        print(f"⚠️ Error sending ₹100 reward notification: {e}")
+                        print(f"⚠️ Error sending ₹50 bonus reward notification: {e}")
                 else:
                     # Add ₹10 to wallet and increment the counter
                     current_balance = user.get("wallet_balance", 0.0)

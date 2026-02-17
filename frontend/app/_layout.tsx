@@ -1,4 +1,4 @@
-import { Slot, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -105,7 +105,7 @@ function RootLayoutNav() {
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <StatusBar style={Platform.OS === "ios" ? "dark" : "auto"} />
-      <Slot />
+      <Stack screenOptions={{ headerShown: false }} />
       <UploadProgressIndicator />
       <LevelUpAnimation />
     </SafeAreaView>

@@ -106,6 +106,7 @@ const distributePosts = (posts: any[]) => {
 };
 
 const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout }: any) => {
+  const tileRouter = useRouter();
   const videoRef = useRef<Video>(null);
   const [isActuallyPlaying, setIsActuallyPlaying] = useState(false);
 
@@ -173,31 +174,34 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout }: any) =>
         </View>
       )}
       {item.dish_name && (
-        <View style={styles.dishNameTag}>
+        <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
           <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
-        </View>
+        </TouchableOpacity>
       )}
     </TouchableOpacity>
   );
 });
 
-const ImageTile = memo(({ item, onPress, onLike }: any) => (
-  <TouchableOpacity style={[styles.tile, { height: item.tileHeight }]} activeOpacity={0.9} onPress={() => onPress(item.id)}>
-    {item.full_image_url ? (
-      <Image source={{ uri: item.full_image_url }} style={styles.tileImage} placeholder={{ blurhash: BLUR_HASH }} cachePolicy="memory-disk" contentFit="cover" transition={200} />
-    ) : (
-      <View style={[styles.tileImage, styles.placeholderImage]}><Ionicons name="image-outline" size={32} color="#ccc" /></View>
-    )}
-    <TouchableOpacity style={styles.likeBtn} onPress={(e) => { e.stopPropagation(); onLike(item.id, item.is_liked); }}>
-      {item.is_liked ? <GradientHeart size={18} /> : <Ionicons name="heart-outline" size={18} color="#ffffff" />}
+const ImageTile = memo(({ item, onPress, onLike }: any) => {
+  const tileRouter = useRouter();
+  return (
+    <TouchableOpacity style={[styles.tile, { height: item.tileHeight }]} activeOpacity={0.9} onPress={() => onPress(item.id)}>
+      {item.full_image_url ? (
+        <Image source={{ uri: item.full_image_url }} style={styles.tileImage} placeholder={{ blurhash: BLUR_HASH }} cachePolicy="memory-disk" contentFit="cover" transition={200} />
+      ) : (
+        <View style={[styles.tileImage, styles.placeholderImage]}><Ionicons name="image-outline" size={32} color="#ccc" /></View>
+      )}
+      <TouchableOpacity style={styles.likeBtn} onPress={(e) => { e.stopPropagation(); onLike(item.id, item.is_liked); }}>
+        {item.is_liked ? <GradientHeart size={18} /> : <Ionicons name="heart-outline" size={18} color="#ffffff" />}
+      </TouchableOpacity>
+      {item.dish_name && (
+        <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
+          <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
-    {item.dish_name && (
-      <View style={styles.dishNameTag}>
-        <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
-      </View>
-    )}
-  </TouchableOpacity>
-));
+  );
+});
 
 const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos }: any) => {
   if (item._isVideo) {

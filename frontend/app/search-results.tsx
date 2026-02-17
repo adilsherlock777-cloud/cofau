@@ -213,7 +213,8 @@ export default function SearchResultsScreen() {
         headers: { Authorization: `Bearer ${token || ''}` },
       });
 
-      const formattedPosts = res.data.map((post: any) => {
+      const postsArray = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      const formattedPosts = postsArray.map((post: any) => {
         const rawUrl = post.media_url || post.image_url;
         const fullUrl = fixUrl(rawUrl);
 

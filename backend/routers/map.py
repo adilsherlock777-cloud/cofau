@@ -372,59 +372,107 @@ async def search_map_pins(
     q: str = Query(..., description="Search query (e.g., 'biryani', 'pizza')"),
     lat: float = Query(..., description="User's current latitude"),
     lng: float = Query(..., description="User's current longitude"),
-    radius_km: float = Query(10, description="Search radius in kilometers"),
+    radius_km: float = Query(12, description="Search radius in kilometers"),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Search for posts on map by keyword (category, location_name, dish_name, review_text).
-    Only returns results within the specified radius.
+    Search for posts nearby by keyword.
+    Matches against dish_name and review_text within the specified radius.
+    Searches both user posts and restaurant posts.
     """
     db = get_database()
 
     if not q or not q.strip():
-        return {"results": [], "query": q, "total": 0}
+        return []
 
     query_text = q.strip()
     search_regex = {"$regex": query_text, "$options": "i"}
+    current_user_id = str(current_user["_id"])
+    seen_ids = set()
+    results = []
 
-    # Search posts matching the query
-    posts = await db.posts.find({
+    # --- User posts with pre-stored coordinates ---
+    user_posts = await db.posts.find({
+        "latitude": {"$exists": True, "$ne": None},
+        "longitude": {"$exists": True, "$ne": None},
+        "$or": [
+            {"dish_name": search_regex},
+            {"review_text": search_regex},
+        ]
+    }).to_list(None)
+
+    for post in user_posts:
+        post_id = str(post["_id"])
+        if post_id in seen_ids:
+            continue
+
+        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
+        if distance <= radius_km:
+            seen_ids.add(post_id)
+            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+            is_liked = await db.likes.find_one({
+                "post_id": post_id,
+                "user_id": current_user_id
+            }) is not None
+
+            results.append({
+                "id": post_id,
+                "type": "post",
+                "user_id": post["user_id"],
+                "username": user.get("full_name", "Unknown") if user else "Unknown",
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "user_level": user.get("level", 1) if user else 1,
+                "latitude": post["latitude"],
+                "longitude": post["longitude"],
+                "distance_km": round(distance, 2),
+                "media_url": post.get("media_url") or post.get("image_url"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": post.get("media_type", "image"),
+                "rating": post.get("rating"),
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "dish_name": post.get("dish_name"),
+                "review_text": post.get("review_text", ""),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "is_liked_by_user": is_liked,
+                "map_link": post.get("map_link"),
+                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
+            })
+
+    # --- User posts with map_link but no stored coordinates ---
+    map_link_posts = await db.posts.find({
         "$and": [
-            {"map_link": {"$exists": True, "$ne": None, "$ne": ""}},
             {"$or": [
-                {"category": search_regex},
-                {"location_name": search_regex},
+                {"latitude": {"$exists": False}},
+                {"latitude": None},
+            ]},
+            {"map_link": {"$exists": True, "$nin": [None, ""]}},
+            {"$or": [
                 {"dish_name": search_regex},
-                {"review_text": search_regex}
+                {"review_text": search_regex},
             ]}
         ]
     }).to_list(None)
-    
-    results = []
-    
-    for post in posts:
+
+    for post in map_link_posts:
+        post_id = str(post["_id"])
+        if post_id in seen_ids:
+            continue
+
         coords = await get_coordinates_for_map_link(post.get("map_link"))
-        
         if coords and coords.get("latitude") and coords.get("longitude"):
-            # Calculate distance from user
-            distance = calculate_distance_km(
-                lat, lng,
-                coords["latitude"], coords["longitude"]
-            )
-            
-            # Only include if within radius
+            distance = calculate_distance_km(lat, lng, coords["latitude"], coords["longitude"])
             if distance <= radius_km:
-                # Get user info
+                seen_ids.add(post_id)
                 user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-                
-                # Check if current user liked this post
                 is_liked = await db.likes.find_one({
-                    "post_id": str(post["_id"]),
-                    "user_id": str(current_user["_id"])
+                    "post_id": post_id,
+                    "user_id": current_user_id
                 }) is not None
-                
+
                 results.append({
-                    "id": str(post["_id"]),
+                    "id": post_id,
                     "type": "post",
                     "user_id": post["user_id"],
                     "username": user.get("full_name", "Unknown") if user else "Unknown",
@@ -447,17 +495,57 @@ async def search_map_pins(
                     "map_link": post.get("map_link"),
                     "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
                 })
-    
+
+    # --- Restaurant posts with pre-stored coordinates ---
+    rest_posts = await db.restaurant_posts.find({
+        "latitude": {"$exists": True, "$ne": None},
+        "longitude": {"$exists": True, "$ne": None},
+        "$or": [
+            {"dish_name": search_regex},
+            {"caption": search_regex},
+            {"about": search_regex},
+        ]
+    }).to_list(None)
+
+    for post in rest_posts:
+        post_id = str(post["_id"])
+        if post_id in seen_ids:
+            continue
+
+        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
+        if distance <= radius_km:
+            seen_ids.add(post_id)
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+
+            results.append({
+                "id": post_id,
+                "type": "restaurant_post",
+                "user_id": post["restaurant_id"],
+                "username": post.get("restaurant_name") or (restaurant.get("restaurant_name") if restaurant else "Unknown"),
+                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "user_level": 0,
+                "latitude": post["latitude"],
+                "longitude": post["longitude"],
+                "distance_km": round(distance, 2),
+                "media_url": post.get("media_url") or post.get("image_url"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": post.get("media_type", "image"),
+                "rating": None,
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "dish_name": post.get("dish_name"),
+                "review_text": post.get("about", "") or post.get("caption", ""),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "is_liked_by_user": False,
+                "map_link": post.get("map_link"),
+                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
+            })
+
     # Sort by distance (nearest first)
     results.sort(key=lambda x: x["distance_km"])
-    
-    return {
-        "query": query_text,
-        "user_location": {"latitude": lat, "longitude": lng},
-        "radius_km": radius_km,
-        "results": results,
-        "total": len(results)
-    }
+
+    return results
 
 
 @router.get("/restaurants/nearby")

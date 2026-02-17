@@ -789,11 +789,18 @@ postId={post.id}
 
     {/* Dish Name Overlay - Bottom left */}
     {post.dish_name ? (
-      <View style={styles.dishNameOverlay}>
+      <TouchableOpacity
+        style={styles.dishNameOverlay}
+        activeOpacity={0.7}
+        onPress={(e) => {
+          e.stopPropagation();
+          router.push({ pathname: "/search-results", params: { query: post.dish_name } });
+        }}
+      >
         <Text style={styles.dishNameOverlayText} numberOfLines={1}>
           {post.dish_name.toUpperCase()}
         </Text>
-      </View>
+      </TouchableOpacity>
     ) : null}
   </Pressable>
 )}
