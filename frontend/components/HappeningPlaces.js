@@ -360,7 +360,7 @@ export default function HappeningPlaces() {
     try {
       setAreasLoading(true);
       const response = await axios.get(
-        `${API_URL}/places/nearby-areas?latitude=${coords.latitude}&longitude=${coords.longitude}&radius_km=50`,
+        `${API_URL}/places/nearby-areas?latitude=${coords.latitude}&longitude=${coords.longitude}&radius_km=5`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data?.success) {
@@ -382,7 +382,7 @@ export default function HappeningPlaces() {
     try {
       setAreaPostsLoading(true);
       const response = await axios.get(
-        `${API_URL}/places/area-posts?latitude=${area.latitude}&longitude=${area.longitude}&radius_km=5`,
+        `${API_URL}/places/area-posts?area_name=${encodeURIComponent(area.name)}&latitude=${area.latitude}&longitude=${area.longitude}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setAreaPosts(response.data?.posts || []);
