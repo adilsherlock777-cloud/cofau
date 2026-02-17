@@ -649,7 +649,7 @@ export default function HappeningPlaces() {
               onPress={() => setDropdownOpen(!dropdownOpen)}
               activeOpacity={0.7}
             >
-              <Ionicons name="restaurant" size={18} color="#E94A37" />
+              <Ionicons name="location" size={18} color="#E94A37" />
               <Text style={styles.dropdownButtonText} numberOfLines={1}>
                 {selectedArea === 'All' ? 'SELECT YOUR FOOD SPOT' : selectedArea.name}
               </Text>

@@ -123,12 +123,13 @@ async def get_nearby_areas(
         db = get_database()
         cache_key = _cache_key(latitude, longitude, radius_km)
 
-        # Check cache first (only use cache if it has > 5 areas, otherwise re-fetch)
+        # Check cache first (v2 = major areas version)
         cached = await db.areas_cache.find_one({
             "cache_key": cache_key,
+            "version": "v2",
             "expires_at": {"$gt": datetime.utcnow()},
         })
-        if cached and len(cached.get("areas", [])) > 5:
+        if cached:
             # Recalculate distances from the user's exact position
             areas = cached["areas"]
             for area in areas:
@@ -165,12 +166,22 @@ async def get_nearby_areas(
         except Exception:
             pass
 
-        # Search queries that return area/locality names for Indian cities
+        # Search queries targeting major/prominent areas (not small layouts)
         search_queries = [
-            f"areas in {city_name}" if city_name else "areas nearby",
-            f"localities in {city_name}" if city_name else "localities nearby",
-            f"neighbourhoods in {city_name}" if city_name else "neighbourhoods nearby",
+            f"major areas in {city_name}" if city_name else "major areas nearby",
+            f"popular neighbourhoods in {city_name}" if city_name else "popular neighbourhoods nearby",
         ]
+
+        # Only accept major area types (level_1 = big areas, skip level_2/3 = small layouts)
+        major_area_types = {
+            "sublocality_level_1", "sublocality", "locality", "neighborhood",
+        }
+
+        # Words that indicate small/minor places — skip these
+        skip_keywords = {
+            "layout", "cross", "extension", "block", "phase", "sector",
+            "colony", "enclave", "mts", "bda", "hbcs", "hig",
+        }
 
         for query in search_queries:
             params = {
@@ -189,17 +200,17 @@ async def get_nearby_areas(
                     if not name or name.lower() in seen:
                         continue
 
-                    # Filter out non-area results (businesses, restaurants, etc.)
+                    # Filter: only keep major area types
                     place_types = place.get("types", [])
-                    area_types = {
-                        "sublocality", "sublocality_level_1", "sublocality_level_2",
-                        "neighborhood", "locality", "political",
-                        "administrative_area_level_3", "administrative_area_level_4",
-                    }
-                    if not any(t in area_types for t in place_types):
+                    if not any(t in major_area_types for t in place_types):
                         continue
 
-                    seen.add(name.lower())
+                    # Skip small layouts/colonies by name
+                    name_lower = name.lower()
+                    if any(kw in name_lower for kw in skip_keywords):
+                        continue
+
+                    seen.add(name_lower)
 
                     loc = place.get("geometry", {}).get("location", {})
                     plat = loc.get("lat")
@@ -224,6 +235,7 @@ async def get_nearby_areas(
             {"cache_key": cache_key},
             {"$set": {
                 "cache_key": cache_key,
+                "version": "v2",
                 "areas": all_areas,
                 "created_at": datetime.utcnow(),
                 "expires_at": datetime.utcnow() + timedelta(hours=AREAS_CACHE_HOURS),
@@ -239,33 +251,56 @@ async def get_nearby_areas(
 
 @router.get("/area-posts")
 async def get_area_posts(
+    area_name: str = Query(..., description="Area name to search for"),
     latitude: float = Query(..., description="Area centre latitude"),
     longitude: float = Query(..., description="Area centre longitude"),
-    radius_km: float = Query(5, description="Radius around the area centre in km"),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Get all posts within a given radius of an area's coordinates.
-    Returns posts sorted from latest to oldest.
+    Get all posts that are inside a specific area.
+    Uses Google Geocoding to get the area's exact viewport bounds,
+    then returns only posts whose coordinates fall within those bounds.
     """
     try:
         db = get_database()
 
+        # Step 1: Get the area's exact viewport bounds from Google Geocoding
+        geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+        async with httpx.AsyncClient() as client:
+            geo_resp = await client.get(geocode_url, params={
+                "address": area_name,
+                "location": f"{latitude},{longitude}",
+                "key": GOOGLE_MAPS_API_KEY,
+            })
+            geo_data = geo_resp.json()
+
+        # Extract viewport bounds (northeast and southwest corners)
+        ne_lat = ne_lng = sw_lat = sw_lng = None
+        if geo_data.get("status") == "OK" and geo_data.get("results"):
+            geometry = geo_data["results"][0].get("geometry", {})
+            viewport = geometry.get("viewport", {})
+            ne = viewport.get("northeast", {})
+            sw = viewport.get("southwest", {})
+            ne_lat = ne.get("lat")
+            ne_lng = ne.get("lng")
+            sw_lat = sw.get("lat")
+            sw_lng = sw.get("lng")
+
+        # If we couldn't get viewport, fall back to a small radius
+        if ne_lat is None or sw_lat is None:
+            ne_lat = latitude + 0.015  # ~1.5km north
+            ne_lng = longitude + 0.015
+            sw_lat = latitude - 0.015
+            sw_lng = longitude - 0.015
+
+        # Step 2: Query posts within the bounding box
         all_posts = await db.posts.find({
-            "latitude": {"$exists": True, "$ne": None},
-            "longitude": {"$exists": True, "$ne": None},
+            "latitude": {"$gte": sw_lat, "$lte": ne_lat},
+            "longitude": {"$gte": sw_lng, "$lte": ne_lng},
         }).sort("created_at", -1).to_list(None)
 
         results = []
         for post in all_posts:
-            plat = post.get("latitude")
-            plng = post.get("longitude")
-            if plat is None or plng is None:
-                continue
-            dist = _haversine(latitude, longitude, plat, plng)
-            if dist > radius_km:
-                continue
-
             media_url = post.get("media_url") or post.get("image_url")
             results.append({
                 "id": str(post["_id"]),
@@ -275,10 +310,17 @@ async def get_area_posts(
                 "location_name": post.get("location_name"),
                 "rating": post.get("rating"),
                 "created_at": post.get("created_at").isoformat() if post.get("created_at") else None,
-                "distance_km": round(dist, 2),
             })
 
-        return {"success": True, "posts": results, "total": len(results)}
+        return {
+            "success": True,
+            "posts": results,
+            "total": len(results),
+            "bounds": {
+                "northeast": {"lat": ne_lat, "lng": ne_lng},
+                "southwest": {"lat": sw_lat, "lng": sw_lng},
+            },
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch area posts: {str(e)}")
