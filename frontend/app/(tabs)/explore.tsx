@@ -15,7 +15,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
@@ -105,10 +105,11 @@ const distributePosts = (posts: any[]) => {
   return columns;
 };
 
-const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout }: any) => {
+const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }: any) => {
   const tileRouter = useRouter();
   const videoRef = useRef<Video>(null);
   const [isActuallyPlaying, setIsActuallyPlaying] = useState(false);
+  const viewTracked = useRef(false);
 
   useEffect(() => {
   const controlVideo = async () => {
@@ -124,6 +125,11 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout }: any) =>
         } else {
           await videoRef.current.setPositionAsync(0);
           await videoRef.current.playAsync();
+        }
+        // Track view once when video starts playing
+        if (!viewTracked.current && !item.is_viewed && onView) {
+          viewTracked.current = true;
+          onView(item.id);
         }
       } else {
         await videoRef.current.pauseAsync();
@@ -164,15 +170,10 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout }: any) =>
           <View style={styles.playIconContainer}><Ionicons name="play" size={24} color="#fff" /></View>
         </>
       )}
-      <TouchableOpacity style={styles.likeBtn} onPress={(e) => { e.stopPropagation(); onLike(item.id, item.is_liked); }}>
-        {item.is_liked ? <GradientHeart size={18} /> : <Ionicons name="heart-outline" size={18} color="#ffffff" />}
-      </TouchableOpacity>
-      {item.views_count > 0 && (
-        <View style={styles.viewsContainer}>
-          <Ionicons name="play" size={12} color="#fff" />
-          <Text style={styles.viewsText}>{item.views_count > 1000 ? `${(item.views_count / 1000).toFixed(1)}K` : item.views_count}</Text>
-        </View>
-      )}
+      <View style={styles.clicksBadge}>
+        <Ionicons name="eye-outline" size={9} color="#fff" />
+        <Text style={styles.clicksText}>{(item.views_count || 0) > 1000 ? `${((item.views_count || 0) / 1000).toFixed(1)}K` : (item.views_count || 0)}</Text>
+      </View>
       {item.dish_name && (
         <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
           <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
@@ -191,9 +192,10 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => {
       ) : (
         <View style={[styles.tileImage, styles.placeholderImage]}><Ionicons name="image-outline" size={32} color="#ccc" /></View>
       )}
-      <TouchableOpacity style={styles.likeBtn} onPress={(e) => { e.stopPropagation(); onLike(item.id, item.is_liked); }}>
-        {item.is_liked ? <GradientHeart size={18} /> : <Ionicons name="heart-outline" size={18} color="#ffffff" />}
-      </TouchableOpacity>
+      <View style={styles.clicksBadge}>
+        <MaterialCommunityIcons name="gesture-tap" size={10} color="#fff" />
+        <Text style={styles.clicksText}>{(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}</Text>
+      </View>
       {item.dish_name && (
         <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
           <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
@@ -203,9 +205,9 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => {
   );
 });
 
-const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos }: any) => {
+const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos, onView }: any) => {
   if (item._isVideo) {
-    return <VideoTile item={item} onPress={onPress} onLike={onLike} shouldPlay={playingVideos.includes(item.id)} onLayout={onVideoLayout} />;
+    return <VideoTile item={item} onPress={onPress} onLike={onLike} shouldPlay={playingVideos.includes(item.id)} onLayout={onVideoLayout} onView={onView} />;
   }
   return <ImageTile item={item} onPress={onPress} onLike={onLike} />;
 };
@@ -1028,6 +1030,91 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
 });
 
 // ======================================================
+// TOP POSTS MODAL
+// ======================================================
+
+const TopPostsModal = memo(({ visible, posts, loading, onClose, onViewPost }: any) => {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.topPostsModal}>
+          <View style={styles.topPostsModalHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="trophy" size={22} color="#F2CF68" />
+              <Text style={styles.topPostsModalTitle}>Top Posts</Text>
+            </View>
+            <Text style={styles.topPostsModalSubtitle}>Last 3 days</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          {loading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }}>
+              <ActivityIndicator size="large" color="#E94A37" />
+              <Text style={{ marginTop: 12, color: '#666' }}>Loading top posts...</Text>
+            </View>
+          ) : posts.length === 0 ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }}>
+              <Ionicons name="images-outline" size={48} color="#ccc" />
+              <Text style={{ marginTop: 12, color: '#666', fontSize: 16 }}>No posts in the last 3 days</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={posts}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ padding: 16 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.topPostItem} onPress={() => onViewPost(item)}>
+                  <View style={[styles.rankBadge, item.rank <= 3 && { backgroundColor: '#F2CF68' }]}>
+                    <Text style={[styles.rankText, item.rank <= 3 && { color: '#333' }]}>#{item.rank}</Text>
+                  </View>
+                  <Image
+                    source={{ uri: fixUrl(item.thumbnail_url || item.media_url || item.image_url) || undefined }}
+                    style={styles.topPostThumbnail}
+                    contentFit="cover"
+                    placeholder={{ blurhash: BLUR_HASH }}
+                  />
+                  <View style={styles.topPostInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      {item.user_profile_picture ? (
+                        <Image source={{ uri: fixUrl(item.user_profile_picture) || undefined }} style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6 }} contentFit="cover" />
+                      ) : (
+                        <View style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+                          <Ionicons name="person" size={12} color="#fff" />
+                        </View>
+                      )}
+                      <Text style={styles.topPostUsername} numberOfLines={1}>{item.username}</Text>
+                    </View>
+                    {item.location_name && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                        <Ionicons name="location" size={12} color="#E94A37" />
+                        <Text style={{ fontSize: 11, color: '#666', marginLeft: 2 }} numberOfLines={1}>{item.location_name}</Text>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="heart" size={13} color="#E94A37" />
+                        <Text style={{ fontSize: 12, color: '#333', marginLeft: 3 }}>{item.likes_count}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="star" size={13} color="#F2CF68" />
+                        <Text style={{ fontSize: 12, color: '#333', marginLeft: 3 }}>{Math.round(item.combined_score)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+// ======================================================
 // DASHBOARD CONTENT (for restaurant users)
 // ======================================================
 
@@ -1186,7 +1273,7 @@ export default function ExploreScreen() {
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'map' | 'users'>(Platform.OS === 'android' ? 'users' : 'map');
+  const [activeTab, setActiveTab] = useState<'map' | 'users' | 'topPosts'>(Platform.OS === 'android' ? 'users' : 'map');
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -1194,6 +1281,9 @@ export default function ExploreScreen() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [appliedCategories, setAppliedCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showTopPostsModal, setShowTopPostsModal] = useState(false);
+  const [topPosts, setTopPosts] = useState<any[]>([]);
+  const [topPostsLoading, setTopPostsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [playingVideos, setPlayingVideos] = useState<string[]>([]);
@@ -1885,10 +1975,12 @@ useEffect(() => {
           ...post, 
           full_image_url: fullUrl, 
           full_thumbnail_url: fixUrl(post.thumbnail_url), 
-          is_liked: post.is_liked_by_user || false, 
-          _isVideo: isVideoFile(fullUrl || "", post.media_type), 
-          category: post.category?.trim() || null, 
-          aspect_ratio: post.aspect_ratio || null 
+          is_liked: post.is_liked_by_user || false,
+          is_clicked: post.is_clicked_by_user || false,
+          is_viewed: post.is_viewed_by_user || false,
+          _isVideo: isVideoFile(fullUrl || "", post.media_type),
+          category: post.category?.trim() || null,
+          aspect_ratio: post.aspect_ratio || null
         };
       });
       
@@ -1911,6 +2003,17 @@ useEffect(() => {
   };
 
   const fetchPostsWithCategories = (categories: string[]) => fetchPosts(true, categories);
+  const fetchTopPosts = async () => {
+    setTopPostsLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/posts/last-3-days`, { headers: { Authorization: `Bearer ${token || ""}` } });
+      setTopPosts(res.data);
+    } catch (err) {
+      console.log("Error fetching top posts:", err);
+    } finally {
+      setTopPostsLoading(false);
+    }
+  };
   const performSearch = () => { if (searchQuery.trim()) router.push({ pathname: "/search-results", params: { query: searchQuery.trim() } }); };
   const toggleCategory = (itemName: string) => { 
   setSelectedCategories((prev) => 
@@ -1920,28 +2023,51 @@ useEffect(() => {
   ); 
 };
   const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch (err) { console.log("Like error:", err); } };
+  const handleView = async (postId: string) => {
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, views_count: (p.views_count || 0) + 1, is_viewed: true } : p));
+    try {
+      const tkn = await AsyncStorage.getItem('token');
+      axios.post(`${API_URL}/posts/${postId}/view`, {}, { headers: { Authorization: `Bearer ${tkn}` } }).catch(err => console.log('View tracking error:', err));
+    } catch (err) { console.log('View tracking error:', err); }
+  };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
   const handlePostPressGrid = async (postId: string) => {
   setPlayingVideos([]);
-  
-  // Find the post to check if it's a restaurant post
+
   const post = posts.find(p => p.id === postId);
-  if (post && post.account_type === 'restaurant') {
-    // Track post click for restaurant
+
+  // Only count click if this user hasn't clicked this post before
+  if (post && !post.is_clicked) {
+    // Optimistically increment clicks_count and mark as clicked
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true } : p));
+
+    // Track click on backend
     try {
-      const token = await AsyncStorage.getItem('token');
+      const tkn = await AsyncStorage.getItem('token');
+      axios.post(`${API_URL}/posts/${postId}/click`, {}, {
+        headers: { Authorization: `Bearer ${tkn}` }
+      }).catch(err => console.log('Click tracking error:', err));
+    } catch (err) {
+      console.log('Click tracking error:', err);
+    }
+  }
+
+  // Also track restaurant analytics if applicable
+  if (post && post.account_type === 'restaurant') {
+    try {
+      const tkn = await AsyncStorage.getItem('token');
       axios.post(`${API_URL}/restaurant/analytics/track`, {
         restaurant_id: post.user_id,
         event_type: 'post_click',
         post_id: postId
       }, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${tkn}` }
       }).catch(err => console.log('Analytics tracking error:', err));
     } catch (err) {
       console.log('Analytics tracking error:', err);
     }
   }
-  
+
   router.push(`/post-details/${postId}`);
 };
 
@@ -2020,16 +2146,36 @@ return (
         </>
       )}
 
-      {/* DASHBOARD/MAP | USERS TOGGLE */}
+      {/* TOP POSTS | DASHBOARD/MAP | USERS TOGGLE */}
 <View style={styles.toggleContainer}>
   <View style={styles.toggleBackground}>
+    <TouchableOpacity
+      style={[styles.toggleTab, activeTab === 'topPosts' && styles.toggleTabActive]}
+      onPress={() => {
+        if (activeTab !== 'topPosts') {
+          setActiveTab('topPosts');
+          setPlayingVideos([]);
+          fetchTopPosts();
+        }
+      }}
+    >
+      <Ionicons
+        name="camera"
+        size={16}
+        color={activeTab === 'topPosts' ? '#E94A37' : '#999'}
+        style={{ marginRight: 6 }}
+      />
+      <Text style={[styles.toggleTabText, activeTab === 'topPosts' && styles.toggleTabTextActive]}>
+        Top Posts
+      </Text>
+    </TouchableOpacity>
+
     <TouchableOpacity
       style={[styles.toggleTab, activeTab === 'map' && styles.toggleTabActive]}
       onPress={() => {
         if (activeTab !== 'map') {
           setActiveTab('map');
           setPlayingVideos([]);
-          // For restaurant users, fetch analytics when switching to dashboard
           if (accountType === 'restaurant') {
             fetchAnalytics();
           }
@@ -2048,18 +2194,17 @@ return (
     </TouchableOpacity>
 
     <TouchableOpacity
-  style={[styles.toggleTab, activeTab === 'users' && styles.toggleTabActive]}
-  onPress={() => {
-    if (activeTab !== 'users') {
-      setActiveTab('users');
-      // Only fetch if no posts cached
-      if (posts.length === 0) {
-        setLoading(true);
-        fetchPosts(true, [], 'users');
-      }
-    }
-  }}
->
+      style={[styles.toggleTab, activeTab === 'users' && styles.toggleTabActive]}
+      onPress={() => {
+        if (activeTab !== 'users') {
+          setActiveTab('users');
+          if (posts.length === 0) {
+            setLoading(true);
+            fetchPosts(true, [], 'users');
+          }
+        }
+      }}
+    >
       <Ionicons
         name="person"
         size={16}
@@ -2107,7 +2252,66 @@ return (
 
 
       {/* CONTENT AREA */}
-      {activeTab === 'map' ? (
+      {activeTab === 'topPosts' ? (
+        // TOP POSTS VIEW
+        topPostsLoading ? (
+          <View style={styles.center}><ActivityIndicator size="large" color="#E94A37" /><Text>Loading top posts...</Text></View>
+        ) : topPosts.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="trophy-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyStateText}>No posts in the last 3 days</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={topPosts}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.topPostItem} onPress={() => router.push(`/post-details/${item.id}`)}>
+                <View style={[styles.rankBadge, item.rank <= 3 && { backgroundColor: '#F2CF68' }]}>
+                  <Text style={[styles.rankText, item.rank <= 3 && { color: '#333' }]}>#{item.rank}</Text>
+                </View>
+                <Image
+                  source={{ uri: fixUrl(item.thumbnail_url || item.media_url || item.image_url) || undefined }}
+                  style={styles.topPostThumbnail}
+                  contentFit="cover"
+                  placeholder={{ blurhash: BLUR_HASH }}
+                />
+                <View style={styles.topPostInfo}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    {item.user_profile_picture ? (
+                      <Image source={{ uri: fixUrl(item.user_profile_picture) || undefined }} style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6 }} contentFit="cover" />
+                    ) : (
+                      <View style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+                        <Ionicons name="person" size={12} color="#fff" />
+                      </View>
+                    )}
+                    <Text style={styles.topPostUsername} numberOfLines={1}>{item.username}</Text>
+                  </View>
+                  {item.location_name && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                      <Ionicons name="location" size={12} color="#E94A37" />
+                      <Text style={{ fontSize: 11, color: '#666', marginLeft: 2 }} numberOfLines={1}>{item.location_name}</Text>
+                    </View>
+                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="heart" size={13} color="#E94A37" />
+                      <Text style={{ fontSize: 12, color: '#333', marginLeft: 3 }}>{item.likes_count}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="star" size={13} color="#F2CF68" />
+                      <Text style={{ fontSize: 12, color: '#333', marginLeft: 3 }}>{Math.round(item.combined_score)}</Text>
+                    </View>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          />
+        )
+      ) : activeTab === 'map' ? (
   // DASHBOARD VIEW for restaurant users, MAP VIEW for regular users
   accountType === 'restaurant' ? (
     <DashboardContent
@@ -2141,7 +2345,7 @@ return (
               <View style={styles.masonryContainer}>
                 {columns.map((column, columnIndex) => (
                   <View key={columnIndex} style={styles.column}>
-                    {column.map((item) => <GridTile key={item.id} item={item} onPress={handlePostPressGrid} onLike={handleLike} onVideoLayout={handleVideoLayout} playingVideos={playingVideos} />)}
+                    {column.map((item) => <GridTile key={item.id} item={item} onPress={handlePostPressGrid} onLike={handleLike} onVideoLayout={handleVideoLayout} playingVideos={playingVideos} onView={handleView} />)}
                   </View>
                 ))}
               </View>
@@ -2150,17 +2354,17 @@ return (
                 <View style={styles.emptyState}>
                   <Ionicons name="images-outline" size={64} color="#ccc" />
                   <Text style={styles.emptyStateText}>
-                    {appliedCategories.length > 0 
-                      ? `No posts found for selected ${appliedCategories.length === 1 ? 'category' : 'categories'}` 
+                    {appliedCategories.length > 0
+                      ? `No posts found for selected ${appliedCategories.length === 1 ? 'category' : 'categories'}`
                       : 'No posts found'}
                   </Text>
                   {appliedCategories.length > 0 && (
-                    <TouchableOpacity 
-                      style={{ marginTop: 12 }} 
-                      onPress={() => { 
-                        setSelectedCategories([]); 
-                        setAppliedCategories([]); 
-                        fetchPosts(true, [], 'users'); 
+                    <TouchableOpacity
+                      style={{ marginTop: 12 }}
+                      onPress={() => {
+                        setSelectedCategories([]);
+                        setAppliedCategories([]);
+                        fetchPosts(true, [], 'users');
                       }}
                     >
                       <Text style={{ color: '#E94A37', fontWeight: '600' }}>Clear Filters</Text>
@@ -2286,6 +2490,17 @@ return (
         onClose={() => setShowPostModal(false)}
         onViewPost={handleViewPost}
       />
+
+      <TopPostsModal
+        visible={showTopPostsModal}
+        posts={topPosts}
+        loading={topPostsLoading}
+        onClose={() => setShowTopPostsModal(false)}
+        onViewPost={(post: any) => {
+          setShowTopPostsModal(false);
+          router.push(`/post-details/${post.id}`);
+        }}
+      />
     </View>
   );
 }
@@ -2379,6 +2594,20 @@ const styles = StyleSheet.create({
   placeholderImage: { backgroundColor: "#2a2a2a", justifyContent: "center", alignItems: "center" },
   playIconContainer: { position: "absolute", top: "50%", left: "50%", transform: [{ translateX: -20 }, { translateY: -20 }], width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   likeBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", padding: 8, borderRadius: 20 },
+  clicksBadge: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 5, paddingVertical: 2, borderRadius: 8, gap: 2 },
+  clicksText: { color: "#fff", fontSize: 8, fontWeight: "600" },
+  topPostsButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF5E6", borderRadius: 22, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: "#F2CF68" },
+  topPostsButtonText: { fontSize: 13, fontWeight: "600", color: "#E94A37" },
+  topPostsModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%", minHeight: 400 },
+  topPostsModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#E5E5E5" },
+  topPostsModalTitle: { fontSize: 20, fontWeight: "bold", color: "#000", marginLeft: 8 },
+  topPostsModalSubtitle: { fontSize: 13, color: "#999", fontWeight: "500" },
+  topPostItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#F9F9F9", borderRadius: 12, padding: 12, marginBottom: 10 },
+  rankBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#E94A37", justifyContent: "center", alignItems: "center", marginRight: 10 },
+  rankText: { color: "#fff", fontSize: 13, fontWeight: "bold" },
+  topPostThumbnail: { width: 56, height: 56, borderRadius: 8, marginRight: 12 },
+  topPostInfo: { flex: 1 },
+  topPostUsername: { fontSize: 14, fontWeight: "600", color: "#333" },
   viewsContainer: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
   viewsText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   dishNameTag: { position: "absolute", bottom: 6, left: 6, backgroundColor: "rgba(233, 74, 55, 0.85)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, maxWidth: "75%" },
@@ -3086,7 +3315,7 @@ quickCategoryTextActive: {
 // TOGGLE TABS STYLES (Pill Style)
 // ======================================================
 toggleContainer: {
-  alignItems: 'center',
+  alignItems: 'center' as const,
   marginBottom: 8,
   paddingHorizontal: 16,
 },
@@ -3101,7 +3330,7 @@ toggleTab: {
   alignItems: 'center',
   justifyContent: 'center',
   paddingVertical: 10,
-  paddingHorizontal: 24,
+  paddingHorizontal: 16,
   borderRadius: 22,
 },
 toggleTabActive: {

@@ -25,7 +25,7 @@ from routers.locations import router as locations_router
 from routers.chat import router as chat_router
 from routers.compliments import router as compliments_router
 from routers.moderation import router as moderation_router
-from routers.leaderboard import router as leaderboard_router
+from routers.leaderboard import router as leaderboard_router, calculate_engagement_score as lb_engagement_score, calculate_combined_score as lb_combined_score
 from routers import restaurant_auth
 from routers import restaurant_posts
 from routers.restaurant_analytics import router as restaurant_analytics_router
@@ -1309,11 +1309,12 @@ async def get_feed(
     
     # Fetch from both collections
     if sort == "engagement":
-        fetch_limit = min((limit or 30) * 3, 300)
-        
+        page_size = limit or 30
+        fetch_limit = min((skip + page_size) * 3, 3000)
+
         # Fetch user posts
         user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
-        
+
         # Fetch restaurant posts
         restaurant_posts_raw = await db.restaurant_posts.find(restaurant_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
         
@@ -1407,7 +1408,17 @@ async def get_feed(
                 "post_id": post_id,
                 "restaurant_id": str(current_user["_id"])
             }) is not None
-            
+
+            is_clicked = await db.post_clicks.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
+            is_viewed = await db.post_views.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
             result.append({
                 "id": post_id,
                 "user_id": restaurant_id,
@@ -1429,8 +1440,12 @@ async def get_feed(
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
+                "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
                 "is_saved_by_user": is_saved,
+                "is_clicked_by_user": is_clicked,
+                "is_viewed_by_user": is_viewed,
                 "is_following": False,
                 "account_type": "restaurant",
                 "tagged_restaurant": None,
@@ -1469,6 +1484,16 @@ async def get_feed(
                 "followingId": user_id
             }) is not None
 
+            is_clicked = await db.post_clicks.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
+            is_viewed = await db.post_views.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
             media_url = post.get("media_url", "")
             media_type = post.get("media_type", "image")
             image_url = post.get("image_url") if media_type == "image" else None
@@ -1494,8 +1519,12 @@ async def get_feed(
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
+                "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
                 "is_saved_by_user": is_saved,
+                "is_clicked_by_user": is_clicked,
+                "is_viewed_by_user": is_viewed,
                 "is_following": is_following,
                 "account_type": "user",
                 "tagged_restaurant": tagged_restaurant,
@@ -1508,32 +1537,31 @@ async def get_feed(
 
 @app.get("/api/posts/last-3-days")
 async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
-    """Get posts from the last 3 days"""
+    """Get top 10 posts from the last 3 days, ranked by quality + engagement."""
     db = get_database()
 
     blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
-    
+
     # Calculate the date 3 days ago
     three_days_ago = datetime.utcnow() - timedelta(days=3)
 
-
-     # ✅ MODIFY THIS: Query posts created in the last 3 days, excluding blocked users
+    # Query posts created in the last 3 days, excluding blocked users
     query = {"created_at": {"$gte": three_days_ago}}
     if blocked_user_ids:
         query["user_id"] = {"$nin": blocked_user_ids}
-    
-    # Query posts created in the last 3 days
-    posts = await db.posts.find({
-        "created_at": {"$gte": three_days_ago}
-    }).sort("created_at", -1).to_list(None)
-    
-    print(f"📊 Found {len(posts)} posts from the last 3 days")
-    
+
+    posts = await db.posts.find(query).sort("created_at", -1).to_list(None)
+
     result = []
+    post_quality_map = {}
+
     for post in posts:
         post_id = str(post["_id"])
         user_id = post["user_id"]
         user = await db.users.find_one({"_id": ObjectId(user_id)})
+
+        # Store quality_score from the raw post document
+        post_quality_map[post_id] = post.get("quality_score", 50.0)
 
         is_liked = await db.likes.find_one({
             "post_id": post_id,
@@ -1545,7 +1573,6 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "user_id": str(current_user["_id"])
         }) is not None
 
-        # Check if current user is following the post author
         is_following = await db.follows.find_one({
             "followerId": str(current_user["_id"]),
             "followingId": user_id
@@ -1553,8 +1580,6 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
 
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
-        
-        # Only set image_url for images, not videos
         image_url = post.get("image_url") if media_type == "image" else None
 
         result.append({
@@ -1582,7 +1607,101 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
 
+    # Score and rank posts
+    if result:
+        max_likes = max((p["likes_count"] for p in result), default=1) or 1
+
+        for p in result:
+            quality = post_quality_map.get(p["id"], 50.0)
+            engagement = lb_engagement_score(p["likes_count"], max_likes)
+            combined = lb_combined_score(quality, engagement)
+            p["quality_score"] = quality
+            p["engagement_score"] = engagement
+            p["combined_score"] = combined
+
+        # Sort by combined score descending, take top 10
+        result.sort(key=lambda x: x["combined_score"], reverse=True)
+        result = result[:10]
+
+        # Assign rank 1-10
+        for idx, p in enumerate(result, start=1):
+            p["rank"] = idx
+
     return result
+
+# ==================== POST CLICK TRACKING ====================
+
+@app.post("/api/posts/{post_id}/click")
+async def track_post_click(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Increment clicks_count on a post when a user taps it. One click per user per post."""
+    db = get_database()
+    user_id = str(current_user["_id"])
+
+    # Check if this user already clicked this post
+    existing_click = await db.post_clicks.find_one({
+        "post_id": post_id,
+        "user_id": user_id
+    })
+
+    if existing_click:
+        return {"status": "already_clicked"}
+
+    # Record the click
+    await db.post_clicks.insert_one({
+        "post_id": post_id,
+        "user_id": user_id,
+        "created_at": datetime.utcnow()
+    })
+
+    # Increment clicks_count — try user posts first, then restaurant posts
+    result = await db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"clicks_count": 1}}
+    )
+    if result.matched_count == 0:
+        await db.restaurant_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"clicks_count": 1}}
+        )
+
+    return {"status": "ok"}
+
+# ==================== POST VIEW TRACKING ====================
+
+@app.post("/api/posts/{post_id}/view")
+async def track_post_view(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Increment views_count on a video post when a user watches it. One view per user per post."""
+    db = get_database()
+    user_id = str(current_user["_id"])
+
+    # Check if this user already viewed this post
+    existing_view = await db.post_views.find_one({
+        "post_id": post_id,
+        "user_id": user_id
+    })
+
+    if existing_view:
+        return {"status": "already_viewed"}
+
+    # Record the view
+    await db.post_views.insert_one({
+        "post_id": post_id,
+        "user_id": user_id,
+        "created_at": datetime.utcnow()
+    })
+
+    # Increment views_count — try user posts first, then restaurant posts
+    result = await db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"views_count": 1}}
+    )
+    if result.matched_count == 0:
+        await db.restaurant_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"views_count": 1}}
+        )
+
+    return {"status": "ok"}
 
 # ==================== LIKES ENDPOINTS ====================
 
