@@ -354,11 +354,16 @@ async def get_area_posts(
             sw_lat = latitude - 0.015
             sw_lng = longitude - 0.015
 
-        # Step 2: Query posts within the bounding box
-        all_posts = await db.posts.find({
+        # Step 2: Query posts within the bounding box (both user posts and restaurant posts)
+        bounds_query = {
             "latitude": {"$gte": sw_lat, "$lte": ne_lat},
             "longitude": {"$gte": sw_lng, "$lte": ne_lng},
-        }).sort("created_at", -1).to_list(None)
+        }
+        user_posts = await db.posts.find(bounds_query).sort("created_at", -1).to_list(None)
+        restaurant_posts = await db.restaurant_posts.find(bounds_query).sort("created_at", -1).to_list(None)
+        all_posts = user_posts + restaurant_posts
+        # Sort combined results by created_at descending
+        all_posts.sort(key=lambda p: p.get("created_at") or datetime.min, reverse=True)
 
         results = []
         for post in all_posts:

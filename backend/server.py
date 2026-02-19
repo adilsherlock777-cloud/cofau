@@ -1917,6 +1917,49 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
     
     return result
 
+
+@app.get("/api/liked/list")
+async def list_liked_posts(skip: int = 0, limit: int = 100, current_user: dict = Depends(get_current_user)):
+    """Get posts liked by the current user (latest 100 max)"""
+    db = get_database()
+    user_id = str(current_user["_id"])
+
+    limit = min(limit, 100)
+
+    likes = await db.likes.find({"user_id": user_id}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    result = []
+    for like in likes:
+        post = await db.posts.find_one({"_id": ObjectId(like["post_id"])})
+        if not post:
+            continue
+
+        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        media_type = post.get("media_type", "image")
+
+        result.append({
+            "_id": str(post["_id"]),
+            "id": str(post["_id"]),
+            "user_id": post["user_id"],
+            "username": user.get("username", "Unknown") if user else "Unknown",
+            "full_name": user.get("full_name", user.get("username", "Unknown")) if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "media_url": post.get("media_url", ""),
+            "media_type": media_type,
+            "thumbnail_url": post.get("thumbnail_url"),
+            "rating": post.get("rating", 0),
+            "review_text": post.get("review_text", ""),
+            "location_name": post.get("location_name"),
+            "dish_name": post.get("dish_name"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "created_at": post["created_at"],
+            "liked_at": like.get("created_at"),
+        })
+
+    return result
+
+
 @app.delete("/api/posts/{post_id}")
 async def delete_post(post_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a post and its associated media file"""

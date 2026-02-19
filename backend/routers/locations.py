@@ -29,16 +29,20 @@ async def get_top_locations(
         
         print("🔍 Fetching top locations...")
         
-        # Fetch all posts with location data (check multiple fields)
+        # Fetch all posts with location data from both collections
         # Sort by created_at descending (latest first) to get newest posts first
-        posts_with_location = await db.posts.find({
+        location_query = {
             "$or": [
                 {"location_name": {"$exists": True, "$ne": None, "$ne": ""}},
                 {"map_link": {"$exists": True, "$ne": None, "$ne": ""}},
             ]
-        }).sort("created_at", -1).to_list(None)  # Sort by created_at descending (latest first)
-        
-        print(f"📊 Found {len(posts_with_location)} posts with location data")
+        }
+        user_posts = await db.posts.find(location_query).sort("created_at", -1).to_list(None)
+        restaurant_posts = await db.restaurant_posts.find(location_query).sort("created_at", -1).to_list(None)
+        posts_with_location = user_posts + restaurant_posts
+        posts_with_location.sort(key=lambda p: p.get("created_at") or datetime.min, reverse=True)
+
+        print(f"📊 Found {len(posts_with_location)} posts with location data (user: {len(user_posts)}, restaurant: {len(restaurant_posts)})")
         
         # Group posts by location_name
         # Store images with their creation dates for sorting
@@ -194,31 +198,48 @@ async def get_location_details(
         
         # Normalize location name
         location_normalized = location_name.strip().title()
-        
-        # Find all posts for this location (search by location_name)
-        posts = await db.posts.find({
-            "location_name": {"$regex": f"^{location_normalized}$", "$options": "i"}
+
+        # Find all posts for this location from both collections
+        location_regex = {"$regex": f"^{location_normalized}$", "$options": "i"}
+        user_posts = await db.posts.find({
+            "location_name": location_regex
         }).sort("created_at", -1).to_list(None)
-        
+        restaurant_posts = await db.restaurant_posts.find({
+            "location_name": location_regex
+        }).sort("created_at", -1).to_list(None)
+        posts = user_posts + restaurant_posts
+        posts.sort(key=lambda p: p.get("created_at") or datetime.min, reverse=True)
+
         # Format posts
         formatted_posts = []
         for post in posts:
-            # Get user details
-            user = await db.users.find_one({"_id": post["user_id"]})
-            
+            # Get user details - handle both user_id and restaurant_id
+            user = None
+            user_id = post.get("user_id") or post.get("restaurant_id")
+            if user_id:
+                try:
+                    user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+                    user = await db.users.find_one({"_id": user_id_obj})
+                except Exception:
+                    pass
+
             formatted_posts.append({
                 "id": str(post["_id"]),
                 "media_url": post.get("media_url"),
                 "image_url": post.get("image_url") or post.get("media_url"),
+                "thumbnail_url": post.get("thumbnail_url"),
                 "rating": post.get("rating"),
                 "review_text": post.get("review_text"),
                 "location_name": post.get("location_name"),
                 "location": post.get("location_name"),  # For backward compatibility
                 "media_type": post.get("media_type", "image"),
+                "dish_name": post.get("dish_name"),
+                "clicks_count": post.get("clicks_count", 0),
+                "views_count": post.get("views_count", 0),
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "created_at": post.get("created_at").isoformat() if post.get("created_at") else None,
-                "user_id": str(post.get("user_id", "")),
+                "user_id": str(user_id) if user_id else "",
                 "user": {
                     "id": str(user["_id"]) if user else None,
                     "username": user.get("full_name") or user.get("username") if user else "Unknown",
@@ -270,10 +291,11 @@ async def get_nearby_locations(
     """
     db = get_database()
     
-    # Get all posts with location_name
-    all_posts = await db.posts.find({
-        "location_name": {"$exists": True, "$ne": None, "$ne": ""}
-    }).to_list(None)
+    # Get all posts with location_name from both collections
+    location_name_query = {"location_name": {"$exists": True, "$ne": None, "$ne": ""}}
+    user_posts = await db.posts.find(location_name_query).to_list(None)
+    restaurant_posts = await db.restaurant_posts.find(location_name_query).to_list(None)
+    all_posts = user_posts + restaurant_posts
     
     # Group posts by location_name and calculate distance
     location_map = {}
