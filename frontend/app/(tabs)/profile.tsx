@@ -21,7 +21,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { useProfileRefresh } from './_layout';
 import LevelBadge from '../../components/LevelBadge';
 import UserAvatar from '../../components/UserAvatar';
 import ProfileBadge from '../../components/ProfileBadge';
@@ -369,9 +371,11 @@ const LoadingFooter = () => (
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { userId } = useLocalSearchParams();
   const auth = useAuth() as any;
   const { token, logout, user: currentUser, accountType } = auth;
+  const { register: registerProfileRefresh } = useProfileRefresh();
 
   const [userData, setUserData] = useState<any>(null);
   const [userStats, setUserStats] = useState<any>(null);
@@ -400,6 +404,9 @@ export default function ProfileScreen() {
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [complimentsListModalVisible, setComplimentsListModalVisible] = useState(false);
+  const [complimentsList, setComplimentsList] = useState<any[]>([]);
+  const [loadingComplimentsList, setLoadingComplimentsList] = useState(false);
   const [followingStatus, setFollowingStatus] = useState<{ [key: string]: boolean }>({});
   const sidebarAnimation = useRef(new Animated.Value(0)).current;
   const [bannerImage, setBannerImage] = useState<string | null>(null);
@@ -452,6 +459,16 @@ export default function ProfileScreen() {
       return;
     }
     fetchProfileData();
+  }, [token, userId]);
+
+  // Register double-tap Profile tab handler: refresh own profile
+  useEffect(() => {
+    registerProfileRefresh(() => {
+      if (navigation.isFocused() && token) {
+        setLoading(true);
+        fetchProfileData();
+      }
+    });
   }, [token, userId]);
 
   useFocusEffect(
@@ -1007,6 +1024,23 @@ const loadMorePosts = () => {
     } catch (err) {
       console.error('❌ Error fetching compliments count:', err);
       setComplimentsCount(0);
+    }
+  };
+
+  const fetchReceivedCompliments = async () => {
+    if (!token) return;
+    setLoadingComplimentsList(true);
+    try {
+      const response = await axios.get(`${API_URL}/compliments/received`, {
+        params: { limit: 100 },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setComplimentsList(response.data || []);
+    } catch (err) {
+      console.error('Error fetching received compliments:', err);
+      setComplimentsList([]);
+    } finally {
+      setLoadingComplimentsList(false);
     }
   };
 
@@ -3031,6 +3065,21 @@ const renderRestaurantProfile = () => {
                 style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
+                  router.push('/liked-posts');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="heart-outline" size={24} color="#E94A37" />
+                </View>
+                <Text style={styles.sidebarMenuText}>Liked Posts</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
                   router.push('/blocked-users');
                 }}
                 activeOpacity={0.7}
@@ -4346,10 +4395,14 @@ if (isRestaurantProfile) {
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>People</Text>
         </TouchableOpacity>
         <View style={styles.statDivider} />
-        <View style={styles.statBox}>
+        <TouchableOpacity
+          style={styles.statBox}
+          onPress={() => { if (isOwnProfile) { setComplimentsListModalVisible(true); fetchReceivedCompliments(); } }}
+          activeOpacity={isOwnProfile ? 0.7 : 1}
+        >
           <Text style={styles.statValue}>{complimentsCount}</Text>
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Compliments</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
     </BlurView>
@@ -4408,10 +4461,14 @@ if (isRestaurantProfile) {
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>People</Text>
         </TouchableOpacity>
         <View style={styles.statDivider} />
-        <View style={styles.statBox}>
+        <TouchableOpacity
+          style={styles.statBox}
+          onPress={() => { if (isOwnProfile) { setComplimentsListModalVisible(true); fetchReceivedCompliments(); } }}
+          activeOpacity={isOwnProfile ? 0.7 : 1}
+        >
           <Text style={styles.statValue}>{complimentsCount}</Text>
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Compliments</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
     </View>
@@ -4741,6 +4798,21 @@ if (isRestaurantProfile) {
                   <Ionicons name="bookmark-outline" size={24} color="#333" />
                 </View>
                 <Text style={styles.sidebarMenuText}>Saved Posts</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  router.push('/liked-posts');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="heart-outline" size={24} color="#E94A37" />
+                </View>
+                <Text style={styles.sidebarMenuText}>Liked Posts</Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
@@ -5102,6 +5174,67 @@ if (isRestaurantProfile) {
                     </TouchableOpacity>
                   );
                 }}
+                contentContainerStyle={styles.followersListContent}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= COMPLIMENTS LIST MODAL ================= */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={complimentsListModalVisible}
+        onRequestClose={() => setComplimentsListModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Compliments</Text>
+              <TouchableOpacity onPress={() => setComplimentsListModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            {loadingComplimentsList ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#4dd0e1" />
+                <Text style={styles.loadingText}>Loading compliments...</Text>
+              </View>
+            ) : complimentsList.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="heart-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>No compliments yet</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={complimentsList}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={styles.complimentListItem}>
+                    <UserAvatar
+                      profilePicture={item.from_user_profile_picture}
+                      username={item.from_user_name}
+                      size={44}
+                      level={1}
+                      showLevelBadge={false}
+                      style={{ marginRight: 12 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.complimentListName}>
+                        {item.compliment_icon} {item.compliment_name}
+                      </Text>
+                      {item.compliment_type === 'custom' && item.custom_message ? (
+                        <Text style={styles.complimentCustomMsg}>"{item.custom_message}"</Text>
+                      ) : null}
+                      <Text style={styles.complimentListFrom}>
+                        from {item.from_user_name}
+                        {item.created_at ? '  ·  ' + new Date(item.created_at).toLocaleDateString() : ''}
+                      </Text>
+                    </View>
+                  </View>
+                )}
                 contentContainerStyle={styles.followersListContent}
               />
             )}
@@ -7541,6 +7674,30 @@ statDivider: {
   },
   followerFollowingButtonText: {
     color: '#fff',
+  },
+  complimentListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  complimentListName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  complimentCustomMsg: {
+    fontSize: 13,
+    color: '#555',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  complimentListFrom: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 3,
   },
   levelDetailsContent: {
     maxHeight: 400,

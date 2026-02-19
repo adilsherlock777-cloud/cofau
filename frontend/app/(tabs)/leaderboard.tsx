@@ -202,6 +202,13 @@ export default function LeaderboardScreen() {
   const [loadingRewardsHistory, setLoadingRewardsHistory] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
 
+  // When accountType loads async, ensure restaurant users default to "Your Orders"
+  useEffect(() => {
+    if (isRestaurant && activeTab === "Near Me") {
+      setActiveTab("Your Orders");
+    }
+  }, [isRestaurant]);
+
   useEffect(() => {
     if (token) {
       if (isRestaurant) {
@@ -3646,23 +3653,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   vendorCardOuter: {
-    marginHorizontal: 0,
-    marginBottom: 12,
+    marginHorizontal: 8,
+    marginBottom: 14,
     borderRadius: 15,
     backgroundColor: '#fff',
-  },
-  vendorCard: {
-    borderRadius: 15,
-    marginBottom: 6,
-    padding: 12,
-    marginHorizontal: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
+    elevation: 3,
+    borderWidth: Platform.OS === 'android' ? 1 : 0,
     borderColor: "#E8E8E8",
+  },
+  vendorCard: {
+    borderRadius: 15,
+    padding: 12,
     overflow: 'hidden',
   },
   vendorHeader: {

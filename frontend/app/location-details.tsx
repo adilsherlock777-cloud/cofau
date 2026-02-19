@@ -203,6 +203,7 @@ export default function LocationDetailsScreen() {
         return {
           ...post,
           full_image_url: fullUrl,
+          full_thumbnail_url: fixUrl(post.thumbnail_url),
           is_liked: false,
           _isVideo: isVideoFile(fullUrl || '', post.media_type),
           category: post.category ? post.category.trim() : null,
@@ -238,6 +239,11 @@ export default function LocationDetailsScreen() {
   
   return true;
 });
+  const formatCount = (count: number) => {
+    if (!count) return '0';
+    return count > 1000 ? `${(count / 1000).toFixed(1)}K` : String(count);
+  };
+
   // ==================================
   // 🔳 Render Grid Tile
   // ==================================
@@ -245,6 +251,10 @@ export default function LocationDetailsScreen() {
     const displayImg = item._isVideo
       ? item.full_thumbnail_url || item.full_image_url
       : item.full_image_url;
+
+    const clicksCount = item.clicks_count || 0;
+    const viewsCount = item.views_count || 0;
+    const dishName = item.dish_name;
 
     return (
       <TouchableOpacity
@@ -264,6 +274,19 @@ export default function LocationDetailsScreen() {
         {item._isVideo && (
           <View style={styles.playIcon}>
             <Ionicons name="play-circle" size={28} color="#fff" />
+          </View>
+        )}
+
+        {(clicksCount > 0 || viewsCount > 0) && (
+          <View style={styles.clicksBadge}>
+            <Ionicons name="eye-outline" size={10} color="#fff" />
+            <Text style={styles.clicksText}>{formatCount(viewsCount || clicksCount)}</Text>
+          </View>
+        )}
+
+        {dishName && (
+          <View style={styles.dishTag}>
+            <Text style={styles.dishText} numberOfLines={1}>{dishName}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -560,6 +583,39 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
     padding: 4,
     borderRadius: 20,
+  },
+
+  clicksBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
+  },
+  clicksText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  dishTag: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    backgroundColor: "rgba(233, 74, 55, 0.85)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    maxWidth: "80%",
+  },
+  dishText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
   },
 
   // Empty State

@@ -1183,7 +1183,7 @@ const StatCard = ({ icon, label, value, color, subtitle }: { icon: string; label
     <View style={[styles.dashboardStatIconContainer, { backgroundColor: color + '15' }]}>
       <Ionicons name={icon as any} size={24} color={color} />
     </View>
-    <Text style={styles.dashboardStatValue}>{value.toLocaleString()}</Text>
+    <Text style={styles.dashboardStatValue}>{(value ?? 0).toLocaleString()}</Text>
     <Text style={styles.dashboardStatLabel}>{label}</Text>
     {subtitle && <Text style={styles.dashboardStatSubtitle}>{subtitle}</Text>}
   </View>
@@ -1205,7 +1205,7 @@ const LargeStatCard = ({ icon, label, value, color, trend }: { icon: string; lab
         )}
       </View>
     </View>
-    <Text style={[styles.dashboardLargeStatValue, { color: color }]}>{value.toLocaleString()}</Text>
+    <Text style={[styles.dashboardLargeStatValue, { color: color }]}>{(value ?? 0).toLocaleString()}</Text>
   </View>
 );
 
@@ -1323,6 +1323,9 @@ export default function ExploreScreen() {
   const router = useRouter();
   const auth = useAuth() as { user: any; token: string | null; accountType: string | null };
   const { user, token, accountType } = auth;
+
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const mapRef = useRef<typeof MapView>(null);
@@ -1497,12 +1500,12 @@ const centerOnUserLocation = useCallback(async () => {
     // Return cached location if available (instant!)
     if (cachedUserLocation.current) {
       console.log('Using cached location - instant!');
-      setUserLocation(cachedUserLocation.current);
+      if (mountedRef.current) setUserLocation(cachedUserLocation.current);
       return cachedUserLocation.current;
     }
-    
+
     const hasPermission = await requestLocationPermission();
-    if (!hasPermission) return null;
+    if (!hasPermission || !mountedRef.current) return null;
 
     // Try to get last known location first (instant)
     try {
@@ -1513,13 +1516,15 @@ const centerOnUserLocation = useCallback(async () => {
           longitude: lastKnown.coords.longitude,
         };
         cachedUserLocation.current = coords;
-        setUserLocation(coords);
+        if (mountedRef.current) setUserLocation(coords);
         console.log('Using last known location - fast!');
         return coords;
       }
     } catch (e) {
       console.log('Last known location not available');
     }
+
+    if (!mountedRef.current) return null;
 
     // Fallback to current position (slower but accurate)
     console.log('Getting fresh GPS location...');
@@ -1534,9 +1539,10 @@ const centerOnUserLocation = useCallback(async () => {
 
     // Cache the location
     cachedUserLocation.current = coords;
-    setUserLocation(coords);
+    if (mountedRef.current) setUserLocation(coords);
     return coords;
   } catch (error) {
+    if (!mountedRef.current) return null;
     console.log("Get location error:", error);
     Alert.alert("Location Error", "Could not get your current location. Please try again.");
     return null;
@@ -1553,14 +1559,14 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
   // If we have cached posts and not forcing refresh, use cache
   if (!forceRefresh && !searchTerm && cachedMapPosts.current.length > 0) {
     console.log('Using cached posts:', cachedMapPosts.current.length);
-    setMapPosts(cachedMapPosts.current);
+    if (mountedRef.current) setMapPosts(cachedMapPosts.current);
     return;
   }
 
   setMapLoading(true);
   try {
     let url: string;
-    
+
     if (searchTerm && searchTerm.trim()) {
       url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
     } else {
@@ -1572,6 +1578,7 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token || ""}` },
     });
+    if (!mountedRef.current) return;
 
     if (searchTerm && searchTerm.trim()) {
       // Search results - don't cache these
@@ -1618,9 +1625,10 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
       setMapRestaurants(restaurants);
     }
   } catch (error) {
+    if (!mountedRef.current) return;
     console.log("Fetch map pins error:", error);
   } finally {
-    setMapLoading(false);
+    if (mountedRef.current) setMapLoading(false);
   }
 };
 
@@ -1648,6 +1656,7 @@ const fetchFollowersPosts = async (forceRefresh = false) => {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token || ""}` },
     });
+    if (!mountedRef.current) return;
 
     console.log('📦 Followers API response:', response.data);
 
@@ -1674,24 +1683,26 @@ const fetchFollowersPosts = async (forceRefresh = false) => {
     setMapPosts(processedPosts);
     setMapRestaurants([]); // Clear restaurants when showing followers
   } catch (error) {
+    if (!mountedRef.current) return;
     console.error("❌ Fetch followers posts error:", error);
     // If there's an error, clear the map posts
     setMapPosts([]);
     setMapRestaurants([]);
   } finally {
-    setMapLoading(false);
+    if (mountedRef.current) setMapLoading(false);
   }
 };
 
 // Fetch analytics for restaurant dashboard
 const fetchAnalytics = async () => {
-  if (accountType !== 'restaurant') return;
+  if (accountType !== 'restaurant' || !token) return;
 
   setDashboardLoading(true);
   try {
     const response = await axios.get(`${API_URL}/restaurant/analytics`, {
       headers: { Authorization: `Bearer ${token}` }
     });
+    if (!mountedRef.current) return;
 
     setAnalytics({
       total_posts: response.data.total_posts || 0,
@@ -1707,22 +1718,10 @@ const fetchAnalytics = async () => {
       post_clicks_trend: response.data.post_clicks_trend || '',
     });
   } catch (error) {
+    if (!mountedRef.current) return;
     console.error('Error fetching analytics:', error);
-    setAnalytics({
-      total_posts: 0,
-      followers_count: 0,
-      customer_reviews: 0,
-      profile_views: 0,
-      profile_views_trend: '',
-      profile_visits: 0,
-      profile_visits_trend: '',
-      search_appearances: 0,
-      search_appearances_trend: '',
-      post_clicks: 0,
-      post_clicks_trend: '',
-    });
   } finally {
-    setDashboardLoading(false);
+    if (mountedRef.current) setDashboardLoading(false);
   }
 };
 
@@ -2025,21 +2024,22 @@ useEffect(() => {
       }
       
       const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
-      
+      if (!mountedRef.current) return;
+
       let postsData = res.data;
-      
-      if (postsData.length === 0) { 
-        setHasMore(false); 
-        if (refresh) setPosts([]); 
-        return; 
+
+      if (postsData.length === 0) {
+        setHasMore(false);
+        if (refresh) setPosts([]);
+        return;
       }
-      
+
       const newPosts = postsData.map((post: any) => {
         const fullUrl = fixUrl(post.media_url || post.image_url);
-        return { 
-          ...post, 
-          full_image_url: fullUrl, 
-          full_thumbnail_url: fixUrl(post.thumbnail_url), 
+        return {
+          ...post,
+          full_image_url: fullUrl,
+          full_thumbnail_url: fixUrl(post.thumbnail_url),
           is_liked: post.is_liked_by_user || false,
           is_clicked: post.is_clicked_by_user || false,
           is_viewed: post.is_viewed_by_user || false,
@@ -2048,22 +2048,24 @@ useEffect(() => {
           aspect_ratio: post.aspect_ratio || null
         };
       });
-      
-      if (refresh) { 
-        setPosts(newPosts); 
-        setPage(2); 
-      } else { 
-        setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]); 
-        setPage((prev) => prev + 1); 
+
+      if (refresh) {
+        setPosts(newPosts);
+        setPage(2);
+      } else {
+        setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]);
+        setPage((prev) => prev + 1);
       }
-      
+
       if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
-    } catch (err) { 
-      console.error("Fetch error:", err); 
-    } finally { 
-      setLoading(false); 
-      setLoadingMore(false); 
-      setRefreshing(false); 
+    } catch (err) {
+      if (!mountedRef.current) return;
+      console.error("Fetch error:", err);
+    } finally {
+      if (!mountedRef.current) return;
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
     }
   };
 
@@ -2078,11 +2080,13 @@ useEffect(() => {
     setTopPostsLoading(true);
     try {
       const res = await axios.get(`${API_URL}/posts/last-3-days`, { headers: { Authorization: `Bearer ${token || ""}` } });
+      if (!mountedRef.current) return;
       setTopPosts(res.data);
     } catch (err) {
+      if (!mountedRef.current) return;
       console.log("Error fetching top posts:", err);
     } finally {
-      setTopPostsLoading(false);
+      if (mountedRef.current) setTopPostsLoading(false);
     }
   };
   const performSearch = () => { if (searchQuery.trim()) router.push({ pathname: "/search-results", params: { query: searchQuery.trim() } }); };

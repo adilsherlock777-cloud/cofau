@@ -36,11 +36,19 @@ export default function LocationPostsScreen() {
     router.push(`/post-details/${postId}`);
   };
 
+  const formatCount = (count: number) => {
+    if (!count) return '0';
+    return count > 1000 ? `${(count / 1000).toFixed(1)}K` : String(count);
+  };
+
   const renderPost = ({ item }: any) => {
     const mediaUrl = fixUrl(item.thumbnail_url || item.media_url);
     const isVideo = item.media_type === 'video' ||
                     mediaUrl?.toLowerCase().endsWith('.mp4') ||
                     mediaUrl?.toLowerCase().endsWith('.mov');
+    const clicksCount = item.clicks_count || 0;
+    const viewsCount = item.views_count || 0;
+    const dishName = item.dish_name;
 
     return (
       <TouchableOpacity
@@ -62,6 +70,21 @@ export default function LocationPostsScreen() {
         {isVideo && (
           <View style={styles.videoIndicator}>
             <Ionicons name="play-circle" size={24} color="#fff" />
+          </View>
+        )}
+
+        {/* Clicks/Views badge */}
+        {(clicksCount > 0 || viewsCount > 0) && (
+          <View style={styles.clicksBadge}>
+            <Ionicons name="eye-outline" size={10} color="#fff" />
+            <Text style={styles.clicksText}>{formatCount(viewsCount || clicksCount)}</Text>
+          </View>
+        )}
+
+        {/* Dish name tag */}
+        {dishName && (
+          <View style={styles.dishTag}>
+            <Text style={styles.dishText} numberOfLines={1}>{dishName}</Text>
           </View>
         )}
 
@@ -193,5 +216,37 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 10,
     fontWeight: "bold",
+  },
+  clicksBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
+  },
+  clicksText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  dishTag: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    backgroundColor: "rgba(233, 74, 55, 0.85)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    maxWidth: "80%",
+  },
+  dishText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
   },
 });

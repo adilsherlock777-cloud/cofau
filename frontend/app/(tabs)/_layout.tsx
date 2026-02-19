@@ -17,10 +17,23 @@ const FeedRefreshContext = createContext<{
 
 export const useFeedRefresh = () => useContext(FeedRefreshContext);
 
+// Context to let profile.tsx know when Profile tab is double-tapped
+type ProfileRefreshFn = () => void;
+const ProfileRefreshContext = createContext<{
+  register: (fn: ProfileRefreshFn) => void;
+  trigger: () => void;
+}>({
+  register: () => {},
+  trigger: () => {},
+});
+
+export const useProfileRefresh = () => useContext(ProfileRefreshContext);
+
 export default function TabsLayout() {
   const { accountType } = useAuth();
   const isRestaurant = accountType === "restaurant";
   const feedRefreshRef = useRef<FeedRefreshFn | null>(null);
+  const profileRefreshRef = useRef<ProfileRefreshFn | null>(null);
 
   const feedRefreshValue = {
     register: (fn: FeedRefreshFn) => {
@@ -31,8 +44,18 @@ export default function TabsLayout() {
     },
   };
 
+  const profileRefreshValue = {
+    register: (fn: ProfileRefreshFn) => {
+      profileRefreshRef.current = fn;
+    },
+    trigger: () => {
+      profileRefreshRef.current?.();
+    },
+  };
+
   return (
     <FeedRefreshContext.Provider value={feedRefreshValue}>
+    <ProfileRefreshContext.Provider value={profileRefreshValue}>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -161,8 +184,14 @@ export default function TabsLayout() {
                 <Ionicons name="person-outline" size={20} color="#000" />
               ),
           }}
+          listeners={{
+            tabPress: () => {
+              profileRefreshRef.current?.();
+            },
+          }}
         />
       </Tabs>
+    </ProfileRefreshContext.Provider>
     </FeedRefreshContext.Provider>
   );
 }
