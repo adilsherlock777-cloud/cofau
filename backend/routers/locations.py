@@ -109,6 +109,9 @@ async def get_top_locations(
                     "thumbnail_url": thumbnail_url,
                     "media_type": media_type,
                     "user_level": user_level,
+                    "dish_name": post.get("dish_name"),
+                    "clicks_count": post.get("clicks_count", 0),
+                    "views_count": post.get("views_count", 0),
                     "created_at": created_at if created_at else datetime.utcnow()  # Use current time as fallback
                 })
             
@@ -136,7 +139,10 @@ async def get_top_locations(
                     "url": img["url"],
                     "thumbnail_url": thumbnail_url,  # Include thumbnail in images_data
                     "user_level": img.get("user_level", 1),
-                    "media_type": img.get("media_type", "image")
+                    "media_type": img.get("media_type", "image"),
+                    "dish_name": img.get("dish_name"),
+                    "clicks_count": img.get("clicks_count", 0),
+                    "views_count": img.get("views_count", 0),
                 })
                 thumbnails.append(thumbnail_url)
             
@@ -324,7 +330,10 @@ async def get_nearby_locations(
                     "media_url": media_url,
                     "thumbnail_url": post.get("thumbnail_url"),
                     "media_type": post.get("media_type", "image"),
-                    "post_id": str(post["_id"])
+                    "post_id": str(post["_id"]),
+                    "dish_name": post.get("dish_name"),
+                    "clicks_count": post.get("clicks_count", 0),
+                    "views_count": post.get("views_count", 0),
                 })
         
         # Collect map_link if not set

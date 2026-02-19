@@ -20,6 +20,7 @@ import { BlurView } from 'expo-blur';
 import * as Location from 'expo-location';
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SalesDashboard } from './SalesDashboard';
 
 export const options = {
@@ -183,6 +184,7 @@ export default function HappeningPlaces() {
   const [areaSearchQuery, setAreaSearchQuery] = useState('');
   const [areaSearchResults, setAreaSearchResults] = useState([]);
   const [areaSearching, setAreaSearching] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
   const searchTimerRef = useRef(null);
 
   // Track if initial load has happened to prevent duplicate fetch
@@ -407,6 +409,7 @@ export default function HappeningPlaces() {
       setAreaPosts([]);
     } else {
       fetchAreaPosts(area);
+      saveRecentSearch(area);
     }
   };
 
@@ -439,6 +442,47 @@ export default function HappeningPlaces() {
     }, 400);
   };
 
+  // Recent searches - load from AsyncStorage
+  const RECENT_SEARCHES_KEY = 'happeningplaces_recent_searches';
+  const MAX_RECENT_SEARCHES = 8;
+
+  const loadRecentSearches = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.log('Error loading recent searches:', e);
+    }
+  };
+
+  const saveRecentSearch = async (area) => {
+    try {
+      const stored = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+      let searches = stored ? JSON.parse(stored) : [];
+      // Remove duplicate if exists
+      searches = searches.filter((s) => s.name !== area.name);
+      // Add to front
+      searches.unshift({ name: area.name, latitude: area.latitude, longitude: area.longitude, distance_km: area.distance_km });
+      // Limit
+      searches = searches.slice(0, MAX_RECENT_SEARCHES);
+      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches));
+      setRecentSearches(searches);
+    } catch (e) {
+      console.log('Error saving recent search:', e);
+    }
+  };
+
+  const clearRecentSearches = async () => {
+    try {
+      await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+      setRecentSearches([]);
+    } catch (e) {
+      console.log('Error clearing recent searches:', e);
+    }
+  };
+
   const handleLocationPress = (location) => {
     setPlayingVideos([]);
     const locationName = location.location || location.location_name;
@@ -454,6 +498,11 @@ export default function HappeningPlaces() {
   // RENDER MEDIA HELPER
   // ============================================
 
+  const formatCount = (count) => {
+    if (!count) return '0';
+    return count > 1000 ? `${(count / 1000).toFixed(1)}K` : String(count);
+  };
+
   const renderMediaItem = (imageUrl, imgIndex, imagesData, thumbnails, locationKey) => {
     const fixedUrl = fixUrl(imageUrl, { thumbnail: true });
     const imageData = imagesData[imgIndex] || {};
@@ -461,25 +510,47 @@ export default function HappeningPlaces() {
       ? fixUrl(imageData.thumbnail_url)
       : (thumbnails[imgIndex] ? fixUrl(thumbnails[imgIndex]) : null);
     const isVideo = isVideoFile(imageUrl) || imageData.media_type === 'video';
-    
+    const dishName = imageData.dish_name;
+    const clicksCount = imageData.clicks_count || 0;
+    const viewsCount = imageData.views_count || 0;
+
     const videoId = `${locationKey}-${imgIndex}`;
+
+    // Overlay badges for dish name and clicks
+    const overlayBadges = (
+      <>
+        {(clicksCount > 0 || viewsCount > 0) && (
+          <View style={styles.gridClicksBadge}>
+            <Ionicons name="eye-outline" size={9} color="#fff" />
+            <Text style={styles.gridClicksText}>{formatCount(viewsCount || clicksCount)}</Text>
+          </View>
+        )}
+        {dishName && (
+          <View style={styles.gridDishTag}>
+            <Text style={styles.gridDishText} numberOfLines={1}>{dishName}</Text>
+          </View>
+        )}
+      </>
+    );
 
     if (isVideo) {
       if (!fixedUrl) return null;
       return (
-        <VideoThumbnail
-          key={imgIndex}
-          videoId={videoId}
-          videoUrl={fixedUrl}
-          thumbnailUrl={thumbnailUrl}
-          style={styles.gridImageContainer}
-          shouldPlay={playingVideos.includes(videoId)}
-          onLayout={(id, e) => {
-            e.target.measureInWindow((x, y, width, height) => {
-              videoPositions.current.set(id, { top: y, height });
-            });
-          }}
-        />
+        <View key={imgIndex} style={styles.gridImageContainer}>
+          <VideoThumbnail
+            videoId={videoId}
+            videoUrl={fixedUrl}
+            thumbnailUrl={thumbnailUrl}
+            style={StyleSheet.absoluteFill}
+            shouldPlay={playingVideos.includes(videoId)}
+            onLayout={(id, e) => {
+              e.target.measureInWindow((x, y, width, height) => {
+                videoPositions.current.set(id, { top: y, height });
+              });
+            }}
+          />
+          {overlayBadges}
+        </View>
       );
     } else {
       if (!fixedUrl) return null;
@@ -496,6 +567,7 @@ export default function HappeningPlaces() {
               console.error("❌ Image load error in HappeningPlaces:", fixedUrl, error);
             }}
           />
+          {overlayBadges}
         </View>
       );
     }
@@ -534,6 +606,10 @@ export default function HappeningPlaces() {
       };
     }, [token, userLocation])
   );
+
+  useEffect(() => {
+    loadRecentSearches();
+  }, []);
 
   useEffect(() => {
     if (topLocations.length > 0) {
@@ -680,19 +756,26 @@ export default function HappeningPlaces() {
           {/* SELECT YOUR FOOD SPOT Dropdown */}
           <View style={styles.dropdownWrapper}>
             <TouchableOpacity
-              style={styles.dropdownButton}
               onPress={() => setDropdownOpen(!dropdownOpen)}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
+              style={styles.dropdownButtonOuter}
             >
-              <Ionicons name="location" size={18} color="#E94A37" />
-              <Text style={styles.dropdownButtonText} numberOfLines={1}>
-                {selectedArea === 'All' ? 'SELECT YOUR FOOD SPOT' : selectedArea.name}
-              </Text>
-              <Ionicons
-                name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
-                size={18}
-                color="#666"
-              />
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.dropdownButton}
+              >
+                <Ionicons name="location" size={18} color="#fff" />
+                <Text style={styles.dropdownButtonText} numberOfLines={1}>
+                  {selectedArea === 'All' ? 'SELECT YOUR FOOD SPOT AROUND 50KM' : selectedArea.name}
+                </Text>
+                <Ionicons
+                  name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+                  size={18}
+                  color="#fff"
+                />
+              </LinearGradient>
             </TouchableOpacity>
 
             {dropdownOpen && (
@@ -755,6 +838,32 @@ export default function HappeningPlaces() {
                   </ScrollView>
                 ) : (
                   <>
+                    {/* Recent Searches */}
+                    {recentSearches.length > 0 && (
+                      <View style={styles.recentSearchesSection}>
+                        <View style={styles.recentSearchesHeader}>
+                          <Ionicons name="time-outline" size={14} color="#999" />
+                          <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
+                          <TouchableOpacity onPress={clearRecentSearches} style={styles.clearRecentBtn}>
+                            <Text style={styles.clearRecentText}>Clear</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentSearchesScroll} keyboardShouldPersistTaps="handled">
+                          {recentSearches.map((area, idx) => (
+                            <TouchableOpacity
+                              key={`recent-${idx}`}
+                              style={styles.recentSearchChip}
+                              onPress={() => handleAreaSelect(area)}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="location" size={12} color="#E94A37" />
+                              <Text style={styles.recentSearchChipText} numberOfLines={1}>{area.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+
                     {/* All option */}
                     <TouchableOpacity
                       style={[
@@ -763,10 +872,11 @@ export default function HappeningPlaces() {
                       ]}
                       onPress={() => handleAreaSelect('All')}
                     >
-                      <Ionicons name="grid" size={16} color={selectedArea === 'All' ? '#E94A37' : '#666'} />
+                      <Ionicons name="grid" size={18} color={selectedArea === 'All' ? '#E94A37' : '#666'} />
                       <Text
                         style={[
                           styles.dropdownItemText,
+                          { fontSize: 16, fontWeight: '700' },
                           selectedArea === 'All' && styles.dropdownItemTextActive,
                         ]}
                       >
@@ -832,7 +942,7 @@ export default function HappeningPlaces() {
             )}
           </View>
 
-          {/* Area Posts Grid - shown when a specific area is selected */}
+          {/* Area Vendor Cards - shown when a specific area is selected */}
           {selectedArea !== 'All' && (
             <View style={styles.areaPostsSection}>
               <Text style={styles.areaPostsTitle}>
@@ -846,40 +956,153 @@ export default function HappeningPlaces() {
                   <Text style={styles.emptyTitle}>No posts yet</Text>
                 </View>
               ) : (
-                <View style={styles.areaPostsGrid}>
-                  {areaPosts.map((post, idx) => {
-                    const mediaUrl = post.media_url || post.image_url;
-                    const isVideo = post.media_type === 'video' || isVideoFile(mediaUrl);
-                    const displayUrl = isVideo
-                      ? fixUrl(post.thumbnail_url || mediaUrl, { thumbnail: true })
-                      : fixUrl(mediaUrl, { thumbnail: true });
+                // Group posts by location_name and render as vendor cards
+                (() => {
+                  const grouped = {};
+                  areaPosts.forEach((post) => {
+                    const locName = post.location_name || selectedArea.name;
+                    if (!grouped[locName]) grouped[locName] = [];
+                    grouped[locName].push(post);
+                  });
+                  const areaLocations = Object.entries(grouped).map(([name, posts]) => {
+                    // Sort posts by latest first (newest created_at on top)
+                    const sorted = [...posts].sort((a, b) => {
+                      const dateA = a.created_at ? new Date(a.created_at) : 0;
+                      const dateB = b.created_at ? new Date(b.created_at) : 0;
+                      return dateB - dateA;
+                    });
+                    return {
+                      location: name,
+                      uploads: sorted.length,
+                      images: sorted.map((p) => p.media_url).filter(Boolean),
+                      thumbnails: sorted.map((p) => p.thumbnail_url).filter(Boolean),
+                      images_data: sorted.map((p) => ({
+                        media_type: p.media_type || 'image',
+                        thumbnail_url: p.thumbnail_url,
+                        dish_name: p.dish_name,
+                        clicks_count: p.clicks_count || 0,
+                        views_count: p.views_count || 0,
+                      })),
+                    };
+                  })
+                  // Sort by highest number of posts first
+                  .sort((a, b) => b.uploads - a.uploads);
 
-                    if (!displayUrl) return null;
+                  return areaLocations.map((location, index) => {
+                    const images = location.images || [];
+                    const thumbnails = location.thumbnails || [];
+                    const imagesData = location.images_data || [];
+                    const locationKey = `area-${location.location}-${index}`;
 
                     return (
                       <TouchableOpacity
-                        key={post.id || idx}
-                        style={styles.areaPostItem}
+                        key={locationKey}
+                        style={styles.cardOuter}
+                        onPress={() => handleLocationPress(location)}
                         activeOpacity={0.8}
-                        onPress={() => handleLocationPress({ location: post.location_name || selectedArea.name })}
                       >
-                        <Image
-                          source={{ uri: displayUrl }}
-                          style={styles.areaPostImage}
-                          contentFit="cover"
-                          placeholder={{ blurhash: BLUR_HASH }}
-                          transition={200}
-                          cachePolicy="disk"
-                        />
-                        {isVideo && (
-                          <View style={styles.areaPostVideoIcon}>
-                            <Ionicons name="play-circle" size={20} color="#fff" />
+                        <LinearGradient
+                          colors={['rgba(255, 122, 24, 0.35)', 'rgba(255, 122, 24, 0.15)', 'rgba(255, 255, 255, 1)']}
+                          locations={[0, 0.3, 1]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 0, y: 1 }}
+                          style={styles.card}
+                        >
+                          <View style={styles.cardHeader}>
+                            <View style={styles.rankNumber}>
+                              <LinearGradient
+                                colors={['#FF2E2E', '#FF7A18']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.rankGradient}
+                              >
+                                <Text style={styles.rankNumberText}>{index + 1}</Text>
+                              </LinearGradient>
+                            </View>
+                            <View style={styles.locationInfo}>
+                              <Text style={styles.locationName} numberOfLines={1}>
+                                {location.location}
+                              </Text>
+                              <Text style={styles.uploadCount}>
+                                ({formatUploadCount(location.uploads)} uploaded)
+                              </Text>
+                            </View>
                           </View>
-                        )}
+
+                          <View style={styles.imageGrid}>
+                            {images.length > 0 ? (
+                              <>
+                                {/* First Row - 3 images/videos */}
+                                <View style={styles.imageRow}>
+                                  {images.slice(0, 3).map((imageUrl, imgIndex) =>
+                                    renderMediaItem(imageUrl, imgIndex, imagesData, thumbnails, locationKey)
+                                  )}
+                                </View>
+
+                                {/* Second Row - 2 images/videos */}
+                                <View style={styles.imageRow}>
+                                  {images[3] && renderMediaItem(images[3], 3, imagesData, thumbnails, locationKey)}
+
+                                  {images.length === 5 ? (
+                                    renderMediaItem(images[4], 4, imagesData, thumbnails, locationKey)
+                                  ) : images.length > 5 ? (
+                                    <View style={styles.blurredImageWrapper}>
+                                      {(() => {
+                                        const imageData = imagesData[4] || {};
+                                        const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
+
+                                        let displayUrl = null;
+                                        if (isVideo) {
+                                          const thumbnailUrl = imageData.thumbnail_url
+                                            ? fixUrl(imageData.thumbnail_url)
+                                            : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
+                                          if (thumbnailUrl) {
+                                            displayUrl = thumbnailUrl;
+                                          } else {
+                                            displayUrl = fixUrl(images[4], { thumbnail: true });
+                                          }
+                                        } else {
+                                          displayUrl = fixUrl(images[4], { thumbnail: true });
+                                        }
+
+                                        if (!displayUrl) return null;
+                                        return (
+                                          <Image
+                                            source={{ uri: displayUrl }}
+                                            style={styles.gridImageSquare}
+                                            contentFit="cover"
+                                            blurRadius={8}
+                                            placeholder={{ blurhash: BLUR_HASH }}
+                                          />
+                                        );
+                                      })()}
+                                      <View style={styles.countButtonOverlay}>
+                                        <LinearGradient
+                                          colors={['#FF2E2E', '#FF7A18']}
+                                          start={{ x: 0, y: 0 }}
+                                          end={{ x: 1, y: 1 }}
+                                          style={styles.countButtonGradientBorder}
+                                        >
+                                          <Text style={styles.countButtonText}>
+                                            +{location.uploads || images.length}
+                                          </Text>
+                                        </LinearGradient>
+                                      </View>
+                                    </View>
+                                  ) : null}
+                                </View>
+                              </>
+                            ) : (
+                              <View style={styles.noImagePlaceholder}>
+                                <Ionicons name="image-outline" size={32} color="#CCC" />
+                              </View>
+                            )}
+                          </View>
+                        </LinearGradient>
                       </TouchableOpacity>
                     );
-                  })}
-                </View>
+                  });
+                })()
               )}
             </View>
           )}
@@ -1142,8 +1365,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFF',
     borderRadius: 15,
-    padding: 12,
-    marginHorizontal: 20,
+    padding: 14,
+    marginHorizontal: 16,
     marginBottom: 6,
     borderWidth: 1,
     borderColor: '#E8E8E8',
@@ -1166,7 +1389,7 @@ const styles = StyleSheet.create({
 
   gridImageContainer: {
     flex: 1,
-    height: 110,
+    height: 130,
     borderRadius: 10,
     overflow: 'hidden',
     position: 'relative',
@@ -1315,20 +1538,20 @@ skeletonImageRow: {
 },
 skeletonImage: {
   flex: 1,
-  height: 110,
+  height: 130,
   backgroundColor: '#E0E0E0',
   borderRadius: 10,
 },
 skeletonImageLarge: {
   flex: 1,
-  height: 110,
+  height: 130,
   backgroundColor: '#E0E0E0',
   borderRadius: 10,
 },
 
   gridImageSquare: {
     flex: 1,
-    height: 110,
+    height: 130,
     borderRadius: 10,
   },
 
@@ -1341,7 +1564,7 @@ skeletonImageLarge: {
 
   blurredImageWrapper: {
     flex: 1,
-    height: 110,
+    height: 130,
     position: 'relative',
     borderRadius: 10,
     overflow: 'hidden',
@@ -1575,27 +1798,29 @@ skeletonImageLarge: {
     marginBottom: 16,
     zIndex: 100,
   },
+  dropdownButtonOuter: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#FF5722',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
   dropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
     gap: 10,
   },
   dropdownButtonText: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.3,
   },
   dropdownList: {
     backgroundColor: '#fff',
@@ -1654,9 +1879,9 @@ skeletonImageLarge: {
     paddingVertical: 6,
   },
 
-  // Area Posts Grid styles
+  // Area Posts Section styles
   areaPostsSection: {
-    marginHorizontal: 20,
+    marginHorizontal: 0,
     marginBottom: 16,
   },
   areaPostsTitle: {
@@ -1664,6 +1889,7 @@ skeletonImageLarge: {
     fontWeight: '700',
     color: '#333',
     marginBottom: 12,
+    marginHorizontal: 20,
   },
   areaPostsGrid: {
     flexDirection: 'row',
@@ -1689,5 +1915,92 @@ skeletonImageLarge: {
     left: 4,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 12,
+  },
+
+  // Grid overlay badges (dish name + clicks)
+  gridClicksBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
+  },
+  gridClicksText: {
+    color: '#fff',
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  gridDishTag: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: 'rgba(233, 74, 55, 0.85)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 5,
+    maxWidth: '80%',
+  },
+  gridDishText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '600',
+  },
+
+  // Recent Searches styles
+  recentSearchesSection: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  recentSearchesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  recentSearchesTitle: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  clearRecentBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  clearRecentText: {
+    fontSize: 12,
+    color: '#E94A37',
+    fontWeight: '600',
+  },
+  recentSearchesScroll: {
+    marginBottom: 6,
+  },
+  recentSearchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F0',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#FFE0D0',
+  },
+  recentSearchChipText: {
+    fontSize: 13,
+    color: '#333',
+    fontWeight: '500',
+    maxWidth: 120,
   },
 });

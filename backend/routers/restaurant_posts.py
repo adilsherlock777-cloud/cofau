@@ -723,7 +723,10 @@ async def get_restaurant_profile_public(restaurant_id: str):
     
     # Get followers count
     followers_count = await db.follows.count_documents({"followingId": restaurant_id})
-    
+
+    # Get total completed orders count
+    total_orders = await db.orders.count_documents({"restaurant_id": restaurant_id, "status": "completed"})
+
     return {
         "id": str(restaurant["_id"]),
         "restaurant_name": restaurant.get("restaurant_name"),
@@ -737,6 +740,7 @@ async def get_restaurant_profile_public(restaurant_id: str):
         "food_type": restaurant.get("food_type"),
         "posts_count": posts_count,
         "reviews_count": restaurant.get("reviews_count", 0),
+        "total_orders": total_orders,
         "followers_count": followers_count,
         "is_verified": restaurant.get("is_verified", False),
         "account_type": "restaurant",

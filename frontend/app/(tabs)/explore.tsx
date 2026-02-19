@@ -60,7 +60,7 @@ const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 const MAX_CONCURRENT_VIDEOS = 2;
 
 // Mini confetti for rank 1 hero card
-const CONFETTI_ITEMS = ['🎉', '✨', '🏆', '⭐', '🥇', '🎯', '💫', '🔥', '❤️', '🌟', '🎀'];
+const CONFETTI_ITEMS = ['🎉', '✨', '🏆', '⭐', '🥇', '🎯', '💫', '🔥', '❤️', '🌟'];
 const CONFETTI_COUNT = 14;
 
 const ConfettiPiece = memo(({ index }: { index: number }) => {
@@ -2151,8 +2151,8 @@ return (
     <View style={styles.headerContainer}>
       {/* GRADIENT HEADER REMOVED - START DIRECTLY WITH SEARCH */}
 
-      {/* Search Box and Categories - Hidden for restaurant users */}
-      {accountType !== 'restaurant' && (
+      {/* Search Box and Categories - Hidden for restaurant users and Top tab */}
+      {accountType !== 'restaurant' && activeTab !== 'topPosts' && (
         <>
           {/* Search Box - Now at the top */}
           <View style={styles.searchBoxWrapper}>

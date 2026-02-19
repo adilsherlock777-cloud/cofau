@@ -1476,7 +1476,9 @@ export default function LeaderboardScreen() {
     const hasPosts = sortedPosts.length > 0;
     const vendorId = vendor?.id || vendor?.user_id || vendor?.restaurant_id;
     const profile = vendorId ? restaurantProfiles[String(vendorId)] : null;
-    const reviewsCount = profile?.reviews_count;
+    const avgRating = vendor.avgRating || profile?.average_rating || 0;
+    const hasRating = avgRating > 0;
+    const totalOrders = profile?.total_orders || 0;
     const goToVendorProfile = () => {
       if (vendorId) {
         router.push(`/profile?userId=${vendorId}`);
@@ -1484,7 +1486,14 @@ export default function LeaderboardScreen() {
     };
 
     return (
-      <View key={vendor.id} style={styles.vendorCard}>
+      <View key={vendor.id} style={styles.vendorCardOuter}>
+      <LinearGradient
+        colors={['rgba(255, 122, 24, 0.08)', 'rgba(255, 122, 24, 0.08)']}
+        locations={[0, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.vendorCard}
+      >
         {/* Vendor Header */}
         <TouchableOpacity
           style={styles.vendorHeader}
@@ -1515,7 +1524,7 @@ export default function LeaderboardScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Distance Row - Rating removed */}
+        {/* Distance, Ratings, Orders - all in one row */}
         <TouchableOpacity
           style={styles.vendorMetaRow}
           onPress={goToVendorProfile}
@@ -1524,33 +1533,35 @@ export default function LeaderboardScreen() {
           {vendor.distanceKm !== Infinity && (
             <View style={styles.vendorMetaItem}>
               <Text style={styles.vendorMetaIcon}>📍</Text>
-              <Text style={styles.vendorMetaText}>{formatDistance(vendor.distanceKm)} away</Text>
+              <Text style={styles.vendorMetaValue}>{formatDistance(vendor.distanceKm)}</Text>
             </View>
           )}
-          {vendor.distanceKm !== Infinity && reviewsCount !== undefined && reviewsCount !== null && (
+          {vendor.distanceKm !== Infinity && hasRating && (
             <Text style={styles.vendorMetaDot}>•</Text>
           )}
-          {reviewsCount !== undefined && reviewsCount !== null && (
+          {hasRating && (
             <View style={styles.vendorMetaItem}>
-              <Text style={styles.vendorMetaText}>Customer Reviews</Text>
-              <Text style={styles.vendorMetaValue}>{reviewsCount}</Text>
+              <Ionicons name="star" size={13} color="#FFD700" style={{ marginRight: 3 }} />
+              <Text style={styles.vendorMetaText}>Ratings</Text>
+              <Text style={styles.vendorMetaValue}>{avgRating % 1 === 0 ? avgRating : avgRating.toFixed(1)}/10</Text>
+            </View>
+          )}
+          {totalOrders > 0 && (hasRating || vendor.distanceKm !== Infinity) && (
+            <Text style={styles.vendorMetaDot}>•</Text>
+          )}
+          {totalOrders > 0 && (
+            <View style={styles.vendorMetaItem}>
+              <Text style={styles.vendorMetaText}>Orders</Text>
+              <Text style={styles.vendorMetaValue}>{totalOrders}</Text>
             </View>
           )}
         </TouchableOpacity>
-
-        {/* Menu Badge */}
-        {vendor.hasMenu && (
-          <View style={styles.menuBadge}>
-            <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
-            <Text style={styles.menuBadgeText}>Menu available on Cofau</Text>
-          </View>
-        )}
 
         {/* Image Section - Show posts/reviews if available, otherwise show profile picture */}
         {hasPosts ? (
           <View style={{ marginTop: 8 }}>
             {/* First row - 3 images */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 3, marginBottom: 3 }}>
               {displayImages.slice(0, 3).map((post: any, index: number) => (
                 <TouchableOpacity
                   key={post.id || index}
@@ -1559,22 +1570,27 @@ export default function LeaderboardScreen() {
                     setFullImageModal(true);
                   }}
                   activeOpacity={0.9}
-                  style={{ flex: 1, marginHorizontal: 2 }}
+                  style={{ flex: 1, height: 110, borderRadius: 10, overflow: 'hidden', position: 'relative', borderWidth: 0.5, borderColor: '#000' }}
                 >
                   <Image
                     source={{
                       uri: fixUrl(post.thumbnail_url || post.media_url || post.image_url),
                       cache: 'force-cache'
                     }}
-                    style={{ width: '100%', aspectRatio: 1, borderRadius: 8 }}
+                    style={{ width: '100%', height: '100%', borderRadius: 10 }}
                     resizeMode="cover"
                   />
+                  {(post.dish_name || post.caption) && (
+                    <View style={styles.dishNameOverlay}>
+                      <Text style={styles.dishNameText} numberOfLines={1}>{(post.dish_name || post.caption).toUpperCase()}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
             {/* Second row - 2 images + extra count if needed */}
             {displayImages.length > 3 && (
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-start' }}>
+              <View style={{ flexDirection: 'row', gap: 3 }}>
                 {displayImages.slice(3, 5).map((post: any, index: number) => (
                   <TouchableOpacity
                     key={post.id || `row2-${index}`}
@@ -1583,16 +1599,21 @@ export default function LeaderboardScreen() {
                       setFullImageModal(true);
                     }}
                     activeOpacity={0.9}
-                    style={{ flex: 1, marginHorizontal: 2, maxWidth: '33%' }}
+                    style={{ flex: 1, height: 110, borderRadius: 10, overflow: 'hidden', position: 'relative', borderWidth: 0.5, borderColor: '#000' }}
                   >
                     <Image
                       source={{
                         uri: fixUrl(post.thumbnail_url || post.media_url || post.image_url),
                         cache: 'force-cache'
                       }}
-                      style={{ width: '100%', aspectRatio: 1, borderRadius: 8 }}
+                      style={{ width: '100%', height: '100%', borderRadius: 10 }}
                       resizeMode="cover"
                     />
+                    {(post.dish_name || post.caption) && (
+                      <View style={styles.dishNameOverlay}>
+                        <Text style={styles.dishNameText} numberOfLines={1}>{(post.dish_name || post.caption).toUpperCase()}</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 ))}
                 {extraCount > 0 && (
@@ -1607,25 +1628,30 @@ export default function LeaderboardScreen() {
                       });
                     }}
                     activeOpacity={0.9}
-                    style={{ flex: 1, marginHorizontal: 2, maxWidth: '33%' }}
+                    style={{ flex: 1, height: 110, borderRadius: 10, overflow: 'hidden', position: 'relative', borderWidth: 0.5, borderColor: '#000' }}
                   >
-                    <View style={{ width: '100%', aspectRatio: 1, borderRadius: 8, overflow: 'hidden' }}>
-                      <Image
-                        source={{
-                          uri: fixUrl(
-                            sortedPosts[5]?.thumbnail_url ||
-                            sortedPosts[5]?.media_url ||
-                            sortedPosts[5]?.image_url
-                          ),
-                          cache: 'force-cache'
-                        }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                        blurRadius={8}
-                      />
-                      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
-                        <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>+{extraCount}</Text>
-                      </View>
+                    <Image
+                      source={{
+                        uri: fixUrl(
+                          sortedPosts[5]?.thumbnail_url ||
+                          sortedPosts[5]?.media_url ||
+                          sortedPosts[5]?.image_url
+                        ),
+                        cache: 'force-cache'
+                      }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                      blurRadius={8}
+                    />
+                    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', borderRadius: 10 }}>
+                      <LinearGradient
+                        colors={['#FF2E2E', '#FF7A18']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{ width: 55, height: 30, borderRadius: 20, justifyContent: 'center', alignItems: 'center' }}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>+{extraCount}</Text>
+                      </LinearGradient>
                     </View>
                   </TouchableOpacity>
                 )}
@@ -1658,13 +1684,11 @@ export default function LeaderboardScreen() {
         <TouchableOpacity
           style={[styles.vendorOrderButton, { marginTop: 12 }]}
           onPress={() => {
-            // If restaurant has posts, use closestPost; otherwise create a post-like object
             const orderPost = vendor.closestPost
               ? (vendor.closestPost.tagged_restaurant_id
                   ? vendor.closestPost
                   : { ...vendor.closestPost, tagged_restaurant_id: vendor.id })
               : {
-                  // Create post-like object for restaurants without posts
                   tagged_restaurant_id: vendor.id,
                   latitude: vendor.latitude,
                   longitude: vendor.longitude,
@@ -1672,9 +1696,20 @@ export default function LeaderboardScreen() {
                 };
             handleOrderClick(orderPost);
           }}
+          activeOpacity={0.85}
         >
-          <Text style={styles.vendorOrderText}>ORDER NOW</Text>
+          <LinearGradient
+            colors={['#FF2E2E', '#FF7A18']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.vendorOrderGradient}
+          >
+            <Ionicons name="cart" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.vendorOrderText}>ORDER NOW</Text>
+            <Ionicons name="arrow-forward" size={13} color="#FFFFFF" style={{ marginLeft: 6 }} />
+          </LinearGradient>
         </TouchableOpacity>
+      </LinearGradient>
       </View>
     );
   };
@@ -2730,68 +2765,68 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   tabsScrollView: {
-    maxHeight: 60,
+    maxHeight: 48,
     backgroundColor: "#FFFFFF",
-    flexGrow: 0, // Prevent unnecessary growth
+    flexGrow: 0,
   },
   tabsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    flexDirection: 'row', // Ensure horizontal layout
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
     alignItems: 'center',
   },
   tab: {
-    marginRight: 8,
+    marginRight: 6,
     flexShrink: 0,
   },
   tabInner: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
   },
   tabInnerInactive: {
     backgroundColor: '#F5F5F5',
     borderWidth: 0,
   },
   tabText: {
-    fontSize: 15,
-    fontWeight: "bold",
+    fontSize: 12,
+    fontWeight: "600",
     color: "#000",
   },
   activeTabText: {
-    fontSize: 15,
-    fontWeight: "bold",
+    fontSize: 12,
+    fontWeight: "700",
     color: "#FFFFFF",
   },
   tabBadge: {
     backgroundColor: "#FF8C00",
     borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    minWidth: 16,
+    height: 16,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   tabBadgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: "700",
     color: "#FFFFFF",
   },
   tabBadgeActive: {
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    minWidth: 16,
+    height: 16,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   tabBadgeTextActive: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: "700",
     color: "#FF8C00",
   },
@@ -3594,18 +3629,41 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   // Vendor Card Styles
+  dishNameOverlay: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(233, 74, 55, 0.85)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    maxWidth: '85%',
+    zIndex: 20,
+  },
+  dishNameText: {
+    color: '#FFF',
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  vendorCardOuter: {
+    marginHorizontal: 0,
+    marginBottom: 12,
+    borderRadius: 15,
+    backgroundColor: '#fff',
+  },
   vendorCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
+    borderRadius: 15,
+    marginBottom: 6,
+    padding: 12,
+    marginHorizontal: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 2,
     borderWidth: 1,
-    borderColor: "#F0F0F0",
+    borderColor: "#E8E8E8",
+    overflow: 'hidden',
   },
   vendorHeader: {
     marginBottom: 8,
@@ -3742,18 +3800,28 @@ const styles = StyleSheet.create({
     borderBottomColor: "#D32F2F",
   },
   vendorOrderButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FF8C00",
+    borderRadius: 20,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  vendorOrderGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 8,
-    alignSelf: "flex-start",
+    borderRadius: 20,
   },
   vendorOrderText: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "800",
     color: "#FFFFFF",
+    letterSpacing: 1.2,
   },
   // Restaurant Order Styles
   customerInfoSection: {

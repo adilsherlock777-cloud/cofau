@@ -370,6 +370,9 @@ async def get_area_posts(
                 "media_type": post.get("media_type", "image"),
                 "location_name": post.get("location_name"),
                 "rating": post.get("rating"),
+                "dish_name": post.get("dish_name"),
+                "clicks_count": post.get("clicks_count", 0),
+                "views_count": post.get("views_count", 0),
                 "created_at": post.get("created_at").isoformat() if post.get("created_at") else None,
             })
 

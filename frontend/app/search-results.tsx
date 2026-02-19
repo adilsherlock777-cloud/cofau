@@ -121,37 +121,45 @@ export default function SearchResultsScreen() {
       });
 
       setPosts(formattedPosts);
+      deriveLocationsFromPosts(formattedPosts);
     } catch (err) {
       console.error("❌ Post search error:", err);
       setPosts([]);
+      setLocations([]);
     }
   };
 
-  const performLocationSearch = async (query: string) => {
-    if (!query.trim() || query.trim().length < 3) {
-      setLocations([]);
-      return;
-    }
+  const deriveLocationsFromPosts = (searchPosts: any[]) => {
+    const locationMap: { [key: string]: any } = {};
 
-    try {
-      const res = await axios.get(`${API_URL}/search/locations`, {
-        params: { q: query.trim(), limit: 20 },
-        headers: { Authorization: `Bearer ${token || ''}` },
-      });
+    searchPosts.forEach((post) => {
+      const locationName = post.location_name;
+      if (!locationName) return;
 
-      const formattedLocations = res.data.map((location: any) => ({
-        ...location,
-        sample_photos: (location.sample_photos || []).map((photo: any) => ({
-          ...photo,
-          media_url: fixUrl(photo.media_url),
-        })),
-      }));
+      if (!locationMap[locationName]) {
+        locationMap[locationName] = {
+          name: locationName,
+          total_posts: 0,
+          all_images: [],
+        };
+      }
 
-      setLocations(formattedLocations);
-    } catch (err) {
-      console.error("❌ Location search error:", err);
-      setLocations([]);
-    }
+      locationMap[locationName].total_posts += 1;
+      const mediaUrl = post.media_url || post.image_url;
+      if (mediaUrl) {
+        locationMap[locationName].all_images.push({
+          post_id: post.id,
+          media_url: fixUrl(mediaUrl),
+          media_type: post.media_type || "image",
+        });
+      }
+    });
+
+    const sorted = Object.values(locationMap).sort(
+      (a: any, b: any) => b.total_posts - a.total_posts
+    );
+
+    setLocations(sorted);
   };
 
   const toggleLocation = (locationName: string) => {
@@ -247,7 +255,6 @@ export default function SearchResultsScreen() {
       await Promise.all([
         performUserSearch(query),
         performPostSearch(query),
-        performLocationSearch(query),
         performNearbySearch(query),
       ]);
     } catch (err) {
