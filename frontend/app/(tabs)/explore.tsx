@@ -14,6 +14,7 @@ import {
   LayoutChangeEvent,
   Platform,
   Alert,
+  Animated,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -24,6 +25,7 @@ import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost } from "../../utils/api";
+import UserAvatar from "../../components/UserAvatar";
 let MapView: any;
 let Marker: any;
 let Callout: any;
@@ -57,6 +59,64 @@ const SMALL_HEIGHT = COLUMN_WIDTH * 0.75;
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 const MAX_CONCURRENT_VIDEOS = 2;
 
+// Mini confetti for rank 1 hero card
+const CONFETTI_ITEMS = ['🎉', '✨', '🏆', '⭐', '🥇', '🎯', '💫', '🔥', '❤️', '🌟', '🎀'];
+const CONFETTI_COUNT = 14;
+
+const ConfettiPiece = memo(({ index }: { index: number }) => {
+  const fall = useRef(new Animated.Value(-30)).current;
+  const sway = useRef(new Animated.Value(0)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+  const fadeOut = useRef(new Animated.Value(1)).current;
+
+  const startX = Math.random() * 90 + 5;
+  const emoji = CONFETTI_ITEMS[index % CONFETTI_ITEMS.length];
+  const size = 12 + Math.random() * 6;
+  const delay = index * 200;
+  const duration = 2500 + Math.random() * 1000;
+
+  useEffect(() => {
+    const animate = () => {
+      fall.setValue(-30);
+      sway.setValue(0);
+      spin.setValue(0);
+      fadeOut.setValue(1);
+      Animated.parallel([
+        Animated.timing(fall, { toValue: 280, duration, delay, useNativeDriver: true }),
+        Animated.timing(sway, { toValue: (Math.random() - 0.5) * 80, duration, delay, useNativeDriver: true }),
+        Animated.timing(spin, { toValue: 360, duration, delay, useNativeDriver: true }),
+        Animated.timing(fadeOut, { toValue: 0, duration, delay: delay + duration * 0.65, useNativeDriver: true }),
+      ]).start(() => animate());
+    };
+    animate();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: `${startX}%`,
+        top: 0,
+        opacity: fadeOut,
+        transform: [
+          { translateY: fall },
+          { translateX: sway },
+          { rotate: spin.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] }) },
+        ],
+      }}
+    >
+      <Text style={{ fontSize: size }}>{emoji}</Text>
+    </Animated.View>
+  );
+});
+
+const HeroConfetti = memo(() => (
+  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', zIndex: 0 }} pointerEvents="none">
+    {Array.from({ length: CONFETTI_COUNT }).map((_, i) => (
+      <ConfettiPiece key={i} index={i} />
+    ))}
+  </View>
+));
 
 const fixUrl = (url: string | null) => {
   if (!url) return null;
@@ -1043,7 +1103,7 @@ const TopPostsModal = memo(({ visible, posts, loading, onClose, onViewPost }: an
               <Ionicons name="trophy" size={22} color="#F2CF68" />
               <Text style={styles.topPostsModalTitle}>Top Posts</Text>
             </View>
-            <Text style={styles.topPostsModalSubtitle}>Last 3 days</Text>
+            <Text style={styles.topPostsModalSubtitle}>Last 2 days</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
@@ -1056,7 +1116,7 @@ const TopPostsModal = memo(({ visible, posts, loading, onClose, onViewPost }: an
           ) : posts.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }}>
               <Ionicons name="images-outline" size={48} color="#ccc" />
-              <Text style={{ marginTop: 12, color: '#666', fontSize: 16 }}>No posts in the last 3 days</Text>
+              <Text style={{ marginTop: 12, color: '#666', fontSize: 16 }}>No posts in the last 2 days</Text>
             </View>
           ) : (
             <FlatList
@@ -1282,10 +1342,11 @@ export default function ExploreScreen() {
   const [appliedCategories, setAppliedCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showTopPostsModal, setShowTopPostsModal] = useState(false);
+  const [showTopPostsInfo, setShowTopPostsInfo] = useState(false);
   const [topPosts, setTopPosts] = useState<any[]>([]);
   const [topPostsLoading, setTopPostsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
+  const scrollYRef = useRef(0);
   const [playingVideos, setPlayingVideos] = useState<string[]>([]);
 
   // Map-specific state
@@ -1909,12 +1970,16 @@ useFocusEffect(
         visible.push(post.id);
       }
     });
-    setPlayingVideos(visible.slice(0, MAX_CONCURRENT_VIDEOS));
+    const newPlaying = visible.slice(0, MAX_CONCURRENT_VIDEOS);
+    setPlayingVideos((prev) => {
+      if (prev.length === newPlaying.length && prev.every((id, i) => id === newPlaying[i])) return prev;
+      return newPlaying;
+    });
   }, [posts]);
 
   const handleScroll = useCallback((event: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    setScrollY(contentOffset.y);
+    scrollYRef.current = contentOffset.y;
     calculateVisibleVideos(contentOffset.y);
     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 200) {
       if (hasMore && !loadingMore && !loading) fetchPosts(false);
@@ -1923,10 +1988,10 @@ useFocusEffect(
 
   useEffect(() => {
     if (posts.length > 0) {
-      const timer = setTimeout(() => calculateVisibleVideos(scrollY), 500);
+      const timer = setTimeout(() => calculateVisibleVideos(scrollYRef.current), 500);
       return () => clearTimeout(timer);
     }
-  }, [posts, calculateVisibleVideos, scrollY]);
+  }, [posts.length]);
 
  useFocusEffect(useCallback(() => {
   // Only fetch posts for users tab if no posts cached
@@ -2003,6 +2068,12 @@ useEffect(() => {
   };
 
   const fetchPostsWithCategories = (categories: string[]) => fetchPosts(true, categories);
+  const getBadgeTitle = (level: number): string => {
+    if (level <= 4) return 'Reviewer';
+    if (level <= 8) return 'Top Reviewer';
+    return 'Influencer';
+  };
+
   const fetchTopPosts = async () => {
     setTopPostsLoading(true);
     try {
@@ -2073,7 +2144,7 @@ useEffect(() => {
 
   if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Authenticating…</Text></View>;
 
-  const columns = distributePosts(posts);
+  const columns = React.useMemo(() => distributePosts(posts), [posts]);
 
 return (
   <View style={styles.container}>
@@ -2166,7 +2237,7 @@ return (
         style={{ marginRight: 6 }}
       />
       <Text style={[styles.toggleTabText, activeTab === 'topPosts' && styles.toggleTabTextActive]}>
-        Top Posts
+        Top
       </Text>
     </TouchableOpacity>
 
@@ -2259,57 +2330,247 @@ return (
         ) : topPosts.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="trophy-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyStateText}>No posts in the last 3 days</Text>
+            <Text style={styles.emptyStateText}>No posts in the last 2 days</Text>
           </View>
         ) : (
-          <FlatList
-            data={topPosts}
-            keyExtractor={(item) => item.id}
+          <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.topPostItem} onPress={() => router.push(`/post-details/${item.id}`)}>
-                <View style={[styles.rankBadge, item.rank <= 3 && { backgroundColor: '#F2CF68' }]}>
-                  <Text style={[styles.rankText, item.rank <= 3 && { color: '#333' }]}>#{item.rank}</Text>
-                </View>
-                <Image
-                  source={{ uri: fixUrl(item.thumbnail_url || item.media_url || item.image_url) || undefined }}
-                  style={styles.topPostThumbnail}
-                  contentFit="cover"
-                  placeholder={{ blurhash: BLUR_HASH }}
-                />
-                <View style={styles.topPostInfo}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                    {item.user_profile_picture ? (
-                      <Image source={{ uri: fixUrl(item.user_profile_picture) || undefined }} style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6 }} contentFit="cover" />
-                    ) : (
-                      <View style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
-                        <Ionicons name="person" size={12} color="#fff" />
-                      </View>
-                    )}
-                    <Text style={styles.topPostUsername} numberOfLines={1}>{item.username}</Text>
+          >
+            {/* Section Header */}
+            <View style={styles.topPostsSectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <MaskedView maskElement={<MaterialCommunityIcons name="check-decagram" size={22} color="#000" />}>
+                  <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 22, height: 22 }} />
+                </MaskedView>
+                <Text style={styles.topPostsSectionTitle}>COFAU'S TOP PICKS</Text>
+                <TouchableOpacity onPress={() => setShowTopPostsInfo(true)} style={{ marginLeft: 6 }}>
+                  <Ionicons name="information-circle-outline" size={18} color="#aaa" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Info Popup */}
+            <Modal
+              visible={showTopPostsInfo}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowTopPostsInfo(false)}
+            >
+              <TouchableOpacity
+                style={styles.infoModalOverlay}
+                activeOpacity={1}
+                onPress={() => setShowTopPostsInfo(false)}
+              >
+                <View style={styles.infoModalBox}>
+                  {/* Title */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                    <Ionicons name="trophy" size={20} color="#F2CF68" />
+                    <Text style={styles.infoModalTitle}>How It Works</Text>
                   </View>
-                  {item.location_name && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                      <Ionicons name="location" size={12} color="#E94A37" />
-                      <Text style={{ fontSize: 11, color: '#666', marginLeft: 2 }} numberOfLines={1}>{item.location_name}</Text>
-                    </View>
-                  )}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="heart" size={13} color="#E94A37" />
-                      <Text style={{ fontSize: 12, color: '#333', marginLeft: 3 }}>{item.likes_count}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="star" size={13} color="#F2CF68" />
-                      <Text style={{ fontSize: 12, color: '#333', marginLeft: 3 }}>{Math.round(item.combined_score)}</Text>
+
+                  {/* Description */}
+                  <Text style={styles.infoModalDesc}>
+                    We showcase the best food photos uploaded in the last 2 days. Every post is scored based on two factors:
+                  </Text>
+
+                  {/* Scoring Breakdown */}
+                  <View style={styles.infoModalRow}>
+                    <Ionicons name="camera-outline" size={16} color="#E94A37" />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.infoModalLabel}>Photo Quality (60%)</Text>
+                      <Text style={styles.infoModalSubtext}>How well-composed, clear, and appetising your photo looks.</Text>
                     </View>
                   </View>
+
+                  <View style={styles.infoModalRow}>
+                    <Ionicons name="heart-outline" size={16} color="#E94A37" />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.infoModalLabel}>Engagement (40%)</Text>
+                      <Text style={styles.infoModalSubtext}>Likes and interactions your post receives from the community.</Text>
+                    </View>
+                  </View>
+
+                  {/* Fair Play Note */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 12, backgroundColor: '#FFF8F0', padding: 10, borderRadius: 8 }}>
+                    <Ionicons name="sparkles" size={16} color="#FF7A18" style={{ marginTop: 1 }} />
+                    <Text style={[styles.infoModalSubtext, { marginLeft: 8, flex: 1, color: '#555' }]}>
+                      Top influencers and new uploaders are given equal opportunity — great photography always wins!
+                    </Text>
+                  </View>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#ccc" />
               </TouchableOpacity>
-            )}
-          />
+            </Modal>
+
+            {/* Hero Card - Rank #1 */}
+            <TouchableOpacity
+              onPress={() => router.push(`/post-details/${topPosts[0].id}`)}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroCardBorder}
+              >
+                <View style={styles.heroCardInner}>
+                  <HeroConfetti />
+                  {/* Rank badge */}
+                  <LinearGradient
+                    colors={['#FF8A80', '#FFB74D']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.heroRankBadge}
+                  >
+                    <Text style={styles.heroRankText}>#1</Text>
+                  </LinearGradient>
+
+                  {/* User info row */}
+                  <TouchableOpacity
+                    style={styles.heroUserRow}
+                    onPress={() => router.push(`/profile?userId=${topPosts[0].user_id}`)}
+                    activeOpacity={0.7}
+                  >
+                    <UserAvatar
+                      profilePicture={topPosts[0].user_profile_picture}
+                      username={topPosts[0].username}
+                      size={48}
+                      showLevelBadge={true}
+                      level={topPosts[0].user_level}
+                      style={undefined}
+                    />
+                    <View style={styles.heroUserInfo}>
+                      <Text style={styles.heroUsername} numberOfLines={1}>
+                        {topPosts[0].username}
+                      </Text>
+                      <Text style={styles.heroBadgeTitle}>
+                        {getBadgeTitle(topPosts[0].user_level)}
+                      </Text>
+                      <View style={styles.heroUserStats}>
+                        <Text style={styles.heroStatText}>
+                          {topPosts[0].user_posts_count ?? '—'} posts
+                        </Text>
+                        <View style={styles.heroStatDot} />
+                        <Text style={styles.heroStatText}>
+                          {topPosts[0].user_followers_count ?? '—'} followers
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Large Image Preview */}
+                  <View style={styles.heroImageWrapper}>
+                    <Image
+                      source={{ uri: fixUrl(topPosts[0].image_url || topPosts[0].media_url || topPosts[0].thumbnail_url) || undefined }}
+                      style={styles.heroImageBlur}
+                      contentFit="cover"
+                      blurRadius={30}
+                    />
+                    <Image
+                      source={{ uri: fixUrl(topPosts[0].image_url || topPosts[0].media_url || topPosts[0].thumbnail_url) || undefined }}
+                      style={styles.heroImageFront}
+                      contentFit="contain"
+                      placeholder={{ blurhash: BLUR_HASH }}
+                    />
+                  </View>
+
+                  {/* Score Bar */}
+                  <View style={styles.heroScoreRow}>
+                    <View style={styles.heroScoreItem}>
+                      <Ionicons name="star" size={14} color="#F2CF68" />
+                      <Text style={styles.heroScoreLabel}>Quality</Text>
+                      <Text style={styles.heroScoreValue}>{Math.round(topPosts[0].quality_score)}</Text>
+                    </View>
+                    <View style={styles.heroScoreDivider} />
+                    <View style={styles.heroScoreItem}>
+                      <MaskedView maskElement={<Ionicons name="heart" size={14} color="#000" />}>
+                        <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 14, height: 14 }} />
+                      </MaskedView>
+                      <Text style={styles.heroScoreLabel}>Likes</Text>
+                      <Text style={styles.heroScoreValue}>{topPosts[0].likes_count}</Text>
+                    </View>
+                    <View style={styles.heroScoreDivider} />
+                    <View style={styles.heroScoreItem}>
+                      <Ionicons name="trophy" size={14} color="#F2CF68" />
+                      <Text style={styles.heroScoreLabel}>Score</Text>
+                      <Text style={styles.heroScoreValue}>{Math.round(topPosts[0].combined_score)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Regular Cards - Ranks 2-10 */}
+            {topPosts.slice(1).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => router.push(`/post-details/${item.id}`)}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={['#FF2E2E', '#FF7A18']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.regularCardBorder}
+                >
+                  <View style={styles.regularCardInner}>
+                    {/* Top row: Rank + User */}
+                    <View style={styles.regularCardHeader}>
+                      <View style={[styles.regularRankBadge, item.rank <= 3 && { backgroundColor: '#FF7A18' }]}>
+                        <Text style={[styles.regularRankText, item.rank <= 3 && { color: '#fff' }]}>#{item.rank}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 10 }}
+                        onPress={() => router.push(`/profile?userId=${item.user_id}`)}
+                        activeOpacity={0.7}
+                      >
+                        <UserAvatar
+                          profilePicture={item.user_profile_picture}
+                          username={item.username}
+                          size={32}
+                          showLevelBadge={true}
+                          level={item.user_level}
+                          style={undefined}
+                        />
+                        <Text style={styles.regularUsername} numberOfLines={1}>{item.username}</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Full-width Image */}
+                    <Image
+                      source={{ uri: fixUrl(item.image_url || item.media_url || item.thumbnail_url) || undefined }}
+                      style={styles.regularImage}
+                      contentFit="cover"
+                      placeholder={{ blurhash: BLUR_HASH }}
+                    />
+
+                    {/* Scores row */}
+                    <View style={styles.regularScoresRow}>
+                      <View style={styles.regularScoreItem}>
+                        <Ionicons name="star" size={13} color="#F2CF68" />
+                        <Text style={styles.regularScoreLabel}>Quality</Text>
+                        <Text style={styles.regularScoreValue}>{Math.round(item.quality_score)}<Text style={styles.regularScoreMax}>/100</Text></Text>
+                      </View>
+                      <View style={styles.regularScoreDividerV} />
+                      <View style={styles.regularScoreItem}>
+                        <MaskedView maskElement={<Ionicons name="heart" size={13} color="#000" />}>
+                          <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 13, height: 13 }} />
+                        </MaskedView>
+                        <Text style={styles.regularScoreLabel}>Engagement</Text>
+                        <Text style={styles.regularScoreValue}>{Math.round(item.engagement_score)}<Text style={styles.regularScoreMax}>/100</Text></Text>
+                      </View>
+                      <View style={styles.regularScoreDividerV} />
+                      <View style={styles.regularScoreItem}>
+                        <Ionicons name="trophy" size={13} color="#F2CF68" />
+                        <Text style={[styles.regularScoreLabel, { fontWeight: '700' }]}>Total</Text>
+                        <Text style={[styles.regularScoreValue, { fontWeight: '700', color: '#E94A37' }]}>{Math.round(item.combined_score)}<Text style={styles.regularScoreMax}>/100</Text></Text>
+                      </View>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         )
       ) : activeTab === 'map' ? (
   // DASHBOARD VIEW for restaurant users, MAP VIEW for regular users
@@ -2608,6 +2869,280 @@ const styles = StyleSheet.create({
   topPostThumbnail: { width: 56, height: 56, borderRadius: 8, marginRight: 12 },
   topPostInfo: { flex: 1 },
   topPostUsername: { fontSize: 14, fontWeight: "600", color: "#333" },
+
+  // ======================================================
+  // REDESIGNED TOP POSTS STYLES
+  // ======================================================
+  topPostsSectionHeader: {
+    alignItems: 'center' as const,
+    marginBottom: 16,
+  },
+  topPostsSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#333',
+    marginLeft: 8,
+  },
+  topPostsSectionSubtitle: {
+    fontSize: 11,
+    color: '#aaa',
+    fontWeight: '500' as const,
+    marginTop: 2,
+  },
+  scoringExplainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 16,
+    gap: 4,
+  },
+  scoringExplainerText: {
+    fontSize: 10,
+    color: '#aaa',
+    fontStyle: 'italic' as const,
+  },
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  infoModalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 22,
+    marginHorizontal: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  infoModalTitle: {
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: '#333',
+    marginLeft: 8,
+  },
+  infoModalDesc: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  infoModalRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    marginBottom: 10,
+    paddingLeft: 2,
+  },
+  infoModalLabel: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#333',
+  },
+  infoModalSubtext: {
+    fontSize: 12,
+    color: '#888',
+    lineHeight: 17,
+    marginTop: 1,
+  },
+  infoModalText: {
+    fontSize: 13,
+    color: '#555',
+    marginLeft: 8,
+  },
+  heroCardBorder: {
+    borderRadius: 16,
+    padding: 2.5,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  heroCardInner: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    overflow: 'hidden' as const,
+  },
+  heroRankBadge: {
+    position: 'absolute' as const,
+    top: -1,
+    left: -1,
+    width: 44,
+    height: 44,
+    borderTopLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    zIndex: 1,
+  },
+  heroRankText: {
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+    color: '#333',
+  },
+  heroUserRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 12,
+    marginLeft: 40,
+  },
+  heroUserInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  heroUsername: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#333',
+  },
+  heroBadgeTitle: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#E94A37',
+    marginTop: 1,
+  },
+  heroUserStats: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginTop: 3,
+  },
+  heroStatText: {
+    fontSize: 12,
+    color: '#888',
+  },
+  heroStatDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#ccc',
+    marginHorizontal: 6,
+  },
+  heroImageWrapper: {
+    width: 'auto' as any,
+    height: 200,
+    marginHorizontal: -16,
+    marginBottom: 12,
+    overflow: 'hidden' as const,
+    position: 'relative' as const,
+  },
+  heroImageBlur: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroImageFront: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroScoreRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-around' as const,
+    alignItems: 'center' as const,
+  },
+  heroScoreItem: {
+    alignItems: 'center' as const,
+    gap: 2,
+  },
+  heroScoreLabel: {
+    fontSize: 11,
+    color: '#888',
+    fontWeight: '500' as const,
+  },
+  heroScoreValue: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: '#333',
+  },
+  heroScoreDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#E5E5E5',
+  },
+  regularCardBorder: {
+    borderRadius: 12,
+    padding: 2,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  regularCardInner: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+  },
+  regularCardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 10,
+  },
+  regularRankBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E94A37',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  regularRankText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold' as const,
+  },
+  regularUsername: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
+  },
+  regularImage: {
+    width: '100%' as any,
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  regularScoresRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-around' as const,
+    alignItems: 'center' as const,
+  },
+  regularScoreItem: {
+    alignItems: 'center' as const,
+    gap: 2,
+  },
+  regularScoreDividerV: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E5E5E5',
+  },
+  regularScoreLabel: {
+    fontSize: 11,
+    color: '#555',
+  },
+  regularScoreValue: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#333',
+  },
+  regularScoreMax: {
+    fontSize: 10,
+    fontWeight: '400' as const,
+    color: '#aaa',
+  },
+
   viewsContainer: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
   viewsText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   dishNameTag: { position: "absolute", bottom: 6, left: 6, backgroundColor: "rgba(233, 74, 55, 0.85)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, maxWidth: "75%" },
@@ -3274,13 +3809,13 @@ searchBarBtnText: {
 // QUICK CATEGORY CHIPS STYLES
 // ======================================================
 quickCategoryScroll: {
-  maxHeight: 44,
-  marginBottom: 8,
-  marginTop: 4,
+  maxHeight: 34,
+  marginBottom: 6,
+  marginTop: 2,
 },
 quickCategoryContainer: {
   paddingHorizontal: 16,
-  gap: 10,
+  gap: 6,
   flexDirection: 'row',
   alignItems: 'center',
 },
@@ -3288,9 +3823,9 @@ quickCategoryChip: {
   flexDirection: 'row',
   alignItems: 'center',
   backgroundColor: '#FFF8F0',
-  borderRadius: 20,
-  paddingVertical: 8,
-  paddingHorizontal: 14,
+  borderRadius: 14,
+  paddingVertical: 4,
+  paddingHorizontal: 10,
   borderWidth: 1,
   borderColor: '#F2CF68',
 },
@@ -3299,11 +3834,11 @@ quickCategoryChipActive: {
   borderColor: '#E94A37',
 },
 quickCategoryEmoji: {
-  fontSize: 18,
-  marginRight: 6,
+  fontSize: 13,
+  marginRight: 4,
 },
 quickCategoryText: {
-  fontSize: 13,
+  fontSize: 11,
   fontWeight: '500',
   color: '#333',
 },

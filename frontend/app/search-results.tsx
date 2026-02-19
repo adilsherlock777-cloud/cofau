@@ -12,7 +12,7 @@ import {
   Alert,
 } from "react-native";
 import * as Location from "expo-location";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
@@ -355,6 +355,9 @@ export default function SearchResultsScreen() {
       ? item.full_thumbnail_url || item.full_image_url
       : item.full_image_url;
 
+    const countValue = item._isVideo ? (item.views_count || 0) : (item.clicks_count || 0);
+    const countDisplay = countValue > 1000 ? `${(countValue / 1000).toFixed(1)}K` : countValue;
+
     return (
       <TouchableOpacity
         style={styles.tile}
@@ -374,6 +377,14 @@ export default function SearchResultsScreen() {
             <Ionicons name="play-circle" size={28} color="#fff" />
           </View>
         )}
+        <View style={styles.clicksBadge}>
+          {item._isVideo ? (
+            <Ionicons name="eye-outline" size={9} color="#fff" />
+          ) : (
+            <MaterialCommunityIcons name="gesture-tap" size={10} color="#fff" />
+          )}
+          <Text style={styles.clicksText}>{countDisplay}</Text>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -396,7 +407,7 @@ export default function SearchResultsScreen() {
         >
           <View style={styles.placesLocationHeaderLeft}>
             <Ionicons name="location" size={20} color="#E94A37" />
-            <Text style={styles.placesLocationName}>{item.name}</Text>
+            <Text style={styles.placesLocationName} numberOfLines={1}>{item.name}</Text>
           </View>
           <View style={styles.placesLocationHeaderRight}>
             <Text style={styles.placesLocationCount}>
@@ -410,30 +421,47 @@ export default function SearchResultsScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Photos Grid - Show when expanded */}
+        {/* Photos Grid - Show when expanded (favourite style) */}
         {isExpanded && imagesToShow.length > 0 && (
-          <View style={styles.locationGrid}>
-            {imagesToShow.map((photo: any, index: number) => (
-              <TouchableOpacity
-                key={photo.post_id || index}
-                style={styles.locationGridItem}
-                activeOpacity={0.9}
-                onPress={() => router.push(`/post-details/${photo.post_id}`)}
-              >
-                <Image
-                  source={fixUrl(photo.media_url)}
-                  style={styles.locationGridImage}
-                  placeholder={{ blurhash: BLUR_HASH }}
-                  cachePolicy="memory-disk"
-                  contentFit="cover"
-                />
-                {photo.media_type === "video" && (
-                  <View style={styles.playIconSmall}>
-                    <Ionicons name="play-circle" size={20} color="#fff" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+          <View style={styles.placesPostsGrid}>
+            {imagesToShow.map((photo: any, index: number) => {
+              const isVideo = photo.media_type === "video";
+              const photoUrl = fixUrl(photo.media_url);
+
+              return (
+                <TouchableOpacity
+                  key={photo.post_id || index}
+                  style={styles.placesGridItem}
+                  activeOpacity={0.8}
+                  onPress={() => router.push(`/post-details/${photo.post_id}`)}
+                >
+                  {photoUrl ? (
+                    <View style={styles.placesGridImageContainer}>
+                      <Image
+                        source={{ uri: photoUrl }}
+                        style={styles.placesGridImage}
+                        placeholder={{ blurhash: BLUR_HASH }}
+                        cachePolicy="memory-disk"
+                        contentFit="cover"
+                      />
+                      {isVideo && (
+                        <View style={styles.videoOverlay}>
+                          <Ionicons name="play-circle" size={32} color="#fff" />
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <View style={styles.gridPlaceholder}>
+                      <Ionicons
+                        name={isVideo ? "videocam-outline" : "image-outline"}
+                        size={32}
+                        color="#ccc"
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
       </View>
@@ -774,6 +802,23 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.3)",
     borderRadius: 14,
   },
+  clicksBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
+  },
+  clicksText: {
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "600",
+  },
   locationBadge: {
     position: "absolute",
     bottom: 4,
@@ -938,6 +983,48 @@ const styles = StyleSheet.create({
   locationGridImage: {
     width: "100%",
     height: "100%",
+  },
+  // Favourite-style grid for Places tab
+  placesPostsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 2,
+  },
+  placesGridItem: {
+    width: (SCREEN_WIDTH - 38) / 3,
+    height: (SCREEN_WIDTH - 38) / 3,
+    position: "relative",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  placesGridImageContainer: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  },
+  placesGridImage: {
+    width: "100%",
+    height: "100%",
+  },
+  videoOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+  },
+  gridPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
   },
   emptyContainer: {
     flex: 1,

@@ -1537,16 +1537,16 @@ async def get_feed(
 
 @app.get("/api/posts/last-3-days")
 async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
-    """Get top 10 posts from the last 3 days, ranked by quality + engagement."""
+    """Get top 10 posts from the last 2 days, ranked by quality + engagement."""
     db = get_database()
 
     blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
 
-    # Calculate the date 3 days ago
-    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    # Calculate the date 2 days ago
+    two_days_ago = datetime.utcnow() - timedelta(days=2)
 
-    # Query posts created in the last 3 days, excluding blocked users
-    query = {"created_at": {"$gte": three_days_ago}}
+    # Query posts created in the last 2 days, excluding blocked users
+    query = {"created_at": {"$gte": two_days_ago}}
     if blocked_user_ids:
         query["user_id"] = {"$nin": blocked_user_ids}
 
@@ -1559,6 +1559,8 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
         post_id = str(post["_id"])
         user_id = post["user_id"]
         user = await db.users.find_one({"_id": ObjectId(user_id)})
+        user_posts_count = await db.posts.count_documents({"user_id": user_id})
+        user_followers_count = await db.follows.count_documents({"followingId": user_id})
 
         # Store quality_score from the raw post document
         post_quality_map[post_id] = post.get("quality_score", 50.0)
@@ -1589,6 +1591,8 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "user_profile_picture": user.get("profile_picture") if user else None,
             "user_badge": user.get("badge") if user else None,
             "user_level": user.get("level", 1),
+            "user_followers_count": user_followers_count,
+            "user_posts_count": user_posts_count,
             "media_url": media_url,
             "image_url": image_url,
             "thumbnail_url": post.get("thumbnail_url"),
@@ -2678,9 +2682,12 @@ async def search_posts(
             "map_link": post.get("map_link"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "clicks_count": post.get("clicks_count", 0),
+            "views_count": post.get("views_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"],
+            "media_type": post.get("media_type", "image"),
             "relevance_score": score  # For debugging/analytics
         })
     
