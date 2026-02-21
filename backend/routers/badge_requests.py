@@ -6,6 +6,7 @@ from routers.auth import get_current_user
 from routers.admin_auth import get_current_admin
 from pydantic import BaseModel
 from typing import Optional
+from utils.push_notifications import send_push_notification, get_user_device_tokens
 
 router = APIRouter(prefix="/api/badge", tags=["Badge Requests"])
 
@@ -208,6 +209,20 @@ async def approve_badge_request(
     except Exception:
         pass
 
+    # Send push notification
+    try:
+        tokens = await get_user_device_tokens(badge_request["user_id"])
+        if tokens:
+            await send_push_notification(
+                device_tokens=tokens,
+                title="Badge Approved! \u2705",
+                body="Congratulations! Your Cofau verified badge has been approved. It's now visible on your profile.",
+                data={"type": "badge_approved", "screen": "profile"},
+                user_id=badge_request["user_id"],
+            )
+    except Exception:
+        pass
+
     return {"message": "Badge request approved", "status": "approved"}
 
 
@@ -255,6 +270,23 @@ async def reject_badge_request(
             "created_at": datetime.utcnow(),
         }
         await db.notifications.insert_one(notification)
+    except Exception:
+        pass
+
+    # Send push notification
+    try:
+        tokens = await get_user_device_tokens(badge_request["user_id"])
+        if tokens:
+            push_body = "Your Cofau badge request was not approved at this time."
+            if body.reject_reason:
+                push_body += f" Reason: {body.reject_reason}"
+            await send_push_notification(
+                device_tokens=tokens,
+                title="Badge Request Update",
+                body=push_body,
+                data={"type": "badge_rejected", "screen": "profile"},
+                user_id=badge_request["user_id"],
+            )
     except Exception:
         pass
 
