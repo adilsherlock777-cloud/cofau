@@ -396,6 +396,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         is_following: post.is_following || false,
         tagged_restaurant: post.tagged_restaurant || null,
         dish_name: post.dish_name || null,
+        user_badge: post.user_badge || null,
       }));
 
       if (forceRefresh) {
