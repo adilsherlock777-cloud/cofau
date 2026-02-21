@@ -11,11 +11,12 @@ import {
   Modal,
   Linking,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 
 // =======================
@@ -205,6 +206,7 @@ export default function LocationDetailsScreen() {
           full_image_url: fullUrl,
           full_thumbnail_url: fixUrl(post.thumbnail_url),
           is_liked: false,
+          is_clicked: post.is_clicked_by_user || false,
           _isVideo: isVideoFile(fullUrl || '', post.media_type),
           category: post.category ? post.category.trim() : null,
         };
@@ -245,6 +247,57 @@ export default function LocationDetailsScreen() {
   };
 
   // ==================================
+  // 🔥 Handle Post Click (track on backend)
+  // ==================================
+  const handlePostPress = async (postId: string) => {
+    const post = posts.find((p: any) => p.id === postId);
+
+    // Only count click if this user hasn't clicked this post before
+    if (post && !post.is_clicked) {
+      // Optimistically increment clicks_count and mark as clicked
+      setPosts((prev: any[]) =>
+        prev.map((p: any) =>
+          p.id === postId
+            ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true }
+            : p
+        )
+      );
+
+      // Track click on backend
+      try {
+        const tkn = await AsyncStorage.getItem("token");
+        axios
+          .post(`${API_URL}/posts/${postId}/click`, {}, {
+            headers: { Authorization: `Bearer ${tkn}` },
+          })
+          .catch((err: any) => console.log("Click tracking error:", err));
+      } catch (err) {
+        console.log("Click tracking error:", err);
+      }
+    }
+
+    // Also track restaurant analytics if applicable
+    if (post && (post.account_type === "restaurant" || post.restaurant_id)) {
+      try {
+        const tkn = await AsyncStorage.getItem("token");
+        axios
+          .post(`${API_URL}/restaurant/analytics/track`, {
+            restaurant_id: post.restaurant_id || post.user_id,
+            event_type: "post_click",
+            post_id: postId,
+          }, {
+            headers: { Authorization: `Bearer ${tkn}` },
+          })
+          .catch((err: any) => console.log("Analytics tracking error:", err));
+      } catch (err) {
+        console.log("Analytics tracking error:", err);
+      }
+    }
+
+    router.push(`/post-details/${postId}`);
+  };
+
+  // ==================================
   // 🔳 Render Grid Tile
   // ==================================
   const renderGridItem = ({ item }: any) => {
@@ -260,7 +313,7 @@ export default function LocationDetailsScreen() {
       <TouchableOpacity
         style={styles.tile}
         activeOpacity={0.85}
-        onPress={() => router.push(`/post-details/${item.id}`)}
+        onPress={() => handlePostPress(item.id)}
       >
         <Image
           source={displayImg}
@@ -277,12 +330,14 @@ export default function LocationDetailsScreen() {
           </View>
         )}
 
-        {(clicksCount > 0 || viewsCount > 0) && (
-          <View style={styles.clicksBadge}>
+        <View style={styles.clicksBadge}>
+          {item._isVideo ? (
             <Ionicons name="eye-outline" size={10} color="#fff" />
-            <Text style={styles.clicksText}>{formatCount(viewsCount || clicksCount)}</Text>
-          </View>
-        )}
+          ) : (
+            <MaterialCommunityIcons name="gesture-tap" size={11} color="#fff" />
+          )}
+          <Text style={styles.clicksText}>{formatCount(item._isVideo ? viewsCount : clicksCount)}</Text>
+        </View>
 
         {dishName && (
           <View style={styles.dishTag}>

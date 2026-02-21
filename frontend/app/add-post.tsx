@@ -26,6 +26,22 @@ import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import axios from 'axios';
 
+// Veg / Non-veg FSSAI-style dot icon
+const FoodTypeIcon = ({ type, size = 20 }: { type: 'veg' | 'nonveg'; size?: number }) => {
+  const color = type === 'veg' ? '#22C55E' : '#E02D2D';
+  return (
+    <View style={{ width: size, height: size, borderRadius: 3, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ width: size * 0.45, height: size * 0.45, borderRadius: size * 0.45, backgroundColor: color }} />
+    </View>
+  );
+};
+
+const renderCategoryIcon = (emoji: string, size: number) => {
+  if (emoji === '__veg__') return <FoodTypeIcon type="veg" size={size} />;
+  if (emoji === '__nonveg__') return <FoodTypeIcon type="nonveg" size={size} />;
+  return <Text style={{ fontSize: size }}>{emoji}</Text>;
+};
+
 export default function AddPostScreen() {
   const router = useRouter();
   const auth = useAuth() as any;
@@ -74,8 +90,8 @@ export default function AddPostScreen() {
 
 // Categories list with emojis
 const CATEGORIES = [
-  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
-  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '__veg__' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '__nonveg__' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
@@ -1067,7 +1083,7 @@ return (
             onPress={() => toggleCategory(item.name)}
           >
             <View style={styles.categoryItemContent}>
-              <Text style={styles.categoryEmoji}>{item.emoji}</Text>
+              <View style={styles.categoryEmoji}>{renderCategoryIcon(item.emoji, 18)}</View>
               <Text style={[
                 styles.categoryItemText,
                 categories.includes(item.name) && styles.categoryItemTextSelected
@@ -1076,9 +1092,9 @@ return (
               </Text>
             </View>
             {categories.includes(item.name) ? (
-              <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+              <Ionicons name="checkmark-circle" size={20} color="#4ECDC4" />
             ) : (
-              <Ionicons name="ellipse-outline" size={24} color="#CCC" />
+              <Ionicons name="ellipse-outline" size={20} color="#CCC" />
             )}
           </TouchableOpacity>
         )}
@@ -1087,13 +1103,20 @@ return (
       
       {/* Done Button */}
       <View style={styles.modalFooter}>
-        <TouchableOpacity 
-          style={styles.doneButton}
+        <TouchableOpacity
           onPress={() => setShowCategoryModal(false)}
+          activeOpacity={0.8}
         >
-          <Text style={styles.doneButtonText}>
-            Done {categories.length > 0 ? `(${categories.length})` : ''}
-          </Text>
+          <LinearGradient
+            colors={['#FF2E2E', '#FF7A18']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.doneButton}
+          >
+            <Text style={styles.doneButtonText}>
+              Done {categories.length > 0 ? `(${categories.length})` : ''}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </View>
@@ -1651,11 +1674,12 @@ categoryItemContent: {
   flex: 1,
 },
 categoryEmoji: {
-  fontSize: 24,
-  marginRight: 12,
+  marginRight: 8,
+  justifyContent: 'center',
+  alignItems: 'center',
 },
 clearAllText: {
-  fontSize: 14,
+  fontSize: 12,
   color: '#E94A37',
   fontWeight: '600',
 },
@@ -1664,24 +1688,25 @@ clearAllText: {
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
   },
   categoryModal: {
     backgroundColor: '#FFF',
+    flex: 1,
+    marginTop: 50,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
   },
   categoryModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
   categoryModalTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -1697,25 +1722,26 @@ mapsButtonTextDisabled: {
   flexDirection: 'row',
   justifyContent: 'space-between',
   alignItems: 'center',
-  paddingHorizontal: 20,
-  paddingVertical: 10,
+  paddingHorizontal: 16,
+  paddingVertical: 8,
   backgroundColor: '#F0F9F9',
 },
   selectedCountText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#4ECDC4',
     fontWeight: '600',
   },
   categoryList: {
-    padding: 12,
+    padding: 8,
   },
   categoryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 4,
     backgroundColor: '#F9F9F9',
   },
   categoryItemSelected: {
@@ -1724,7 +1750,7 @@ mapsButtonTextDisabled: {
     borderColor: '#F2CF68',
   },
   categoryItemText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
   },
   categoryItemTextSelected: {
@@ -1734,19 +1760,18 @@ mapsButtonTextDisabled: {
   
   // Modal Footer
   modalFooter: {
-    padding: 16,
+    padding: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E5E5',
   },
   doneButton: {
-    backgroundColor: '#1B7C82',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
   },
   doneButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
   },
 });

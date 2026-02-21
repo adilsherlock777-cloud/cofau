@@ -1,5 +1,5 @@
 import React, { useRef, createContext, useContext } from "react";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { View, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -32,6 +32,7 @@ export const useProfileRefresh = () => useContext(ProfileRefreshContext);
 export default function TabsLayout() {
   const { accountType } = useAuth();
   const isRestaurant = accountType === "restaurant";
+  const router = useRouter();
   const feedRefreshRef = useRef<FeedRefreshFn | null>(null);
   const profileRefreshRef = useRef<ProfileRefreshFn | null>(null);
 
@@ -185,7 +186,9 @@ export default function TabsLayout() {
               ),
           }}
           listeners={{
-            tabPress: () => {
+            tabPress: (e) => {
+              e.preventDefault();
+              router.navigate('/profile');
               profileRefreshRef.current?.();
             },
           }}

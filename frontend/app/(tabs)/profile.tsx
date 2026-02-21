@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
   FlatList,
+  SectionList,
   Dimensions,
   Platform,
   Animated,
@@ -31,6 +32,8 @@ import ComplimentModal from '../../components/ComplimentModal';
 import { MenuUploadModal } from '../../components/MenuUploadModal';
 import { sendCompliment, getFollowers, followUser, unfollowUser } from '../../utils/api';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import CofauVerifiedBadge from '../../components/CofauVerifiedBadge';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
 // Named differently from useAuth()'s 'auth' to avoid shadowing
@@ -372,10 +375,18 @@ const LoadingFooter = () => (
 export default function ProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const { userId } = useLocalSearchParams();
+  const { userId, from } = useLocalSearchParams();
   const auth = useAuth() as any;
   const { token, logout, user: currentUser, accountType } = auth;
   const { register: registerProfileRefresh } = useProfileRefresh();
+
+  const handleBack = useCallback(() => {
+    if (from === 'leaderboard') {
+      router.replace('/leaderboard');
+    } else {
+      router.back();
+    }
+  }, [from, router]);
 
   const [userData, setUserData] = useState<any>(null);
   const [userStats, setUserStats] = useState<any>(null);
@@ -404,9 +415,11 @@ export default function ProfileScreen() {
   const [followersModalVisible, setFollowersModalVisible] = useState(false);
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [followersTab, setFollowersTab] = useState<'reviewers' | 'top_reviewers' | 'influencers'>('reviewers');
   const [complimentsListModalVisible, setComplimentsListModalVisible] = useState(false);
   const [complimentsList, setComplimentsList] = useState<any[]>([]);
   const [loadingComplimentsList, setLoadingComplimentsList] = useState(false);
+  const [complimentsTab, setComplimentsTab] = useState<'reviewers' | 'top_reviewers' | 'influencers'>('reviewers');
   const [followingStatus, setFollowingStatus] = useState<{ [key: string]: boolean }>({});
   const sidebarAnimation = useRef(new Animated.Value(0)).current;
   const [bannerImage, setBannerImage] = useState<string | null>(null);
@@ -431,6 +444,10 @@ export default function ProfileScreen() {
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [badgeRequestModalVisible, setBadgeRequestModalVisible] = useState(false);
+  const [badgeRequestStatus, setBadgeRequestStatus] = useState<string>('none');
+  const [badgeRequestReason, setBadgeRequestReason] = useState('');
+  const [submittingBadgeRequest, setSubmittingBadgeRequest] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [replyModalVisible, setReplyModalVisible] = useState(false);
@@ -459,17 +476,18 @@ export default function ProfileScreen() {
       return;
     }
     fetchProfileData();
+    fetchBadgeRequestStatus();
   }, [token, userId]);
 
-  // Register double-tap Profile tab handler: refresh own profile
+  // Register Profile tab handler: always show own profile
   useEffect(() => {
     registerProfileRefresh(() => {
-      if (navigation.isFocused() && token) {
+      if (token) {
         setLoading(true);
-        fetchProfileData();
+        fetchProfileData(true);
       }
     });
-  }, [token, userId]);
+  }, [token]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -510,19 +528,18 @@ useEffect(() => {
 
 useEffect(() => {
   if (userData) {
-    // Reset pagination when switching tabs or user changes
     setPostsPage(0);
     setHasMorePosts(true);
-    fetchUserPosts(false); // false = not loading more, fresh fetch
+    fetchUserPosts(false);
     fetchComplimentsCount();
     checkIfComplimented();
-    
+
     if (isRestaurantProfile || accountType === 'restaurant') {
       fetchMenuItems();
       fetchRestaurantReviews();
     }
   }
-}, [userData, activeTab, isRestaurantProfile]);
+}, [userData, isRestaurantProfile]);
 
 
   // Animate sidebar when modal visibility changes
@@ -726,22 +743,24 @@ const GradientCofauText = () => (
   </View>
 );
 
-  const fetchProfileData = async () => {
+  const fetchProfileData = async (forceOwnProfile = false) => {
     try {
       let user: any;
 
-      const finalUserId = userId ?? currentUser?.id;
-      const isOwn = !userId || finalUserId === currentUser?.id;
+      const effectiveUserId = forceOwnProfile ? undefined : userId;
+      const finalUserId = effectiveUserId ?? currentUser?.id;
+      const isOwn = !effectiveUserId || finalUserId === currentUser?.id;
       setIsOwnProfile(isOwn);
 
       console.log('👤 Profile Detection:', {
-        userId,
+        userId: effectiveUserId,
         currentUserId: currentUser?.id,
         finalUserId,
         isOwn,
+        forceOwnProfile,
       });
 
-      if (userId && userId !== currentUser?.id) {
+      if (effectiveUserId && effectiveUserId !== currentUser?.id) {
         console.log('📡 Fetching other user profile:', userId);
 
         const meResponse = await axios.get(`${API_URL}/auth/me`, {
@@ -969,7 +988,11 @@ try {
 
     if (loadMore) {
       // Append to existing posts
-      setUserPosts((prev) => [...prev, ...sorted]);
+      setUserPosts((prev) => {
+        const existingIds = new Set(prev.map((p: any) => p.id));
+        const newPosts = sorted.filter((p: any) => !existingIds.has(p.id));
+        return [...prev, ...newPosts];
+      });
       setPostsPage((prev) => prev + 1);
     } else {
       // Replace posts
@@ -1010,6 +1033,13 @@ const loadMorePosts = () => {
     fetchUserPosts(true);
   }
 };
+
+// When Favourite tab is active, load ALL remaining posts so grouping by location is complete
+useEffect(() => {
+  if (activeTab === 'favourite' && hasMorePosts && !loadingMore && !postsLoading) {
+    fetchUserPosts(true);
+  }
+}, [activeTab, hasMorePosts, loadingMore, postsLoading]);
 
 
 
@@ -1267,6 +1297,40 @@ const loadMorePosts = () => {
       console.log('🔄 Navigating to login screen...');
       router.push('/auth/login');
       console.log('✅ Logout complete!');
+    }
+  };
+
+  // ======== BADGE REQUEST FUNCTIONS ========
+  const fetchBadgeRequestStatus = async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(`${API_URL}/badge/request/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setBadgeRequestStatus(response.data.status || 'none');
+    } catch (err) {
+      console.error('Error fetching badge status:', err);
+    }
+  };
+
+  const handleSubmitBadgeRequest = async () => {
+    if (!token || submittingBadgeRequest) return;
+    setSubmittingBadgeRequest(true);
+    try {
+      await axios.post(
+        `${API_URL}/badge/request`,
+        { reason: badgeRequestReason || null },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setBadgeRequestStatus('pending');
+      setBadgeRequestModalVisible(false);
+      setBadgeRequestReason('');
+      Alert.alert('Success', 'Your badge request has been submitted! Our team will review it shortly.');
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'Failed to submit badge request.';
+      Alert.alert('Error', msg);
+    } finally {
+      setSubmittingBadgeRequest(false);
     }
   };
 
@@ -2327,7 +2391,7 @@ const renderRestaurantProfile = () => {
       {!isOwnProfile ? (
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
         >
           <Ionicons name="arrow-back" size={24} color="#FF2E2E" />
         </TouchableOpacity>
@@ -2608,11 +2672,11 @@ const renderRestaurantProfile = () => {
                 disabled={followLoading}
               >
                 <LinearGradient
-                  colors={isFollowing ? ['#FFD700', '#FFD700'] : ['#FF2E2E', '#FF7A18']}
+                  colors={isFollowing ? ['#1B7C82', '#1B7C82'] : ['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
-                  style={styles.actionButton}
+                  style={[styles.actionButton, isFollowing && { opacity: 0.7 }]}
                 >
                   {followLoading ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -3076,25 +3140,37 @@ const renderRestaurantProfile = () => {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
+              {/* APPLY FOR COFAU BADGE */}
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
-                  router.push('/blocked-users');
+                  if (userData?.badge === 'verified') {
+                    Alert.alert('Cofau Badge', 'You already have a verified Cofau badge!');
+                  } else if (badgeRequestStatus === 'pending') {
+                    Alert.alert('Badge Request', 'Your badge request is already under review. We\'ll notify you once it\'s processed.');
+                  } else {
+                    setBadgeRequestModalVisible(true);
+                  }
                 }}
                 activeOpacity={0.7}
               >
-                <View style={styles.sidebarMenuIconContainer}>
-                  <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
+                <View style={[styles.sidebarMenuIconContainer, { backgroundColor: '#FFF5F0' }]}>
+                  <CofauVerifiedBadge size={24} />
                 </View>
-                <Text style={styles.sidebarMenuText}>Blocked Users</Text>
+                <Text style={[styles.sidebarMenuText, { textTransform: 'uppercase', letterSpacing: 0.5 }]}>
+                  {userData?.badge === 'verified' ? 'COFAU BADGE' : badgeRequestStatus === 'pending' ? 'BADGE REQUEST PENDING' : 'APPLY FOR COFAU BADGE'}
+                </Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
+
+              <View style={styles.sidebarDivider} />
 
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
+                  setLevelDetailsModalVisible(true);
                 }}
                 activeOpacity={0.7}
               >
@@ -3103,99 +3179,6 @@ const renderRestaurantProfile = () => {
                 </View>
                 <Text style={styles.sidebarMenuText}>Settings</Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-  style={styles.sidebarMenuItem}
-  onPress={() => {
-    setSettingsModalVisible(false);
-    resetPhoneModal();
-    setPhoneUpdateStep(userData?.phone_number ? 'verify_old' : 'verify_new');
-    setPhoneModalVisible(true);
-  }}
-  activeOpacity={0.7}
->
-  <View style={styles.sidebarMenuIconContainer}>
-    <Ionicons name="call-outline" size={24} color="#333" />
-  </View>
-  <Text style={styles.sidebarMenuText}>
-    {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
-  </Text>
-  <Ionicons name="chevron-forward" size={20} color="#999" />
-</TouchableOpacity>
-
-              <View style={styles.sidebarDivider} />
-
-{/* DELETE ACCOUNT - Separate TouchableOpacity */}
-<TouchableOpacity
-  style={styles.sidebarMenuItem}
-  onPress={() => {
-    setSettingsModalVisible(false);
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        'Are you sure you want to delete your account? This action is permanent and cannot be undone.'
-      );
-      if (confirmed) {
-        const doubleConfirm = window.confirm(
-          'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?'
-        );
-        if (doubleConfirm) handleDeleteAccount();
-      }
-    } else {
-      Alert.alert(
-        'Delete Account',
-        'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            onPress: () => {
-              Alert.alert(
-                'Final Confirmation',
-                'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete Forever', onPress: () => handleDeleteAccount(), style: 'destructive' },
-                ]
-              );
-            },
-            style: 'destructive',
-          },
-        ]
-      );
-    }
-  }}
-  activeOpacity={0.7}
->
-  <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
-    <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
-  </View>
-  <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Delete Account</Text>
-  <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
-</TouchableOpacity>
-
-{/* LOGOUT - Separate TouchableOpacity */}
-<TouchableOpacity
-  style={styles.sidebarMenuItem}
-  onPress={() => {
-    setSettingsModalVisible(false);
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to logout?');
-      if (confirmed) handleLogout();
-    } else {
-      Alert.alert('Logout', 'Are you sure you want to logout?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
-      ]);
-    }
-  }}
-  activeOpacity={0.7}
->
-                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
-                  <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-                </View>
-                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Logout</Text>
-                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
               </TouchableOpacity>
             </ScrollView>
           </Animated.View>
@@ -4276,7 +4259,7 @@ if (isRestaurantProfile) {
               {!isOwnProfile ? (
                 <TouchableOpacity
                   style={styles.backButton}
-                  onPress={() => router.back()}
+                  onPress={handleBack}
                 >
                   <Ionicons name="arrow-back" size={24} color="#FF2E2E" />
                 </TouchableOpacity>
@@ -4351,6 +4334,7 @@ if (isRestaurantProfile) {
   dpSize={95}
   badgeSize={140}
   isOwnProfile={isOwnProfile}
+  badge={userData.badge}
   cameraIcon={
     isOwnProfile ? (
       <TouchableOpacity
@@ -4417,6 +4401,7 @@ if (isRestaurantProfile) {
   dpSize={95}
   badgeSize={140}
   isOwnProfile={isOwnProfile}
+  badge={userData.badge}
   cameraIcon={
     isOwnProfile ? (
       <TouchableOpacity
@@ -4523,19 +4508,19 @@ if (isRestaurantProfile) {
                 disabled={followLoading}
               >
                 <LinearGradient
-                  colors={isFollowing ? ['#FFD700', '#FFD700', '#FFD700'] : ['#FF2E2E', '#FF7A18']}
+                  colors={isFollowing ? ['#1B7C82', '#1B7C82'] : ['#FF2E2E', '#FF7A18']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   locations={[0, 0.35, 0.9]}
-                  style={styles.actionButton}
+                  style={[styles.actionButton, isFollowing && { opacity: 0.7 }]}
                 >
                   {followLoading ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <>
-                      <Ionicons 
-                        name={isFollowing ? "checkmark-circle" : "person-add"} 
-                        size={15} 
+                      <Ionicons
+                        name={isFollowing ? "checkmark-circle" : "person-add"}
+                        size={15}
                         color="#fff"
                       />
                       <Text style={styles.actionButtonText}>
@@ -4816,20 +4801,31 @@ if (isRestaurantProfile) {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
+              {/* APPLY FOR COFAU BADGE */}
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
                 onPress={() => {
                   setSettingsModalVisible(false);
-                  router.push('/blocked-users');
+                  if (userData?.badge === 'verified') {
+                    Alert.alert('Cofau Badge', 'You already have a verified Cofau badge!');
+                  } else if (badgeRequestStatus === 'pending') {
+                    Alert.alert('Badge Request', 'Your badge request is already under review. We\'ll notify you once it\'s processed.');
+                  } else {
+                    setBadgeRequestModalVisible(true);
+                  }
                 }}
                 activeOpacity={0.7}
               >
-                <View style={styles.sidebarMenuIconContainer}>
-                  <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
+                <View style={[styles.sidebarMenuIconContainer, { backgroundColor: '#FFF5F0' }]}>
+                  <CofauVerifiedBadge size={24} />
                 </View>
-                <Text style={styles.sidebarMenuText}>Blocked Users</Text>
+                <Text style={[styles.sidebarMenuText, { textTransform: 'uppercase', letterSpacing: 0.5 }]}>
+                  {userData?.badge === 'verified' ? 'COFAU BADGE' : badgeRequestStatus === 'pending' ? 'BADGE REQUEST PENDING' : 'APPLY FOR COFAU BADGE'}
+                </Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
+
+              <View style={styles.sidebarDivider} />
 
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
@@ -4844,99 +4840,6 @@ if (isRestaurantProfile) {
                 </View>
                 <Text style={styles.sidebarMenuText}>Settings</Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.sidebarMenuItem}
-                onPress={() => {
-                  setSettingsModalVisible(false);
-                  resetPhoneModal();
-                  setPhoneUpdateStep(userData?.phone_number ? 'verify_old' : 'verify_new');
-                  setPhoneModalVisible(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.sidebarMenuIconContainer}>
-                  <Ionicons name="call-outline" size={24} color="#333" />
-                </View>
-                <Text style={styles.sidebarMenuText}>
-                  {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
-                </Text>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
-              </TouchableOpacity>
-
-              <View style={styles.sidebarDivider} />
-
-{/* DELETE ACCOUNT - Separate TouchableOpacity */}
-<TouchableOpacity
-  style={styles.sidebarMenuItem}
-  onPress={() => {
-    setSettingsModalVisible(false);
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        'Are you sure you want to delete your account? This action is permanent and cannot be undone.'
-      );
-      if (confirmed) {
-        const doubleConfirm = window.confirm(
-          'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?'
-        );
-        if (doubleConfirm) handleDeleteAccount();
-      }
-    } else {
-      Alert.alert(
-        'Delete Account',
-        'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            onPress: () => {
-              Alert.alert(
-                'Final Confirmation',
-                'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete Forever', onPress: () => handleDeleteAccount(), style: 'destructive' },
-                ]
-              );
-            },
-            style: 'destructive',
-          },
-        ]
-      );
-    }
-  }}
-  activeOpacity={0.7}
->
-  <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
-    <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
-  </View>
-  <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Delete Account</Text>
-  <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
-</TouchableOpacity>
-
-{/* LOGOUT - Separate TouchableOpacity */}
-<TouchableOpacity
-  style={styles.sidebarMenuItem}
-  onPress={() => {
-    setSettingsModalVisible(false);
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to logout?');
-      if (confirmed) handleLogout();
-    } else {
-      Alert.alert('Logout', 'Are you sure you want to logout?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
-      ]);
-    }
-  }}
-  activeOpacity={0.7}
->
-                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
-                  <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-                </View>
-                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Logout</Text>
-                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
               </TouchableOpacity>
             </ScrollView>
           </Animated.View>
@@ -5036,6 +4939,119 @@ if (isRestaurantProfile) {
         }}
       />
 
+      {/* ================= BADGE REQUEST MODAL ================= */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={badgeRequestModalVisible}
+        onRequestClose={() => setBadgeRequestModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setBadgeRequestModalVisible(false)}
+            style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}
+          >
+            <TouchableOpacity activeOpacity={1} style={{ width: '92%', maxWidth: 400, backgroundColor: '#fff', borderRadius: 24, overflow: 'hidden' }}>
+              {/* Gradient header banner */}
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ paddingTop: 32, paddingBottom: 28, alignItems: 'center' }}
+              >
+                {/* Large spinning Instagram-style badge */}
+                <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', width: 96, height: 96, borderRadius: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+                  <View style={{ backgroundColor: '#fff', width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center' }}>
+                    <CofauVerifiedBadge size={56} animate={badgeRequestModalVisible} />
+                  </View>
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: 0.5 }}>Cofau Verified</Text>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 6, textAlign: 'center', paddingHorizontal: 30 }}>
+                  Get the official verified badge on your profile
+                </Text>
+              </LinearGradient>
+
+              {/* Content */}
+              <View style={{ padding: 24 }}>
+                {/* What you get */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, backgroundColor: '#FFF7F5', borderRadius: 12, padding: 12 }}>
+                  <CofauVerifiedBadge size={20} />
+                  <Text style={{ fontSize: 13, color: '#666', marginLeft: 10, flex: 1 }}>
+                    Verified badge appears next to your name across Cofau
+                  </Text>
+                </View>
+
+                {/* Note */}
+                <View style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 14, marginBottom: 18 }}>
+                  <Text style={{ fontSize: 13, color: '#555', lineHeight: 20 }}>
+                    <Text style={{ fontWeight: '700', color: '#333' }}>Note: </Text>
+                    Our team will review your profile, posts, and overall activity on Cofau. The verified badge is granted based on your contribution and engagement with the community.
+                  </Text>
+                </View>
+
+                {/* Reason input */}
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 8 }}>Tell us why (Optional)</Text>
+                <TextInput
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#E8E8E8',
+                    borderRadius: 14,
+                    padding: 14,
+                    fontSize: 14,
+                    minHeight: 80,
+                    textAlignVertical: 'top',
+                    color: '#333',
+                    backgroundColor: '#FAFAFA',
+                  }}
+                  placeholder="Tell us about yourself..."
+                  placeholderTextColor="#BBB"
+                  value={badgeRequestReason}
+                  onChangeText={setBadgeRequestReason}
+                  multiline
+                  maxLength={500}
+                />
+
+                {/* Submit button */}
+                <TouchableOpacity
+                  onPress={handleSubmitBadgeRequest}
+                  disabled={submittingBadgeRequest}
+                  activeOpacity={0.8}
+                  style={{ marginTop: 20, borderRadius: 14, overflow: 'hidden' }}
+                >
+                  <LinearGradient
+                    colors={['#FF2E2E', '#FF7A18']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ paddingVertical: 15, alignItems: 'center', borderRadius: 14 }}
+                  >
+                    {submittingBadgeRequest ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <MaterialCommunityIcons name="check-decagram" size={20} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Submit Request</Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* Cancel button */}
+                <TouchableOpacity
+                  onPress={() => setBadgeRequestModalVisible(false)}
+                  style={{ marginTop: 12, paddingVertical: 12, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#999', fontSize: 15, fontWeight: '500' }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ================= DELETE POST MODAL ================= */}
       <Modal
         animationType="slide"
@@ -5120,62 +5136,110 @@ if (isRestaurantProfile) {
                 <Text style={styles.emptyText}>No followers yet</Text>
               </View>
             ) : (
-              <FlatList
-                data={followersList}
-                keyExtractor={(item) => item.id || item.user_id || String(Math.random())}
-                renderItem={({ item }) => {
-                  const followerId = item.id || item.user_id;
-                  const isFollowingFollower = followingStatus[followerId] || false;
-                  
-                  return (
+              <>
+                {/* Horizontal Tabs */}
+                <View style={styles.followersTabBar}>
+                  {([
+                    { key: 'reviewers' as const, label: 'Reviewers', count: followersList.filter((f: any) => (f.level || 1) >= 1 && (f.level || 1) <= 4).length },
+                    { key: 'top_reviewers' as const, label: 'Top Reviewers', count: followersList.filter((f: any) => (f.level || 1) >= 5 && (f.level || 1) <= 8).length },
+                    { key: 'influencers' as const, label: 'Influencers', count: followersList.filter((f: any) => (f.level || 1) >= 9 && (f.level || 1) <= 12).length },
+                  ]).map((tab) => (
                     <TouchableOpacity
-                      style={styles.followerItem}
-                      onPress={() => {
-                        setFollowersModalVisible(false);
-                        router.push(`/profile?userId=${followerId}`);
-                      }}
-                      activeOpacity={0.7}
+                      key={tab.key}
+                      style={styles.followersTabItem}
+                      onPress={() => setFollowersTab(tab.key)}
                     >
-                      <UserAvatar
-                        profilePicture={item.profile_picture}
-                        username={item.full_name || item.username}
-                        size={50}
-                        level={item.level || 1}
-                        showLevelBadge={false}
-                        style={{}}
-                      />
-                      <View style={styles.followerInfo}>
-                        <Text style={styles.followerName}>
-                          {item.full_name || item.username || 'Unknown User'}
-                        </Text>
-                      </View>
-                      {!isOwnProfile && (
-                        <TouchableOpacity
-                          style={[
-                            styles.followerFollowButton,
-                            isFollowingFollower && styles.followerFollowingButton,
-                          ]}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            handleFollowerFollowToggle(followerId);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <Text
-                            style={[
-                              styles.followerFollowButtonText,
-                              isFollowingFollower && styles.followerFollowingButtonText,
-                            ]}
-                          >
-                            {isFollowingFollower ? 'Following' : 'Follow'}
-                          </Text>
-                        </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.followersTabText,
+                          followersTab === tab.key && styles.followersTabTextActive,
+                        ]}
+                        allowFontScaling={false}
+                        maxFontSizeMultiplier={1}
+                      >
+                        {tab.label} ({tab.count})
+                      </Text>
+                      {followersTab === tab.key && (
+                        <LinearGradient
+                          colors={['#FF2E2E', '#FF7A18']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.followersTabIndicator}
+                        />
                       )}
                     </TouchableOpacity>
-                  );
-                }}
-                contentContainerStyle={styles.followersListContent}
-              />
+                  ))}
+                </View>
+
+                {/* Filtered FlatList */}
+                <FlatList
+                  data={followersList.filter((f: any) => {
+                    const level = f.level || 1;
+                    if (followersTab === 'reviewers') return level >= 1 && level <= 4;
+                    if (followersTab === 'top_reviewers') return level >= 5 && level <= 8;
+                    return level >= 9 && level <= 12;
+                  })}
+                  keyExtractor={(item) => item.id || item.user_id || String(Math.random())}
+                  renderItem={({ item }) => {
+                    const followerId = item.id || item.user_id;
+                    const isFollowingFollower = followingStatus[followerId] || false;
+
+                    return (
+                      <TouchableOpacity
+                        style={styles.followerItem}
+                        onPress={() => {
+                          setFollowersModalVisible(false);
+                          router.push(`/profile?userId=${followerId}`);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <UserAvatar
+                          profilePicture={item.profile_picture}
+                          username={item.full_name || item.username}
+                          size={50}
+                          level={item.level || 1}
+                          showLevelBadge={false}
+                          style={{}}
+                        />
+                        <View style={styles.followerInfo}>
+                          <Text style={styles.followerName}>
+                            {item.full_name || item.username || 'Unknown User'}
+                          </Text>
+                        </View>
+                        {!isOwnProfile && (
+                          <TouchableOpacity
+                            style={[
+                              styles.followerFollowButton,
+                              isFollowingFollower && styles.followerFollowingButton,
+                            ]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleFollowerFollowToggle(followerId);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.followerFollowButtonText,
+                                isFollowingFollower && styles.followerFollowingButtonText,
+                              ]}
+                            >
+                              {isFollowingFollower ? 'Following' : 'Follow'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
+                  contentContainerStyle={styles.followersListContent}
+                  ListEmptyComponent={() => (
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="people-outline" size={48} color="#ccc" />
+                      <Text style={styles.emptyText}>No followers in this category</Text>
+                    </View>
+                  )}
+                />
+              </>
             )}
           </View>
         </View>
@@ -5208,41 +5272,89 @@ if (isRestaurantProfile) {
                 <Text style={styles.emptyText}>No compliments yet</Text>
               </View>
             ) : (
-              <FlatList
-                data={complimentsList}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View style={styles.complimentListItem}>
-                    <UserAvatar
-                      profilePicture={item.from_user_profile_picture}
-                      username={item.from_user_name}
-                      size={44}
-                      level={1}
-                      showLevelBadge={false}
-                      style={{ marginRight: 12 }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.complimentListName}>
-                        {item.compliment_icon} {item.compliment_name}
+              <>
+                {/* Horizontal Tabs */}
+                <View style={styles.followersTabBar}>
+                  {([
+                    { key: 'reviewers' as const, label: 'Reviewers', count: complimentsList.filter((c: any) => (c.from_user_level || 1) >= 1 && (c.from_user_level || 1) <= 4).length },
+                    { key: 'top_reviewers' as const, label: 'Top Reviewers', count: complimentsList.filter((c: any) => (c.from_user_level || 1) >= 5 && (c.from_user_level || 1) <= 8).length },
+                    { key: 'influencers' as const, label: 'Influencers', count: complimentsList.filter((c: any) => (c.from_user_level || 1) >= 9 && (c.from_user_level || 1) <= 12).length },
+                  ]).map((tab) => (
+                    <TouchableOpacity
+                      key={tab.key}
+                      style={styles.followersTabItem}
+                      onPress={() => setComplimentsTab(tab.key)}
+                    >
+                      <Text
+                        style={[
+                          styles.followersTabText,
+                          complimentsTab === tab.key && styles.followersTabTextActive,
+                        ]}
+                        allowFontScaling={false}
+                        maxFontSizeMultiplier={1}
+                      >
+                        {tab.label} ({tab.count})
                       </Text>
-                      {item.compliment_type === 'custom' && item.custom_message ? (
-                        <Text style={styles.complimentCustomMsg}>"{item.custom_message}"</Text>
-                      ) : null}
-                      <Text style={styles.complimentListFrom}>
-                        from {item.from_user_name}
-                        {item.created_at ? '  ·  ' + new Date(item.created_at).toLocaleDateString() : ''}
-                      </Text>
+                      {complimentsTab === tab.key && (
+                        <LinearGradient
+                          colors={['#FF2E2E', '#FF7A18']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.followersTabIndicator}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Filtered FlatList */}
+                <FlatList
+                  data={complimentsList.filter((c: any) => {
+                    const level = c.from_user_level || 1;
+                    if (complimentsTab === 'reviewers') return level >= 1 && level <= 4;
+                    if (complimentsTab === 'top_reviewers') return level >= 5 && level <= 8;
+                    return level >= 9 && level <= 12;
+                  })}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <View style={styles.complimentListItem}>
+                      <UserAvatar
+                        profilePicture={item.from_user_profile_picture}
+                        username={item.from_user_name}
+                        size={44}
+                        level={item.from_user_level || 1}
+                        showLevelBadge={false}
+                        style={{ marginRight: 12 }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.complimentListName}>
+                          {item.compliment_icon} {item.compliment_name}
+                        </Text>
+                        {item.compliment_type === 'custom' && item.custom_message ? (
+                          <Text style={styles.complimentCustomMsg}>"{item.custom_message}"</Text>
+                        ) : null}
+                        <Text style={styles.complimentListFrom}>
+                          from {item.from_user_name}
+                          {item.created_at ? '  ·  ' + new Date(item.created_at).toLocaleDateString() : ''}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                )}
-                contentContainerStyle={styles.followersListContent}
-              />
+                  )}
+                  contentContainerStyle={styles.followersListContent}
+                  ListEmptyComponent={() => (
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="heart-outline" size={48} color="#ccc" />
+                      <Text style={styles.emptyText}>No compliments in this category</Text>
+                    </View>
+                  )}
+                />
+              </>
             )}
           </View>
         </View>
       </Modal>
 
-      {/* ================= LEVEL DETAILS MODAL ================= */}
+      {/* ================= SETTINGS MODAL ================= */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -5252,118 +5364,122 @@ if (isRestaurantProfile) {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Level Details</Text>
+              <Text style={styles.modalTitle}>Settings</Text>
               <TouchableOpacity onPress={() => setLevelDetailsModalVisible(false)}>
                 <Ionicons name="close" size={28} color="#000" />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.levelDetailsContent}>
-              <View style={styles.levelInfoCard}>
-                <View style={styles.levelInfoRow}>
-                  <Text style={styles.levelInfoLabel}>Current Level:</Text>
-                  <View style={styles.levelBadgeContainer}>
-                    <Text style={styles.levelBadgeText}>
-                      Level {userData?.level || 1}
-                    </Text>
-                  </View>
+              {/* BLOCKED USERS */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  router.push('/blocked-users');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
                 </View>
+                <Text style={styles.sidebarMenuText}>Blocked Users</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
 
-                <View style={styles.levelInfoRow}>
-                  <Text style={styles.levelInfoLabel}>Title:</Text>
-                  <Text style={styles.levelInfoValue}>
-                    {userData?.title || 'Reviewer'}
-                  </Text>
+              {/* CHANGE PHONE */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  resetPhoneModal();
+                  setPhoneUpdateStep(userData?.phone_number ? 'verify_old' : 'verify_new');
+                  setPhoneModalVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="call-outline" size={24} color="#333" />
                 </View>
+                <Text style={styles.sidebarMenuText}>
+                  {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
 
-                {userData?.points !== undefined && (
-                  <View style={styles.levelInfoRow}>
-                    <Text style={styles.levelInfoLabel}>Current Points:</Text>
-                    <Text style={styles.levelInfoValue}>
-                      {userData.points || 0}
-                    </Text>
-                  </View>
-                )}
+              <View style={styles.sidebarDivider} />
 
-                {userData?.total_points !== undefined && (
-                  <View style={styles.levelInfoRow}>
-                    <Text style={styles.levelInfoLabel}>Total Points:</Text>
-                    <Text style={styles.levelInfoValue}>
-                      {userData.total_points || 0}
-                    </Text>
-                  </View>
-                )}
-
-                {userData?.requiredPoints !== undefined && userData?.level !== undefined && (
-                  <View style={styles.levelInfoRow}>
-                    <Text style={styles.levelInfoLabel}>Points for Next Level:</Text>
-                    <Text style={styles.levelInfoValue}>
-                      {(() => {
-                        const currentLevel = userData.level || 1;
-                        const currentRequiredPoints = userData.requiredPoints || 1250;
-                        return getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
-                      })()}
-                    </Text>
-                  </View>
-                )}
-
-                {userData?.requiredPoints !== undefined && userData?.currentPoints !== undefined && (
-                  <View style={styles.progressContainer}>
-                    <Text style={styles.progressLabel}>Progress to Next Level</Text>
-                    <View style={styles.progressBar}>
-                      {(() => {
-                        const currentLevel = userData?.level || 1;
-                        const currentRequiredPoints = userData.requiredPoints || 1250;
-                        const currentPoints = userData.currentPoints || 0;
-                        const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
-                        const progressPercent = Math.min((currentPoints / pointsNeeded) * 100, 100);
-                        
-                        return (
-                          <LinearGradient
-                            colors={['#FF2E2E', '#FF7A18']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={[
-                              styles.progressFill,
-                              {
-                                width: `${progressPercent}%`
-                              }
-                            ]}
-                          />
-                        );
-                      })()}
-                    </View>
-                    {(() => {
-                      const currentLevel = userData?.level || 1;
-                      const currentRequiredPoints = userData.requiredPoints || 1250;
-                      const currentPoints = userData.currentPoints || 0;
-                      const pointsNeeded = getPointsNeededForNextLevel(currentLevel, currentRequiredPoints);
-                      
-                      return (
-                        <Text style={styles.progressText}>
-                          {currentPoints} / {pointsNeeded} points
-                        </Text>
+              {/* DELETE ACCOUNT */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  if (Platform.OS === 'web') {
+                    const confirmed = window.confirm(
+                      'Are you sure you want to delete your account? This action is permanent and cannot be undone.'
+                    );
+                    if (confirmed) {
+                      const doubleConfirm = window.confirm(
+                        'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?'
                       );
-                    })()}
-                  </View>
-                )}
-              </View>
+                      if (doubleConfirm) handleDeleteAccount();
+                    }
+                  } else {
+                    Alert.alert(
+                      'Delete Account',
+                      'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          onPress: () => {
+                            Alert.alert(
+                              'Final Confirmation',
+                              'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Delete Forever', onPress: () => handleDeleteAccount(), style: 'destructive' },
+                              ]
+                            );
+                          },
+                          style: 'destructive',
+                        },
+                      ]
+                    );
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
+                  <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Delete Account</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+              </TouchableOpacity>
 
-              <View style={styles.levelSystemInfo}>
-                <Text style={styles.levelSystemTitle}>Level System</Text>
-                <Text style={styles.levelSystemText}>
-                  • Levels 1-4: Reviewer (25 points per post)
-                </Text>
-                <Text style={styles.levelSystemText}>
-                  • Levels 5-8: Top Reviewer (15 points per post)
-                </Text>
-                <Text style={styles.levelSystemText}>
-                  • Levels 9-12: Influencer (5 points per post)
-                </Text>
-                <Text style={styles.levelSystemText}>
-                  • Earn points by creating posts and engaging with content
-                </Text>
-              </View>
+              {/* LOGOUT */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  if (Platform.OS === 'web') {
+                    const confirmed = window.confirm('Are you sure you want to logout?');
+                    if (confirmed) handleLogout();
+                  } else {
+                    Alert.alert('Logout', 'Are you sure you want to logout?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
+                    ]);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
+                  <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Logout</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -7147,14 +7263,12 @@ header: {
   marginTop: -40,
   marginBottom: 8,
   borderRadius: 20,
-  overflow: 'hidden',
-  borderWidth: 1,
-  borderColor: '#FF5C5C',
+  borderWidth: 0,
   shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.1,
-  shadowRadius: 8,
-  elevation: 4,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.12,
+  shadowRadius: 24,
+  elevation: 8,
 },
  profileCard: {
   borderRadius: 20,
@@ -7164,16 +7278,20 @@ header: {
   alignItems: 'center',
   position: 'relative',
   backgroundColor: '#fff',
+  overflow: 'hidden',
 },
 
 profileCardAndroid: {
   backgroundColor: '#fff',
+  borderWidth: 0.5,
+  borderColor: 'rgba(0,0,0,0.06)',
 },
 bioInsideCard: {
   paddingHorizontal: 0,
   paddingTop: 14,
   paddingBottom: 2,
   alignSelf: 'stretch',
+  width: '100%',
   alignItems: 'flex-start',
 },
 cardDivider: {
@@ -7316,9 +7434,11 @@ statDivider: {
     lineHeight: 16,
     fontStyle: 'italic',
     fontWeight: '600',
+    flexShrink: 1,
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,
       textAlignVertical: 'center',
+      width: '100%',
     }),
   },
 
@@ -7657,6 +7777,36 @@ statDivider: {
   },
   followersListContent: {
     paddingBottom: 20,
+  },
+  followersTabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  followersTabItem: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  followersTabText: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
+  },
+  followersTabTextActive: {
+    color: '#333',
+    fontWeight: '700',
+  },
+  followersTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
   },
   followerFollowButton: {
     backgroundColor: '#4dd0e1',

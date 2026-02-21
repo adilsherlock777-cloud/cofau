@@ -44,7 +44,7 @@ const GradientHeart = ({ size = 28 }) => {
       }
     >
       <LinearGradient
-        colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+        colors={["#FF2E2E", "#FF7A18"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ width: size, height: size }}
@@ -83,6 +83,19 @@ export default function StoryViewerScreen() {
   const [contentLayout, setContentLayout] = useState({ width: 0, height: 0, y: 0 });
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const leftHalfX = useRef(new Animated.Value(-200)).current;
+  const rightHalfX = useRef(new Animated.Value(200)).current;
+  const mergedScale = useRef(new Animated.Value(1)).current;
+  const heartOpacity = useRef(new Animated.Value(1)).current;
+  const confettiAnims = useRef(
+    Array.from({ length: 10 }, () => ({
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0),
+      translateX: new Animated.Value(0),
+      translateY: new Animated.Value(0),
+    }))
+  ).current;
   const [showShareModal, setShowShareModal] = useState(false);
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -149,6 +162,54 @@ export default function StoryViewerScreen() {
   /* ----------------------------------------------------------
      HANDLE LIKE/UNLIKE STORY
   -----------------------------------------------------------*/
+  const triggerHeartAnimation = () => {
+    leftHalfX.setValue(-200);
+    rightHalfX.setValue(200);
+    mergedScale.setValue(1);
+    heartOpacity.setValue(1);
+    confettiAnims.forEach((c) => {
+      c.opacity.setValue(0);
+      c.scale.setValue(0);
+      c.translateX.setValue(0);
+      c.translateY.setValue(0);
+    });
+    setShowHeartAnimation(true);
+
+    // Phase 1: Two halves slide in from left and right
+    Animated.parallel([
+      Animated.timing(leftHalfX, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(rightHalfX, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => {
+      // Phase 2: Bounce on merge + confetti burst
+      Animated.sequence([
+        Animated.spring(mergedScale, { toValue: 1.3, friction: 3, tension: 180, useNativeDriver: true }),
+        Animated.spring(mergedScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+      ]).start();
+
+      const confettiAnimations = confettiAnims.map((c, i) => {
+        const angle = (i / confettiAnims.length) * Math.PI * 2;
+        const distance = 80 + Math.random() * 60;
+        return Animated.parallel([
+          Animated.sequence([
+            Animated.timing(c.opacity, { toValue: 1, duration: 50, useNativeDriver: true }),
+            Animated.timing(c.opacity, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true }),
+          ]),
+          Animated.timing(c.scale, { toValue: 1, duration: 100, useNativeDriver: true }),
+          Animated.timing(c.translateX, { toValue: Math.cos(angle) * distance, duration: 600, useNativeDriver: true }),
+          Animated.timing(c.translateY, { toValue: Math.sin(angle) * distance, duration: 600, useNativeDriver: true }),
+        ]);
+      });
+      Animated.parallel(confettiAnimations).start();
+
+      Animated.sequence([
+        Animated.delay(700),
+        Animated.timing(heartOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => {
+        setShowHeartAnimation(false);
+      });
+    });
+  };
+
   const handleLikeStory = async () => {
     const currentStory = stories[currentIndex];
     if (!currentStory) return;
@@ -166,6 +227,7 @@ export default function StoryViewerScreen() {
         });
         setIsLiked(true);
         setLikeCount(prev => prev + 1);
+        triggerHeartAnimation();
       }
     } catch (error) {
       console.error('❌ Error liking/unliking story:', error);
@@ -1141,6 +1203,41 @@ const handlePrevious = () => {
         {/* Tap zones */}
         <TouchableOpacity style={styles.tapLeft} onPress={handlePrevious} />
         <TouchableOpacity style={styles.tapRight} onPress={handleNext} />
+
+        {/* Heart Animation Overlay */}
+        {showHeartAnimation && (
+          <View style={styles.heartAnimationContainer}>
+            <Animated.View style={{ opacity: heartOpacity }}>
+              <Animated.View style={{ transform: [{ scale: mergedScale }], flexDirection: 'row' }}>
+                <Animated.View style={{ width: 60, height: 120, overflow: 'hidden', transform: [{ translateX: leftHalfX }] }}>
+                  <GradientHeart size={120} />
+                </Animated.View>
+                <Animated.View style={{ width: 60, height: 120, overflow: 'hidden', transform: [{ translateX: rightHalfX }] }}>
+                  <View style={{ marginLeft: -60 }}>
+                    <GradientHeart size={120} />
+                  </View>
+                </Animated.View>
+              </Animated.View>
+              {confettiAnims.map((c: any, i: number) => (
+                <Animated.View
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: ['#FF2E2E', '#FF7A18', '#FFD700', '#FF6B35', '#FF4757', '#FFA502', '#FF6348', '#FF3838', '#FFAA33', '#FF5252'][i],
+                    alignSelf: 'center',
+                    top: '50%',
+                    marginTop: -4,
+                    opacity: c.opacity,
+                    transform: [{ translateX: c.translateX }, { translateY: c.translateY }, { scale: c.scale }],
+                  }}
+                />
+              ))}
+            </Animated.View>
+          </View>
+        )}
       </View>
 
       {/* Bottom Section - OUTSIDE contentContainer */}
@@ -1416,6 +1513,17 @@ tapHintText: {
   headerActions: { flexDirection: "row", gap: 16 },
   headerButton: { padding: 4 },
   contentContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  heartAnimationContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+    pointerEvents: 'none',
+  },
   storyImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150 },
   storyVideo: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT - 150, backgroundColor: '#000' },
   errorContainer: {

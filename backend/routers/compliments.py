@@ -5,6 +5,7 @@ from bson import ObjectId
 from database import get_database
 from routers.auth import get_current_user
 from routers.notifications import create_notification
+from utils.level_system import get_level_from_total_points
 
 router = APIRouter(prefix="/api/compliments", tags=["compliments"])
 
@@ -158,6 +159,7 @@ async def get_received_compliments(
             "from_user_name": from_user["full_name"] if from_user else "Unknown User",
             "from_user_username": from_user.get("username") if from_user else None,
             "from_user_profile_picture": from_user.get("profile_picture") if from_user else None,
+            "from_user_level": get_level_from_total_points(from_user.get("total_points", 0))["level"] if from_user else 1,
             "compliment_type": compliment_type,
             "compliment_name": compliment_info.get("name", compliment_type),
             "compliment_icon": compliment_info.get("icon", "💝"),

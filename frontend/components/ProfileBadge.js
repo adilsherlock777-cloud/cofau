@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import UserAvatar from './UserAvatar';
+import CofauVerifiedBadge from './CofauVerifiedBadge';
 
 // Import badge images
 const ReviewerBadge = require('../assets/badges/reviewer.png');
@@ -38,7 +39,8 @@ export default function ProfileBadge({
   dpSize = 90,
   badgeSize = 120,
   cameraIcon = null,
-  isOwnProfile = false
+  isOwnProfile = false,
+  badge = null,
 }) {
   const [showLevelInfo, setShowLevelInfo] = useState(false);
 
@@ -159,9 +161,12 @@ export default function ProfileBadge({
         </View>
         
         {/* Username below DP */}
-        <Text style={styles.usernameText} numberOfLines={1}>
-          {username && username.length > 10 ? `${username.substring(0, 10)}...` : username}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 4 }}>
+          <Text style={[styles.usernameText, { marginTop: 0 }]} numberOfLines={1}>
+            {username && username.length > 10 ? `${username.substring(0, 10)}...` : username}
+          </Text>
+          {badge === 'verified' && <CofauVerifiedBadge size={14} />}
+        </View>
       </View>
 
       {/* Right side: Badge + Title */}

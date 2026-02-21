@@ -11,7 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
@@ -519,15 +519,17 @@ export default function HappeningPlaces() {
     // Overlay badges for dish name and clicks
     const overlayBadges = (
       <>
-        {(clicksCount > 0 || viewsCount > 0) && (
-          <View style={styles.gridClicksBadge}>
+        <View style={styles.gridClicksBadge}>
+          {isVideo ? (
             <Ionicons name="eye-outline" size={9} color="#fff" />
-            <Text style={styles.gridClicksText}>{formatCount(viewsCount || clicksCount)}</Text>
-          </View>
-        )}
+          ) : (
+            <MaterialCommunityIcons name="gesture-tap" size={10} color="#fff" />
+          )}
+          <Text style={styles.gridClicksText}>{formatCount(isVideo ? viewsCount : clicksCount)}</Text>
+        </View>
         {dishName && (
           <View style={styles.gridDishTag}>
-            <Text style={styles.gridDishText} numberOfLines={1}>{dishName}</Text>
+            <Text style={styles.gridDishText} numberOfLines={1}>{dishName.toUpperCase()}</Text>
           </View>
         )}
       </>
@@ -580,15 +582,7 @@ export default function HappeningPlaces() {
   useFocusEffect(
     React.useCallback(() => {
       if (token) {
-        if (hasInitiallyLoaded.current) {
-          // Subsequent focus: use cached location, skip GPS wait
-          console.log('🔄 HappeningPlaces screen focused - refreshing locations');
-          if (userLocation) {
-            fetchTopLocations(userLocation);
-          } else {
-            fetchTopLocations();
-          }
-        } else {
+        if (!hasInitiallyLoaded.current) {
           // First load: get location then fetch + fetch nearby areas
           hasInitiallyLoaded.current = true;
           getCurrentLocation().then((coords) => {
@@ -600,11 +594,12 @@ export default function HappeningPlaces() {
             }
           });
         }
+        // Subsequent focus: use cached data, don't re-fetch
       }
       return () => {
         setPlayingVideos([]);
       };
-    }, [token, userLocation])
+    }, [token])
   );
 
   useEffect(() => {

@@ -12,6 +12,7 @@ TextInput,
 ActivityIndicator,
 Platform,
 Pressable,
+Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -27,6 +28,7 @@ import SharePreviewModal from "./SharePreviewModal";
 import ShareToUsersModal from "./ShareToUsersModal";
 import SimpleShareModal from "./SimpleShareModal";
 import ReportModal from "./ReportModal";
+import CofauVerifiedBadge from "./CofauVerifiedBadge";
 import { useAuth } from "../context/AuthContext";
 import {
 likePost,
@@ -123,6 +125,18 @@ const [imageDimensions, setImageDimensions] = useState(null);
 const dimensionCache = useRef({});
 const [lastTap, setLastTap] = useState(0);
 const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+const leftHalfX = useRef(new Animated.Value(-200)).current;
+const rightHalfX = useRef(new Animated.Value(200)).current;
+const mergedScale = useRef(new Animated.Value(1)).current;
+const heartOpacity = useRef(new Animated.Value(1)).current;
+const confettiAnims = useRef(
+  Array.from({ length: 10 }, () => ({
+    opacity: new Animated.Value(0),
+    scale: new Animated.Value(0),
+    translateX: new Animated.Value(0),
+    translateY: new Animated.Value(0),
+  }))
+).current;
 const [showCommentsModal, setShowCommentsModal] = useState(false);
 const [isBlocked, setIsBlocked] = useState(post.is_blocked || false);
 
@@ -405,8 +419,75 @@ const handleDoubleTap = () => {
     if (!isLiked) {
       handleLike();
     }
+    // Reset all animation values
+    leftHalfX.setValue(-200);
+    rightHalfX.setValue(200);
+    mergedScale.setValue(1);
+    heartOpacity.setValue(1);
+    confettiAnims.forEach((c) => {
+      c.opacity.setValue(0);
+      c.scale.setValue(0);
+      c.translateX.setValue(0);
+      c.translateY.setValue(0);
+    });
     setShowHeartAnimation(true);
-    setTimeout(() => setShowHeartAnimation(false), 1000);
+
+    // Phase 1: Two halves slide in from left and right
+    Animated.parallel([
+      Animated.timing(leftHalfX, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rightHalfX, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Phase 2: Bounce on merge + confetti burst
+      Animated.sequence([
+        Animated.spring(mergedScale, {
+          toValue: 1.3,
+          friction: 3,
+          tension: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(mergedScale, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Confetti burst when halves meet
+      const confettiAnimations = confettiAnims.map((c, i) => {
+        const angle = (i / confettiAnims.length) * Math.PI * 2;
+        const distance = 80 + Math.random() * 60;
+        return Animated.parallel([
+          Animated.sequence([
+            Animated.timing(c.opacity, { toValue: 1, duration: 50, useNativeDriver: true }),
+            Animated.timing(c.opacity, { toValue: 0, duration: 500, delay: 200, useNativeDriver: true }),
+          ]),
+          Animated.timing(c.scale, { toValue: 1, duration: 100, useNativeDriver: true }),
+          Animated.timing(c.translateX, { toValue: Math.cos(angle) * distance, duration: 600, useNativeDriver: true }),
+          Animated.timing(c.translateY, { toValue: Math.sin(angle) * distance, duration: 600, useNativeDriver: true }),
+        ]);
+      });
+      Animated.parallel(confettiAnimations).start();
+
+      // Phase 3: Fade out after a pause
+      Animated.sequence([
+        Animated.delay(700),
+        Animated.timing(heartOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShowHeartAnimation(false);
+      });
+    });
   } else {
     // Single tap - track post click for restaurants
     trackRestaurantPostClick();
@@ -445,6 +526,9 @@ showLevelBadge
 />
 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
   <Text style={styles.username}>{post.username}</Text>
+  {post.user_badge === 'verified' && (
+    <CofauVerifiedBadge size={16} />
+  )}
   {post.account_type === 'restaurant' && (
     <Ionicons name="storefront" size={14} color="#FF2E2E" />
   )}
@@ -559,6 +643,9 @@ postId={post.id}
             
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
   <Text style={styles.videoUsername}>{post.username}</Text>
+  {post.user_badge === 'verified' && (
+    <CofauVerifiedBadge size={14} />
+  )}
   {post.account_type === 'restaurant' && (
     <Ionicons name="storefront" size={14} color="#fff" />
   )}
@@ -769,7 +856,39 @@ postId={post.id}
     {/* Double Tap Heart Animation */}
     {showHeartAnimation && (
       <View style={styles.heartAnimationContainer}>
-        <GradientHeart size={120} />
+        <Animated.View style={{ opacity: heartOpacity }}>
+          {/* Two halves + merged heart */}
+          <Animated.View style={{ transform: [{ scale: mergedScale }], flexDirection: 'row' }}>
+            {/* Left half */}
+            <Animated.View style={{ width: 60, height: 120, overflow: 'hidden', transform: [{ translateX: leftHalfX }] }}>
+              <GradientHeart size={120} />
+            </Animated.View>
+            {/* Right half */}
+            <Animated.View style={{ width: 60, height: 120, overflow: 'hidden', transform: [{ translateX: rightHalfX }] }}>
+              <View style={{ marginLeft: -60 }}>
+                <GradientHeart size={120} />
+              </View>
+            </Animated.View>
+          </Animated.View>
+          {/* Confetti particles */}
+          {confettiAnims.map((c, i) => (
+            <Animated.View
+              key={i}
+              style={{
+                position: 'absolute',
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: ['#FF2E2E', '#FF7A18', '#FFD700', '#FF6B35', '#FF4757', '#FFA502', '#FF6348', '#FF3838', '#FFAA33', '#FF5252'][i],
+                alignSelf: 'center',
+                top: '50%',
+                marginTop: -4,
+                opacity: c.opacity,
+                transform: [{ translateX: c.translateX }, { translateY: c.translateY }, { scale: c.scale }],
+              }}
+            />
+          ))}
+        </Animated.View>
       </View>
     )}
 

@@ -1384,7 +1384,7 @@ export default function LeaderboardScreen() {
       <TouchableOpacity
         key={restaurant.id}
         style={styles.restaurantCard}
-        onPress={() => router.push(`/profile?userId=${restaurant.id}`)}
+        onPress={() => router.push(`/profile?userId=${restaurant.id}&from=leaderboard`)}
         activeOpacity={0.9}
       >
         {/* Restaurant Profile Image */}
@@ -1488,7 +1488,7 @@ export default function LeaderboardScreen() {
     const totalOrders = profile?.total_orders || 0;
     const goToVendorProfile = () => {
       if (vendorId) {
-        router.push(`/profile?userId=${vendorId}`);
+        router.push(`/profile?userId=${vendorId}&from=leaderboard`);
       }
     };
 
@@ -1550,7 +1550,7 @@ export default function LeaderboardScreen() {
             <View style={styles.vendorMetaItem}>
               <Ionicons name="star" size={13} color="#FFD700" style={{ marginRight: 3 }} />
               <Text style={styles.vendorMetaText}>Ratings</Text>
-              <Text style={styles.vendorMetaValue}>{avgRating % 1 === 0 ? avgRating : avgRating.toFixed(1)}/10</Text>
+              <Text style={styles.vendorMetaValue}>{avgRating % 1 === 0 ? avgRating : avgRating.toFixed(1)}/10{vendor.reviewCount > 0 ? ` (${vendor.reviewCount})` : ''}</Text>
             </View>
           )}
           {totalOrders > 0 && (hasRating || vendor.distanceKm !== Infinity) && (
@@ -1558,6 +1558,7 @@ export default function LeaderboardScreen() {
           )}
           {totalOrders > 0 && (
             <View style={styles.vendorMetaItem}>
+              <Ionicons name="receipt-outline" size={13} color="#FF7A18" style={{ marginRight: 3 }} />
               <Text style={styles.vendorMetaText}>Orders</Text>
               <Text style={styles.vendorMetaValue}>{totalOrders}</Text>
             </View>

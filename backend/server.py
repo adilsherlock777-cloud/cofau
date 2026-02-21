@@ -36,6 +36,8 @@ from routers.user_profile import router as user_profile_router
 from routers.places import router as places_router
 from routers.orders import router as orders_router
 from routers.menu import router as menu_router
+from routers.admin_auth import router as admin_auth_router
+from routers.badge_requests import router as badge_requests_router
 from utils.wallet_system import calculate_wallet_reward, process_wallet_reward, WalletRewardResult
 
 # Import utils
@@ -597,7 +599,35 @@ app.include_router(user_profile_router)
 app.include_router(places_router)
 app.include_router(orders_router)
 app.include_router(menu_router)
+app.include_router(admin_auth_router)
+app.include_router(badge_requests_router)
 
+
+
+# ======================================================
+# ADMIN PORTAL - Serve at /admin
+# ======================================================
+ADMIN_PORTAL_DIR = os.path.join(BASE_DIR, "static", "admin-portal")
+os.makedirs(ADMIN_PORTAL_DIR, exist_ok=True)
+
+# Mount static assets for admin portal (CSS, JS, images)
+try:
+    app.mount("/admin/assets", StaticFiles(directory=os.path.join(ADMIN_PORTAL_DIR, "assets")), name="admin-assets")
+    print(f"✅ Mounted admin portal assets at /admin/assets")
+except Exception as e:
+    print(f"⚠️ Could not mount admin portal assets: {e}")
+
+@app.get("/admin", response_class=HTMLResponse)
+async def serve_admin_portal_root():
+    """Serve the admin portal SPA at /admin"""
+    admin_index = os.path.join(ADMIN_PORTAL_DIR, "index.html")
+    if os.path.exists(admin_index):
+        return FileResponse(admin_index)
+    else:
+        return HTMLResponse(
+            content="<h1>Admin Portal Not Found</h1><p>Please build the admin portal first.</p>",
+            status_code=404
+        )
 
 
 # ======================================================

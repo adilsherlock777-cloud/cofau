@@ -549,7 +549,7 @@ const renderPost = useCallback(
           <FeedCard
             post={post}
             onLikeUpdate={() => {}}
-            onStoryCreated={() => {}}
+            onStoryCreated={() => fetchOwnStory()}
             shouldPlay={shouldPlay}
             shouldPreload={shouldPlay}
             isMuted={isMuted}

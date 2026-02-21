@@ -59,6 +59,22 @@ const SMALL_HEIGHT = COLUMN_WIDTH * 0.75;
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 const MAX_CONCURRENT_VIDEOS = 2;
 
+// Veg / Non-veg FSSAI-style dot icon (green square+dot for veg, red for non-veg)
+const FoodTypeIcon = ({ type, size = 20 }: { type: 'veg' | 'nonveg'; size?: number }) => {
+  const color = type === 'veg' ? '#22C55E' : '#E02D2D';
+  return (
+    <View style={{ width: size, height: size, borderRadius: 3, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ width: size * 0.45, height: size * 0.45, borderRadius: size * 0.45, backgroundColor: color }} />
+    </View>
+  );
+};
+
+const renderCategoryIcon = (emoji: string, size: number, marginRight = 0) => {
+  if (emoji === '__veg__') return <View style={{ marginRight }}><FoodTypeIcon type="veg" size={size} /></View>;
+  if (emoji === '__nonveg__') return <View style={{ marginRight }}><FoodTypeIcon type="nonveg" size={size} /></View>;
+  return <Text style={{ fontSize: size, marginRight }}>{emoji}</Text>;
+};
+
 // Mini confetti for rank 1 hero card
 const CONFETTI_ITEMS = ['🎉', '✨', '🏆', '⭐', '🥇', '🎯', '💫', '🔥', '❤️', '🌟'];
 const CONFETTI_COUNT = 14;
@@ -236,7 +252,7 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
       </View>
       {item.dish_name && (
         <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
-          <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
+          <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name.toUpperCase()}</Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -245,10 +261,11 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
 
 const ImageTile = memo(({ item, onPress, onLike }: any) => {
   const tileRouter = useRouter();
+  const displayUrl = item.full_thumbnail_url || item.full_image_url;
   return (
     <TouchableOpacity style={[styles.tile, { height: item.tileHeight }]} activeOpacity={0.9} onPress={() => onPress(item.id)}>
-      {item.full_image_url ? (
-        <Image source={{ uri: item.full_image_url }} style={styles.tileImage} placeholder={{ blurhash: BLUR_HASH }} cachePolicy="memory-disk" contentFit="cover" transition={200} />
+      {displayUrl ? (
+        <Image source={{ uri: displayUrl }} style={styles.tileImage} placeholder={{ blurhash: BLUR_HASH }} cachePolicy="memory-disk" contentFit="cover" transition={200} recyclingKey={item.id} />
       ) : (
         <View style={[styles.tileImage, styles.placeholderImage]}><Ionicons name="image-outline" size={32} color="#ccc" /></View>
       )}
@@ -258,19 +275,19 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => {
       </View>
       {item.dish_name && (
         <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
-          <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name}</Text>
+          <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name.toUpperCase()}</Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
   );
 });
 
-const GridTile = ({ item, onPress, onLike, onVideoLayout, playingVideos, onView }: any) => {
+const GridTile = memo(({ item, onPress, onLike, onVideoLayout, playingVideos, onView }: any) => {
   if (item._isVideo) {
     return <VideoTile item={item} onPress={onPress} onLike={onLike} shouldPlay={playingVideos.includes(item.id)} onLayout={onVideoLayout} onView={onView} />;
   }
   return <ImageTile item={item} onPress={onPress} onLike={onLike} />;
-};
+});
 
 // ======================================================
 // CORRECTED MAP MARKERS - Copy these to your ExploreScreen.tsx
@@ -634,7 +651,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
             categoryEmoji && styles.clusterPinWithEmoji
           ]}>
             {categoryEmoji ? (
-              <Text style={styles.clusterPinEmoji}>{categoryEmoji}</Text>
+              renderCategoryIcon(categoryEmoji, 18)
             ) : (
               <Ionicons name="location" size={18} color="#fff" />
             )}
@@ -759,8 +776,8 @@ const getCategoryEmoji = (categoryName: string | null) => {
   
   // Fallback mapping
   const CATEGORY_EMOJIS: { [key: string]: string } = {
-    'Vegetarian/Vegan': '🥬',
-    'Non vegetarian': '🍖',
+    'Vegetarian/Vegan': '__veg__',
+    'Non vegetarian': '__nonveg__',
     'Biryani': '🍛',
     'Desserts': '🍰',
     'SeaFood': '🦐',
@@ -1382,11 +1399,11 @@ export default function ExploreScreen() {
   });
 
 
-  const POSTS_PER_PAGE = 30;
+  const POSTS_PER_PAGE = 20;
   const CATEGORIES = [
   { id: 'all', name: 'All', emoji: '🍽️' },
-  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
-  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '__veg__' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '__nonveg__' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
@@ -1427,10 +1444,8 @@ export default function ExploreScreen() {
 
 // Show only popular categories in quick chips (names must match CATEGORIES exactly)
 const QUICK_CATEGORIES = [
-  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
-  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
-  { id: 'dosa', name: 'Dosa', emoji: '🫕' },
-  { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
+  { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '__veg__' },
+  { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '__nonveg__' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
   { id: 'italian', name: 'Italian', emoji: '🍕' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
@@ -1442,6 +1457,8 @@ const QUICK_CATEGORIES = [
   { id: 'kerala-style', name: 'Kerala', emoji: '🥥' },
   { id: 'andhra-style', name: 'Andhra', emoji: '🔥' },
   { id: 'punjabi-style', name: 'Punjabi', emoji: '🧈' },
+  { id: 'dosa', name: 'Dosa', emoji: '🫕' },
+  { id: 'tea-coffee', name: 'Tea/Coffee', emoji: '☕' },
   { id: 'bengali-style', name: 'Bengali', emoji: '🐟' },
   { id: 'asian', name: 'Asian', emoji: '🥢' },
   { id: 'odia-style', name: 'Odia', emoji: '🍚' },
@@ -1939,12 +1956,12 @@ useFocusEffect(
     }
     
     // Users tab logic
-    if (activeTab === 'users' && posts.length === 0) {
+    if (user && token && activeTab === 'users' && posts.length === 0) {
       fetchPosts(true);
     }
     
     return () => setPlayingVideos([]);
-  }, [activeTab, userLocation, selectedQuickCategory])
+  }, [activeTab, userLocation, selectedQuickCategory, user, token])
 );
 
 
@@ -1980,7 +1997,7 @@ useFocusEffect(
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     scrollYRef.current = contentOffset.y;
     calculateVisibleVideos(contentOffset.y);
-    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 200) {
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - SCREEN_HEIGHT * 3) {
       if (hasMore && !loadingMore && !loading) fetchPosts(false);
     }
   }, [calculateVisibleVideos, hasMore, loadingMore, loading]);
@@ -1992,21 +2009,6 @@ useFocusEffect(
     }
   }, [posts.length]);
 
- useFocusEffect(useCallback(() => {
-  // Only fetch posts for users tab if no posts cached
-  if (user && token && activeTab === 'users' && posts.length === 0) {
-    fetchPosts(true);
-  }
-  // DON'T refetch map data on focus - preserve existing data
-  return () => setPlayingVideos([]);
-}, [user, token, activeTab, posts.length]));
-
-// Initial load - fetch posts once when component mounts
-useEffect(() => {
-  if (user && token && posts.length === 0) {
-    fetchPosts(true);
-  }
-}, [user, token]);
 
   const fetchPosts = async (refresh = false, categories?: string[], tab?: 'map' | 'users') => {
     try {
@@ -2056,6 +2058,15 @@ useEffect(() => {
         setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]);
         setPage((prev) => prev + 1);
       }
+
+      // Pre-fetch thumbnails for grid view (much smaller than full images)
+      const postsToPreFetch = newPosts.slice(0, 6);
+      postsToPreFetch.forEach((post: any) => {
+        const urlToPreFetch = post.full_thumbnail_url || post.full_image_url;
+        if (urlToPreFetch && !post._isVideo) {
+          Image.prefetch(urlToPreFetch);
+        }
+      });
 
       if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
     } catch (err) {
@@ -2146,9 +2157,9 @@ useEffect(() => {
   router.push(`/post-details/${postId}`);
 };
 
-  if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Authenticating…</Text></View>;
-
   const columns = React.useMemo(() => distributePosts(posts), [posts]);
+
+  if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Authenticating…</Text></View>;
 
 return (
   <View style={styles.container}>
@@ -2208,7 +2219,7 @@ return (
                 onPress={() => handleQuickCategoryPress(category)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.quickCategoryEmoji}>{category.emoji}</Text>
+                {renderCategoryIcon(category.emoji, 13, 4)}
                 <Text style={[
                   styles.quickCategoryText,
                   selectedQuickCategory === category.id && styles.quickCategoryTextActive
@@ -2604,7 +2615,17 @@ return (
         // USERS GRID VIEW
         <>
           {loading && posts.length === 0 ? (
-            <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Loading posts…</Text></View>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+              <View style={styles.masonryContainer}>
+                {[0, 1, 2].map((col) => (
+                  <View key={col} style={styles.column}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <View key={i} style={{ width: '100%', height: COLUMN_WIDTH * (1 + (i % 3) * 0.3), borderRadius: 12, backgroundColor: '#F0F0F0', marginBottom: SPACING }} />
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
           ) : (
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4dd0e1" />}>
               <View style={styles.masonryContainer}>
@@ -2684,15 +2705,15 @@ return (
         }}
       >
         <View style={styles.categoryItemContent}>
-          <Text style={styles.categoryEmoji}>{item.emoji}</Text>
+          <View style={styles.categoryEmoji}>{renderCategoryIcon(item.emoji, 18)}</View>
           <Text style={[styles.categoryItemText, isSelected && styles.categoryItemTextSelected]}>
             {item.name}
           </Text>
         </View>
         {isSelected ? (
-          <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+          <Ionicons name="checkmark-circle" size={20} color="#FFF" />
         ) : (
-          <Ionicons name="ellipse-outline" size={24} color="#CCC" />
+          <Ionicons name="ellipse-outline" size={20} color="#CCC" />
         )}
       </TouchableOpacity>
     );
@@ -3163,22 +3184,22 @@ const styles = StyleSheet.create({
   centerIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#fff", borderWidth: 2, borderColor: "#333", justifyContent: "center", alignItems: "center", marginBottom: 4, elevation: 8 },
   centerIconGradient: { width: 56, height: 56, borderRadius: 28, justifyContent: "center", alignItems: "center", marginBottom: 4, elevation: 8 },
   centerIconCircleInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#fff", justifyContent: "center", alignItems: "center" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: "flex-end" },
-  categoryModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" },
-  categoryModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#E5E5E5" },
-  categoryModalTitle: { fontSize: 20, fontWeight: "bold", color: "#000" },
-  selectedCountContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 12, backgroundColor: "#FFF5E6" },
-  selectedCountText: { fontSize: 14, color: "#E94A37", fontWeight: "600" },
-  clearAllModalText: { fontSize: 14, color: "#E94A37", fontWeight: "600" },
-  categoryList: { padding: 12 },
-  categoryItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderRadius: 12, marginBottom: 8, backgroundColor: "#F9F9F9" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)" },
+  categoryModal: { backgroundColor: "#fff", flex: 1, marginTop: 50, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  categoryModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#E5E5E5" },
+  categoryModalTitle: { fontSize: 17, fontWeight: "bold", color: "#000" },
+  selectedCountContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#FFF5E6" },
+  selectedCountText: { fontSize: 12, color: "#E94A37", fontWeight: "600" },
+  clearAllModalText: { fontSize: 12, color: "#E94A37", fontWeight: "600" },
+  categoryList: { padding: 8 },
+  categoryItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4, backgroundColor: "#F9F9F9" },
   categoryItemSelected: { backgroundColor: "#E94A37", borderWidth: 2, borderColor: "#F2CF68" },
-  categoryItemContent: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  categoryItemText: { fontSize: 16, color: "#000", flex: 1 },
+  categoryItemContent: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  categoryItemText: { fontSize: 14, color: "#000", flex: 1 },
   categoryItemTextSelected: { fontWeight: "600", color: "#fff" },
-  modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: "#E5E5E5" },
-  doneButton: { backgroundColor: "#E94A37", paddingVertical: 14, borderRadius: 12, alignItems: "center" },
-  doneButtonText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
+  modalFooter: { padding: 12, borderTopWidth: 1, borderTopColor: "#E5E5E5" },
+  doneButton: { backgroundColor: "#E94A37", paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+  doneButtonText: { color: "#FFF", fontSize: 15, fontWeight: "bold" },
 
   // ======================================================
   // MAP STYLES
@@ -3973,8 +3994,9 @@ toggleTabTextActive: {
     marginTop: 4,
   },
   categoryEmoji: {
-  fontSize: 24,
-  marginRight: 12,
+  marginRight: 8,
+  justifyContent: 'center',
+  alignItems: 'center',
 },
   statDivider: {
     width: 1,
