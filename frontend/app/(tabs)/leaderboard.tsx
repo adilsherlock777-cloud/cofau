@@ -26,6 +26,7 @@ import { ReviewModal } from "../../components/ReviewModal";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 import * as Location from "expo-location";
+import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = BACKEND_URL;
@@ -1409,8 +1410,8 @@ export default function LeaderboardScreen() {
               <Text style={styles.restaurantName} numberOfLines={1}>
                 {restaurant.restaurant_name || restaurant.name || restaurant.full_name}
               </Text>
-              {restaurant.is_verified && (
-                <Ionicons name="checkmark-circle" size={16} color="#E94A37" style={{ marginLeft: 6 }} />
+              {(restaurant.is_verified || restaurant.badge === 'verified') && (
+                <View style={{ marginLeft: 6 }}><CofauVerifiedBadge size={16} /></View>
               )}
             </View>
             <TouchableOpacity
@@ -1511,6 +1512,9 @@ export default function LeaderboardScreen() {
             <Text style={styles.vendorName} numberOfLines={1}>
               {vendor.restaurant_name || vendor.name || vendor.full_name}
             </Text>
+            {(vendor.is_verified || vendor.badge === 'verified') && (
+              <View style={{ marginLeft: 4 }}><CofauVerifiedBadge size={14} /></View>
+            )}
             {vendor.food_type && (
               <View style={styles.foodTypeBadgeContainer}>
                 {(vendor.food_type === 'veg' || vendor.food_type === 'veg_and_non_veg') && (

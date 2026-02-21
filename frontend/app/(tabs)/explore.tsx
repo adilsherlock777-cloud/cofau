@@ -26,6 +26,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost } from "../../utils/api";
 import UserAvatar from "../../components/UserAvatar";
+import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
 let MapView: any;
 let Marker: any;
 let Callout: any;
@@ -1052,6 +1053,7 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
                   </View>
                 )}
                 <Text style={styles.postUsername}>{post.username}</Text>
+                {post.user_badge === 'verified' && <CofauVerifiedBadge size={14} />}
               </View>
 
               {post.location_name && (
@@ -1162,6 +1164,7 @@ const TopPostsModal = memo(({ visible, posts, loading, onClose, onViewPost }: an
                         </View>
                       )}
                       <Text style={styles.topPostUsername} numberOfLines={1}>{item.username}</Text>
+                      {item.user_badge === 'verified' && <CofauVerifiedBadge size={12} />}
                     </View>
                     {item.location_name && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
@@ -2455,9 +2458,12 @@ return (
                       style={undefined}
                     />
                     <View style={styles.heroUserInfo}>
-                      <Text style={styles.heroUsername} numberOfLines={1}>
-                        {topPosts[0].username}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={styles.heroUsername} numberOfLines={1}>
+                          {topPosts[0].username}
+                        </Text>
+                        {topPosts[0].user_badge === 'verified' && <CofauVerifiedBadge size={16} />}
+                      </View>
                       <Text style={styles.heroBadgeTitle}>
                         {getBadgeTitle(topPosts[0].user_level)}
                       </Text>
@@ -2548,6 +2554,7 @@ return (
                           style={undefined}
                         />
                         <Text style={styles.regularUsername} numberOfLines={1}>{item.username}</Text>
+                        {item.user_badge === 'verified' && <CofauVerifiedBadge size={12} />}
                       </TouchableOpacity>
                     </View>
 

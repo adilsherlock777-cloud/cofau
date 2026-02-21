@@ -1454,6 +1454,7 @@ async def get_feed(
                 "user_id": restaurant_id,
                 "username": post.get("restaurant_name") or (restaurant["restaurant_name"] if restaurant else "Unknown"),
                 "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "user_badge": "verified" if (restaurant and (restaurant.get("badge") == "verified" or restaurant.get("is_verified"))) else None,
                 "user_level": None,
                 "media_url": post.get("media_url", ""),
                 "image_url": post.get("image_url"),
@@ -1929,6 +1930,7 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "username": user.get("username", "Unknown") if user else "Unknown",
             "full_name": user.get("full_name", user.get("username", "Unknown")) if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "media_url": post.get("media_url", ""),
             "mediaUrl": post.get("media_url", ""),  # For compatibility
             "image_url": post.get("media_url") if media_type == "image" else None,
@@ -1974,6 +1976,7 @@ async def list_liked_posts(skip: int = 0, limit: int = 100, current_user: dict =
             "username": user.get("username", "Unknown") if user else "Unknown",
             "full_name": user.get("full_name", user.get("username", "Unknown")) if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "media_url": post.get("media_url", ""),
             "media_type": media_type,
             "thumbnail_url": post.get("thumbnail_url"),
@@ -2114,6 +2117,7 @@ async def get_saved_posts(user_id: str, skip: int = 0, limit: int = 50, current_
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,
             "media_type": media_type,
@@ -2305,30 +2309,31 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
     # Apply diverse algorithm
     diverse_posts = get_diverse_explore_posts(posts, current_time, limit=skip + limit + 20)
     paginated = diverse_posts[skip:skip + limit]
-    
+
     result = []
     for item in paginated:
         post = item["post"]
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-        
+
         is_liked = await db.likes.find_one({
             "post_id": str(post["_id"]),
             "user_id": str(current_user["_id"])
         }) is not None
-        
+
         is_saved = await db.saved_posts.find_one({
             "post_id": str(post["_id"]),
             "user_id": str(current_user["_id"])
         }) is not None
-        
+
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
-        
+
         result.append({
             "id": str(post["_id"]),
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,
             "thumbnail_url": post.get("thumbnail_url"),
@@ -2345,7 +2350,7 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
-    
+
     return result
 
 
@@ -2511,6 +2516,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,
             "thumbnail_url": post.get("thumbnail_url"),
@@ -2527,7 +2533,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
-    
+
     return result
 
 @app.get("/api/explore/nearby")
@@ -2560,6 +2566,7 @@ async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: 
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,  # Only for images, None for videos
             "thumbnail_url": post.get("thumbnail_url"),  # Thumbnail for videos
@@ -2746,6 +2753,7 @@ async def search_posts(
             "user_id": post["user_id"],
             "username": user["full_name"] if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "media_url": post.get("media_url", ""),
             "image_url": image_url,
             "rating": post.get("rating", 0),
@@ -3059,6 +3067,7 @@ async def get_restaurant_reviews(
             "user_id": post["user_id"],
             "username": user.get("full_name") or user.get("username") if user else "Unknown",
             "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_badge": user.get("badge") if user else None,
             "user_level": user.get("level", 1) if user else 1,
             "media_url": post.get("media_url") or post.get("image_url", ""),
             "thumbnail_url": post.get("thumbnail_url"),
@@ -3812,6 +3821,8 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
             "user_id": post["user_id"],
             "username": user.get("username") or user.get("full_name") or "Unknown",
             "user_profile_picture": user.get("profile_picture"),
+            "user_badge": user.get("badge"),
+            "user_level": user.get("level", 1),
             "media_url": post.get("media_url", ""),
             "image_url": image_url,
             "thumbnail_url": post.get("thumbnail_url"),

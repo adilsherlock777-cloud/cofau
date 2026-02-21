@@ -26,6 +26,7 @@ import { Video, ResizeMode } from 'expo-av';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
+import CofauVerifiedBadge from '../../components/CofauVerifiedBadge';
 import { normalizeStoryUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
 import { markStoryViewed, getStoryViews } from '../../utils/api';
 import { LinearGradient } from "expo-linear-gradient";
@@ -854,7 +855,10 @@ const handlePrevious = () => {
             style={{}}
           />
           <View>
-            <Text style={styles.username}>{storyUser.username}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.username}>{storyUser.username}</Text>
+              {storyUser.badge === 'verified' && <CofauVerifiedBadge size={14} />}
+            </View>
             {currentIsOwner && (
               <Text style={styles.viewCountHeader}>
                 👁 {viewCount} {viewCount === 1 ? 'view' : 'views'}
@@ -1117,7 +1121,10 @@ const handlePrevious = () => {
             style={{}}
           />
           <View style={styles.postCardHeaderText}>
-            <Text style={styles.postCardUsername}>{storyUser.username}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.postCardUsername}>{storyUser.username}</Text>
+              {storyUser.badge === 'verified' && <CofauVerifiedBadge size={14} />}
+            </View>
             <Text style={styles.postCardTime}>1h</Text>
           </View>
         </View>

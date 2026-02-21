@@ -112,6 +112,10 @@ export default function NotificationsScreen() {
       // Route to leaderboard which shows orders for restaurants
       router.push('/(tabs)/leaderboard');
     }
+    // Badge notifications
+    else if (type === 'badge_approved' || type === 'badge_rejected') {
+      router.push('/(tabs)/profile');
+    }
     // Fallback: if no specific route, go to feed
     else {
       console.log(`⚠️ Unhandled notification type: ${type}`);

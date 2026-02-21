@@ -198,12 +198,13 @@ async def approve_badge_request(
     # Send notification to user
     try:
         notification = {
-            "to_user_id": badge_request["user_id"],
+            "toUserId": badge_request["user_id"],
+            "fromUserId": badge_request["user_id"],
+            "fromUserName": "Cofau",
             "type": "badge_approved",
-            "title": "Badge Approved!",
             "message": "Congratulations! Your Cofau verified badge has been approved.",
-            "read": False,
-            "created_at": datetime.utcnow(),
+            "isRead": False,
+            "createdAt": datetime.utcnow(),
         }
         await db.notifications.insert_one(notification)
     except Exception:
@@ -262,12 +263,13 @@ async def reject_badge_request(
     try:
         reason_text = f" Reason: {body.reject_reason}" if body.reject_reason else ""
         notification = {
-            "to_user_id": badge_request["user_id"],
+            "toUserId": badge_request["user_id"],
+            "fromUserId": badge_request["user_id"],
+            "fromUserName": "Cofau",
             "type": "badge_rejected",
-            "title": "Badge Request Update",
             "message": f"Your Cofau badge request was not approved at this time.{reason_text}",
-            "read": False,
-            "created_at": datetime.utcnow(),
+            "isRead": False,
+            "createdAt": datetime.utcnow(),
         }
         await db.notifications.insert_one(notification)
     except Exception:
