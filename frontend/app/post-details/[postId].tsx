@@ -293,7 +293,6 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
               // Reset video position to beginning to stop audio completely
               await (videoRef.current as any).setPositionAsync(0);
             } catch (err) {
-              console.log("Video stop error:", err);
             }
           }
         }
@@ -336,7 +335,6 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       }));
       setComments(normalized);
     } catch (e) {
-      console.log("❌ Comment fetch error", e);
     }
   };
 
@@ -672,7 +670,6 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                   usePoster={false}
                   posterSource={null}
                   onLoad={(status: any) => {
-                    console.log("✅ Video loaded in post details", status);
                     if (!videoLoaded) {
                       setVideoLoaded(true);
                     }
@@ -691,13 +688,11 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                                 try {
                                   await (videoRef.current as any).playAsync();
                                 } catch (retryErr) {
-                                  console.log("Video play retry error in post details:", retryErr);
                                 }
                               }, 300);
                             }
                           }
                         } catch (err) {
-                          console.log("Auto-play error in post details:", err);
                         }
                       }, 200);
                     }
@@ -733,7 +728,6 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                     }
                   }}
                   onLoadStart={() => {
-                    console.log("📹 Video loading started in post details:", mediaUrl || displayUrl);
                     if (videoError) {
                       setVideoError(false);
                     }
@@ -1422,7 +1416,6 @@ export default function PostDetailsScreen() {
       }, 800);
       
     } catch (e) {
-      console.log("❌ Post fetch error", e);
       
       // Fallback: If single post endpoint doesn't exist, use old method
       loadInitialPostFallback();
@@ -1467,7 +1460,6 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
       // Update skip to match the number of posts actually loaded
       setSkip(5);
     } catch (e) {
-      console.log("Background load error", e);
     }
   };
 
@@ -1501,7 +1493,6 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
       setVisiblePostId(postsFromCurrent[0]?.id || postId);
       setSkip(postsFromCurrent.length);
     } catch (e) {
-      console.log("❌ Fallback fetch error", e);
       Alert.alert("Error", "Unable to load post");
     } finally {
       setLoading(false);
@@ -1545,7 +1536,6 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
       setSkip((prev) => prev + newPosts.length);
       if (newPosts.length < LIMIT) setHasMore(false);
     } catch (e) {
-      console.log("❌ Load more error", e);
     } finally {
       setLoadingMore(false);
     }

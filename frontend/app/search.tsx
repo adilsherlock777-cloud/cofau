@@ -160,7 +160,6 @@ export default function PostBottomSheet({ visible, postId, onClose }: PostBottom
       }));
       setComments(normalized);
     } catch (e) {
-      console.log('❌ Comment fetch error', e);
     }
   };
 

@@ -56,12 +56,9 @@ export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
 
   // Debug: Monitor visibility changes
   React.useEffect(() => {
-    console.log('📋 MenuUploadModal visibility changed:', visible);
-    console.log('📋 Token received:', token ? 'Yes' : 'No');
   }, [visible, token]);
 
   // Debug: Component render
-  console.log('📋 MenuUploadModal RENDERING - visible:', visible);
 
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -106,8 +103,6 @@ export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
         } as any);
       });
 
-      console.log('📤 Uploading menu images...');
-
       const response = await axios.post(
         `${BACKEND_URL}/api/restaurant/menu/upload`,
         formData,
@@ -118,8 +113,6 @@ export const MenuUploadModal: React.FC<MenuUploadModalProps> = ({
           },
         }
       );
-
-      console.log('✅ Menu extraction response:', response.data);
 
       setExtractedItems(response.data.items || []);
       setShowReview(true);

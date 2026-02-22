@@ -163,7 +163,6 @@ const getTileHeight = (post: any) => {
   return SQUARE_HEIGHT;
 };
 
-
 const GradientHeart = ({ size = 18 }) => (
   <MaskedView maskElement={<Ionicons name="heart" size={size} color="#000" />}>
     <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size }} />
@@ -212,7 +211,6 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
         await videoRef.current.pauseAsync();
       }
     } catch (e) {
-      console.log("Video control error:", e);
     }
   };
   controlVideo();
@@ -405,16 +403,8 @@ const PostMarker = memo(({ post, onPress }: any) => {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   if (!post.latitude || !post.longitude) {
-    console.log('❌ PostMarker: No coordinates for post', post.id);
     return null;
   }
-
-  console.log('✅ Rendering PostMarker:', {
-    id: post.id,
-    lat: post.latitude,
-    lng: post.longitude,
-    platform: Platform.OS
-  });
 
   // Stop tracking after image loads or timeout
   const [tracksChanges, setTracksChanges] = useState(true);
@@ -520,13 +510,6 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
     }, 5000); // Increased to 5s for Android image loading
     return () => clearTimeout(timer);
   }, []);
-
-  console.log('✅ Rendering ClusterMarker:', {
-    count,
-    lat: latitude,
-    lng: longitude,
-    platform: Platform.OS
-  });
 
   // Android - Use expo-image for reliable rendering inside map markers
   if (Platform.OS === 'android') {
@@ -685,7 +668,6 @@ class MapErrorBoundary extends React.Component<
     return { hasError: true };
   }
   componentDidCatch(error: any, info: any) {
-    console.log('MapErrorBoundary caught:', error, info);
   }
   render() {
     if (this.state.hasError) {
@@ -765,8 +747,6 @@ const MapViewComponent = memo(({
       }
     });
 
-    console.log(`📊 Map clustering: ${singlePosts.length} single posts, ${clusters.length} clusters (Platform: ${Platform.OS})`);
-
     return { singlePosts, clusters };
   }, [posts]);
 
@@ -820,7 +800,6 @@ const getCategoryEmoji = (categoryName: string | null) => {
 };
 
   const categoryEmoji = getCategoryEmoji(selectedCategory);
-  console.log('Selected Category:', selectedCategory, 'Emoji:', categoryEmoji);
   
 
   return (
@@ -851,7 +830,6 @@ const getCategoryEmoji = (categoryName: string | null) => {
 
           {/* Single Post Markers */}
           {(filterType === 'posts' || filterType === 'followers') && (() => {
-            console.log(`🗺️  Rendering ${singlePosts.length} single PostMarkers for filterType: ${filterType}`);
             return singlePosts.map((post: any) => (
               <PostMarker
                 key={`post-${post.id}`}
@@ -927,9 +905,6 @@ const getCategoryEmoji = (categoryName: string | null) => {
     </View>
   );
 });
-
-
-
 
 // ======================================================
 // RESTAURANT DETAIL MODAL
@@ -1361,6 +1336,44 @@ export default function ExploreScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  // Animated placeholder typing effect
+  const PLACEHOLDER_WORDS = ['Biryani', 'Desserts', 'Pizza', 'Dosa', 'Chinese', 'BBQ', 'Coffee', 'Salad'];
+  const [placeholderText, setPlaceholderText] = useState('');
+  const placeholderRef = useRef({ wordIndex: 0, charIndex: 0, isDeleting: false });
+
+  useEffect(() => {
+    if (searchQuery || searchFocused) return;
+
+    const timer = setInterval(() => {
+      const { wordIndex, charIndex, isDeleting } = placeholderRef.current;
+      const currentWord = PLACEHOLDER_WORDS[wordIndex];
+
+      if (!isDeleting) {
+        // Typing
+        if (charIndex < currentWord.length) {
+          setPlaceholderText(currentWord.substring(0, charIndex + 1));
+          placeholderRef.current.charIndex = charIndex + 1;
+        } else {
+          // Pause at full word, then start deleting
+          placeholderRef.current.isDeleting = true;
+        }
+      } else {
+        // Deleting
+        if (charIndex > 0) {
+          setPlaceholderText(currentWord.substring(0, charIndex - 1));
+          placeholderRef.current.charIndex = charIndex - 1;
+        } else {
+          // Move to next word
+          placeholderRef.current.isDeleting = false;
+          placeholderRef.current.wordIndex = (wordIndex + 1) % PLACEHOLDER_WORDS.length;
+        }
+      }
+    }, placeholderRef.current.isDeleting ? 80 : 180);
+
+    return () => clearInterval(timer);
+  }, [searchQuery, searchFocused]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [appliedCategories, setAppliedCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -1400,7 +1413,6 @@ export default function ExploreScreen() {
     profile_views: 0,
     profile_views_trend: '',
   });
-
 
   const POSTS_PER_PAGE = 20;
   const CATEGORIES = [
@@ -1510,7 +1522,6 @@ const centerOnUserLocation = useCallback(async () => {
       }
       return true;
     } catch (error) {
-      console.log("Location permission error:", error);
       return false;
     }
   };
@@ -1519,7 +1530,6 @@ const centerOnUserLocation = useCallback(async () => {
   try {
     // Return cached location if available (instant!)
     if (cachedUserLocation.current) {
-      console.log('Using cached location - instant!');
       if (mountedRef.current) setUserLocation(cachedUserLocation.current);
       return cachedUserLocation.current;
     }
@@ -1537,17 +1547,14 @@ const centerOnUserLocation = useCallback(async () => {
         };
         cachedUserLocation.current = coords;
         if (mountedRef.current) setUserLocation(coords);
-        console.log('Using last known location - fast!');
         return coords;
       }
     } catch (e) {
-      console.log('Last known location not available');
     }
 
     if (!mountedRef.current) return null;
 
     // Fallback to current position (slower but accurate)
-    console.log('Getting fresh GPS location...');
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
@@ -1563,7 +1570,6 @@ const centerOnUserLocation = useCallback(async () => {
     return coords;
   } catch (error) {
     if (!mountedRef.current) return null;
-    console.log("Get location error:", error);
     Alert.alert("Location Error", "Could not get your current location. Please try again.");
     return null;
   }
@@ -1572,13 +1578,11 @@ const centerOnUserLocation = useCallback(async () => {
   // MAP DATA FETCHING
   // ======================================================
 
-
 const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
   if (!userLocation) return;
 
   // If we have cached posts and not forcing refresh, use cache
   if (!forceRefresh && !searchTerm && cachedMapPosts.current.length > 0) {
-    console.log('Using cached posts:', cachedMapPosts.current.length);
     if (mountedRef.current) setMapPosts(cachedMapPosts.current);
     return;
   }
@@ -1593,8 +1597,6 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
       url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
     }
 
-    console.log('Fetching URL:', url);
-
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token || ""}` },
     });
@@ -1603,7 +1605,6 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
     if (searchTerm && searchTerm.trim()) {
       // Search results - don't cache these
       const results = response.data.results || [];
-      console.log('Search results:', results.length);
 
       // Process results to add full URLs
       const processedResults = results.map((post: any) => {
@@ -1621,22 +1622,17 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
       // All pins - cache these
       const posts = response.data.posts || [];
       const restaurants = response.data.restaurants || [];
-      console.log('All posts:', posts.length);
-      console.log('All restaurants:', restaurants.length);
 
       // Process posts to add full URLs
       const processedPosts = posts.map((post: any) => {
         const fullUrl = fixUrl(post.media_url || post.image_url);
         const thumbnailUrl = fixUrl(post.thumbnail_url);
-        console.log('📸 Processing post:', post.id, 'media_url:', post.media_url, 'thumbnail_url:', post.thumbnail_url, 'full_image_url:', fullUrl, 'full_thumbnail_url:', thumbnailUrl);
         return {
           ...post,
           full_image_url: fullUrl,
           full_thumbnail_url: thumbnailUrl,
         };
       });
-
-      console.log('✅ Processed', processedPosts.length, 'posts with URLs');
 
       // Cache the processed posts
       cachedMapPosts.current = processedPosts;
@@ -1646,7 +1642,6 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
     }
   } catch (error) {
     if (!mountedRef.current) return;
-    console.log("Fetch map pins error:", error);
   } finally {
     if (mountedRef.current) setMapLoading(false);
   }
@@ -1655,13 +1650,11 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
 // Fetch followers posts for map with caching (NO RADIUS LIMIT - worldwide)
 const fetchFollowersPosts = async (forceRefresh = false) => {
   if (!userLocation) {
-    console.log('⚠️  Cannot fetch followers posts - no user location');
     return;
   }
 
   // If we have cached followers posts and not forcing refresh, use cache
   if (!forceRefresh && cachedFollowersPosts.current.length > 0) {
-    console.log('✅ Using cached followers posts:', cachedFollowersPosts.current.length);
     setMapPosts(cachedFollowersPosts.current);
     return;
   }
@@ -1671,21 +1664,13 @@ const fetchFollowersPosts = async (forceRefresh = false) => {
     // No radius limit for followers - show all worldwide
     const url = `${API_URL}/map/followers-posts?lat=${userLocation.latitude}&lng=${userLocation.longitude}`;
 
-    console.log('🔍 Fetching followers posts (worldwide):', url);
-
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token || ""}` },
     });
     if (!mountedRef.current) return;
 
-    console.log('📦 Followers API response:', response.data);
-
     const posts = response.data.posts || [];
     const followingCount = response.data.following_count || 0;
-    const message = response.data.message || '';
-
-    console.log(`✅ Followers posts received: ${posts.length} posts from ${followingCount} followed users`);
-    if (message) console.log(`ℹ️  Message: ${message}`);
 
     // Process posts to add full URLs
     const processedPosts = posts.map((post: any) => {
@@ -1752,7 +1737,6 @@ const handleQuickCategoryPress = (category: any) => {
     if (activeTab === 'map') {
       // Use appropriate cache based on filter type
       const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
-      console.log('Deselecting category, using cache:', cacheToUse.length);
       setMapPosts(cacheToUse);
     } else {
       setAppliedCategories([]);
@@ -1771,7 +1755,6 @@ const handleQuickCategoryPress = (category: any) => {
   // Strict match only - exact category or exact substring
   return postCategory === selectedCategoryName;
 });
-      console.log(`Filtered ${filteredPosts.length} posts for category: ${category.name} from ${mapFilterType} cache`);
       setMapPosts(filteredPosts);
     } else {
       setAppliedCategories([category.name]);
@@ -1841,17 +1824,16 @@ const handleQuickCategoryPress = (category: any) => {
       event_type: 'profile_view'
     }, {
       headers: { Authorization: `Bearer ${token}` }
-    }).catch(err => console.log('Analytics tracking error:', err));
-    
+    }).catch(() => {});
+
     // Also track profile visit
     axios.post(`${API_URL}/restaurant/analytics/track`, {
       restaurant_id: restaurant.id,
       event_type: 'profile_visit'
     }, {
       headers: { Authorization: `Bearer ${token}` }
-    }).catch(err => console.log('Analytics tracking error:', err));
+    }).catch(() => {});
   } catch (err) {
-    console.log('Analytics tracking error:', err);
   }
 
   router.push(`/profile?userId=${restaurant.id}`);
@@ -1870,12 +1852,11 @@ const handleQuickCategoryPress = (category: any) => {
         post_id: post.id
       }, {
         headers: { Authorization: `Bearer ${token}` }
-      }).catch(err => console.log('Analytics tracking error:', err));
+      }).catch(() => {});
     } catch (err) {
-      console.log('Analytics tracking error:', err);
     }
   }
-  
+
   router.push(`/post-details/${post.id}`);
 };
 
@@ -1904,7 +1885,6 @@ useEffect(() => {
     // We have location - check if we need to fetch posts
     // Only fetch if cache is empty (first time load)
     if (cachedMapPosts.current.length === 0 && mapPosts.length === 0) {
-      console.log('Cache empty, fetching posts...');
       await fetchMapPins(undefined, true); // Force refresh
     }
     // Otherwise, data is already in mapPosts or will be restored from cache
@@ -1913,14 +1893,8 @@ useEffect(() => {
   loadMapData();
 }, [activeTab, userLocation, accountType]);
 
-
 useFocusEffect(
   useCallback(() => {
-    console.log('=== FOCUS EFFECT ===');
-    console.log('activeTab:', activeTab);
-    console.log('mapPosts.length:', mapPosts.length);
-    console.log('cachedMapPosts.length:', cachedMapPosts.current.length);
-    console.log('userLocation:', userLocation ? 'yes' : 'no');
     
     // When returning to this screen and map tab is active
     if (activeTab === 'map' && userLocation) {
@@ -1929,7 +1903,6 @@ useFocusEffect(
 
       if (mapPosts.length === 0 && cacheToUse.length > 0) {
         // Cache exists but mapPosts is empty (returned from navigation)
-        console.log('Restoring from cache on focus...');
         if (selectedQuickCategory) {
           // Re-apply category filter from cache
           const category = QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory);
@@ -1948,7 +1921,6 @@ useFocusEffect(
         }
       } else if (cacheToUse.length === 0) {
         // No cache exists, need to fetch
-        console.log('No cache, fetching...');
         if (mapFilterType === 'followers') {
           fetchFollowersPosts(true);
         } else {
@@ -1966,7 +1938,6 @@ useFocusEffect(
     return () => setPlayingVideos([]);
   }, [activeTab, userLocation, selectedQuickCategory, user, token])
 );
-
 
   // ======================================================
   // EXISTING FEED LOGIC (for USERS tab)
@@ -2011,7 +1982,6 @@ useFocusEffect(
       return () => clearTimeout(timer);
     }
   }, [posts.length]);
-
 
   const fetchPosts = async (refresh = false, categories?: string[], tab?: 'map' | 'users') => {
     try {
@@ -2098,12 +2068,11 @@ useFocusEffect(
       setTopPosts(res.data);
     } catch (err) {
       if (!mountedRef.current) return;
-      console.log("Error fetching top posts:", err);
     } finally {
       if (mountedRef.current) setTopPostsLoading(false);
     }
   };
-  const performSearch = () => { if (searchQuery.trim()) router.push({ pathname: "/search-results", params: { query: searchQuery.trim() } }); };
+  const performSearch = () => { if (searchQuery.trim()) { const q = searchQuery.trim(); setSearchQuery(''); router.push({ pathname: "/search-results", params: { query: q } }); } };
   const toggleCategory = (itemName: string) => { 
   setSelectedCategories((prev) => 
     prev.includes(itemName) 
@@ -2111,13 +2080,12 @@ useFocusEffect(
       : [...prev, itemName]
   ); 
 };
-  const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch (err) { console.log("Like error:", err); } };
+  const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch {} };
   const handleView = async (postId: string) => {
     setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, views_count: (p.views_count || 0) + 1, is_viewed: true } : p));
     try {
-      const tkn = await AsyncStorage.getItem('token');
-      axios.post(`${API_URL}/posts/${postId}/view`, {}, { headers: { Authorization: `Bearer ${tkn}` } }).catch(err => console.log('View tracking error:', err));
-    } catch (err) { console.log('View tracking error:', err); }
+      await AsyncStorage.getItem('token');
+    } catch {}
   };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
   const handlePostPressGrid = async (postId: string) => {
@@ -2135,9 +2103,8 @@ useFocusEffect(
       const tkn = await AsyncStorage.getItem('token');
       axios.post(`${API_URL}/posts/${postId}/click`, {}, {
         headers: { Authorization: `Bearer ${tkn}` }
-      }).catch(err => console.log('Click tracking error:', err));
+      }).catch(() => {});
     } catch (err) {
-      console.log('Click tracking error:', err);
     }
   }
 
@@ -2151,9 +2118,8 @@ useFocusEffect(
         post_id: postId
       }, {
         headers: { Authorization: `Bearer ${tkn}` }
-      }).catch(err => console.log('Analytics tracking error:', err));
+      }).catch(() => {});
     } catch (err) {
-      console.log('Analytics tracking error:', err);
     }
   }
 
@@ -2178,15 +2144,25 @@ return (
               <TouchableOpacity onPress={performSearch} activeOpacity={0.7}>
                 <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
               </TouchableOpacity>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="What are you hungry for? 🤤"
-                placeholderTextColor="#999"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                returnKeyType="search"
-                onSubmitEditing={performSearch}
-              />
+              <View style={{ flex: 1, justifyContent: 'center' }}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder=""
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  returnKeyType="search"
+                  onSubmitEditing={performSearch}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                />
+                {!searchQuery && !searchFocused && (
+                  <View style={styles.animatedPlaceholder} pointerEvents="none">
+                    <Text style={styles.animatedPlaceholderStatic}>Search for </Text>
+                    <Text style={styles.animatedPlaceholderTyping}>{placeholderText}</Text>
+                    <Text style={styles.animatedPlaceholderCursor}>|</Text>
+                  </View>
+                )}
+              </View>
 
               {/* UPDATED CATEGORY BUTTON - NEW BRAND COLORS */}
               <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
@@ -2337,8 +2313,6 @@ return (
           </ScrollView>
         </View>
       )}
-
-
 
       {/* CONTENT AREA */}
       {activeTab === 'topPosts' ? (
@@ -2535,13 +2509,20 @@ return (
                   style={styles.regularCardBorder}
                 >
                   <View style={styles.regularCardInner}>
-                    {/* Top row: Rank + User */}
+                    {/* Rank badge - corner style like hero */}
+                    <LinearGradient
+                      colors={['#FF8A80', '#FFB74D']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.regularRankBadge}
+                    >
+                      <Text style={styles.regularRankText}>#{item.rank}</Text>
+                    </LinearGradient>
+
+                    {/* Top row: User */}
                     <View style={styles.regularCardHeader}>
-                      <View style={[styles.regularRankBadge, item.rank <= 3 && { backgroundColor: '#FF7A18' }]}>
-                        <Text style={[styles.regularRankText, item.rank <= 3 && { color: '#fff' }]}>#{item.rank}</Text>
-                      </View>
                       <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 10 }}
+                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
                         onPress={() => router.push(`/profile?userId=${item.user_id}`)}
                         activeOpacity={0.7}
                       >
@@ -2553,18 +2534,28 @@ return (
                           level={item.user_level}
                           style={undefined}
                         />
-                        <Text style={styles.regularUsername} numberOfLines={1}>{item.username}</Text>
-                        {item.user_badge === 'verified' && <CofauVerifiedBadge size={12} />}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+                          <Text style={styles.regularUsername} numberOfLines={1}>{item.username}</Text>
+                          {item.user_badge === 'verified' && <CofauVerifiedBadge size={12} />}
+                        </View>
                       </TouchableOpacity>
                     </View>
 
-                    {/* Full-width Image */}
-                    <Image
-                      source={{ uri: fixUrl(item.image_url || item.media_url || item.thumbnail_url) || undefined }}
-                      style={styles.regularImage}
-                      contentFit="cover"
-                      placeholder={{ blurhash: BLUR_HASH }}
-                    />
+                    {/* Image Preview - same as hero */}
+                    <View style={styles.regularImageWrapper}>
+                      <Image
+                        source={{ uri: fixUrl(item.image_url || item.media_url || item.thumbnail_url) || undefined }}
+                        style={styles.regularImageBlur}
+                        contentFit="cover"
+                        blurRadius={30}
+                      />
+                      <Image
+                        source={{ uri: fixUrl(item.image_url || item.media_url || item.thumbnail_url) || undefined }}
+                        style={styles.regularImageFront}
+                        contentFit="contain"
+                        placeholder={{ blurhash: BLUR_HASH }}
+                      />
+                    </View>
 
                     {/* Scores row */}
                     <View style={styles.regularScoresRow}>
@@ -2671,7 +2662,6 @@ return (
         </>
       )}
 
-
       {/* CATEGORY MODAL - Hidden for restaurant users */}
       {accountType !== 'restaurant' && (
       <Modal visible={showCategoryModal} transparent animationType="slide" onRequestClose={() => { setSelectedCategories(appliedCategories); setShowCategoryModal(false); }}>
@@ -2743,7 +2733,6 @@ return (
         postCategory === cat.toLowerCase().trim()
       );
     });
-    console.log(`Modal filter: ${filteredPosts.length} posts for categories: ${selectedCategories.join(', ')} from ${mapFilterType} cache`);
     setMapPosts(filteredPosts);
   } else {
     // No filter - show all cached posts
@@ -2797,8 +2786,6 @@ return (
     </View>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
@@ -2862,10 +2849,32 @@ const styles = StyleSheet.create({
     marginRight: 10 
   },
   
-  searchInput: { 
-    flex: 1, 
-    fontSize: 14, 
-    color: "#333" 
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#333"
+  },
+  animatedPlaceholder: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+  },
+  animatedPlaceholderStatic: {
+    fontSize: 14,
+    color: '#999',
+  },
+  animatedPlaceholderTyping: {
+    fontSize: 14,
+    color: '#E94A37',
+    fontWeight: '600' as const,
+  },
+  animatedPlaceholderCursor: {
+    fontSize: 14,
+    color: '#E94A37',
+    fontWeight: '300' as const,
+    marginLeft: 1,
   },
   inlineFilterButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#E94A37", borderRadius: 18, paddingVertical: 5, paddingHorizontal: 12, gap: 4 },
   gradientBorder: { borderRadius: 20, padding: 2 },
@@ -3119,18 +3128,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     marginBottom: 10,
+    marginLeft: 36,
   },
   regularRankBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#E94A37',
+    position: 'absolute' as const,
+    top: -1,
+    left: -1,
+    width: 38,
+    height: 38,
+    borderTopLeftRadius: 10,
+    borderBottomRightRadius: 10,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+    zIndex: 1,
   },
   regularRankText: {
-    color: '#fff',
-    fontSize: 12,
+    color: '#333',
+    fontSize: 14,
     fontWeight: 'bold' as const,
   },
   regularUsername: {
@@ -3138,13 +3152,29 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: '#333',
     marginLeft: 8,
-    flex: 1,
+    flexShrink: 1,
   },
-  regularImage: {
-    width: '100%' as any,
-    height: 160,
-    borderRadius: 10,
+  regularImageWrapper: {
+    width: 'auto' as any,
+    height: 200,
+    marginHorizontal: -12,
     marginBottom: 10,
+    overflow: 'hidden' as const,
+    position: 'relative' as const,
+  },
+  regularImageBlur: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  regularImageFront: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   regularScoresRow: {
     flexDirection: 'row' as const,
@@ -3191,7 +3221,7 @@ const styles = StyleSheet.create({
   centerIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#fff", borderWidth: 2, borderColor: "#333", justifyContent: "center", alignItems: "center", marginBottom: 4, elevation: 8 },
   centerIconGradient: { width: 56, height: 56, borderRadius: 28, justifyContent: "center", alignItems: "center", marginBottom: 4, elevation: 8 },
   centerIconCircleInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#fff", justifyContent: "center", alignItems: "center" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: 'flex-end' as const },
   categoryModal: { backgroundColor: "#fff", flex: 1, marginTop: 50, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   categoryModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#E5E5E5" },
   categoryModalTitle: { fontSize: 17, fontWeight: "bold", color: "#000" },
@@ -3285,7 +3315,7 @@ const styles = StyleSheet.create({
   },
   resultsCountContainer: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 20,
     left: 16,
     right: 16,
     backgroundColor: 'rgba(0,0,0,0.7)',

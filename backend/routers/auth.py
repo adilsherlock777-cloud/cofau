@@ -13,11 +13,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     """Get current authenticated user (works for both users and restaurants)"""
-    print(f"🔐 get_current_user called with token: {token[:20]}...")
     email = verify_token(token)
-    print(f"   Token verified, email: {email}")
     if email is None:
-        print(f"   ❌ Token verification failed - returning 401")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -28,12 +25,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     # First try users collection
     user = await db.users.find_one({"email": email})
-    print(f"   User found in users collection: {user is not None}")
-    
+
     # If not found in users, try restaurants collection
     if user is None:
         user = await db.restaurants.find_one({"email": email})
-        print(f"   User found in restaurants collection: {user is not None}")
         if user:
             # Map restaurant fields to user fields for compatibility
             user["account_type"] = "restaurant"
@@ -43,14 +38,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             user["points"] = None
 
     if user is None:
-        print(f"   ❌ User not found in either collection - returning 404")
         raise HTTPException(status_code=404, detail="User not found")
 
     # Set account_type for regular users
     if "account_type" not in user:
         user["account_type"] = "user"
 
-    print(f"   ✅ Returning user: email={user.get('email')}, account_type={user.get('account_type')}, has_id={'_id' in user}")
     return user
 
 @router.post("/signup", response_model=Token)

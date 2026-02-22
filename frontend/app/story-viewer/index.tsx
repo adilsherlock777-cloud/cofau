@@ -258,7 +258,6 @@ const handleSendStoryReply = async () => {
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
-      console.log("✅ WebSocket connected for story reply");
       ws.send(JSON.stringify({
         message: replyText.trim(),
         story_id: currentStory.id,
@@ -273,7 +272,6 @@ const handleSendStoryReply = async () => {
     };
 
     ws.onmessage = (event) => {
-      console.log("📨 Message confirmation received");
       // Message was saved and broadcast, now we can close
       ws.close();
       setShowReplyInput(false);
@@ -289,7 +287,6 @@ const handleSendStoryReply = async () => {
     };
 
     ws.onclose = () => {
-      console.log("🔌 WebSocket closed");
     };
 
     // Timeout fallback in case no response
@@ -389,14 +386,9 @@ useEffect(() => {
         const parsedAllUsers = JSON.parse(allUsersParam as string);
         setAllUsersStories(parsedAllUsers);
         setCurrentUserIndex(parseInt(userIndexParam as string) || 0);
-        console.log("📦 Loaded all users stories:", parsedAllUsers.length, "users");
       } catch (e) {
-        console.log("⚠️ Could not parse allUsersStories");
       }
     }
-
-    console.log("📦 Parsed stories:", parsedStories.length);
-    console.log("👤 Parsed user:", parsedUser.username);
 
     const fixedStories = parsedStories.map((s: any, idx: number) => {
       const fixedUrl = normalizeStoryUrl(s.media_url);
@@ -410,12 +402,6 @@ useEffect(() => {
           mediaType = 'image';
         }
       }
-
-      console.log(`📹 Story ${idx + 1}:`, {
-        original_url: s.media_url,
-        fixed_url: fixedUrl,
-        media_type: mediaType,
-      });
 
       const storyLength = s.story_length || (mediaType === 'video' ? 30 : 5);
 
@@ -533,7 +519,6 @@ useEffect(() => {
 const startProgress = () => {
   const currentStory = stories[currentIndex];
   if (!currentStory || mediaLoading || mediaError) {
-    console.log("⏸️ Cannot start progress:", { mediaLoading, mediaError, hasStory: !!currentStory });
     return;
   }
 
@@ -544,7 +529,6 @@ const startProgress = () => {
   }
 
   const duration = isVideoContent(currentStory) ? 10000 : 5000;
-  console.log(`▶️ Starting progress for story ${currentIndex + 1}/${stories.length}, duration: ${duration}ms`);
 
   // Reset and start animation
   progressAnims.current[currentIndex]?.setValue(0);
@@ -556,13 +540,11 @@ const startProgress = () => {
   }).start(({ finished }) => {
     // Animation completed naturally (not interrupted)
     if (finished) {
-      console.log(`✅ Animation finished for story ${currentIndex + 1}`);
     }
   });
 
   // Set timer to advance to next story
   autoAdvanceTimer.current = setTimeout(() => {
-    console.log(`⏰ Timer fired, advancing from story ${currentIndex + 1}`);
     handleNext();
   }, duration);
 };
@@ -573,7 +555,6 @@ useEffect(() => {
   
   if (mediaLoading) {
     fallbackTimer = setTimeout(() => {
-      console.log("⚠️ Media loading timeout, forcing next story");
       setMediaLoading(false);
       setMediaError(true);
       // Auto-skip after showing error briefly
@@ -603,7 +584,6 @@ const handleNext = () => {
       const nextUserIndex = currentUserIndex + 1;
       const nextUserData = allUsersStories[nextUserIndex];
       
-      console.log(`➡️ Switching to next user: ${nextUserData.user.username}`);
       
       // Fix the next user's stories
       const fixedStories = nextUserData.stories.map((s: any) => {
@@ -649,7 +629,6 @@ const handleNext = () => {
       setViewers([]);
     } else {
       // No more users, exit story viewer
-      console.log("✅ All stories finished, exiting");
       router.back();
     }
   }
@@ -670,7 +649,6 @@ const handlePrevious = () => {
     const prevUserIndex = currentUserIndex - 1;
     const prevUserData = allUsersStories[prevUserIndex];
     
-    console.log(`⬅️ Switching to previous user: ${prevUserData.user.username}`);
     
     // Fix the previous user's stories
     const fixedStories = prevUserData.stories.map((s: any) => {
@@ -822,8 +800,6 @@ const handlePrevious = () => {
   const currentIsOwner = user && storyUser && 
     String(user._id || user.id) === String(storyUser._id || storyUser.id);
 
-  console.log("🔍 Current story - isOwner:", currentIsOwner, "user:", user?._id || user?.id, "storyUser:", storyUser?._id || storyUser?.id)
-
   return (
     <SafeAreaView style={styles.container}>
       {/* Progress bars */}
@@ -948,7 +924,6 @@ const handlePrevious = () => {
               setMediaLoading(false);
             }}
             onLoadStart={() => {
-              console.log("📹 Video loading:", currentStory.media_url);
               setMediaLoading(true);
               setMediaError(false);
               if (autoAdvanceTimer.current) {
@@ -956,7 +931,6 @@ const handlePrevious = () => {
               }
             }}
             onLoad={(event) => {
-              console.log("✅ Video loaded successfully");
               setActualMediaType("video");
               setMediaLoading(false);
               setMediaError(false);
@@ -1014,7 +988,6 @@ const handlePrevious = () => {
                 setMediaLoading(false);
               }}
               onLoadStart={() => {
-                console.log("🖼️ Image loading:", currentStory.media_url);
                 setMediaLoading(true);
                 setMediaError(false);
                 if (autoAdvanceTimer.current) {
@@ -1022,7 +995,6 @@ const handlePrevious = () => {
                 }
               }}
               onLoad={(event) => {
-                console.log("✅ Image loaded successfully");
                 setActualMediaType("image");
                 setMediaLoading(false);
                 setMediaError(false);
@@ -1147,7 +1119,6 @@ const handlePrevious = () => {
     resizeMode="cover"
   />
 )}
-
 
         {/* Rating */}
         {currentStory.from_post.rating > 0 && (

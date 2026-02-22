@@ -23,11 +23,9 @@ let auth: any = null;
 try {
   auth = require('@react-native-firebase/auth').default;
 } catch (e) {
-  console.log('Firebase Auth not available (Expo Go mode)');
 }
 
 export default function LoginScreen() {
-  console.log('🎬 LoginScreen component rendered');
   const router = useRouter();
   const { login, loginWithPhone } = useAuth();
   const [email, setEmail] = useState('');
@@ -173,10 +171,6 @@ export default function LoginScreen() {
   };
 
 const handleLogin = async () => {
-    console.log('🚀 Login Screen: handleLogin called');
-    console.log('📧 Email input:', email);
-    console.log('🔒 Password length:', password.length);
-    console.log('🏪 Is Restaurant:', isRestaurant);
     
     // Clear previous errors
     setEmailError('');
@@ -186,7 +180,6 @@ const handleLogin = async () => {
     if (!email || !password) {
       if (!email) setEmailError('Email is required');
       if (!password) setPasswordError('Password is required');
-      console.log('❌ Validation failed: Missing fields');
       return;
     }
 
@@ -194,33 +187,26 @@ const handleLogin = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setEmailError('Please enter a valid email address');
-      console.log('❌ Validation failed: Invalid email format');
       return;
     }
 
     if (password.length < 4) {
       setPasswordError('Password must be at least 4 characters');
-      console.log('❌ Validation failed: Password too short');
       return;
     }
 
-    console.log('✅ Validation passed, setting loading state');
     setLoading(true);
 
     try {
-      console.log('🔄 Calling login from AuthContext...');
       // Call backend login API with isRestaurant flag
       const result = await login(email, password, isRestaurant);
-      console.log('📥 Login result received:', result);
 
       if (result.success) {
-        console.log('✅ Login successful! Auth state updated.');
         const welcomeMessage = isRestaurant 
           ? 'Welcome back to Cofau Restaurant!' 
           : 'Welcome back to Cofau';
         showAlert('Login Successful! 🎉', welcomeMessage);
       } else {
-        console.log('❌ Login failed:', result.error);
         
         // Parse error message to show specific field errors
         const errorMessage = (result.error || '').toLowerCase();
@@ -250,7 +236,6 @@ const handleLogin = async () => {
         setPasswordError('An unexpected error occurred. Please try again.');
       }
     } finally {
-      console.log('🏁 Login process completed, clearing loading state');
       setLoading(false);
     }
   };
@@ -390,7 +375,6 @@ const handleLogin = async () => {
             <TouchableOpacity
               style={styles.buttonContainer}
               onPress={() => {
-                console.log('🔘 Login button onPress triggered!');
                 handleLogin();
               }}
               activeOpacity={0.8}

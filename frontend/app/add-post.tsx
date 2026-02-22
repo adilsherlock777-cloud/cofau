@@ -87,7 +87,6 @@ export default function AddPostScreen() {
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarChecked, setGrammarChecked] = useState(false);
 
-
 // Categories list with emojis
 const CATEGORIES = [
   { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '__veg__' },
@@ -248,7 +247,6 @@ const getAverageRating = () => {
     setShowMediaConfirm(false);
   };
 
-
   // ------------------------------ GOOGLE MAPS (FREE) ------------------------------
 
   const generateMapsLink = () => {
@@ -294,7 +292,6 @@ const checkGrammar = async (text: string) => {
     );
     return response.data;
   } catch (error) {
-    console.log('Grammar check failed:', error);
     return { original: text, corrected: text, was_changed: false };
   } finally {
     setGrammarLoading(false);
@@ -330,10 +327,8 @@ React.useEffect(() => {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
         });
-        console.log('📍 User location:', location.coords);
       }
     } catch (error) {
-      console.log('Location error:', error);
     }
   })();
 }, []);
@@ -453,12 +448,9 @@ if (accountType !== 'restaurant' && !grammarChecked) {
       };
     }
 
-    console.log('📤 Starting background upload...');
-
     // Start the background upload
     startUpload(postData, accountType || 'user').then(async (result) => {
       if (result.success) {
-        console.log('✅ Upload completed successfully');
         // Refresh user data to update level/points
         await refreshUser();
       }
@@ -500,7 +492,6 @@ const fetchLocationSuggestions = async (text: string) => {
       setShowSuggestions(false);
     }
   } catch (error) {
-    console.log('Error fetching suggestions:', error);
     setLocationSuggestions([]);
     setShowSuggestions(false);
   } finally {
@@ -563,7 +554,6 @@ const fetchRestaurantSuggestions = async (text: string) => {
       setShowRestaurantSuggestions(false);
     }
   } catch (error) {
-    console.log('Error fetching restaurant suggestions:', error);
     setRestaurantSuggestions([]);
     setShowRestaurantSuggestions(false);
   } finally {
@@ -584,8 +574,6 @@ const handleRestaurantSearchChange = (text: string) => {
 };
 
 const selectRestaurant = (restaurant: any) => {
-  console.log('🏷️ FULL restaurant object:', JSON.stringify(restaurant, null, 2));
-  console.log('🏷️ Restaurant ID being saved:', restaurant.id);
   setTaggedRestaurant(restaurant);
   setRestaurantSearchQuery('');
   setShowRestaurantSuggestions(false);
@@ -658,7 +646,6 @@ return (
             )}
           </TouchableOpacity>
         </View>
-
 
         {/* Rating - Only for Users */}
 {accountType !== 'restaurant' && (
@@ -1583,7 +1570,6 @@ locationInputContainer: {
   position: 'relative',
   zIndex: 1000,
 },
-
 
 suggestionLoader: {
   position: 'absolute',

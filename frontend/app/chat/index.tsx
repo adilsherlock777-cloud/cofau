@@ -73,7 +73,6 @@ useEffect(() => {
 
       setItems(mapped);
     } catch (err: any) {
-      console.log("Chat list error", err?.response?.data || err?.message);
     }
   };
 

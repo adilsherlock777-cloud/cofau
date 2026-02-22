@@ -29,9 +29,7 @@ export default function BlockedUsersScreen() {
   const fetchBlockedUsers = async () => {
     try {
       setLoading(true);
-      console.log('📋 Fetching blocked users...');
       const users = await getBlockedUsers();
-      console.log('✅ Blocked users fetched:', users);
       setBlockedUsers(users);
     } catch (error: any) {
       console.error('❌ Error fetching blocked users:', error);

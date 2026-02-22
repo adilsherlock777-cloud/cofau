@@ -268,14 +268,8 @@ async def get_restaurant_orders(
                     # Fallback: Check main phone_number field if not found in delivery_address
                     if not customer_phone:
                         customer_phone = customer.get("phone_number")
-                        if customer_phone:
-                            print(f"📞 Using main phone_number for user {user_id}: {customer_phone}")
-
-                    # Debug: Log if phone is still missing
-                    if not customer_phone:
-                        print(f"⚠️ No phone number found for user {user_id} ({customer_name}) in order {str(order['_id'])}")
-            except Exception as e:
-                print(f"Error fetching customer info: {e}")
+            except Exception:
+                pass
 
         # Get price from the post or calculate from menu items
         price = None
@@ -882,7 +876,6 @@ async def get_all_orders_for_partner(
 
     verify_partner_pin(pin)
 
-    print("🔍 Partner dashboard accessing orders...")
     db = get_database()
 
     # Get all orders
@@ -950,14 +943,7 @@ async def get_all_orders_for_partner(
                     # Fallback: Check main phone_number field if not found in delivery_address
                     if not customer_phone:
                         customer_phone = customer.get("phone_number")
-                        if customer_phone:
-                            print(f"📞 Using main phone_number for user {user_id}: {customer_phone}")
-
-                    # Debug: Log if phone is still missing
-                    if not customer_phone:
-                        print(f"⚠️ No phone number found for user {user_id} ({customer_name}) in order {order_id}")
-            except Exception as e:
-                print(f"❌ Error fetching customer info for order {order_id}: {e}")
+            except Exception:
                 pass
 
         # Get restaurant coordinates and phone
@@ -975,27 +961,14 @@ async def get_all_orders_for_partner(
                         restaurant_lng = restaurant.get("longitude")
                         restaurant_phone = restaurant.get("phone_number") or restaurant.get("phone")
                         restaurant_profile_name = restaurant.get("restaurant_name", restaurant_profile_name)
-
-                        # Debug: Log restaurant phone status
-                        if restaurant_phone:
-                            print(f"✅ Found restaurant phone for {restaurant_profile_name}: {restaurant_phone}")
-                        else:
-                            print(f"⚠️ No phone number found for restaurant {restaurant_id} ({restaurant_profile_name}) in order {order_id}")
-                except Exception as e:
-                    print(f"❌ Error fetching restaurant info for order {order_id}: {e}")
-            else:
-                print(f"⚠️ Skipping invalid restaurant_id for order {order_id}: {restaurant_id} (likely Google Place ID)")
+                except Exception:
+                    pass
 
         # Calculate distance
         distance_km = calculate_distance_km(restaurant_lat, restaurant_lng, user_lat, user_lng)
 
         # Get total price
         price = order.get("total_price") or order.get("price")
-
-        # Log what we're returning for this order
-        customer_phone_status = f"Customer: {customer_phone}" if customer_phone else "Customer: NO PHONE"
-        restaurant_phone_status = f"Restaurant: {restaurant_phone}" if restaurant_phone else "Restaurant: NO PHONE"
-        print(f"📞 Order {order_id}: {customer_phone_status} | {restaurant_phone_status}")
 
         order_data = {
             "order_id": order_id,

@@ -96,18 +96,6 @@ export const createPost = async (postData) => {
       }
     }
 
-    console.log('📤 Creating post with data:', {
-      rating: postData.rating,
-      review_text: postData.review_text,
-      map_link: postData.map_link,
-      location_name: postData.location_name,
-      category: postData.category,
-      dish_name: postData.dish_name,
-      tagged_restaurant_id: postData.tagged_restaurant_id,
-      media_type: postData.media_type,
-      file: postData.file?.name || postData.file?.uri || 'unknown'
-    });
-
     const response = await axios.post(`${API_URL}/posts/create`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -115,7 +103,6 @@ export const createPost = async (postData) => {
       },
     });
 
-    console.log('✅ Post created successfully:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ Error creating post:', error.response?.data || error.message);
@@ -514,9 +501,7 @@ export const unblockUser = async (userId) => {
 
 export const getBlockedUsers = async () => {
   try {
-    console.log('🔍 getBlockedUsers: Calling API endpoint:', `${API_URL}/users/blocked-list`);
     const response = await axios.get(`${API_URL}/users/blocked-list`);
-    console.log('✅ getBlockedUsers: Response received:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ getBlockedUsers: Error occurred:', {
@@ -569,16 +554,6 @@ export const createRestaurantPost = async (postData) => {
       }
     }
 
-    console.log('📤 Creating restaurant post with data:', {
-      price: postData.price,
-      about: postData.about,
-      map_link: postData.map_link,
-      location_name: postData.location_name,
-      category: postData.category,
-      dish_name: postData.dish_name,
-      media_type: postData.media_type,
-    });
-
     const response = await axios.post(`${API_URL}/restaurant/posts/create`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -586,7 +561,6 @@ export const createRestaurantPost = async (postData) => {
       },
     });
 
-    console.log('✅ Restaurant post created successfully:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ Error creating restaurant post:', error.response?.data || error.message);
@@ -634,7 +608,6 @@ export const createMenuItem = async (data: {
   return response.json();
 };
 
-
 // ==================== GET RESTAURANT MENU ====================
 
 export const getRestaurantMenu = async (restaurantId: string): Promise<any[]> => {
@@ -655,7 +628,6 @@ export const getRestaurantMenu = async (restaurantId: string): Promise<any[]> =>
 
   return response.json();
 };
-
 
 // ==================== DELETE MENU ITEM ====================
 

@@ -8,8 +8,6 @@ import Constants from 'expo-constants';
 
 const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';
 
-console.log('🔧 AuthContext initialized with API_URL:', API_URL);
-
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -48,18 +46,13 @@ export const AuthProvider = ({ children }) => {
           setToken(storedToken);
 
           // Register for push notifications (works even without navigation)
-          console.log('🔔 Registering for push notifications on app startup...');
-          console.log(`   Account type: ${storedAccountType || 'user'}`);
           registerForPushNotificationsAsync(storedToken, storedAccountType || 'user').catch(err => {
-            console.log('⚠️ Push notification registration failed:', err);
             setTimeout(() => {
-              console.log('🔄 Retrying push notification registration...');
               registerForPushNotificationsAsync(storedToken, storedAccountType || 'user').catch(() => {});
             }, 3000);
           });
         } catch (error) {
           // Token invalid - delete it
-          console.log('Token validation failed:', error.response?.status);
           await storage.deleteItem('userToken');
           await storage.deleteItem('accountType');
           delete axios.defaults.headers.common['Authorization'];
@@ -67,12 +60,10 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } catch (error) {
-      console.log('Error loading user:', error.message);
       try {
         await storage.deleteItem('userToken');
         await storage.deleteItem('accountType');
       } catch (deleteError) {
-        console.log('Error deleting token:', deleteError);
       }
     } finally {
       setLoading(false);
@@ -80,9 +71,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password, loginAsRestaurant = false) => {
-    console.log('🔐 AuthContext: Starting login process...');
-    console.log('📧 Email:', email);
-    console.log('🏪 Login as Restaurant:', loginAsRestaurant);
 
     // Determine endpoints based on account type
     const loginEndpoint = loginAsRestaurant
@@ -93,61 +81,46 @@ export const AuthProvider = ({ children }) => {
       ? `${API_URL}/api/restaurant/auth/me`
       : `${API_URL}/api/auth/me`;
 
-    console.log('🌐 Login URL:', loginEndpoint);
-
     try {
       // FastAPI OAuth2 expects form data with 'username' field
       const formData = new URLSearchParams();
       formData.append('username', email);
       formData.append('password', password);
 
-      console.log('📤 Sending login request...');
       const response = await axios.post(loginEndpoint, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       });
 
-      console.log('✅ Login response received:', response.status);
       const { access_token } = response.data;
-      console.log('🔑 Token received:', access_token ? 'Yes' : 'No');
 
       // Store token and account type in storage
       await storage.setItem('userToken', access_token);
       const accType = loginAsRestaurant ? 'restaurant' : 'user';
       await storage.setItem('accountType', accType);
-      console.log('💾 Token and accountType stored');
 
       setToken(access_token);
       setAccountType(accType);
 
       // Set axios authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      console.log('🔐 Authorization header set');
 
       // Fetch user/restaurant info
-      console.log('👤 Fetching profile from:', meEndpoint);
 
       try {
         const userResponse = await axios.get(meEndpoint);
-        console.log('📥 Profile response received:', JSON.stringify(userResponse.data));
 
         // Set user state
         setUser(userResponse.data);
-        console.log('✅ User state set:', userResponse.data.email);
 
         // Register for push notifications immediately after login
-        console.log('🔔 Registering for push notifications after login...');
-        console.log(`   Account type: ${accType}`);
         registerForPushNotificationsAsync(access_token, accType).catch(err => {
-          console.log('⚠️ Push notification registration failed:', err);
           setTimeout(() => {
-            console.log('🔄 Retrying push notification registration...');
             registerForPushNotificationsAsync(access_token, accType).catch(() => {});
           }, 3000);
         });
 
-        console.log('🎉 Login successful! Returning success...');
         return { success: true, user: userResponse.data };
       } catch (meError) {
         console.error('❌ /auth/me failed:', meError.response?.status);
@@ -195,18 +168,14 @@ export const AuthProvider = ({ children }) => {
       setUser(userResponse.data);
 
       // Register for push notifications immediately after signup
-      console.log('🔔 Registering for push notifications after signup...');
       registerForPushNotificationsAsync(access_token, 'user').catch(err => {
-        console.log('⚠️ Push notification registration failed:', err);
         setTimeout(() => {
-          console.log('🔄 Retrying push notification registration...');
           registerForPushNotificationsAsync(access_token, 'user').catch(() => {});
         }, 3000);
       });
 
       return { success: true };
     } catch (error) {
-      console.log('Signup error:', error.response?.data || error.message);
       return {
         success: false,
         error: error.response?.data?.detail || 'Signup failed',
@@ -239,18 +208,14 @@ export const AuthProvider = ({ children }) => {
       setUser(restaurantResponse.data);
 
       // Register for push notifications
-      console.log('🔔 Registering for push notifications after restaurant signup...');
       registerForPushNotificationsAsync(access_token, 'restaurant').catch(err => {
-        console.log('⚠️ Push notification registration failed:', err);
         setTimeout(() => {
-          console.log('🔄 Retrying push notification registration...');
           registerForPushNotificationsAsync(access_token, 'restaurant').catch(() => {});
         }, 3000);
       });
 
       return { success: true };
     } catch (error) {
-      console.log('Restaurant signup error:', error.response?.data || error.message);
       return {
         success: false,
         error: error.response?.data?.detail || 'Restaurant signup failed',
@@ -259,9 +224,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const loginWithPhone = async (phoneNumber, loginAsRestaurant = false) => {
-    console.log('🔐 AuthContext: Starting phone login process...');
-    console.log('📱 Phone:', phoneNumber);
-    console.log('🏪 Login as Restaurant:', loginAsRestaurant);
 
     // Determine endpoints based on account type
     const loginEndpoint = loginAsRestaurant
@@ -272,49 +234,36 @@ export const AuthProvider = ({ children }) => {
       ? `${API_URL}/api/restaurant/auth/me`
       : `${API_URL}/api/auth/me`;
 
-    console.log('🌐 Phone Login URL:', loginEndpoint);
-
     try {
-      console.log('📤 Sending phone login request...');
       const response = await axios.post(loginEndpoint, {
         phone_number: phoneNumber,
       });
 
-      console.log('✅ Phone login response received:', response.status);
       const { access_token } = response.data;
-      console.log('🔑 Token received:', access_token ? 'Yes' : 'No');
 
       // Store token and account type in storage
       await storage.setItem('userToken', access_token);
       const accType = loginAsRestaurant ? 'restaurant' : 'user';
       await storage.setItem('accountType', accType);
-      console.log('💾 Token and accountType stored');
 
       setToken(access_token);
       setAccountType(accType);
 
       // Set axios authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      console.log('🔐 Authorization header set');
 
       // Fetch user/restaurant info
-      console.log('👤 Fetching profile from:', meEndpoint);
 
       try {
         const userResponse = await axios.get(meEndpoint);
-        console.log('📥 Profile response received:', JSON.stringify(userResponse.data));
 
         // Set user state
         setUser(userResponse.data);
-        console.log('✅ User state set:', userResponse.data.email);
 
         // Register for push notifications immediately after login
-        console.log('🔔 Registering for push notifications after phone login...');
         registerForPushNotificationsAsync(access_token, accType).catch(err => {
-          console.log('⚠️ Push notification registration failed:', err);
         });
 
-        console.log('🎉 Phone login successful! Returning success...');
         return { success: true, user: userResponse.data };
       } catch (meError) {
         console.error('❌ /auth/me failed:', meError.response?.status);
@@ -347,7 +296,6 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setAccountType(null);
     } catch (error) {
-      console.log('Logout error:', error);
     }
   };
 
@@ -363,7 +311,6 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       // Only log if it's not a 401 (expected when not authenticated)
       if (error.response?.status !== 401) {
-        console.log('Error refreshing user:', error);
       }
       // If refresh fails, logout
       await logout();

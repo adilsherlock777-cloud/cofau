@@ -165,7 +165,6 @@ useEffect(() => {
   }
 }, []);
 
-
 const fetchRestaurantReviewsCount = async () => {
   if (!token || !user?.id || accountType !== 'restaurant') return;
   try {
@@ -176,7 +175,6 @@ const fetchRestaurantReviewsCount = async () => {
     const reviews = response.data || [];
     setRestaurantReviewsCount(reviews.length);
   } catch (err) {
-    console.log('Error fetching restaurant reviews count:', err);
     setRestaurantReviewsCount(0);
   }
 };
@@ -193,11 +191,9 @@ const fetchWalletUnreadCount = async () => {
     );
     setWalletUnreadCount(response.data?.unread_count || 0);
   } catch (err) {
-    console.log('Error fetching wallet unread count:', err);
     setWalletUnreadCount(0);
   }
 };
-
 
 useFocusEffect(
   React.useCallback(() => {
@@ -217,8 +213,6 @@ useEffect(() => {
   if (lastUploadTimestamp > lastKnownUploadRef.current) {
     const prevLevel = previousLevelRef.current;
     lastKnownUploadRef.current = lastUploadTimestamp;
-    console.log('📤 Upload completed, refreshing feed...');
-    console.log('📤 Upload result:', JSON.stringify(lastUploadResult));
     fetchFeed(true);
 
     // Show animations based on upload result
@@ -246,7 +240,6 @@ useEffect(() => {
         previousLevelRef.current = data.level_update.level || prevLevel;
 
         const earnedPoints = data.level_update.pointsEarned || 25;
-        console.log('📤 Points earned for GIF:', earnedPoints);
 
         if (!hasWalletReward) {
           setPointsEarned(earnedPoints);
@@ -268,12 +261,8 @@ const loadUnreadMessagesCount = async () => {
     });
     setUnreadMessagesCount(response.data.unreadCount || 0);
   } catch (error) {
-    console.log('Error fetching unread messages:', error);
   }
 };
-
-
-
 
 // ADD this ref near your other refs
 const visibleVideoIdRef = useRef<string | null>(null);
@@ -301,7 +290,6 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
     const newVisibleId = visibleVideo ? String(visibleVideo.item.id) : null;
     
     if (newVisibleId !== visibleVideoIdRef.current) {
-      console.log(`[Video] Setting visible video: ${newVisibleId}`);
       visibleVideoIdRef.current = newVisibleId;
       setVisibleVideoId(newVisibleId);
     }
@@ -337,7 +325,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         setOwnStoryData(null);
       }
     } catch (err) {
-      if (__DEV__) console.log("Error fetching own story:", err);
+      // error silenced
       setOwnStoryData(null);
     }
   };
@@ -641,7 +629,6 @@ const renderPost = useCallback(
                 );
                 setWalletUnreadCount(0);
               } catch (err) {
-                console.log('Error marking wallet as viewed:', err);
               }
             }}
             badgeCount={walletUnreadCount}
@@ -1045,7 +1032,6 @@ const renderPost = useCallback(
       {/* ================= STORIES ================= */}
       <StoriesBar refreshTrigger={refreshing} />
 
-
       {/* ⭐ SKELETON LOADING - Replace ActivityIndicator with FeedSkeleton */}
       {loading && feedPosts.length === 0 && (
         <FeedSkeleton showStories={false} />
@@ -1098,7 +1084,6 @@ const renderPost = useCallback(
   initialNumToRender={5}
   updateCellsBatchingPeriod={50}
 />
-
 
       {/* Post a Bite/Bite Stories Modal */}
 <Modal

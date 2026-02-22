@@ -36,7 +36,6 @@ export default function SavedPostsScreen() {
     try {
       setLoading(true);
       const data = await getSavedPosts();
-      console.log('📚 Fetched saved posts:', data.length);
       setSavedPosts(data);
     } catch (error) {
       console.error('❌ Error fetching saved posts:', error);
@@ -53,12 +52,6 @@ export default function SavedPostsScreen() {
 
   const renderPost = (post: any) => {
   // Debug log
-  console.log('📹 Post data:', {
-    id: post._id || post.id,
-    media_type: post.media_type,
-    thumbnail_url: post.thumbnail_url,
-    media_url: post.media_url
-  });
 
   const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
   const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;

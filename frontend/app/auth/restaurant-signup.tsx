@@ -25,7 +25,6 @@ let auth: any = null;
 try {
   auth = require('@react-native-firebase/auth').default;
 } catch (e) {
-  console.log('Firebase Auth not available (Expo Go mode)');
 }
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com';

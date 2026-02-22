@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
+  Image as RNImage,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
@@ -17,6 +17,7 @@ import {
   Animated,
   KeyboardAvoidingView,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -41,7 +42,6 @@ let firebaseAuth: any = null;
 try {
   firebaseAuth = require('@react-native-firebase/auth').default;
 } catch (e) {
-  console.log('Firebase Auth not available (Expo Go mode)');
 }
 import { BlurView } from 'expo-blur';
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
@@ -49,7 +49,6 @@ import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../../u
 const API_BACKEND_URL = BACKEND_URL;
 const API_URL = `${BACKEND_URL}/api`;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-
 
 /* -------------------------
    Level System Helper
@@ -152,7 +151,6 @@ const getPointsNeededForNextLevel = (currentLevel: number, requiredPoints: numbe
 // This handles all URL formats including direct filenames, legacy paths, etc.
 const fixUrl = normalizeMediaUrl;
 
-
 const fetchRestaurantPosts = async () => {
      if (!userData?.id) return;
      try {
@@ -166,7 +164,6 @@ const fetchRestaurantPosts = async () => {
        setUserPosts([]);
      }
    };
-
 
 const ProfileSkeleton = () => {
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -194,7 +191,6 @@ const ProfileSkeleton = () => {
     inputRange: [0, 1],
     outputRange: ['#E0E0E0', '#F5F5F5'],
   });
-
 
   const SkeletonBox = ({ width, height, borderRadius = 4, style = {} }) => (
     <Animated.View
@@ -492,7 +488,6 @@ export default function ProfileScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (token && userData && userPosts.length === 0) {
-        console.log('🔄 Profile screen focused - loading posts (first time)');
         fetchUserPosts();
       }
     }, [token, userData])
@@ -509,7 +504,7 @@ export default function ProfileScreen() {
         event_type: 'profile_view'
       }, {
         headers: { Authorization: `Bearer ${token}` }
-      }).catch(err => console.log('Analytics tracking error:', err));
+    }).catch(() => {});
     }
   }
 }, [isOwnProfile, userData?.id, token, isRestaurantProfile]);
@@ -522,7 +517,7 @@ useEffect(() => {
       event_type: 'profile_visit'
     }, {
       headers: { Authorization: `Bearer ${token}` }
-    }).catch(err => console.log('Analytics visit tracking error:', err));
+    }).catch(() => {});
   }
 }, [userData?.id]); // Only run once when userData loads
 
@@ -541,19 +536,15 @@ useEffect(() => {
   }
 }, [userData, isRestaurantProfile]);
 
-
   // Animate sidebar when modal visibility changes
   useEffect(() => {
-    console.log('🔄 Sidebar visibility changed:', settingsModalVisible, 'isOwnProfile:', isOwnProfile);
     if (settingsModalVisible) {
-      console.log('✅ Opening sidebar menu');
       sidebarAnimation.setValue(0); // Reset to start position
       Animated.timing(sidebarAnimation, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
-        console.log('✅ Sidebar animation completed');
       });
     } else {
       Animated.timing(sidebarAnimation, {
@@ -576,17 +567,10 @@ useEffect(() => {
 
   // Debug: Log when component renders (MUST be before any early returns)
   useEffect(() => {
-    console.log('🔍 Profile Screen Render:', {
-      isOwnProfile,
-      settingsModalVisible,
-      userData: userData ? 'loaded' : 'not loaded',
-    });
   }, [isOwnProfile, settingsModalVisible, userData]);
 
   // Debug: Monitor menu upload modal visibility
   useEffect(() => {
-    console.log('🔍 Menu Upload Modal Visible State Changed:', menuUploadModalVisible);
-    console.log('🔍 Token available:', !!token);
   }, [menuUploadModalVisible, token]);
 
   // Fetch restaurant menu items from AI-extracted menu
@@ -596,7 +580,6 @@ useEffect(() => {
       const response = await axios.get(
         `${BACKEND_URL}/api/restaurant/menu/${userData.id}/public`
       );
-      console.log('✅ Menu items fetched:', response.data);
       setMenuItems(response.data.items || []);
     } catch (err: any) {
       console.error('❌ Error fetching menu:', err.response?.data || err.message);
@@ -612,13 +595,11 @@ const fetchRestaurantReviews = async () => {
   setLoadingReviews(true);
   try {
     const url = `${API_URL}/restaurants/${userData.id}/reviews`;
-    console.log('🔍 Fetching reviews from:', url);
     
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` }
     });
     
-    console.log('✅ Reviews response:', response.data);
     const reviews = response.data || [];
     setRestaurantReviews(reviews);
     calculateReviewFilterCounts(reviews); // Add this line
@@ -686,11 +667,6 @@ const getFilteredPostsByCategory = (posts: any[], isVideo: boolean) => {
   const categoryName = selectedCategoryData?.name;
 
   // DEBUG LOG
-  console.log('🔍 FILTER DEBUG:', {
-    selectedCategory,
-    categoryName,
-    postsWithCategory: mediaFiltered.filter(p => p.category).map(p => p.category).slice(0, 5),
-  });
   
   return mediaFiltered.filter((post: any) => {
     if (!post.category || !categoryName) return false;
@@ -752,16 +728,7 @@ const GradientCofauText = () => (
       const isOwn = !effectiveUserId || finalUserId === currentUser?.id;
       setIsOwnProfile(isOwn);
 
-      console.log('👤 Profile Detection:', {
-        userId: effectiveUserId,
-        currentUserId: currentUser?.id,
-        finalUserId,
-        isOwn,
-        forceOwnProfile,
-      });
-
       if (effectiveUserId && effectiveUserId !== currentUser?.id) {
-        console.log('📡 Fetching other user profile:', userId);
 
         const meResponse = await axios.get(`${API_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -777,11 +744,9 @@ const GradientCofauText = () => (
     headers: { Authorization: `Bearer ${token}` },
   });
   user = userResponse.data;
-  console.log('✅ Fetched user profile from /users endpoint:', user);
   setIsRestaurantProfile(user.account_type === 'restaurant');
   
 } catch (userError: any) {
-  console.log('⚠️ User endpoint failed, trying restaurant endpoint:', userError.message);
   
   // Try restaurant endpoint
  try {
@@ -790,11 +755,9 @@ const GradientCofauText = () => (
       { headers: { Authorization: `Bearer ${token}` } }
     );
     user = restaurantResponse.data;
-    console.log('✅ Fetched restaurant profile:', user);
     setIsRestaurantProfile(true);
     
   } catch (restaurantError: any) {
-    console.log('⚠️ Restaurant endpoint also failed, trying feed fallback:', restaurantError.message);
     
     // Fallback to feed
     const feedResponse = await axios.get(`${API_URL}/feed`, {
@@ -824,7 +787,6 @@ const GradientCofauText = () => (
 }
         }
       } else {
-        console.log('📡 Fetching own profile, accountType:', accountType);
 setIsOwnProfile(true);
 
 // Use different endpoint based on account type
@@ -832,7 +794,6 @@ const endpoint = accountType === 'restaurant'
   ? `${API_URL}/restaurant/auth/me` 
   : `${API_URL}/auth/me`;
 
-console.log('📡 Fetching own profile from:', endpoint);
 const response = await axios.get(endpoint, {
   headers: { Authorization: `Bearer ${token}` },
 });
@@ -855,7 +816,6 @@ const response = await axios.get(endpoint, {
         user.banner_image_url;
       if (rawCoverImage) {
         user.cover_image = fixUrl(rawCoverImage);
-        console.log(`🖼️ Cover image: raw="${rawCoverImage}" → normalized="${user.cover_image}"`);
       }
 
       setUserData(user);
@@ -871,7 +831,6 @@ try {
   const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
   setUserStats(statsResponse.data);
 } catch (statsError) {
-  console.log('⚠️ Stats fetch failed (might be restaurant account):', statsError);
   // Set default stats for restaurants
   setUserStats({
     total_posts: 0,
@@ -917,18 +876,14 @@ try {
       endpoint = `${API_URL}/users/${userData.id}/posts?skip=${skip}&limit=${POSTS_PER_PAGE}`;
     }
 
-    console.log(`📡 Fetching posts: page=${currentPage}, skip=${skip}, limit=${POSTS_PER_PAGE}`);
-
     const response = await axios.get(endpoint, {
       headers: { Authorization: `Bearer ${token}` },
     });
     
     const posts = response.data || [];
-    console.log(`✅ Received ${posts.length} posts`);
 
     // Debug: Log first post to see field names
     if (posts.length > 0) {
-      console.log('🔍 First post raw data:', JSON.stringify(posts[0], null, 2));
     }
 
     // Check if we have more posts to load
@@ -942,7 +897,6 @@ try {
       const normalizedUrl = fixUrl(mediaUrl);
 
       // Debug: Log URL normalization for each post
-      console.log(`🖼️ Post ${post.id}: raw="${mediaUrl}" → normalized="${normalizedUrl}"`);
       const thumbnailUrl = post.thumbnail_url ? fixUrl(post.thumbnail_url) : null;
       const isVideo = 
         post.media_type === 'video' ||
@@ -1041,10 +995,6 @@ useEffect(() => {
   }
 }, [activeTab, hasMorePosts, loadingMore, postsLoading]);
 
-
-
-
-
   const fetchComplimentsCount = async () => {
     if (!userData?.id) return;
 
@@ -1132,7 +1082,6 @@ useEffect(() => {
         await followUser(userData.id, accountType);
       }
 
-      console.log(`✅ ${isFollowing ? 'Unfollowed' : 'Followed'} successfully`);
     } catch (err) {
       console.error('❌ Error toggling follow:', err);
       setIsFollowing(previousFollowState);
@@ -1153,7 +1102,6 @@ useEffect(() => {
     try {
       const followers = await getFollowers(userData.id);
       
-      console.log('📋 Raw followers data:', followers);
       
       const followersArray = Array.isArray(followers) ? followers : (followers?.followers || []);
       
@@ -1215,7 +1163,6 @@ useEffect(() => {
         await followUser(followerId, 'user');
       }
 
-      console.log(`✅ ${currentStatus ? 'Unfollowed' : 'Followed'} follower successfully`);
     } catch (err) {
       console.error('❌ Error toggling follower follow:', err);
       setFollowingStatus((prev) => ({
@@ -1228,7 +1175,6 @@ useEffect(() => {
 
  const handleUpdateProfile = async () => {
   try {
-    console.log('📝 Updating profile with:', { name: editedName, bio: editedBio });
 
     if (accountType === 'restaurant') {
       // Restaurant: Send JSON body
@@ -1247,7 +1193,6 @@ useEffect(() => {
         }
       );
 
-      console.log('✅ Restaurant profile update response:', response.data);
     } else {
       // Regular user: Send FormData
       const formData = new FormData();
@@ -1262,7 +1207,6 @@ useEffect(() => {
         },
       });
 
-      console.log('✅ Profile update response:', response.data);
     }
 
     Alert.alert('Success', 'Profile updated successfully!');
@@ -1282,21 +1226,16 @@ useEffect(() => {
 
   const handleLogout = async () => {
     try {
-      console.log('🚪 Starting logout process...');
       await axios.post(
         `${API_URL}/auth/logout`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log('✅ Logout API call successful');
     } catch (err) {
       console.error('❌ Logout API error:', err);
     } finally {
-      console.log('🧹 Clearing auth state...');
       await logout();
-      console.log('🔄 Navigating to login screen...');
       router.push('/auth/login');
-      console.log('✅ Logout complete!');
     }
   };
 
@@ -1336,7 +1275,6 @@ useEffect(() => {
 
   const handleDeleteAccount = async () => {
   try {
-    console.log('🗑️ Starting account deletion...');
     
     // This should match your API_URL pattern
     const deleteEndpoint = accountType === 'restaurant'
@@ -1347,7 +1285,6 @@ useEffect(() => {
       headers: { Authorization: `Bearer ${token}` },
     });
     
-    console.log('✅ Account deleted successfully');
     Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
     
     await logout();
@@ -1475,7 +1412,6 @@ const handleChooseBannerPhoto = async () => {
 const uploadBannerImage = async (uri: string) => {
   setUploadingBanner(true);
   try {
-    console.log('📤 Uploading banner image:', uri);
 
     const formData = new FormData();
     const filename = uri.split('/').pop() || 'banner.jpg';
@@ -1498,8 +1434,6 @@ const uploadBannerImage = async (uri: string) => {
         },
       }
     );
-
-    console.log('✅ Banner image uploaded:', response.data);
 
     const apiBannerImage =
       response.data.cover_image ||
@@ -1553,13 +1487,10 @@ const handleRemoveBanner = async () => {
 const removeBannerImage = async () => {
   setUploadingBanner(true);
   try {
-    console.log('🗑️ Removing banner image');
 
     await axios.delete(`${API_URL}/users/banner-image`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
-    console.log('✅ Banner image removed');
 
     setBannerImage(null);
     setUserData((prev: any) => ({
@@ -1607,7 +1538,6 @@ const handleMenuItemImagePick = async (itemId: string) => {
 const uploadMenuItemImage = async (itemId: string, uri: string) => {
   setUploadingMenuItemImage(itemId);
   try {
-    console.log('📤 Uploading menu item image:', itemId, uri);
 
     const formData = new FormData();
     const filename = uri.split('/').pop() || 'menuitem.jpg';
@@ -1630,8 +1560,6 @@ const uploadMenuItemImage = async (itemId: string, uri: string) => {
         },
       }
     );
-
-    console.log('✅ Menu item image uploaded:', response.data);
 
     // Update local state with new image
     const imageUrl = fixUrl(response.data.image_url);
@@ -1711,7 +1639,6 @@ const uploadMenuItemImage = async (itemId: string, uri: string) => {
   const uploadProfilePicture = async (uri: string) => {
     setUploadingImage(true);
     try {
-      console.log('📤 Uploading profile picture:', uri);
 
       const formData = new FormData();
       const filename = uri.split('/').pop() || 'profile.jpg';
@@ -1734,8 +1661,6 @@ const uploadMenuItemImage = async (itemId: string, uri: string) => {
           },
         }
       );
-
-      console.log('✅ Profile picture uploaded:', response.data);
 
       const apiProfilePicture =
         response.data.profile_image_url ||
@@ -1794,13 +1719,10 @@ const uploadMenuItemImage = async (itemId: string, uri: string) => {
   const removeProfilePicture = async () => {
     setUploadingImage(true);
     try {
-      console.log('🗑️ Removing profile picture');
 
       await axios.delete(`${API_URL}/users/profile-image`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      console.log('✅ Profile picture removed');
 
       setUserData((prev: any) => ({
         ...prev,
@@ -1899,7 +1821,6 @@ const uploadMenuItemImage = async (itemId: string, uri: string) => {
     );
   }
 
-
   return (
     <View style={styles.favouriteContainer}>
       {sortedLocations.map(([location, posts]) => {
@@ -1952,16 +1873,12 @@ const uploadMenuItemImage = async (itemId: string, uri: string) => {
                     >
                       {displayUrl ? (
                         <View style={styles.favouriteGridImageContainer}>
-                          <Image 
-                            source={{ uri: displayUrl }} 
-                            style={styles.favouriteGridImage} 
-                            resizeMode="cover"
-                            onError={(error) => {
-                              console.error("❌ Image load error in profile (favourite):", displayUrl, error);
-                            }}
-                            onLoadStart={() => {
-                              console.log("🖼️ Loading image (favourite):", displayUrl);
-                            }}
+                          <ExpoImage
+                            source={{ uri: displayUrl }}
+                            style={styles.favouriteGridImage}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={200}
                           />
                           {isVideo && (
                             <View style={styles.videoOverlay}>
@@ -2088,7 +2005,7 @@ const renderMenuByCategory = () => {
                               }}
                               activeOpacity={0.9}
                             >
-                              <Image
+                              <RNImage
                                 source={{ uri: itemImageUrl }}
                                 style={styles.menuItemImage}
                                 resizeMode="cover"
@@ -2165,13 +2082,11 @@ const renderMenuByCategory = () => {
   );
 };
 
-const renderGridWithLikes = ({ item }: { item: any }) => {
+const renderGridWithLikes = useCallback(({ item }: { item: any }) => {
   const rawUrl = item.full_image_url || item.media_url || item.image_url;
   const mediaUrl = fixUrl(rawUrl);
   const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
 
-  // Debug: Log URL transformation
-  console.log(`📸 Grid item ${item.id}: raw="${rawUrl}" → final="${mediaUrl}"`);
   const isVideo =
     item.media_type === 'video' ||
     mediaUrl?.toLowerCase().endsWith('.mp4') ||
@@ -2183,7 +2098,6 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
 
   const handlePostPress = () => {
   if (item.id) {
-    // Add profileUserId parameter
     router.push(`/post-details/${item.id}?profileUserId=${userData?.id}&profilePicture=${encodeURIComponent(userData?.profile_picture || '')}&profileUsername=${encodeURIComponent(userData?.full_name || userData?.username || '')}&profileLevel=${userData?.level || 1}`);
   }
 };
@@ -2196,12 +2110,13 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
     >
       {displayUrl ? (
         <>
-          <Image
+          <ExpoImage
             source={{ uri: displayUrl }}
             style={styles.gridImage}
-            resizeMode="cover"
-            onError={(e) => console.log(`❌ Grid image error for ${item.id}:`, displayUrl, e.nativeEvent?.error)}
-            onLoad={() => console.log(`✅ Grid image loaded: ${item.id}`)}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={item.id}
+            transition={200}
           />
           {/* Video Play Icon */}
           {isVideo && (
@@ -2229,7 +2144,7 @@ const renderGridWithLikes = ({ item }: { item: any }) => {
       </View>
     </TouchableOpacity>
   );
-};
+}, [userData]);
 
   // ================= RESTAURANT PROFILE UI =================
   const formatPhoneNumber = (phone: string): string => {
@@ -2463,7 +2378,7 @@ const renderRestaurantProfile = () => {
           >
             {bannerImage || userData?.cover_image ? (
               <>
-                <Image
+                <RNImage
                   source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
                   style={restaurantStyles.bannerImage}
                   resizeMode="cover"
@@ -2894,7 +2809,7 @@ const renderRestaurantProfile = () => {
       <View style={restaurantStyles.reviewImageWrapper}>
         <View style={restaurantStyles.reviewImageContainer}>
           {item.media_url ? (
-            <Image
+            <RNImage
               source={{ uri: fixUrl(item.media_url) }}
               style={restaurantStyles.reviewImage}
               resizeMode="cover"
@@ -3022,9 +2937,7 @@ const renderRestaurantProfile = () => {
           <TouchableOpacity
             style={styles.uploadMenuButton}
             onPress={() => {
-              console.log('🔵 Upload Menu button pressed');
               setMenuUploadModalVisible(true);
-              console.log('🔵 Modal state set to true');
             }}
           >
             <Ionicons name="cloud-upload-outline" size={20} color="#FFF" />
@@ -3039,9 +2952,7 @@ const renderRestaurantProfile = () => {
       <TouchableOpacity
         style={styles.floatingUploadButton}
         onPress={() => {
-          console.log('🔵 Floating Upload button pressed');
           setMenuUploadModalVisible(true);
-          console.log('🔵 Modal state set to true (floating)');
         }}
       >
         <Ionicons name="add" size={28} color="#FFF" />
@@ -3052,19 +2963,14 @@ const renderRestaurantProfile = () => {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-
       {/* ================= MENU UPLOAD MODAL ================= */}
-      {console.log('🔍 Menu Upload Modal Visible State Changed:', menuUploadModalVisible)}
-      {console.log('🔍 Token available:', !!token)}
       <MenuUploadModal
         visible={menuUploadModalVisible}
         onClose={() => {
-          console.log('🔵 MenuUploadModal onClose called');
           setMenuUploadModalVisible(false);
         }}
         token={token || ''}
         onSuccess={() => {
-          console.log('🔵 MenuUploadModal onSuccess called');
           fetchMenuItems();
           setMenuUploadModalVisible(false);
         }}
@@ -3184,7 +3090,6 @@ const renderRestaurantProfile = () => {
           </Animated.View>
         </View>
       </Modal>
-
 
       {/* ================= EDIT PROFILE MODAL (RESTAURANT) ================= */}
       {accountType === 'restaurant' && (
@@ -3656,7 +3561,6 @@ const renderRestaurantProfile = () => {
   </KeyboardAvoidingView>
 </Modal>
 {/* ================= CATEGORY FILTER MODAL ================= */}
-{console.log('🎯 Modal render check - categoryModalVisible:', categoryModalVisible)}
 <Modal
   animationType="slide"
   transparent={true}
@@ -3699,7 +3603,6 @@ const renderRestaurantProfile = () => {
                 backgroundColor: isSelected ? '#FFF5F5' : '#fff',
               }}
               onPress={() => {
-                console.log('✅ Selected category:', category.id);
                 setSelectedCategory(category.id);
                 setCategoryModalVisible(false);
               }}
@@ -3755,7 +3658,7 @@ const renderRestaurantProfile = () => {
       <Ionicons name="close-circle" size={36} color="#fff" />
     </TouchableOpacity>
     {fullImageUrl && (
-      <Image
+      <RNImage
         source={{ uri: fullImageUrl }}
         style={styles.fullImageView}
         resizeMode="contain"
@@ -3866,7 +3769,6 @@ const renderRestaurantProfile = () => {
   );
 };
 
-
   const renderGridItem = ({ item }: { item: any }) => {
     const mediaUrl = fixUrl(item.full_image_url || item.media_url);
     const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
@@ -3882,10 +3784,7 @@ const renderRestaurantProfile = () => {
 
     const handlePostPress = () => {
       if (item.id) {
-        console.log('📱 Navigating to post details:', item.id, 'isVideo:', isVideo);
         router.push(`/post-details/${item.id}`);
-      } else {
-        console.warn('⚠️ Post ID is missing:', item);
       }
     };
 
@@ -3902,29 +3801,23 @@ const renderRestaurantProfile = () => {
         activeOpacity={0.8}
       >
         {displayUrl && !isVideo ? (
-          <Image 
-            source={{ uri: displayUrl }} 
-            style={styles.gridImage} 
-            resizeMode="cover"
-            onError={(error) => {
-              console.error("❌ Image load error in profile (grid):", displayUrl, error);
-            }}
-            onLoadStart={() => {
-              console.log("🖼️ Loading image (grid):", displayUrl);
-            }}
+          <ExpoImage
+            source={{ uri: displayUrl }}
+            style={styles.gridImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={item.id}
+            transition={200}
           />
         ) : displayUrl && isVideo ? (
           <View style={styles.gridImageContainer}>
-            <Image
+            <ExpoImage
               source={{ uri: displayUrl }}
               style={styles.gridImage}
-              resizeMode="cover"
-              onError={(error) => {
-                console.error("❌ Video thumbnail load error in profile (grid):", displayUrl, error);
-              }}
-              onLoadStart={() => {
-                console.log("🖼️ Loading video thumbnail (grid):", displayUrl);
-              }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={`video-${item.id}`}
+              transition={200}
             />
             <View style={styles.videoOverlay}>
               <Ionicons name="play-circle" size={40} color="#fff" />
@@ -3968,7 +3861,6 @@ const renderRestaurantProfile = () => {
 
   const handlePostPress = () => {
     if (item.id) {
-      console.log('📱 Navigating to post details:', item.id);
       router.push(`/post-details/${item.id}`);
     } else {
       console.warn('⚠️ Post ID is missing:', item);
@@ -3991,7 +3883,7 @@ const renderRestaurantProfile = () => {
       {/* Left Side - Image */}
       <View style={styles.listImageContainer}>
         {mediaUrl ? (
-          <Image 
+          <RNImage 
             source={{ uri: mediaUrl }} 
             style={styles.listImage} 
             resizeMode="cover" 
@@ -4067,7 +3959,6 @@ const renderRestaurantProfile = () => {
 
   const handlePostPress = () => {
     if (item.id) {
-      console.log('📱 Navigating to post details:', item.id);
       router.push(`/post-details/${item.id}`);
     } else {
       console.warn('⚠️ Post ID is missing:', item);
@@ -4091,7 +3982,7 @@ const renderRestaurantProfile = () => {
         <View style={styles.listImageContainer}>
           {displayUrl ? (
             <View style={styles.videoThumbnailContainer}>
-              <Image 
+              <RNImage 
                 source={{ uri: displayUrl }} 
                 style={styles.listImage} 
                 resizeMode="cover"
@@ -4099,7 +3990,6 @@ const renderRestaurantProfile = () => {
                   console.error("❌ Video thumbnail load error in profile (video list):", displayUrl, error);
                 }}
                 onLoadStart={() => {
-                  console.log("🖼️ Loading video thumbnail (video list):", displayUrl);
                 }}
               />
               <View style={styles.videoPlayOverlay}>
@@ -4182,17 +4072,12 @@ const renderCategoryFilter = () => {
     ? currentTabPosts.length 
     : currentTabPosts.filter((post: any) => post.category === selectedCategory).length;
 
-  console.log('🔍 renderCategoryFilter called, categoryModalVisible:', categoryModalVisible);
-
   return (
     <View style={styles.categoryFilterContainer}>
       <TouchableOpacity
         style={styles.categoryDropdownButton}
         onPress={() => {
-          console.log('🔥 Category button PRESSED!');
-          console.log('🔥 Before: categoryModalVisible =', categoryModalVisible);
           setCategoryModalVisible(true);
-          console.log('🔥 Called setCategoryModalVisible(true)');
         }}
         activeOpacity={0.7}
       >
@@ -4306,11 +4191,7 @@ if (isRestaurantProfile) {
                   <TouchableOpacity
                     style={styles.headerIconButton}
                     onPress={() => {
-                      console.log('✅ Menu button pressed!');
-                      console.log('✅ isOwnProfile:', isOwnProfile);
-                      console.log('✅ Current settingsModalVisible:', settingsModalVisible);
                       setSettingsModalVisible(true);
-                      console.log('✅ Called setSettingsModalVisible(true)');
                     }}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -4552,8 +4433,6 @@ if (isRestaurantProfile) {
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
                 onPress={() => {
-  console.log('🎁 Compliment button pressed!');
-  console.log('Current complimentModalVisible:', complimentModalVisible);
   setComplimentModalVisible(true);
 }}
                 disabled={hasComplimented}
@@ -4668,6 +4547,10 @@ if (isRestaurantProfile) {
         columnWrapperStyle={{ gap: 1 }}
         onEndReached={loadMorePosts}
         onEndReachedThreshold={0.5}
+        initialNumToRender={9}
+        maxToRenderPerBatch={9}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListFooterComponent={
           loadingMore && hasMorePosts ? <LoadingFooter /> : null
         }
@@ -4705,6 +4588,10 @@ if (isRestaurantProfile) {
         columnWrapperStyle={{ gap: 1 }}
         onEndReached={loadMorePosts}
         onEndReachedThreshold={0.5}
+        initialNumToRender={9}
+        maxToRenderPerBatch={9}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListFooterComponent={
           loadingMore && hasMorePosts ? <LoadingFooter /> : null
         }
@@ -4728,8 +4615,6 @@ if (isRestaurantProfile) {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-
-
 
       {/* ================= SIDEBAR MENU MODAL ================= */}
       <Modal
@@ -4924,16 +4809,13 @@ if (isRestaurantProfile) {
       />
 
       {/* ================= MENU UPLOAD MODAL ================= */}
-      {console.log('🔍 Rendering MenuUploadModal with visible:', menuUploadModalVisible, 'token:', !!token)}
       <MenuUploadModal
         visible={menuUploadModalVisible}
         onClose={() => {
-          console.log('🔵 MenuUploadModal onClose called');
           setMenuUploadModalVisible(false);
         }}
         token={token || ''}
         onSuccess={() => {
-          console.log('🔵 MenuUploadModal onSuccess called');
           fetchMenuItems();
           setMenuUploadModalVisible(false);
         }}
@@ -5795,7 +5677,6 @@ if (isRestaurantProfile) {
                 backgroundColor: isSelected ? '#FFF5F5' : '#fff',
               }}
               onPress={() => {
-                console.log('✅ Selected category:', category.id);
                 setSelectedCategory(category.id);
                 setCategoryModalVisible(false);
               }}
@@ -5838,7 +5719,6 @@ if (isRestaurantProfile) {
     </View>
   );
 }
-
 
 /* ================= STYLES ================= */
 

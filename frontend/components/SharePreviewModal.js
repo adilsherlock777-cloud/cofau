@@ -31,7 +31,6 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
   const handleAddToStory = async () => {
     try {
       setLoading(true);
-      console.log("📸 Creating story from post...");
 
       const response = await fetch(`${BACKEND_URL}/api/stories/create-from-post`, {
         method: "POST",
@@ -51,7 +50,6 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Failed to create story");
 
-      console.log("✅ Story created successfully:", data);
       
       // Call the callback to refresh stories
       if (onStoryCreated) {

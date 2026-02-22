@@ -23,11 +23,9 @@ if (Platform.OS === 'android') {
       console.warn('⚠️ Firebase App not initialized. Make sure google-services.json is configured.');
       messaging = null;
     } else {
-      console.log('✅ Firebase Messaging initialized for Android');
 
       // Register background message handler - critical for sound/banner when app is killed
       messaging().setBackgroundMessageHandler(async remoteMessage => {
-        console.log('📬 FCM background message received:', remoteMessage);
         // The notification display is handled by FCM automatically for notification+data messages.
         // This handler ensures the app processes the data payload in the background.
       });
@@ -45,7 +43,6 @@ const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    console.log('📬 Notification received in foreground:', notification);
     return {
       shouldShowAlert: true,
       shouldPlaySound: true,
@@ -88,7 +85,6 @@ async function ensureNotificationChannel() {
         bypassDnd: true,
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
-      console.log('✅ Android default notification channel created (v3)');
 
       // Create restaurant channel
       await Notifications.setNotificationChannelAsync(RESTAURANT_CHANNEL_ID, {
@@ -104,7 +100,6 @@ async function ensureNotificationChannel() {
         bypassDnd: true,
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
-      console.log('✅ Android restaurant notification channel created (v3)');
     } catch (error) {
       console.error('❌ Failed to create notification channel:', error);
     }
@@ -130,7 +125,6 @@ async function getFCMToken() {
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
     if (!enabled) {
-      console.log('❌ FCM permission not granted');
       return null;
     }
 
@@ -138,10 +132,8 @@ async function getFCMToken() {
     const fcmToken = await messaging().getToken();
     
     if (fcmToken) {
-      console.log('✅ FCM token obtained:', fcmToken.substring(0, 50) + '...');
       return fcmToken;
     } else {
-      console.log('⚠️ FCM token is empty');
       return null;
     }
   } catch (error) {
@@ -160,10 +152,8 @@ async function getExpoPushToken() {
     });
 
     if (expoPushToken?.data) {
-      console.log('✅ Expo push token obtained:', expoPushToken.data);
       return expoPushToken.data;
     } else {
-      console.log('❌ Failed to get Expo push token');
       return null;
     }
   } catch (error) {
@@ -177,12 +167,10 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
   const RETRY_DELAY = 2000;
 
   if (!Device.isDevice) {
-    console.log('⚠️ Push notifications only work on physical devices');
     return null;
   }
 
   if (!token) {
-    console.log('⚠️ No auth token provided for push notification registration');
     return null;
   }
 
@@ -190,8 +178,6 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
   // when Firebase refreshes the FCM token in the background.
   lastAuthToken = token;
   lastAccountType = accountType || 'user';
-
-  console.log(`📱 Registering push notifications for account type: ${accountType}`);
 
   try {
     // Ensure channel exists before registering (Android)
@@ -219,7 +205,6 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let status = existingStatus;
         if (existingStatus !== 'granted') {
-          console.log('📱 Requesting push notification permissions...');
           const { status: newStatus } = await Notifications.requestPermissionsAsync();
           status = newStatus;
         }
@@ -230,7 +215,6 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let status = existingStatus;
       if (existingStatus !== 'granted') {
-        console.log('📱 Requesting push notification permissions...');
         const { status: newStatus } = await Notifications.requestPermissionsAsync();
         status = newStatus;
       }
@@ -238,11 +222,8 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
     }
 
     if (finalStatus !== 'granted') {
-      console.log('❌ Push notification permission denied by user');
       return null;
     }
-
-    console.log('✅ Push notification permissions granted');
 
     // Get device token based on platform
     let deviceToken = null;
@@ -253,14 +234,12 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
       if (messaging) {
         deviceToken = await getFCMToken();
         if (!deviceToken) {
-          console.log('⚠️ Failed to get FCM token, falling back to Expo token');
           // Fallback to Expo token if FCM fails
           const expoToken = await getExpoPushToken();
           deviceToken = expoToken;
         }
       } else {
         // Fallback to Expo if Firebase is not available
-        console.log('⚠️ Firebase Messaging not available, using Expo token for Android');
         const expoToken = await getExpoPushToken();
         deviceToken = expoToken;
       }
@@ -270,11 +249,8 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
     }
 
     if (!deviceToken) {
-      console.log('❌ Failed to get device token');
       return null;
     }
-
-    console.log(`📱 ${Platform.OS === 'android' ? 'FCM' : 'Expo'} Token obtained:`, deviceToken.substring(0, 50) + '...');
 
     // Register token with backend - use correct endpoint based on account type
     if (token && deviceToken) {
@@ -284,8 +260,6 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
       const registerEndpoint = accountType === 'restaurant'
         ? `${API_URL}/notifications/restaurant/register-device`
         : `${API_URL}/notifications/register-device`;
-
-      console.log(`📱 Using registration endpoint: ${registerEndpoint}`);
 
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
@@ -302,10 +276,6 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
           );
 
           if (response.data?.success) {
-            console.log('✅ Device token registered with backend successfully');
-            console.log(`   Account type: ${accountType}`);
-            console.log(`   Platform: ${platform}`);
-            console.log(`   Token count: ${response.data.tokenCount || 1}`);
             registered = true;
             break;
           }
@@ -314,16 +284,13 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
           const isLastAttempt = attempt === MAX_RETRIES;
 
           if (status === 401) {
-            console.log('⚠️ Push notification registration failed - user not authenticated');
             break;
           } else if (status === 404) {
-            console.log('⚠️ Push notification endpoint not found');
             break;
           } else {
             if (isLastAttempt) {
               console.error('❌ Error registering device token after retries:', error.response?.data || error.message);
             } else {
-              console.log(`⚠️ Error registering device token (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying...`);
               await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (attempt + 1)));
             }
           }
@@ -331,7 +298,6 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
       }
 
       if (!registered && retryCount < MAX_RETRIES) {
-        console.log(`🔄 Retrying token registration in ${RETRY_DELAY * 2}ms...`);
         setTimeout(() => {
           registerForPushNotificationsAsync(token, accountType, retryCount + 1);
         }, RETRY_DELAY * 2);
@@ -343,7 +309,6 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
     console.error('❌ Error registering for push notifications:', error);
 
     if (retryCount < MAX_RETRIES) {
-      console.log(`🔄 Retrying push notification registration in ${RETRY_DELAY * 2}ms...`);
       setTimeout(() => {
         registerForPushNotificationsAsync(token, accountType, retryCount + 1);
       }, RETRY_DELAY * 2);
@@ -354,42 +319,30 @@ export async function registerForPushNotificationsAsync(token, accountType = 'us
 }
 
 export function setupNotificationListeners(navigation) {
-  console.log('🔔 Setting up notification listeners...');
 
   // Setup Expo notification listeners (for iOS and fallback Android)
   const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
-    console.log('📬 Notification received in foreground:', notification);
     const data = notification.request.content.data;
-    console.log('   Type:', data?.type);
-    console.log('   From:', data?.fromUserName || data?.fromUserId);
   });
 
   const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
-    console.log('👆 Notification tapped:', response);
     const data = response.notification.request.content.data;
     
     setTimeout(() => {
       try {
         if (data?.type === 'message' && data?.fromUserId) {
-          console.log('   Navigating to chat with:', data.fromUserId);
           navigation?.push(`/chat/${data.fromUserId}`);
         } else if (data?.type === 'like' && data?.postId) {
-          console.log('   Navigating to post:', data.postId);
           navigation?.push(`/post-details/${data.postId}`);
         } else if (data?.type === 'comment' && data?.postId) {
-          console.log('   Navigating to post:', data.postId);
           navigation?.push(`/post-details/${data.postId}`);
         } else if (data?.type === 'new_post' && data?.postId) {
-          console.log('   Navigating to post:', data.postId);
           navigation?.push(`/post-details/${data.postId}`);
         } else if (data?.type === 'follow' && data?.fromUserId) {
-          console.log('   Navigating to profile:', data.fromUserId);
           navigation?.push(`/profile?userId=${data.fromUserId}`);
         } else if (data?.type === 'compliment' && data?.fromUserId) {
-          console.log('   Navigating to profile:', data.fromUserId);
           navigation?.push(`/profile?userId=${data.fromUserId}`);
         } else {
-          console.log('   Unknown notification type, navigating to feed');
           navigation?.push('/(tabs)/feed');
         }
       } catch (error) {
@@ -403,7 +356,6 @@ export function setupNotificationListeners(navigation) {
     try {
       // Handle foreground messages
       const unsubscribeForeground = messaging().onMessage(async remoteMessage => {
-        console.log('📬 FCM notification received in foreground:', remoteMessage);
         const data = remoteMessage.data;
 
         // Determine which channel to use based on notification type
@@ -411,7 +363,6 @@ export function setupNotificationListeners(navigation) {
         const restaurantNotificationTypes = ['new_order', 'order_in_progress'];
         const notificationType = data?.type;
         const channelId = restaurantNotificationTypes.includes(notificationType) ? RESTAURANT_CHANNEL_ID : DEFAULT_CHANNEL_ID;
-        console.log(`📱 Using channel: ${channelId} for notification type: ${notificationType}`);
 
         // Show local notification when app is in foreground
         await Notifications.scheduleNotificationAsync({
@@ -428,7 +379,6 @@ export function setupNotificationListeners(navigation) {
 
       // Handle notification taps (when app is in background or closed)
       messaging().onNotificationOpenedApp(remoteMessage => {
-        console.log('👆 FCM notification opened app:', remoteMessage);
         const data = remoteMessage.data;
         
         setTimeout(() => {
@@ -459,7 +409,6 @@ export function setupNotificationListeners(navigation) {
         .getInitialNotification()
         .then(remoteMessage => {
           if (remoteMessage) {
-            console.log('📱 App opened from FCM notification:', remoteMessage);
             const data = remoteMessage.data;
             
             setTimeout(() => {
@@ -482,22 +431,18 @@ export function setupNotificationListeners(navigation) {
 
       // Listen for FCM token refresh events and re-register the new token
       messaging().onTokenRefresh(async newToken => {
-        console.log('🔄 FCM token refreshed:', newToken.substring(0, 50) + '...');
 
         if (!lastAuthToken) {
-          console.log('⚠️ No auth token available for token refresh registration. Skipping backend update.');
           return;
         }
 
         try {
-          console.log('🔔 Re-registering refreshed FCM token with backend...');
           await registerForPushNotificationsAsync(lastAuthToken, lastAccountType || 'user');
         } catch (error) {
           console.error('❌ Error re-registering refreshed FCM token:', error);
         }
       });
 
-      console.log('✅ FCM notification listeners set up for Android');
     } catch (error) {
       console.error('❌ Error setting up FCM listeners:', error);
     }
@@ -505,7 +450,6 @@ export function setupNotificationListeners(navigation) {
 
   Notifications.getLastNotificationResponseAsync().then((response) => {
     if (response) {
-      console.log('📱 App opened from notification:', response);
       const data = response.notification.request.content.data;
       
       setTimeout(() => {
@@ -527,7 +471,6 @@ export function setupNotificationListeners(navigation) {
   });
 
   return () => {
-    console.log('🔕 Cleaning up notification listeners...');
     if (notificationListener && notificationListener.remove) {
       notificationListener.remove();
     }

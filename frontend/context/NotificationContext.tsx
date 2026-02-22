@@ -34,7 +34,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
       const count = response.data.unreadCount || 0;
       setUnreadCount(count);
-      console.log('🔔 Unread notification count:', count);
     } catch (error) {
       console.error('Error fetching unread count:', error);
     }
@@ -49,7 +48,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Listen for notifications received while app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('📬 Notification received, incrementing count...');
       // Increment count immediately for responsiveness
       setUnreadCount((prev) => prev + 1);
     });

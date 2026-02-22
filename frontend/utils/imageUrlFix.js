@@ -21,7 +21,6 @@ const DEBUG_URLS = true;
  */
 const debugLog = (message) => {
   if (DEBUG_URLS) {
-    console.log(message);
   }
 };
 

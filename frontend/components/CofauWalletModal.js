@@ -62,7 +62,6 @@ const CofauWalletModal = ({ visible, onClose }) => {
 
       setWalletData(response.data);
     } catch (err) {
-      console.log("Error fetching wallet:", err);
       setError("Failed to load wallet data");
     } finally {
       setLoading(false);

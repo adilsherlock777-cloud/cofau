@@ -41,7 +41,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
       });
       setUsers(response.data || []);
     } catch (error) {
-      console.log("Error fetching suggested users:", error);
       setUsers([]);
     } finally {
       setLoading(false);
@@ -74,7 +73,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
         setFollowingIds(prev => new Set(prev).add(userId));
       }
     } catch (error) {
-      console.log("Error following/unfollowing:", error?.response?.data || error);
     } finally {
       setLoadingFollow(null);
     }

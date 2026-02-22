@@ -106,21 +106,15 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ? `${API_URL}/api/restaurant/posts/create`
         : `${API_URL}/api/posts/create`;
 
-      console.log('📤 Starting upload to:', endpoint);
-      console.log('📤 Token present:', !!token);
-
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded / event.total) * 100);
-          console.log('📤 Upload progress:', progress + '%');
           setUploadState(prev => ({ ...prev, progress }));
         }
       };
 
       xhr.onload = () => {
         xhrRef.current = null;
-        console.log('📤 Upload response status:', xhr.status);
-        console.log('📤 Upload response:', xhr.responseText?.substring(0, 500));
 
         if (xhr.status >= 200 && xhr.status < 300) {
           try {

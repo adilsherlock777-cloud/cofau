@@ -215,8 +215,6 @@ export default function SearchResultsScreen() {
 
       const url = `${API_URL}/map/search?q=${encodeURIComponent(query.trim())}&lat=${location.latitude}&lng=${location.longitude}&radius_km=12`;
 
-      console.log('🔍 Fetching nearby posts:', url);
-
       const res = await axios.get(url, {
         headers: { Authorization: `Bearer ${token || ''}` },
       });

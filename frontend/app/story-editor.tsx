@@ -51,7 +51,6 @@ export default function StoryEditorScreen() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const uploadLockRef = useRef(false);
 
-
  
 
   // ============================
@@ -82,7 +81,6 @@ export default function StoryEditorScreen() {
         setShowSuggestions(false);
       }
     } catch (error) {
-      console.log('Error fetching suggestions:', error);
       setLocationSuggestions([]);
       setShowSuggestions(false);
     } finally {
@@ -148,7 +146,6 @@ const handlePostStory = async () => {
 
   // 🔒 Hard lock (prevents all race conditions)
   if (uploadLockRef.current) {
-    console.log("⚠️ Upload blocked (already in progress)");
     return;
   }
 
@@ -185,8 +182,6 @@ const handlePostStory = async () => {
       uploadUrl += `?${queryParams.join('&')}`;
     }
 
-    console.log('📤 Uploading story to:', uploadUrl);
-
     const response = await axios.post(
       uploadUrl,
       formData,
@@ -197,8 +192,6 @@ const handlePostStory = async () => {
         },
       }
     );
-
-    console.log('✅ Story uploaded:', response.data);
 
     router.replace('/(tabs)/feed');
   } catch (error: any) {
@@ -344,7 +337,6 @@ return (
             <Ionicons name="map" size={20} color="#FF9A4D" />
             <Text style={styles.mapsButtonText}>Generate Google Maps Link</Text>
           </TouchableOpacity>
-
 
           {/* Verify Location */}
 <TouchableOpacity

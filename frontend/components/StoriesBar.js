@@ -64,7 +64,6 @@ export default function StoriesBar({ refreshTrigger }) {
 const filtered = fixed.filter(u => u.user.id !== user?.id);
 setStories(filtered);
     } catch (err) {
-      console.log("❌ Story fetch error:", err?.response?.data || err.message);
     } finally {
       setLoading(false);
     }

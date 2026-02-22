@@ -89,7 +89,6 @@ export default function LevelUpAnimation() {
 
   useEffect(() => {
     if (showAnimation) {
-      console.log('🎬 Starting level-up animation for Level', currentLevel);
 
       // Fade in background
       fadeAnim.setValue(0);
@@ -109,7 +108,6 @@ export default function LevelUpAnimation() {
   }, [showAnimation, currentLevel]);
 
   const handleAnimationEnd = () => {
-    console.log('✅ Animation completed, fading out');
 
     Animated.parallel([
       Animated.timing(fadeAnim, {

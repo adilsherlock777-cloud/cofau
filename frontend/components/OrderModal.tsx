@@ -162,7 +162,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
           allMenuItems = [...allMenuItems, ...extractedItems];
         }
       } catch (err) {
-        console.log("Restaurant menu fetch failed, trying manual menu");
       }
 
       try {
@@ -177,7 +176,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
           allMenuItems = [...allMenuItems, ...manualItems];
         }
       } catch (err) {
-        console.log("Manual menu fetch failed");
       }
 
       setMenuItems(allMenuItems);

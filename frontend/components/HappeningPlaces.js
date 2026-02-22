@@ -9,6 +9,8 @@ import {
   Dimensions,
   TextInput,
   Linking,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -34,7 +36,6 @@ const API_URL = `${API_BASE_URL}/api`;
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const MAX_CONCURRENT_VIDEOS = 3;
-
 
 // Check if URL is a video file
 const isVideoFile = (url) => {
@@ -110,7 +111,6 @@ const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayo
           await videoRef.current.pauseAsync();
         }
       } catch (e) {
-        console.log("Video control error:", e);
       }
     };
     if (hasBeenVisible) {
@@ -190,6 +190,90 @@ export default function HappeningPlaces() {
   // Track if initial load has happened to prevent duplicate fetch
   const hasInitiallyLoaded = useRef(false);
 
+  // Food Spot button animations
+  const shimmerAnim = useRef(new Animated.Value(-1)).current;
+  const pinBounce = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Shimmer sweep: a white gleam that slides across the button every 3s
+    const shimmerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(2500),
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnim, {
+          toValue: -1,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Location pin bounce: subtle bounce every 3s
+    const pinLoop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(2000),
+        Animated.timing(pinBounce, {
+          toValue: -6,
+          duration: 200,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pinBounce, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.bounce,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pinBounce, {
+          toValue: -3,
+          duration: 150,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pinBounce, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.bounce,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Glow pulse: subtle opacity pulse on the outer shadow
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    shimmerLoop.start();
+    pinLoop.start();
+    glowLoop.start();
+
+    return () => {
+      shimmerLoop.stop();
+      pinLoop.stop();
+      glowLoop.stop();
+    };
+  }, []);
+
   // Video autoplay state
   const videoPositions = useRef(new Map());
   const [scrollY, setScrollY] = useState(0);
@@ -236,7 +320,6 @@ export default function HappeningPlaces() {
       }
       return true;
     } catch (error) {
-      console.log("Location permission error:", error);
       setLocationError("Could not get location permission");
       return false;
     }
@@ -261,7 +344,6 @@ export default function HappeningPlaces() {
             return coords;
           }
         } catch (e) {
-          console.log("Last known position unavailable:", e);
         }
       }
 
@@ -278,7 +360,6 @@ export default function HappeningPlaces() {
       setLocationError(null);
       return coords;
     } catch (error) {
-      console.log("Get location error:", error);
       setLocationError("Could not get your location");
       return null;
     }
@@ -304,10 +385,8 @@ export default function HappeningPlaces() {
     if (coords || userLocation) {
       const location = coords || userLocation;
       endpoint = `${API_URL}/locations/nearby?lat=${location.latitude}&lng=${location.longitude}&radius_km=50&limit=20`;
-      console.log('🔍 Fetching nearby locations from:', endpoint);
     } else {
       endpoint = `${API_URL}/locations/top`;
-      console.log('🔍 Fetching top locations (no location) from:', endpoint);
     }
 
     const response = await axios.get(endpoint, {
@@ -316,7 +395,6 @@ export default function HappeningPlaces() {
 
     const locations = Array.isArray(response.data) ? response.data : [];
     setTopLocations(locations);
-    console.log(`✅ Loaded ${locations.length} locations`);
   } catch (error) {
     console.error('❌ Error fetching locations:', error.response?.data || error.message);
     setTopLocations([]);
@@ -453,7 +531,6 @@ export default function HappeningPlaces() {
         setRecentSearches(JSON.parse(stored));
       }
     } catch (e) {
-      console.log('Error loading recent searches:', e);
     }
   };
 
@@ -470,7 +547,6 @@ export default function HappeningPlaces() {
       await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches));
       setRecentSearches(searches);
     } catch (e) {
-      console.log('Error saving recent search:', e);
     }
   };
 
@@ -479,7 +555,6 @@ export default function HappeningPlaces() {
       await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
       setRecentSearches([]);
     } catch (e) {
-      console.log('Error clearing recent searches:', e);
     }
   };
 
@@ -750,6 +825,10 @@ export default function HappeningPlaces() {
 
           {/* SELECT YOUR FOOD SPOT Dropdown */}
           <View style={styles.dropdownWrapper}>
+            <Animated.View style={[
+              styles.dropdownButtonGlow,
+              { opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] }) }
+            ]} />
             <TouchableOpacity
               onPress={() => setDropdownOpen(!dropdownOpen)}
               activeOpacity={0.8}
@@ -761,7 +840,9 @@ export default function HappeningPlaces() {
                 end={{ x: 1, y: 0 }}
                 style={styles.dropdownButton}
               >
-                <Ionicons name="location" size={18} color="#fff" />
+                <Animated.View style={{ transform: [{ translateY: pinBounce }] }}>
+                  <Ionicons name="location" size={18} color="#fff" />
+                </Animated.View>
                 <Text style={styles.dropdownButtonText} numberOfLines={1}>
                   {selectedArea === 'All' ? 'SELECT YOUR FOOD SPOT AROUND 50KM' : selectedArea.name}
                 </Text>
@@ -769,6 +850,22 @@ export default function HappeningPlaces() {
                   name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
                   size={18}
                   color="#fff"
+                />
+
+                {/* Shimmer sweep */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.shimmerOverlay,
+                    {
+                      transform: [{
+                        translateX: shimmerAnim.interpolate({
+                          inputRange: [-1, 1],
+                          outputRange: [-80, Dimensions.get('window').width],
+                        }),
+                      }],
+                    },
+                  ]}
                 />
               </LinearGradient>
             </TouchableOpacity>
@@ -1265,7 +1362,6 @@ export default function HappeningPlaces() {
     </>
   );
 }
-
 
 /* ================= STYLES ================= */
 
@@ -1793,6 +1889,16 @@ skeletonImageLarge: {
     marginBottom: 16,
     zIndex: 100,
   },
+  dropdownButtonGlow: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 17,
+    backgroundColor: '#FF5722',
+    zIndex: -1,
+  },
   dropdownButtonOuter: {
     borderRadius: 14,
     overflow: 'hidden',
@@ -1801,6 +1907,14 @@ skeletonImageLarge: {
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 5,
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 14,
   },
   dropdownButton: {
     flexDirection: 'row',

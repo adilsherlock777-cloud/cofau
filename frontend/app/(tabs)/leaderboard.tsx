@@ -304,7 +304,6 @@ export default function LeaderboardScreen() {
             );
             profiles[restaurantId] = profileResponse.data;
           } catch (error) {
-            console.log(`Failed to fetch profile for restaurant ${restaurantId}`);
           }
         }
         setRestaurantProfiles(profiles);
@@ -329,7 +328,6 @@ export default function LeaderboardScreen() {
         }
       );
       setRestaurantReviews(response.data || []);
-      console.log(`✅ Fetched ${response.data?.length || 0} reviews for restaurant`);
     } catch (error) {
       console.error("Error fetching reviews:", error);
     } finally {
@@ -349,7 +347,6 @@ export default function LeaderboardScreen() {
       );
       const completedDeliveries = response.data?.completed_deliveries_count || 0;
       setDeliveryRewardProgress(completedDeliveries);
-      console.log(`📦 User has completed ${completedDeliveries}/10 deliveries`);
     } catch (error) {
       console.error("Error fetching delivery reward progress:", error);
     }
@@ -370,8 +367,6 @@ export default function LeaderboardScreen() {
       setRewardsHistory(response.data.recent_transactions || []);
       setWalletBalance(response.data.balance || 0);
       setDeliveryRewardProgress(response.data.completed_deliveries || 0);
-      console.log(`💰 Fetched ${response.data.recent_transactions?.length || 0} reward transactions`);
-      console.log(`💰 Wallet balance: ₹${response.data.balance}, Deliveries: ${response.data.completed_deliveries}/10`);
     } catch (error) {
       console.error("Error fetching rewards history:", error);
     } finally {
@@ -484,7 +479,6 @@ export default function LeaderboardScreen() {
         const hasChanges = prev.length !== completed.length;
         // Check if a new order was just completed (length increased)
         if (hasChanges && completed.length > prev.length && !isRestaurant) {
-          console.log('💰 New completed order detected - refreshing rewards history');
           fetchRewardsHistory();
         }
         return hasChanges ? completed : prev;
@@ -509,7 +503,6 @@ export default function LeaderboardScreen() {
     const startPolling = () => {
       if (pollingInterval) return; // Already polling
 
-      console.log('📊 Starting fallback polling for order updates (every 15s)');
       pollingInterval = setInterval(() => {
         if (activeTab === "In Progress" || activeTab === "Your Orders") {
           updateOrdersInBackground(); // Use silent update instead of full fetchOrders
@@ -521,7 +514,6 @@ export default function LeaderboardScreen() {
       if (pollingInterval) {
         clearInterval(pollingInterval);
         pollingInterval = null;
-        console.log('⏹️ Stopped fallback polling');
       }
     };
 
@@ -533,7 +525,6 @@ export default function LeaderboardScreen() {
         ws = new WebSocket(`${wsUrl}/api/orders/ws?token=${token}`);
 
         ws.onopen = () => {
-          console.log('📡 Connected to order updates WebSocket');
           wsConnected = true;
           stopPolling(); // Stop polling since WebSocket is connected
         };
@@ -541,7 +532,6 @@ export default function LeaderboardScreen() {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('📨 Received WebSocket message:', data);
 
             if (data.type === 'order_status_update') {
               const newStatus = data.status;
@@ -562,7 +552,6 @@ export default function LeaderboardScreen() {
 
                 // Refresh rewards history when an order is completed (for delivery rewards)
                 if (newStatus === 'completed' && !isRestaurant) {
-                  console.log('💰 Order completed - refreshing rewards history');
                   fetchRewardsHistory();
                 }
               } else {
@@ -576,7 +565,6 @@ export default function LeaderboardScreen() {
                 );
               }
 
-              console.log(`✅ Updated order ${data.order_id} to status: ${newStatus}`);
             }
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -584,7 +572,6 @@ export default function LeaderboardScreen() {
         };
 
         ws.onerror = (error) => {
-          console.log('⚠️ WebSocket connection failed, using polling fallback');
           wsConnected = false;
           shouldReconnect = false; // Don't retry WebSocket
           startPolling(); // Fall back to polling
@@ -592,7 +579,6 @@ export default function LeaderboardScreen() {
 
         ws.onclose = (event) => {
           wsConnected = false;
-          console.log('🔌 WebSocket disconnected, using polling fallback');
           startPolling(); // Always fall back to polling when disconnected
         };
       } catch (error) {
@@ -607,7 +593,6 @@ export default function LeaderboardScreen() {
     // If WebSocket doesn't connect within 3 seconds, start polling as backup
     const wsTimeout = setTimeout(() => {
       if (!wsConnected) {
-        console.log('⏱️ WebSocket connection timeout, starting polling');
         startPolling();
       }
     }, 3000);
@@ -756,7 +741,6 @@ export default function LeaderboardScreen() {
       fetchNearbyPosts(coords); // Fetch nearby posts with tagged restaurants
       return coords;
     } catch (error) {
-      console.log("Get location error:", error);
       Alert.alert("Location Error", "Could not get your current location. Please try again.");
       return null;
     }
@@ -787,10 +771,6 @@ export default function LeaderboardScreen() {
           post.restaurant_id
       );
 
-      console.log(
-        `📍 Found ${allPosts.length} total posts, ${orderablePosts.length} orderable (tagged or restaurant), ${restaurants.length} restaurants within 3km`
-      );
-
       // Cache both posts and restaurants
       cachedNearbyPosts.current = orderablePosts;
       cachedNearbyRestaurants.current = restaurants;
@@ -804,7 +784,6 @@ export default function LeaderboardScreen() {
         fetchRestaurantOwnPosts(restaurants, orderablePosts);
       }
     } catch (error) {
-      console.log("Fetch nearby posts error:", error);
       Alert.alert("Error", "Failed to load nearby posts. Please try again.");
     } finally {
       setLoadingPosts(false);
@@ -829,7 +808,6 @@ export default function LeaderboardScreen() {
             account_type: 'restaurant',
           }));
         } catch (err) {
-          console.log(`Failed to fetch posts for restaurant ${restaurant.id}`);
           return [];
         }
       });
@@ -847,11 +825,9 @@ export default function LeaderboardScreen() {
           cachedNearbyPosts.current = mergedPosts;
           setNearbyPosts(mergedPosts);
           setNearbyRestaurants(mergeNearbyRestaurants(mergedPosts, restaurants));
-          console.log(`📍 Added ${newPosts.length} restaurant posts to nearby posts`);
         }
       }
     } catch (error) {
-      console.log("Error fetching restaurant own posts:", error);
     }
   };
 
@@ -885,15 +861,12 @@ export default function LeaderboardScreen() {
               );
               profiles[String(restaurant.id)] = profileResponse.data;
             } catch (error) {
-              console.log(`Failed to fetch profile for restaurant ${restaurant.id}`);
             }
           })
         );
         setRestaurantProfiles((prev) => ({ ...prev, ...profiles }));
       }
-      console.log(`📍 Found ${restaurants.length} onboarded restaurants within 3km (from pins endpoint)`);
     } catch (error) {
-      console.log("Fetch nearby restaurants error:", error);
       Alert.alert("Error", "Failed to load nearby restaurants. Please try again.");
     } finally {
       setLoadingRestaurants(false);
@@ -1015,7 +988,6 @@ export default function LeaderboardScreen() {
             );
             profiles[restaurantId] = profileResponse.data;
           } catch (error) {
-            console.log(`Failed to fetch profile for restaurant ${restaurantId}`);
           }
         })
       );

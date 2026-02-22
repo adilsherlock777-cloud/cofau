@@ -118,7 +118,6 @@ export default function NotificationsScreen() {
     }
     // Fallback: if no specific route, go to feed
     else {
-      console.log(`⚠️ Unhandled notification type: ${type}`);
     }
   };
 

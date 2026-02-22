@@ -56,7 +56,6 @@ export default function CommentsScreen() {
 
   useEffect(() => {
     if (postId) {
-      console.log('📝 CommentsScreen - postId:', postId, typeof postId);
       fetchComments();
     } else {
       console.error('❌ CommentsScreen - No postId found in params:', params);
@@ -80,7 +79,6 @@ export default function CommentsScreen() {
     
     try {
       setLoading(true);
-      console.log('📤 Fetching comments for postId:', normalizedPostId);
       const data = await getComments(normalizedPostId);
 
       // 🔥 Normalize DP inside every comment
@@ -117,7 +115,6 @@ export default function CommentsScreen() {
 
     setSubmitting(true);
     try {
-      console.log('📤 Submitting comment for postId:', normalizedPostId);
       await addComment(normalizedPostId, commentText, token);
       setCommentText('');
       await fetchComments();

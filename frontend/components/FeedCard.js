@@ -84,28 +84,18 @@ function FeedCard({
   // Add debug log HERE - inside the function
 
   // Debug: Check if tagged_restaurant and dish_name data is coming through
-  console.log('🏷️ FeedCard - Post ID:', post.id, '| Tagged Restaurant:', post.tagged_restaurant, '| Dish Name:', post.dish_name);
 
   if (post.tagged_restaurant) {
-    console.log('✅ Has tagged_restaurant:', {
-      id: post.tagged_restaurant.id,
-      name: post.tagged_restaurant.restaurant_name
-    });
   } else {
-    console.log('❌ No tagged_restaurant data for post', post.id);
   }
 
   if (post.dish_name) {
-    console.log('✅ Has dish_name:', post.dish_name);
   } else {
-    console.log('❌ No dish_name for post', post.id);
   }
 
   const router = useRouter();
   const { user } = useAuth();
   const videoRef = useRef(null);
-
-console.log('Post user:', post.username, 'is_following:', post.is_following);
 
 const [isLiked, setIsLiked] = useState(post.is_liked || false);
 const [likesCount, setLikes] = useState(post.likes || 0);
@@ -151,9 +141,8 @@ const trackRestaurantPostClick = async () => {
         post_id: post.id
       }, {
         headers: { Authorization: `Bearer ${token}` }
-      }).catch(err => console.log('Analytics tracking error:', err));
+      }).catch(() => {});
     } catch (err) {
-      console.log('Analytics tracking error:', err);
     }
   }
 };
@@ -182,14 +171,11 @@ useEffect(() => {
         });
         setGeneratedThumbnail(uri);
       } catch (e) {
-        console.log('Thumbnail generation failed:', e);
       }
     }
   };
   generateThumbnail();
 }, [isVideo, thumbnailUrl, mediaUrl]);
-
-
 
 const dpRaw = normalizeProfilePicture(post.user_profile_picture);
 
@@ -227,7 +213,6 @@ useEffect(() => {
                 await videoRef.current.setIsMutedAsync(isMuted);
               }
             } catch (err) {
-              console.log("Video play retry error:", err);
             }
           }, 300);
         }
@@ -244,12 +229,10 @@ useEffect(() => {
             // Mute to ensure no audio plays
             await videoRef.current.setIsMutedAsync(true);
           } catch (err) {
-            console.log("Video stop error:", err);
           }
         }
       }
     } catch (error) {
-      console.log("Video playback control error:", error);
     }
   };
 
@@ -279,7 +262,6 @@ useEffect(() => {
         await videoRef.current.setIsMutedAsync(isMuted);
       }
     } catch (err) {
-      console.log("Mute state update error:", err);
     }
   };
 
@@ -511,7 +493,7 @@ onPress={() => {
         event_type: 'profile_view'
       }, {
         headers: { Authorization: `Bearer ${token}` }
-      }).catch(err => console.log('Analytics tracking error:', err));
+      }).catch(() => {});
     });
   }
   router.push(`/profile?userId=${post.user_id}`);
@@ -627,7 +609,7 @@ postId={post.id}
         event_type: 'profile_view'
       }, {
         headers: { Authorization: `Bearer ${token}` }
-      }).catch(err => console.log('Analytics tracking error:', err));
+      }).catch(() => {});
     });
   }
   router.push(`/profile?userId=${post.user_id}`);
@@ -726,7 +708,6 @@ postId={post.id}
             videoStyle={{ backgroundColor: 'black' }} 
             // Preload video for iOS
             onLoad={(status) => {
-              console.log("✅ Video loaded on iOS/Android", status);
               // Only update state if it changed to prevent flickering
               if (!videoLoaded) {
                 setVideoLoaded(true);
@@ -752,13 +733,11 @@ postId={post.id}
                           try {
                             await videoRef.current.playAsync();
                           } catch (retryErr) {
-                            console.log("Video play retry error:", retryErr);
                           }
                         }, 300);
                       }
                     }
                   } catch (err) {
-                    console.log("Auto-play error:", err);
                   }
                 }, 200); // Reduced delay to prevent flickering
               }
@@ -833,7 +812,6 @@ postId={post.id}
               dimensionCache.current[mediaUrl] = { width, height };
               setImageDimensions({ width, height });
             }
-            console.log("✅ Image loaded successfully:", mediaUrl);
           }}
           onError={(error) => {
             console.error("❌ Image load error in FeedCard:", mediaUrl, error);
@@ -842,7 +820,6 @@ postId={post.id}
             console.error("❌ Original post.image_url:", post.image_url);
           }}
           onLoadStart={() => {
-            console.log("🖼️ Loading image:", mediaUrl, "| account_type:", post.account_type);
           }}
         />
       ) : (
@@ -1197,7 +1174,6 @@ width: "100%",
 aspectRatio: 0.75, // Default aspect ratio while loading
 backgroundColor: '#f9f9f9',
 },
-
 
 video: {
 width: "100%",
@@ -1585,7 +1561,6 @@ color: '#333',
 fontWeight: '500',
 },
 });
-
 
 export default React.memo(FeedCard, (prevProps, nextProps) => {
   return (

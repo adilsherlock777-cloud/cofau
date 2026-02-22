@@ -169,7 +169,6 @@ export default function LocationDetailsScreen() {
   // Refetch posts when category changes
   useEffect(() => {
     if (user && token && decodedLocationName) {
-      console.log('🔄 Category changed, refetching posts:', selectedCategory);
       fetchLocationPosts();
     }
   }, [selectedCategory]);
@@ -270,9 +269,8 @@ export default function LocationDetailsScreen() {
           .post(`${API_URL}/posts/${postId}/click`, {}, {
             headers: { Authorization: `Bearer ${tkn}` },
           })
-          .catch((err: any) => console.log("Click tracking error:", err));
+          .catch(() => {});
       } catch (err) {
-        console.log("Click tracking error:", err);
       }
     }
 
@@ -288,9 +286,8 @@ export default function LocationDetailsScreen() {
           }, {
             headers: { Authorization: `Bearer ${tkn}` },
           })
-          .catch((err: any) => console.log("Analytics tracking error:", err));
+          .catch(() => {});
       } catch (err) {
-        console.log("Analytics tracking error:", err);
       }
     }
 

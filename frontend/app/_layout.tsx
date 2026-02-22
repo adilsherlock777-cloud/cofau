@@ -67,17 +67,12 @@ function RootLayoutNav() {
     }
   }, [isAuthenticated, router]);
 
-
  useEffect(() => {
     if (isAuthenticated && token) {
-      console.log('🔔 Attempting to register push notifications...');
-      console.log(`   Account type: ${accountType || 'user'}`);
       registerForPushNotificationsAsync(token, accountType || 'user')
         .then((pushToken) => {
           if (pushToken) {
-            console.log('✅ Push token obtained:', pushToken);
           } else {
-            console.log('⚠️ No push token returned');
           }
         })
         .catch((error) => {
@@ -111,7 +106,6 @@ function RootLayoutNav() {
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {

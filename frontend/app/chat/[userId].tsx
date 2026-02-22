@@ -81,9 +81,7 @@ const markMessagesAsRead = async () => {
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    console.log('✅ Messages marked as read');
   } catch (error) {
-    console.log('Error marking messages as read:', error);
   }
 };
 
@@ -130,13 +128,10 @@ const markMessagesAsRead = async () => {
 
     const wsUrl = `${WS_BASE}/api/chat/ws/${userId}?token=${encodeURIComponent(token)}`;
 
-    console.log("🔗 Connecting WebSocket:", wsUrl);
-
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("🟢 WebSocket Connected");
     };
 
     ws.onmessage = (event) => {
@@ -162,24 +157,16 @@ const markMessagesAsRead = async () => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 80);
       } catch (e) {
-        console.log("❌ WS parse error:", e);
       }
     };
 
     ws.onerror = (err) => {
-      console.log("❌ WS error:", err);
     };
 
     ws.onclose = (event) => {
-      console.log("🔴 WS closed", {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean
-      });
     };
 
     return () => {
-      console.log("🔌 Cleaning WebSocket");
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
       }
@@ -233,7 +220,6 @@ const markMessagesAsRead = async () => {
               message: messageText
             }));
 
-            console.log("📤 Auto-sent order card message");
             setHasAutoSent(true);
           } catch (error) {
             console.error("❌ Error auto-sending order card:", error);
@@ -255,14 +241,12 @@ const markMessagesAsRead = async () => {
     }
 
     if (!wsRef.current) {
-      console.log("❌ WebSocket not initialized");
       return;
     }
 
     const readyState = wsRef.current.readyState;
 
     if (readyState === WebSocket.CONNECTING) {
-      console.log("⏳ WebSocket still connecting, waiting...");
       let attempts = 0;
       while (wsRef.current.readyState === WebSocket.CONNECTING && attempts < 30) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -270,27 +254,22 @@ const markMessagesAsRead = async () => {
       }
 
       if (wsRef.current.readyState !== WebSocket.OPEN) {
-        console.log(`❌ WebSocket failed to connect. State: ${wsRef.current.readyState}`);
         return;
       }
     }
 
     if (readyState === WebSocket.CLOSED || readyState === WebSocket.CLOSING) {
-      console.log(`❌ WebSocket is closed. State: ${readyState}`);
       return;
     }
 
     if (readyState !== WebSocket.OPEN) {
-      console.log(`❌ WebSocket not ready. State: ${readyState}`);
       return;
     }
 
     try {
       wsRef.current.send(JSON.stringify({ message: text }));
-      console.log("📤 Message sent:", text);
       setInput("");
     } catch (error) {
-      console.log("❌ Error sending message:", error);
     }
   };
 

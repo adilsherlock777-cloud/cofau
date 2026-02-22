@@ -65,86 +65,6 @@ export default function ProfileBadge({
     return 'INFLUENCER';
   };
 
-  /**
-   * Level System Info Modal
-   */
-  const LevelInfoModal = () => (
-    <Modal
-      animationType="fade"
-      transparent={true}
-      visible={showLevelInfo}
-      onRequestClose={() => setShowLevelInfo(false)}
-    >
-      <Pressable 
-        style={styles.modalOverlay}
-        onPress={() => setShowLevelInfo(false)}
-      >
-        <Pressable 
-          style={styles.modalContent}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <Text style={styles.modalTitle}>Level System</Text>
-          
-          {/* Reviewer Level */}
-          <View style={styles.levelRow}>
-            <Image 
-              source={ReviewerBadge} 
-              style={styles.modalBadgeIcon}
-            />
-            <View style={styles.levelTextContainer}>
-              <Text style={styles.levelName}>Levels 1-4: Reviewer</Text>
-              <Text style={styles.levelPoints}>25 points per post</Text>
-            </View>
-          </View>
-
-          {/* Top Reviewer Level */}
-          <View style={styles.levelRow}>
-            <Image 
-              source={TopReviewerBadge} 
-              style={styles.modalBadgeIcon}
-            />
-            <View style={styles.levelTextContainer}>
-              <Text style={styles.levelName}>Levels 5-8: Top Reviewer</Text>
-              <Text style={styles.levelPoints}>15 points per post</Text>
-            </View>
-          </View>
-
-          {/* Influencer Level */}
-          <View style={styles.levelRow}>
-            <Image 
-              source={InfluencerBadge} 
-              style={styles.modalBadgeIcon}
-            />
-            <View style={styles.levelTextContainer}>
-              <Text style={styles.levelName}>Levels 9-12: Influencer</Text>
-              <Text style={styles.levelPoints}>5 points per post</Text>
-            </View>
-          </View>
-
-          {/* Info text */}
-          <Text style={styles.infoText}>
-            Earn points by creating posts and engaging with content
-          </Text>
-
-          {/* Close button */}
-          <TouchableOpacity
-            style={styles.closeButtonWrapper}
-            onPress={() => setShowLevelInfo(false)}
-          >
-            <LinearGradient
-              colors={['#FF7A18', '#FF2E2E']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.closeButton}
-            >
-              <Text style={styles.closeButtonText}>Got it</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-
   return (
     <View style={styles.container}>
       {/* Left side: DP + Username stacked */}
@@ -159,7 +79,7 @@ export default function ProfileBadge({
           />
           {cameraIcon}
         </View>
-        
+
         {/* Username below DP */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 4 }}>
           <Text style={[styles.usernameText, { marginTop: 0 }]} numberOfLines={1}>
@@ -185,7 +105,7 @@ export default function ProfileBadge({
           </Text>
           {/* Info button - only shown on own profile */}
           {isOwnProfile && (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowLevelInfo(true)}
               style={styles.infoButton}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -198,8 +118,81 @@ export default function ProfileBadge({
         </View>
       </View>
 
-      {/* Level Info Modal */}
-      <LevelInfoModal />
+      {/* Level Info Modal - inlined to prevent unmount/remount on re-renders */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showLevelInfo}
+        onRequestClose={() => setShowLevelInfo(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowLevelInfo(false)}
+        >
+          <Pressable
+            style={styles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.modalTitle}>Level System</Text>
+
+            {/* Reviewer Level */}
+            <View style={styles.levelRow}>
+              <Image
+                source={ReviewerBadge}
+                style={styles.modalBadgeIcon}
+              />
+              <View style={styles.levelTextContainer}>
+                <Text style={styles.levelName}>Levels 1-4: Reviewer</Text>
+                <Text style={styles.levelPoints}>25 points per post</Text>
+              </View>
+            </View>
+
+            {/* Top Reviewer Level */}
+            <View style={styles.levelRow}>
+              <Image
+                source={TopReviewerBadge}
+                style={styles.modalBadgeIcon}
+              />
+              <View style={styles.levelTextContainer}>
+                <Text style={styles.levelName}>Levels 5-8: Top Reviewer</Text>
+                <Text style={styles.levelPoints}>15 points per post</Text>
+              </View>
+            </View>
+
+            {/* Influencer Level */}
+            <View style={styles.levelRow}>
+              <Image
+                source={InfluencerBadge}
+                style={styles.modalBadgeIcon}
+              />
+              <View style={styles.levelTextContainer}>
+                <Text style={styles.levelName}>Levels 9-12: Influencer</Text>
+                <Text style={styles.levelPoints}>5 points per post</Text>
+              </View>
+            </View>
+
+            {/* Info text */}
+            <Text style={styles.infoText}>
+              Earn points by creating posts and engaging with content
+            </Text>
+
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.closeButtonWrapper}
+              onPress={() => setShowLevelInfo(false)}
+            >
+              <LinearGradient
+                colors={['#FF7A18', '#FF2E2E']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>Got it</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

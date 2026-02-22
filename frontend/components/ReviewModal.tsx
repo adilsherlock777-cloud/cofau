@@ -52,12 +52,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
     setSubmitting(true);
     try {
-      console.log('Submitting review for order:', order.id);
-      console.log('Review data:', {
-        rating,
-        review_text: reviewText,
-        is_complaint: isComplaint,
-      });
 
       const response = await axios.post(
         `${BACKEND_URL}/api/orders/${order.id}/review`,
@@ -71,7 +65,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         }
       );
 
-      console.log('Review submitted successfully:', response.data);
       Alert.alert("Success", "Your review has been submitted successfully!");
       onReviewAdded();
       handleClose();

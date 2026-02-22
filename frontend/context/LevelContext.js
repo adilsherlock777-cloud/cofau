@@ -7,13 +7,11 @@ export const LevelProvider = ({ children }) => {
   const [currentLevel, setCurrentLevel] = useState(null);
 
   const showLevelUpAnimation = (levelNumber) => {
-    console.log('🎉 Showing level-up animation for Level', levelNumber);
     setCurrentLevel(levelNumber);
     setShowAnimation(true);
   };
 
   const hideLevelUpAnimation = () => {
-    console.log('✅ Hiding level-up animation');
     setShowAnimation(false);
     setCurrentLevel(null);
   };
