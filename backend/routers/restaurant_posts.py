@@ -728,12 +728,20 @@ async def get_restaurant_profile_public(restaurant_id: str):
     restaurant_name = restaurant.get("restaurant_name")
     total_orders = await db.orders.count_documents({"restaurant_id": restaurant_id, "status": "completed"})
     if total_orders == 0 and restaurant_name:
-        # Fallback: count orders where restaurant_id is null but restaurant_name matches
-        # This handles orders placed via Google Place tagged posts
-        total_orders = await db.orders.count_documents({
-            "restaurant_name": {"$regex": f"^{restaurant_name}$", "$options": "i"},
-            "status": "completed"
-        })
+        # Fallback: flexible name matching for orders placed via Google Place tagged posts
+        # Google Place names may differ from registered name (e.g. "Bakasura Bandi Nagarbhavi" vs "BakasuraBandi")
+        import re
+        # Build regex that allows optional spaces/separators between characters of each word
+        # "BakasuraBandi" -> split into words by camelCase/spaces -> ["Bakasura", "Bandi"]
+        # Then match if order name contains both words (in order)
+        words = re.findall(r'[A-Z][a-z]*|[a-z]+', restaurant_name)
+        if words:
+            # Join words with a flexible separator pattern (spaces, hyphens, or nothing)
+            flexible_pattern = r'[\s\-]*'.join(re.escape(w) for w in words)
+            total_orders = await db.orders.count_documents({
+                "restaurant_name": {"$regex": flexible_pattern, "$options": "i"},
+                "status": "completed"
+            })
 
     return {
         "id": str(restaurant["_id"]),
