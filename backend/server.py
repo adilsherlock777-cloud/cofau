@@ -917,6 +917,7 @@ async def create_post(
     # Handles both iOS MOV files and Android MP4 files
     # ======================================================
     thumbnail_url = None
+    thumbnail_path = None
     if media_type == "video":
         from utils.video_transcode import should_transcode_video, optimize_video_with_thumbnail
         
@@ -1073,10 +1074,8 @@ async def create_post(
     quality_score = 50.0
     try:
         from utils.sightengine_quality import analyze_media_quality
-        backend_url = os.getenv("BACKEND_URL", "https://api.cofau.com")
-        full_media_url = f"{backend_url}{media_url}"
-        quality_score = await analyze_media_quality(full_media_url, media_type)
-        print(f"✅ Quality score calculated: {quality_score} for {full_media_url}")
+        quality_score = await analyze_media_quality(file_path, media_type, thumbnail_path=thumbnail_path)
+        print(f"✅ Quality score calculated: {quality_score} for {file_path}")
     except Exception as e:
         print(f"⚠️ Quality scoring failed, using default: {str(e)}")
         quality_score = 50.0

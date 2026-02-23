@@ -4,6 +4,9 @@ Sightengine Quality Scoring Service
 This module integrates with Sightengine API to analyze image/video quality
 and returns a normalized quality score (0-100) for leaderboard ranking.
 
+Uses POST file upload for secure analysis — files are sent directly to
+Sightengine without needing publicly accessible URLs.
+
 Quality Score Components:
 - Sharpness (0-1): Image/video clarity
 - Contrast (0-1): Visual contrast quality
@@ -13,8 +16,10 @@ Quality Score Components:
 Final Score = Average of all components * 100 (normalized to 0-100)
 """
 
+import os
 import httpx
 import logging
+import mimetypes
 from typing import Dict, Optional
 from config import settings
 
@@ -29,59 +34,71 @@ SIGHTENGINE_BASE_URL = "https://api.sightengine.com/1.0"
 DEFAULT_QUALITY_SCORE = 50.0
 
 
-async def analyze_media_quality(media_url: str, media_type: str = "image") -> float:
+async def analyze_media_quality(file_path: str, media_type: str = "image", thumbnail_path: str = None) -> float:
     """
-    Analyze media quality using Sightengine API.
-    
+    Analyze media quality using Sightengine API via POST file upload.
+
     Args:
-        media_url: Public URL of the image/video
+        file_path: Local path to the image/video file
         media_type: Either "image" or "video"
-    
+        thumbnail_path: For videos, path to the thumbnail image to analyze
+
     Returns:
         float: Quality score between 0-100
     """
     try:
         if media_type == "video":
-            return await _analyze_video_quality(media_url)
+            return await _analyze_video_quality(file_path, thumbnail_path)
         else:
-            return await _analyze_image_quality(media_url)
+            return await _analyze_image_quality(file_path)
     except Exception as e:
-        logger.error(f"❌ Sightengine quality analysis failed for {media_url}: {str(e)}")
+        logger.error(f"❌ Sightengine quality analysis failed for {file_path}: {str(e)}")
         return DEFAULT_QUALITY_SCORE
 
 
-async def _analyze_image_quality(image_url: str) -> float:
+async def _analyze_image_quality(file_path: str) -> float:
     """
-    Analyze image quality using Sightengine's quality detection endpoint.
-    
-    Quality metrics analyzed:
-    - Sharpness: How sharp/clear the image is
-    - Contrast: Visual contrast quality
-    - Brightness: Lighting quality
-    - Colors: Color quality and vibrancy
+    Analyze image quality by uploading the file directly to Sightengine via POST.
     """
+    if not os.path.exists(file_path):
+        logger.error(f"❌ File not found for quality analysis: {file_path}")
+        return DEFAULT_QUALITY_SCORE
+
     try:
-        params = {
-            'url': image_url,
-            'models': 'properties',  # properties includes quality metrics
-            'api_user': SIGHTENGINE_API_USER,
-            'api_secret': SIGHTENGINE_API_SECRET
+        content_type = mimetypes.guess_type(file_path)[0] or "image/jpeg"
+        filename = os.path.basename(file_path)
+
+        with open(file_path, "rb") as f:
+            files = {"media": (filename, f, content_type)}
+            data = {
+                "models": "properties",
+                "api_user": SIGHTENGINE_API_USER,
+                "api_secret": SIGHTENGINE_API_SECRET,
+            }
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{SIGHTENGINE_BASE_URL}/check.json",
+                    data=data,
+                    files=files,
+                )
+                response.raise_for_status()
+                result = response.json()
+
+        if result.get("status") != "success":
+            logger.error(f"❌ Sightengine returned error: {result.get('error', {})}")
+            return DEFAULT_QUALITY_SCORE
+
+        quality_metrics = {
+            "sharpness": result.get("sharpness"),
+            "contrast": result.get("contrast"),
+            "brightness": result.get("brightness"),
         }
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{SIGHTENGINE_BASE_URL}/check.json", params=params)
-            response.raise_for_status()
-            data = response.json()
-        
-        # Extract quality metrics from Sightengine response
-        quality_metrics = data.get('quality', {})
-        
-        # Calculate quality score from available metrics
-        quality_score = _calculate_quality_score(quality_metrics, data)
-        
-        logger.info(f"✅ Image quality analyzed: {image_url} -> Score: {quality_score}")
+
+        quality_score = _calculate_quality_score(quality_metrics, result)
+        logger.info(f"✅ Image quality analyzed: {file_path} -> Score: {quality_score}")
         return quality_score
-        
+
     except httpx.HTTPError as e:
         logger.error(f"❌ HTTP error analyzing image quality: {str(e)}")
         return DEFAULT_QUALITY_SCORE
@@ -90,53 +107,21 @@ async def _analyze_image_quality(image_url: str) -> float:
         return DEFAULT_QUALITY_SCORE
 
 
-async def _analyze_video_quality(video_url: str) -> float:
+async def _analyze_video_quality(file_path: str, thumbnail_path: str = None) -> float:
     """
-    Analyze video quality using Sightengine's video analysis endpoint.
-    
-    Note: Video analysis may take longer and might require different pricing tier.
-    For MVP, we analyze the first frame as representative of video quality.
+    Analyze video quality by analyzing its thumbnail image.
+    Sightengine's video URL API doesn't support static file URLs,
+    so we analyze the already-generated thumbnail as a representative frame.
     """
-    try:
-        params = {
-            'url': video_url,
-            'models': 'properties',
-            'api_user': SIGHTENGINE_API_USER,
-            'api_secret': SIGHTENGINE_API_SECRET
-        }
-        
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(f"{SIGHTENGINE_BASE_URL}/video/check.json", params=params)
-            response.raise_for_status()
-            data = response.json()
-        
-        # For videos, Sightengine returns frame-by-frame analysis
-        # We'll use the first frame or average of multiple frames
-        frames = data.get('data', {}).get('frames', [])
-        
-        if frames:
-            # Average quality across analyzed frames
-            frame_scores = []
-            for frame in frames[:5]:  # Analyze first 5 frames
-                quality_metrics = frame.get('quality', {})
-                score = _calculate_quality_score(quality_metrics, frame)
-                frame_scores.append(score)
-            
-            quality_score = sum(frame_scores) / len(frame_scores)
-        else:
-            # Fallback: analyze as image (first frame)
-            quality_score = await _analyze_image_quality(video_url)
-        
-        logger.info(f"✅ Video quality analyzed: {video_url} -> Score: {quality_score}")
-        return quality_score
-        
-    except Exception as e:
-        logger.error(f"❌ Error analyzing video quality: {str(e)}")
-        # Fallback: try analyzing as image
-        try:
-            return await _analyze_image_quality(video_url)
-        except:
-            return DEFAULT_QUALITY_SCORE
+    # Use the thumbnail if available, otherwise fall back to default
+    image_to_analyze = thumbnail_path if thumbnail_path and os.path.exists(thumbnail_path) else None
+
+    if not image_to_analyze:
+        logger.warning(f"⚠️ No thumbnail available for video quality analysis: {file_path}")
+        return DEFAULT_QUALITY_SCORE
+
+    logger.info(f"🎬 Analyzing video quality via thumbnail: {image_to_analyze}")
+    return await _analyze_image_quality(image_to_analyze)
 
 
 def _calculate_quality_score(quality_metrics: Dict, full_data: Dict) -> float:
