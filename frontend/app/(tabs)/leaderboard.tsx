@@ -306,7 +306,7 @@ export default function LeaderboardScreen() {
           } catch (error) {
           }
         }
-        setRestaurantProfiles(profiles);
+        setRestaurantProfiles((prev) => ({ ...prev, ...profiles }));
       }
     } catch (error) {
       console.error("Error fetching orders:", error);
