@@ -154,12 +154,12 @@ const handlePostStory = async () => {
   try {
     const formData = new FormData();
 
-    // Prepare file
-    const filename = imageUri.split('/').pop() || `story_${Date.now()}.jpg`;
-    const match = /\.(\w+)$/.exec(filename);
-    const type = mediaType === 'video'
-      ? 'video/mp4'
-      : match ? `image/${match[1]}` : 'image/jpeg';
+    // Prepare file - normalize filename extension for iOS (HEIC -> jpg)
+    let filename = imageUri.split('/').pop() || `story_${Date.now()}.jpg`;
+    if (mediaType !== 'video') {
+      filename = filename.replace(/\.\w+$/, '.jpg');
+    }
+    const type = mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
 
     formData.append('file', {
       uri: imageUri,

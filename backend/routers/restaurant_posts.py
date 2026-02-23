@@ -724,8 +724,16 @@ async def get_restaurant_profile_public(restaurant_id: str):
     # Get followers count
     followers_count = await db.follows.count_documents({"followingId": restaurant_id})
 
-    # Get total completed orders count
+    # Get total completed orders count (by restaurant_id or by restaurant_name fallback)
+    restaurant_name = restaurant.get("restaurant_name")
     total_orders = await db.orders.count_documents({"restaurant_id": restaurant_id, "status": "completed"})
+    if total_orders == 0 and restaurant_name:
+        # Fallback: count orders where restaurant_id is null but restaurant_name matches
+        # This handles orders placed via Google Place tagged posts
+        total_orders = await db.orders.count_documents({
+            "restaurant_name": {"$regex": f"^{restaurant_name}$", "$options": "i"},
+            "status": "completed"
+        })
 
     return {
         "id": str(restaurant["_id"]),

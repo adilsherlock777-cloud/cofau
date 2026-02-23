@@ -1507,34 +1507,25 @@ export default function LeaderboardScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Distance, Ratings, Orders - all in one row */}
+        {/* Ratings, Orders - all in one row */}
         <TouchableOpacity
           style={styles.vendorMetaRow}
           onPress={goToVendorProfile}
           activeOpacity={0.7}
         >
-          {vendor.distanceKm !== Infinity && (
-            <View style={styles.vendorMetaItem}>
-              <Text style={styles.vendorMetaIcon}>📍</Text>
-              <Text style={styles.vendorMetaValue}>{formatDistance(vendor.distanceKm)}</Text>
-            </View>
-          )}
-          {vendor.distanceKm !== Infinity && hasRating && (
-            <Text style={styles.vendorMetaDot}>•</Text>
-          )}
           {hasRating && (
             <View style={styles.vendorMetaItem}>
-              <Ionicons name="star" size={13} color="#FFD700" style={{ marginRight: 3 }} />
-              <Text style={styles.vendorMetaText}>Ratings</Text>
+              <Ionicons name="star" size={18} color="#FFD700" style={{ marginRight: 3 }} />
+              <Text style={styles.vendorMetaText}>Cofau Ratings</Text>
               <Text style={styles.vendorMetaValue}>{avgRating % 1 === 0 ? avgRating : avgRating.toFixed(1)}/10{vendor.reviewCount > 0 ? ` (${vendor.reviewCount})` : ''}</Text>
             </View>
           )}
-          {totalOrders > 0 && (hasRating || vendor.distanceKm !== Infinity) && (
+          {totalOrders > 0 && hasRating && (
             <Text style={styles.vendorMetaDot}>•</Text>
           )}
           {totalOrders > 0 && (
             <View style={styles.vendorMetaItem}>
-              <Ionicons name="receipt-outline" size={13} color="#FF7A18" style={{ marginRight: 3 }} />
+              <Ionicons name="receipt-outline" size={18} color="#FF7A18" style={{ marginRight: 3 }} />
               <Text style={styles.vendorMetaText}>Orders</Text>
               <Text style={styles.vendorMetaValue}>{totalOrders}</Text>
             </View>

@@ -18,6 +18,8 @@ import {
   PanResponder,
   Pressable,
   Animated,
+  Modal,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -25,7 +27,7 @@ import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
 import SharePreviewModal from "../../components/SharePreviewModal";
 import ReportModal from "../../components/ReportModal";
-import { followUser, unfollowUser } from "../../utils/api";
+import { followUser, unfollowUser, getComments, addComment } from "../../utils/api";
 import axios from "axios";
 import { Image } from "expo-image";
 import { Video, ResizeMode } from "expo-av";
@@ -103,6 +105,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [comments, setComments] = useState([]);
+  const [commentCount, setCommentCount] = useState(post.comments_count || 0);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -328,13 +331,15 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
 
   const fetchComments = async () => {
     try {
-      const res = await axios.get(`${API_URL}/posts/${post.id}/comments`);
-      const normalized = res.data.map((c: any) => ({
+      const data = await getComments(post.id, post.account_type || accountType);
+      const normalized = data.map((c: any) => ({
         ...c,
         profile_pic: normalizeProfilePicture(c.profile_pic),
       }));
       setComments(normalized);
+      setCommentCount(normalized.length);
     } catch (e) {
+      console.error("Error fetching comments:", e);
     }
   };
 
@@ -434,16 +439,9 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
     if (!commentText.trim()) return;
     setSubmittingComment(true);
     try {
-      const formData = new FormData();
-      formData.append("comment_text", commentText.trim());
-      await axios.post(`${API_URL}/posts/${post.id}/comment`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      await addComment(post.id, commentText.trim(), token, post.account_type || accountType);
       setCommentText("");
-      fetchComments();
+      await fetchComments();
     } catch (e) {
       Alert.alert("Error", "Unable to add comment");
     } finally {
@@ -1131,7 +1129,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                   onPress={() => setShowComments(true)}
                 >
                   <Ionicons name="chatbubble-outline" size={18} color="#000" />
-                  <Text style={styles.detailsActionText}>{post.comments_count || comments.length}</Text>
+                  <Text style={styles.detailsActionText}>{commentCount}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -1245,71 +1243,90 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
               <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Comments Overlay - full screen inside sheet */}
-            {showComments && (
-              <View style={styles.commentsOverlay}>
-                <View style={styles.commentsHeader}>
-                  <Text style={styles.commentsHeaderTitle}>
-                    Comments ({comments.length})
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.commentsCloseButton}
-                    onPress={() => setShowComments(false)}
-                  >
-                    <Ionicons name="close" size={22} color="#000" />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  style={styles.commentsList}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {comments.length === 0 ? (
-                    <Text style={styles.noComments}>No comments yet</Text>
-                  ) : (
-                    comments.map((c: any) => (
-                      <View key={c.id} style={styles.commentItem}>
-                        <UserAvatar
-                          profilePicture={c.profile_pic}
-                          username={c.username}
-                          size={36}
-                          level={c.level || 1}
-                          style={{}}
-                        />
-                        <View style={styles.commentContent}>
-                          <Text style={styles.commentUsername}>{c.username}</Text>
-                          <Text style={styles.commentText}>{c.comment_text}</Text>
-                          <Text style={styles.commentTime}>{formatTime(c.created_at)}</Text>
-                        </View>
-                      </View>
-                    ))
-                  )}
-                </ScrollView>
-
-                <View style={styles.commentInputContainer}>
-                  <TextInput
-                    value={commentText}
-                    onChangeText={setCommentText}
-                    placeholder="Add a comment…"
-                    style={styles.commentInput}
-                  />
-                  <TouchableOpacity
-                    style={[styles.sendButton, !commentText.trim() && { backgroundColor: "#ccc" }]}
-                    disabled={!commentText.trim() || submittingComment}
-                    onPress={handleSubmitComment}
-                  >
-                    {submittingComment ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Ionicons name="send" size={20} color="#fff" />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
           </Animated.View>
         </>
        </Animated.View>
+
+      {/* Comments Modal */}
+      <Modal
+        visible={showComments}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowComments(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        >
+          <TouchableOpacity
+            style={styles.commentsModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowComments(false)}
+          />
+          <View style={styles.commentsModalSheet}>
+            <View style={styles.commentsHeader}>
+              <View style={styles.commentsHandleBar} />
+              <Text style={styles.commentsHeaderTitle}>
+                Comments ({commentCount})
+              </Text>
+              <TouchableOpacity
+                style={styles.commentsCloseButton}
+                onPress={() => setShowComments(false)}
+              >
+                <Ionicons name="close" size={22} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.commentsList}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {comments.length === 0 ? (
+                <Text style={styles.noComments}>No comments yet</Text>
+              ) : (
+                comments.map((c: any) => (
+                  <View key={c.id} style={styles.commentItem}>
+                    <UserAvatar
+                      profilePicture={c.profile_pic}
+                      username={c.username}
+                      size={36}
+                      level={c.level || 1}
+                      style={{}}
+                    />
+                    <View style={styles.commentContent}>
+                      <Text style={styles.commentUsername}>{c.username}</Text>
+                      <Text style={styles.commentText}>{c.comment_text}</Text>
+                      <Text style={styles.commentTime}>{formatTime(c.created_at)}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <View style={styles.commentInputContainer}>
+              <TextInput
+                value={commentText}
+                onChangeText={setCommentText}
+                placeholder="Add a comment…"
+                style={styles.commentInput}
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, !commentText.trim() && { backgroundColor: "#ccc" }]}
+                disabled={!commentText.trim() || submittingComment}
+                onPress={handleSubmitComment}
+              >
+                {submittingComment ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Report Modal */}
       <ReportModal
@@ -1529,12 +1546,13 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
   user_id: p.user_id || p.restaurant_id || profileUserId,
 }));
 
-      const existingIds = new Set(posts.map((p: any) => p.id));
-      const newPosts = normalized.filter((p: any) => !existingIds.has(p.id));
-
-      setPosts((prev) => [...prev, ...newPosts]);
-      setSkip((prev) => prev + newPosts.length);
-      if (newPosts.length < LIMIT) setHasMore(false);
+      setPosts((prev) => {
+        const existingIds = new Set(prev.map((p: any) => p.id));
+        const newPosts = normalized.filter((p: any) => !existingIds.has(p.id));
+        if (newPosts.length < LIMIT) setHasMore(false);
+        setSkip((s) => s + newPosts.length);
+        return [...prev, ...newPosts];
+      });
     } catch (e) {
     } finally {
       setLoadingMore(false);
@@ -2057,26 +2075,40 @@ heartAnimationContainer: {
     fontSize: 14,
   },
 
-  commentsOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.98)",
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    zIndex: 5,
+  commentsModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+
+  commentsModalSheet: {
+    height: SCREEN_HEIGHT * 0.5,
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+
+  commentsHandleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#DDD",
+    borderRadius: 2,
+    marginBottom: 8,
   },
 
   commentsHeader: {
-    height: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#EFEFEF",
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
   },
 
   commentsHeaderTitle: {
@@ -2133,11 +2165,12 @@ heartAnimationContainer: {
   commentInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 16,
-    paddingTop: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 30 : 16,
     paddingHorizontal: 16,
     borderTopWidth: 0.5,
     borderColor: "#DBDBDB",
+    backgroundColor: "rgba(255, 255, 255, 0.98)",
   },
 
   commentInput: {
@@ -2146,16 +2179,18 @@ heartAnimationContainer: {
     borderRadius: 24,
     paddingHorizontal: 18,
     paddingVertical: 12,
+    paddingRight: 18,
     marginRight: 12,
     fontSize: 14,
     borderWidth: 1,
     borderColor: "#DBDBDB",
+    maxHeight: 100,
   },
 
   sendButton: {
     width: 44,
     height: 44,
-    backgroundColor: "#4dd0e1",
+    backgroundColor: "#FF4500",
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",

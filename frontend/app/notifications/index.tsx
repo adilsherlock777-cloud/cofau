@@ -99,8 +99,8 @@ export default function NotificationsScreen() {
     }
     // Wallet and reward notifications
     else if (type === 'wallet_reward' || type === 'delivery_completed_reward' || type === 'reward_earned') {
-      // Route to the leaderboard screen which shows Delivery/Rewards
-      router.push('/(tabs)/leaderboard');
+      // Route to feed and open the Cofau Wallet modal
+      router.push({ pathname: '/(tabs)/feed', params: { openWallet: 'true' } });
     }
     // Order notifications for customers
     else if (type === 'order_preparing' || type === 'order_in_progress' || type === 'order_completed') {

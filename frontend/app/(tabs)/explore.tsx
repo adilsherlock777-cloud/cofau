@@ -15,6 +15,7 @@ import {
   Platform,
   Alert,
   Animated,
+  Easing,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -1381,6 +1382,21 @@ export default function ExploreScreen() {
   const [showTopPostsInfo, setShowTopPostsInfo] = useState(false);
   const [topPosts, setTopPosts] = useState<any[]>([]);
   const [topPostsLoading, setTopPostsLoading] = useState(false);
+
+  // Hero card border glow animation
+  const heroBorderAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(heroBorderAnim, {
+        toValue: 1,
+        duration: 2000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
   const [refreshing, setRefreshing] = useState(false);
   const scrollYRef = useRef(0);
   const [playingVideos, setPlayingVideos] = useState<string[]>([]);
@@ -2336,8 +2352,8 @@ return (
                   <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 22, height: 22 }} />
                 </MaskedView>
                 <Text style={styles.topPostsSectionTitle}>COFAU'S TOP PICKS</Text>
-                <TouchableOpacity onPress={() => setShowTopPostsInfo(true)} style={{ marginLeft: 6 }}>
-                  <Ionicons name="information-circle-outline" size={18} color="#aaa" />
+                <TouchableOpacity onPress={() => setShowTopPostsInfo(true)} style={{ marginLeft: 6, opacity: 0.85 }}>
+                  <Ionicons name="information-circle" size={20} color="#E94A37" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -2399,12 +2415,41 @@ return (
               onPress={() => router.push(`/post-details/${topPosts[0].id}`)}
               activeOpacity={0.9}
             >
-              <LinearGradient
-                colors={['#FF2E2E', '#FF7A18']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.heroCardBorder}
-              >
+              <View style={styles.heroCardBorder}>
+                {/* Animated rotating gradient border */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    width: 600,
+                    height: 600,
+                    top: '50%',
+                    left: '50%',
+                    marginTop: -300,
+                    marginLeft: -300,
+                    transform: [{
+                      rotate: heroBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    }],
+                  }}
+                >
+                  {/* Top half: bright red to gold */}
+                  <LinearGradient
+                    colors={['#FF0000', '#FF6600', '#FFD700']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ width: 600, height: 300 }}
+                  />
+                  {/* Bottom half: gold back to red (completing the circle) */}
+                  <LinearGradient
+                    colors={['#FFD700', '#FF6600', '#FF0000']}
+                    start={{ x: 1, y: 0 }}
+                    end={{ x: 0, y: 0 }}
+                    style={{ width: 600, height: 300 }}
+                  />
+                </Animated.View>
                 <View style={styles.heroCardInner}>
                   <HeroConfetti />
                   {/* Rank badge */}
@@ -2492,7 +2537,7 @@ return (
                     </View>
                   </View>
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             {/* Regular Cards - Ranks 2-10 */}
@@ -2562,21 +2607,21 @@ return (
                       <View style={styles.regularScoreItem}>
                         <Ionicons name="star" size={13} color="#F2CF68" />
                         <Text style={styles.regularScoreLabel}>Quality</Text>
-                        <Text style={styles.regularScoreValue}>{Math.round(item.quality_score)}<Text style={styles.regularScoreMax}>/100</Text></Text>
+                        <Text style={styles.regularScoreValue}>{Math.round(item.quality_score)}</Text>
                       </View>
                       <View style={styles.regularScoreDividerV} />
                       <View style={styles.regularScoreItem}>
                         <MaskedView maskElement={<Ionicons name="heart" size={13} color="#000" />}>
                           <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 13, height: 13 }} />
                         </MaskedView>
-                        <Text style={styles.regularScoreLabel}>Engagement</Text>
-                        <Text style={styles.regularScoreValue}>{Math.round(item.engagement_score)}<Text style={styles.regularScoreMax}>/100</Text></Text>
+                        <Text style={styles.regularScoreLabel}>Likes</Text>
+                        <Text style={styles.regularScoreValue}>{item.likes_count}</Text>
                       </View>
                       <View style={styles.regularScoreDividerV} />
                       <View style={styles.regularScoreItem}>
                         <Ionicons name="trophy" size={13} color="#F2CF68" />
-                        <Text style={[styles.regularScoreLabel, { fontWeight: '700' }]}>Total</Text>
-                        <Text style={[styles.regularScoreValue, { fontWeight: '700', color: '#E94A37' }]}>{Math.round(item.combined_score)}<Text style={styles.regularScoreMax}>/100</Text></Text>
+                        <Text style={[styles.regularScoreLabel, { fontWeight: '700' }]}>Score</Text>
+                        <Text style={[styles.regularScoreValue, { fontWeight: '700', color: '#E94A37' }]}>{Math.round(item.combined_score)}</Text>
                       </View>
                     </View>
                   </View>
@@ -2995,13 +3040,14 @@ const styles = StyleSheet.create({
   },
   heroCardBorder: {
     borderRadius: 16,
-    padding: 2.5,
+    padding: 3.5,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+    overflow: 'hidden' as const,
+    shadowColor: '#FF2E2E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
   },
   heroCardInner: {
     backgroundColor: '#fff',

@@ -128,6 +128,7 @@ const confettiAnims = useRef(
   }))
 ).current;
 const [showCommentsModal, setShowCommentsModal] = useState(false);
+const [commentCount, setCommentCount] = useState(post.comments || post.comments_count || 0);
 const [isBlocked, setIsBlocked] = useState(post.is_blocked || false);
 
 // Track restaurant post click for analytics
@@ -996,7 +997,7 @@ postId={post.id}
   onPress={() => setShowCommentsModal(true)}
 >
   <Ionicons name="chatbubble-outline" size={22} color="#666" />
-  <Text style={styles.actionCount}>{post.comments || 0}</Text>
+  <Text style={styles.actionCount}>{commentCount}</Text>
 </TouchableOpacity>
 
 {/* SHARE */}
@@ -1100,7 +1101,8 @@ console.error("Error sharing post:", error);
   postId={post.id}
   isVisible={showCommentsModal}
   onClose={() => setShowCommentsModal(false)}
-  accountType={post.account_type} 
+  accountType={post.account_type}
+  onCommentCountChange={setCommentCount}
 />
 
 {/* Simple Share Modal (WhatsApp/Instagram) */}

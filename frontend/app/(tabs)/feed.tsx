@@ -27,7 +27,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect, useNavigation } from "expo-router";
+import { useRouter, useFocusEffect, useNavigation, useLocalSearchParams } from "expo-router";
 import { useFeedRefresh } from "./_layout";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
@@ -91,6 +91,7 @@ const getPostDP = (post: any) =>
 
 export default function FeedScreen() {
   const router = useRouter();
+  const { openWallet } = useLocalSearchParams<{ openWallet?: string }>();
   const { user, token, refreshUser, accountType } = useAuth() as any;
   const { lastUploadTimestamp, lastUploadResult } = useUpload();
   const { showLevelUpAnimation } = useLevelAnimation();
@@ -205,8 +206,22 @@ useFocusEffect(
     if (accountType === 'restaurant') {
       fetchRestaurantReviewsCount();
     }
+
+    // When leaving this tab, stop all video playback
+    return () => {
+      setVisibleVideoId(null);
+    };
   }, [hasInitiallyLoaded, accountType])
 );
+
+// Open wallet modal when navigated with openWallet param (e.g. from notifications)
+useEffect(() => {
+  if (openWallet === 'true') {
+    setShowWalletModal(true);
+    // Clear the param so it doesn't re-trigger
+    router.setParams({ openWallet: undefined } as any);
+  }
+}, [openWallet]);
 
 // Refresh feed and show animations when a background upload completes
 useEffect(() => {

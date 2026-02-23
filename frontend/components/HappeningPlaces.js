@@ -191,27 +191,18 @@ export default function HappeningPlaces() {
   const hasInitiallyLoaded = useRef(false);
 
   // Food Spot button animations
-  const shimmerAnim = useRef(new Animated.Value(-1)).current;
+  const borderLineAnim = useRef(new Animated.Value(0)).current;
   const pinBounce = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Shimmer sweep: a white gleam that slides across the button every 3s
-    const shimmerLoop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(2500),
-        Animated.timing(shimmerAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmerAnim, {
-          toValue: -1,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ])
+    // Rotating gradient border (Google AI style)
+    const borderLoop = Animated.loop(
+      Animated.timing(borderLineAnim, {
+        toValue: 1,
+        duration: 4000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
     );
 
     // Location pin bounce: subtle bounce every 3s
@@ -245,32 +236,12 @@ export default function HappeningPlaces() {
       ])
     );
 
-    // Glow pulse: subtle opacity pulse on the outer shadow
-    const glowLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    shimmerLoop.start();
+    borderLoop.start();
     pinLoop.start();
-    glowLoop.start();
 
     return () => {
-      shimmerLoop.stop();
+      borderLoop.stop();
       pinLoop.stop();
-      glowLoop.stop();
     };
   }, []);
 
@@ -394,7 +365,14 @@ export default function HappeningPlaces() {
     });
 
     const locations = Array.isArray(response.data) ? response.data : [];
-    setTopLocations(locations);
+    // Reverse images so latest posts appear first in cards
+    const reversed = locations.map(loc => ({
+      ...loc,
+      images: loc.images ? [...loc.images].reverse() : [],
+      thumbnails: loc.thumbnails ? [...loc.thumbnails].reverse() : [],
+      images_data: loc.images_data ? [...loc.images_data].reverse() : [],
+    }));
+    setTopLocations(reversed);
   } catch (error) {
     console.error('❌ Error fetching locations:', error.response?.data || error.message);
     setTopLocations([]);
@@ -825,50 +803,58 @@ export default function HappeningPlaces() {
 
           {/* SELECT YOUR FOOD SPOT Dropdown */}
           <View style={styles.dropdownWrapper}>
-            <Animated.View style={[
-              styles.dropdownButtonGlow,
-              { opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] }) }
-            ]} />
-            <TouchableOpacity
-              onPress={() => setDropdownOpen(!dropdownOpen)}
-              activeOpacity={0.8}
-              style={styles.dropdownButtonOuter}
-            >
-              <LinearGradient
-                colors={['#FF2E2E', '#FF7A18']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.dropdownButton}
+            {/* Animated gradient border container (Google AI style) */}
+            <View style={styles.animatedBorderContainer}>
+              {/* Rotating gradient behind the button - visible as animated border */}
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  width: 400,
+                  height: 400,
+                  top: -176,
+                  left: (Dimensions.get('window').width - 40) / 2 - 200,
+                  transform: [{
+                    rotate: borderLineAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  }],
+                }}
               >
-                <Animated.View style={{ transform: [{ translateY: pinBounce }] }}>
-                  <Ionicons name="location" size={18} color="#fff" />
-                </Animated.View>
-                <Text style={styles.dropdownButtonText} numberOfLines={1}>
-                  {selectedArea === 'All' ? 'SELECT YOUR FOOD SPOT AROUND 50KM' : selectedArea.name}
-                </Text>
-                <Ionicons
-                  name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
-                  size={18}
-                  color="#fff"
+                <LinearGradient
+                  colors={['#FFFFFF', '#FF2E2E', '#FFD700', '#FFFFFF', '#FF7A18', '#FF2E2E', '#FFD700', '#FFFFFF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ width: 400, height: 400 }}
                 />
+              </Animated.View>
 
-                {/* Shimmer sweep */}
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.shimmerOverlay,
-                    {
-                      transform: [{
-                        translateX: shimmerAnim.interpolate({
-                          inputRange: [-1, 1],
-                          outputRange: [-80, Dimensions.get('window').width],
-                        }),
-                      }],
-                    },
-                  ]}
-                />
-              </LinearGradient>
-            </TouchableOpacity>
+              {/* Actual button content */}
+              <TouchableOpacity
+                onPress={() => setDropdownOpen(!dropdownOpen)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#FF2E2E', '#FF7A18']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.dropdownButton, { borderRadius: 13 }]}
+                >
+                  <Animated.View style={{ transform: [{ translateY: pinBounce }] }}>
+                    <Ionicons name="location" size={18} color="#fff" />
+                  </Animated.View>
+                  <Text style={styles.dropdownButtonText} numberOfLines={1}>
+                    {selectedArea === 'All' ? 'SELECT YOUR FOOD SPOT AROUND 50KM' : selectedArea.name}
+                  </Text>
+                  <Ionicons
+                    name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color="#fff"
+                  />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
 
             {dropdownOpen && (
               <View style={styles.dropdownList}>
@@ -1898,6 +1884,16 @@ skeletonImageLarge: {
     borderRadius: 17,
     backgroundColor: '#FF5722',
     zIndex: -1,
+  },
+  animatedBorderContainer: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    padding: 3,
+    shadowColor: '#FF5722',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
   dropdownButtonOuter: {
     borderRadius: 14,

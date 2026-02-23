@@ -46,7 +46,7 @@ const normalizeDP = (input) => {
   return `${BASE}${input}`;
 };
 
-export default function CommentsModal({ postId, isVisible, onClose, accountType }) {
+export default function CommentsModal({ postId, isVisible, onClose, accountType, onCommentCountChange }) {
   const { token } = useAuth();
 
   const [comments, setComments] = useState([]);
@@ -77,6 +77,7 @@ export default function CommentsModal({ postId, isVisible, onClose, accountType 
         ),
       }));
       setComments(fixed);
+      if (onCommentCountChange) onCommentCountChange(fixed.length);
     } catch (error) {
       console.error('Error fetching comments:', error);
     } finally {
@@ -203,12 +204,12 @@ export default function CommentsModal({ postId, isVisible, onClose, accountType 
               disabled={submitting || !commentText.trim()}
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#4dd0e1" />
+                <ActivityIndicator size="small" color="#FF4500" />
               ) : (
-                <Ionicons 
-                  name="send" 
-                  size={24} 
-                  color={commentText.trim() ? "#4dd0e1" : "#CCC"} 
+                <Ionicons
+                  name="send"
+                  size={24}
+                  color={commentText.trim() ? "#FF4500" : "#CCC"}
                 />
               )}
             </TouchableOpacity>
