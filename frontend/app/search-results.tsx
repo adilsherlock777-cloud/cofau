@@ -29,7 +29,7 @@ const SPACING = 2;
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS);
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
-type TabType = "nearby" | "posts" | "places";
+type TabType = "nearby" | "posts" | "places" | "restaurants";
 
 const fixUrl = (url: string | null) => {
   if (!url) return null;
@@ -65,6 +65,7 @@ export default function SearchResultsScreen() {
   const [posts, setPosts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [nearbyPosts, setNearbyPosts] = useState<any[]>([]);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedLocations, setExpandedLocations] = useState<{ [key: string]: boolean }>({});
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -126,6 +127,25 @@ export default function SearchResultsScreen() {
       console.error("❌ Post search error:", err);
       setPosts([]);
       setLocations([]);
+    }
+  };
+
+  const performRestaurantSearch = async (query: string) => {
+    if (!query.trim() || query.trim().length < 3) {
+      setRestaurants([]);
+      return;
+    }
+
+    try {
+      const res = await axios.get(`${API_URL}/search/restaurants`, {
+        params: { q: query.trim(), limit: 20 },
+        headers: { Authorization: `Bearer ${token || ''}` },
+      });
+
+      setRestaurants(res.data || []);
+    } catch (err) {
+      console.error("❌ Restaurant search error:", err);
+      setRestaurants([]);
     }
   };
 
@@ -244,6 +264,7 @@ export default function SearchResultsScreen() {
       setPosts([]);
       setLocations([]);
       setNearbyPosts([]);
+      setRestaurants([]);
       setLoading(false);
       return;
     }
@@ -254,6 +275,7 @@ export default function SearchResultsScreen() {
         performUserSearch(query),
         performPostSearch(query),
         performNearbySearch(query),
+        performRestaurantSearch(query),
       ]);
     } catch (err) {
       console.error("❌ Search error:", err);
@@ -285,6 +307,7 @@ export default function SearchResultsScreen() {
       setPosts([]);
       setLocations([]);
       setNearbyPosts([]);
+      setRestaurants([]);
       setLoading(false);
     }
 
@@ -518,6 +541,49 @@ export default function SearchResultsScreen() {
     );
   };
 
+  const renderRestaurantItem = ({ item }: any) => {
+    const profilePic = fixUrl(item.profile_picture);
+
+    return (
+      <TouchableOpacity
+        style={styles.restaurantCard}
+        activeOpacity={0.7}
+        onPress={() => router.push(`/profile?userId=${item.id}`)}
+      >
+        <UserAvatar
+          profilePicture={profilePic}
+          username={item.restaurant_name}
+          size={56}
+          showLevelBadge={false}
+          style={{}}
+        />
+        <View style={styles.restaurantInfo}>
+          <Text style={styles.restaurantName} numberOfLines={1}>{item.restaurant_name}</Text>
+          {item.location && (
+            <View style={styles.restaurantLocationRow}>
+              <Ionicons name="location-outline" size={13} color="#999" />
+              <Text style={styles.restaurantLocation} numberOfLines={1}>{item.location}</Text>
+            </View>
+          )}
+          {item.matching_menu_items && item.matching_menu_items.length > 0 && (
+            <View style={styles.menuMatchRow}>
+              <Ionicons name="restaurant-outline" size={13} color="#E94A37" />
+              <Text style={styles.menuMatchText} numberOfLines={1}>
+                {item.matching_menu_items.map((m: any) => m.name).join(", ")}
+              </Text>
+            </View>
+          )}
+          <View style={styles.restaurantStatsRow}>
+            <Text style={styles.restaurantStat}>{item.post_count || 0} posts</Text>
+            <Text style={styles.restaurantStatDot}> · </Text>
+            <Text style={styles.restaurantStat}>{item.follower_count || 0} followers</Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#ccc" />
+      </TouchableOpacity>
+    );
+  };
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -534,6 +600,33 @@ export default function SearchResultsScreen() {
 
       case "posts":
         return renderPostsGrid(posts, "No posts found");
+
+      case "restaurants":
+        return (
+          <FlatList
+            data={restaurants}
+            renderItem={renderRestaurantItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            ListEmptyComponent={
+              searchQuery.trim() ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="storefront-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyText}>No restaurants found</Text>
+                  <Text style={styles.emptySubtext}>
+                    Try searching for a dish or restaurant name
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="search-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyText}>Search for dishes to find restaurants</Text>
+                </View>
+              )
+            }
+          />
+        );
 
       case "places":
         return (
@@ -624,6 +717,20 @@ export default function SearchResultsScreen() {
             Near me
           </Text>
           {activeTab === "nearby" && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "restaurants" && styles.activeTab]}
+          onPress={() => setActiveTab("restaurants")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "restaurants" && styles.activeTabText,
+            ]}
+          >
+            Restaurants
+          </Text>
+          {activeTab === "restaurants" && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === "places" && styles.activeTab]}
@@ -1047,6 +1154,60 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: "#999",
+  },
+  // Restaurant card styles
+  restaurantCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  restaurantInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  restaurantName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333",
+  },
+  restaurantLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 3,
+  },
+  restaurantLocation: {
+    fontSize: 13,
+    color: "#999",
+    flex: 1,
+  },
+  menuMatchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  menuMatchText: {
+    fontSize: 13,
+    color: "#E94A37",
+    fontWeight: "500",
+    flex: 1,
+  },
+  restaurantStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  restaurantStat: {
+    fontSize: 12,
+    color: "#999",
+  },
+  restaurantStatDot: {
+    fontSize: 12,
+    color: "#ccc",
   },
 });
 

@@ -3010,6 +3010,88 @@ async def search_users(
     # Limit results
     return result[:limit]
 
+@app.get("/api/search/restaurants")
+async def search_restaurants_by_menu(
+    q: str,
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Search restaurants whose menu items match the query.
+    Returns restaurant profiles with matching menu items.
+    """
+    if not q or not q.strip():
+        return []
+
+    db = get_database()
+    query = q.strip().lower()
+    search_regex = {"$regex": query, "$options": "i"}
+
+    # Search menu_items collection for matching item names
+    matching_items = await db.menu_items.find({
+        "name": search_regex,
+        "status": "approved",
+    }).to_list(None)
+
+    # Group by restaurant_id
+    restaurant_items_map = {}
+    for item in matching_items:
+        rid = item.get("restaurant_id")
+        if not rid:
+            continue
+        if rid not in restaurant_items_map:
+            restaurant_items_map[rid] = []
+        restaurant_items_map[rid].append({
+            "name": item.get("name"),
+            "price": item.get("price"),
+            "category": item.get("category"),
+            "image_url": item.get("image_url"),
+        })
+
+    # Also search by restaurant_name directly
+    matching_restaurants_by_name = await db.restaurants.find({
+        "restaurant_name": search_regex
+    }).to_list(None)
+
+    for r in matching_restaurants_by_name:
+        rid = str(r["_id"])
+        if rid not in restaurant_items_map:
+            restaurant_items_map[rid] = []
+
+    # Build result with restaurant profiles
+    result = []
+    for restaurant_id, menu_matches in restaurant_items_map.items():
+        try:
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)})
+        except Exception:
+            continue
+        if not restaurant:
+            continue
+
+        # Get post count for this restaurant
+        post_count = await db.restaurant_posts.count_documents({"restaurant_id": restaurant_id})
+
+        # Get follower count
+        follower_count = await db.follows.count_documents({"followingId": restaurant_id})
+
+        result.append({
+            "id": restaurant_id,
+            "restaurant_name": restaurant.get("restaurant_name", "Restaurant"),
+            "profile_picture": restaurant.get("profile_picture"),
+            "location": restaurant.get("location") or restaurant.get("address"),
+            "cuisine_type": restaurant.get("cuisine_type"),
+            "post_count": post_count,
+            "follower_count": follower_count,
+            "matching_menu_items": menu_matches[:5],  # Top 5 matching items
+            "account_type": "restaurant",
+        })
+
+    # Sort by number of matching menu items (most relevant first)
+    result.sort(key=lambda x: len(x["matching_menu_items"]), reverse=True)
+
+    return result[:limit]
+
+
 @app.get("/api/search/locations")
 async def search_locations(
     q: str,
