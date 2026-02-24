@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Video } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaskedView from "@react-native-masked-view/masked-view";
 import CommentsModal from './CommentsModal';
@@ -38,6 +39,7 @@ unsavePost,
 reportPost,
 sharePostToUsers,
 addPostToStory,
+incrementShareCount,
 followUser,
 unfollowUser,
 blockUser,
@@ -130,6 +132,7 @@ const confettiAnims = useRef(
 const [showCommentsModal, setShowCommentsModal] = useState(false);
 const [commentCount, setCommentCount] = useState(post.comments || post.comments_count || 0);
 const [isBlocked, setIsBlocked] = useState(post.is_blocked || false);
+const [sharesCount, setSharesCount] = useState(post.shares_count || post.shares || 0);
 
 // Track restaurant post click for analytics
 const trackRestaurantPostClick = async () => {
@@ -902,182 +905,160 @@ postId={post.id}
   </Pressable>
 )}
 
-{/* RATING (Users) or PRICE (Restaurants) */}
-{post.rating != null && !post.price && (
-  <View style={styles.detailBox}>
-    <Text style={styles.detailLabel}>RATING</Text>
-    <View style={styles.ratingRow}>
-      <Ionicons name="star" size={19} color="#FFD700" />
-      <Text style={styles.ratingText}>
-        <Text style={styles.ratingNumber}>{post.rating}</Text>/10
-      </Text>
+{/* ALL-IN-ONE GLASS CARD */}
+{(post.rating != null || post.price || post.description || post.about || post.location_name || post.location_address) && (
+  <View style={styles.glassCardShadow}>
+    <View style={styles.glassCardClipper}>
+    <BlurView intensity={100} tint="default" style={styles.glassCard}>
+      <View style={styles.glassCardInner}>
+
+        {/* RATING */}
+        {post.rating != null && !post.price && (
+          <View style={styles.glassSection}>
+            <Text style={styles.detailLabel}>RATING</Text>
+            <View style={styles.ratingRow}>
+              <Ionicons name="star" size={19} color="#FFD700" />
+              <Text style={styles.ratingText}>
+                <Text style={styles.ratingNumber}>{post.rating}</Text>/10
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* PRICE */}
+        {post.price && (
+          <View style={styles.glassSection}>
+            <Text style={styles.detailLabel}>PRICE</Text>
+            <View style={styles.ratingRow}>
+              <Ionicons name="pricetag" size={19} color="#FFD700" />
+              <Text style={styles.ratingText}>{post.price}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* REVIEW / ABOUT */}
+        {(post.description || post.about) && (
+          <View style={styles.glassSection}>
+            <Text style={styles.detailLabel}>
+              {post.price ? 'ABOUT' : 'REVIEW'}
+            </Text>
+            <View style={styles.reviewRow}>
+              <Ionicons
+                name={post.price ? "information-circle" : "create"}
+                size={19}
+                color="#FFD700"
+              />
+              <Text style={styles.reviewText}>
+                {post.about || post.description}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* LOCATION */}
+        {(post.location_name || post.location_address) && (
+          <View style={[styles.glassSection, { borderBottomWidth: 0 }]}>
+              <Text style={styles.detailLabel}>LOCATION</Text>
+              <Pressable onPress={handleOpenMap} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              <LinearGradient
+                colors={['rgba(255,46,46,0.10)', 'rgba(255,122,24,0.08)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.locationGradientWrap}
+              >
+                <Ionicons name="location" size={18} color="#FF2E2E" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {post.location_name || post.location_address}
+                </Text>
+                <View style={{ flex: 1 }} />
+                <View style={styles.locationArrowButton}>
+                  <Ionicons name="chevron-forward" size={14} color="#fff" />
+                </View>
+              </LinearGradient>
+              </Pressable>
+            </View>
+        )}
+
+      </View>
+    </BlurView>
     </View>
   </View>
 )}
 
-{/* PRICE (Restaurant posts only) */}
-{post.price && (
-  <View style={styles.detailBox}>
-    <Text style={styles.detailLabel}>PRICE</Text>
-    <View style={styles.ratingRow}>
-      <Ionicons name="pricetag" size={19} color="#FFD700" />
-      <Text style={styles.ratingText}>{post.price}</Text>
+{/* ENGAGEMENT ICONS - below the glass card */}
+<View style={styles.engagementRow}>
+  <TouchableOpacity onPress={handleLike} style={styles.engagementBtn}>
+    <View style={styles.engagementIcon}>
+      {isLiked ? (
+        <GradientHeart size={18} />
+      ) : (
+        <Ionicons name="heart-outline" size={18} color="#888" />
+      )}
     </View>
-  </View>
-)}
+    <Text style={[styles.engagementCount, isLiked && { color: '#FF2E2E' }]}>{likesCount}</Text>
+  </TouchableOpacity>
 
-{/* REVIEW (Users) or ABOUT (Restaurants) */}
-{(post.description || post.about) && (
-  <View style={styles.detailBox}>
-    <Text style={styles.detailLabel}>
-      {post.price ? 'ABOUT' : 'REVIEW'}
-    </Text>
-    <View style={styles.reviewRow}>
-      <Ionicons 
-        name={post.price ? "information-circle" : "create"} 
-        size={19} 
-        color={post.price ? "#FFD700" : "#FFD700"} 
-      />
-      <Text style={styles.reviewText}>
-        {post.about || post.description}
-      </Text>
+  <TouchableOpacity onPress={() => setShowCommentsModal(true)} style={styles.engagementBtn}>
+    <View style={styles.engagementIcon}>
+      <Ionicons name="chatbubble-outline" size={17} color="#888" />
     </View>
-  </View>
-)}
+    <Text style={styles.engagementCount}>{commentCount}</Text>
+  </TouchableOpacity>
 
-{/* LOCATION */}
-{(post.location_name || post.location_address) && (
-  <Pressable 
-    onPress={handleOpenMap}
-    style={({ pressed }) => [
-      styles.locationBoxWrapper,
-      pressed && styles.locationBoxPressed
-    ]}
-  >
-    <LinearGradient
-      colors={[
-        "rgba(255,46,46,0.12)",
-        "rgba(255,122,24,0.06)"
-      ]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={styles.locationBox}
-    >
-      <Text style={styles.detailLabel}>LOCATION</Text>
-
-      <View style={styles.locationRow}>
-  <Ionicons name="location" size={18} color="#FF2E2E" />
-  <Text style={styles.locationText} numberOfLines={1}>{post.location_name}</Text>
-  <View style={{ flex: 1 }} />
-  <View style={styles.locationArrowButton}>
-    <Ionicons name="chevron-forward" size={14} color="#fff" />
-  </View>
-</View>
-    </LinearGradient>
-  </Pressable>
-)}
-
-{/* ACTIONS */}
-<View style={styles.actions}>
-{/* LIKE */}
-<TouchableOpacity onPress={handleLike} style={styles.actionButton}>
-{isLiked ? (
-<GradientHeart size={22} /> // ✅ COFAU GRADIENT RESTORED
-) : (
-<Ionicons name="heart-outline" size={22} color="#666" />
-)}
-<Text style={[styles.actionCount, isLiked && styles.likedCount]}>
-{likesCount}
-</Text>
-</TouchableOpacity>
-
-{/* COMMENT */}
-<TouchableOpacity
-  style={styles.actionButton}
-  onPress={() => setShowCommentsModal(true)}
->
-  <Ionicons name="chatbubble-outline" size={22} color="#666" />
-  <Text style={styles.actionCount}>{commentCount}</Text>
-</TouchableOpacity>
-
-{/* SHARE */}
-<TouchableOpacity
-style={styles.actionButton}
-onPress={() => {
-// Show options: Add to Story, Share to Users (Cofau), or External (WhatsApp/Instagram)
-Alert.alert(
-  "Share Post",
-  "Choose how you want to share",
-  [
-    {
-      text: "Add to Story",
-      onPress: async () => {
-        try {
-          await addPostToStory(
-            post.id,
-            mediaUrl,
-            post.description || post.review_text || "",
-            post.rating || 0,
-            post.location_name || ""
-          );
-
-          // Show success message
-          Alert.alert(
-            "✓ Successfully Added!",
-            "Post has been added to your story",
-            [
-              {
-                text: "OK",
-                onPress: () => {
-                  // Trigger story update if callback exists
-                  if (onStoryCreated) {
-                    onStoryCreated();
-                  }
-                }
+  <TouchableOpacity
+    style={styles.engagementBtn}
+    onPress={() => {
+      Alert.alert(
+        "Share Post",
+        "Choose how you want to share",
+        [
+          {
+            text: "Add to Story",
+            onPress: async () => {
+              try {
+                await addPostToStory(
+                  post.id,
+                  mediaUrl,
+                  post.description || post.review_text || "",
+                  post.rating || 0,
+                  post.location_name || ""
+                );
+                setSharesCount(prev => prev + 1);
+                incrementShareCount(post.id);
+                Alert.alert(
+                  "Successfully Added!",
+                  "Post has been added to your story",
+                  [{ text: "OK", onPress: () => { if (onStoryCreated) onStoryCreated(); } }]
+                );
+              } catch (error) {
+                console.error("Error adding post to story:", error);
+                Alert.alert("Error", error.response?.data?.detail || "Failed to add post to story. Please try again.");
               }
-            ]
-          );
-        } catch (error) {
-          console.error("Error adding post to story:", error);
-          Alert.alert(
-            "Error",
-            error.response?.data?.detail || "Failed to add post to story. Please try again."
-          );
-        }
-      },
-    },
-    {
-      text: "Add to Instagram Story",
-      onPress: () => setShowSimpleShareModal(true),
-    },
-    {
-      text: "Share to Cofau Users",
-      onPress: () => setShowShareToUsersModal(true),
-    },
-    {
-      text: "More Options",
-      onPress: () => setShowSimpleShareModal(true),
-    },
-    {
-      text: "Cancel",
-      style: "cancel",
-    },
-  ]
-);
-}}
->
-<Ionicons name="share-outline" size={22} color="#666" />
-<Text style={styles.actionCount}>{post.shares || 0}</Text>
-</TouchableOpacity>
+            },
+          },
+          { text: "Add to Instagram Story", onPress: () => { setShowSimpleShareModal(true); setSharesCount(prev => prev + 1); incrementShareCount(post.id); } },
+          { text: "Share to Cofau Users", onPress: () => setShowShareToUsersModal(true) },
+          { text: "More Options", onPress: () => { setShowSimpleShareModal(true); setSharesCount(prev => prev + 1); incrementShareCount(post.id); } },
+          { text: "Cancel", style: "cancel" },
+        ]
+      );
+    }}
+  >
+    <View style={styles.engagementIcon}>
+      <Ionicons name="arrow-redo-outline" size={18} color="#888" />
+    </View>
+    <Text style={styles.engagementCount}>{sharesCount}</Text>
+  </TouchableOpacity>
 
-{/* SAVE */}
-<TouchableOpacity style={styles.actionButton} onPress={handleSave}>
-  {isSaved ? (
-    <GradientBookmark size={22} />
-  ) : (
-    <Ionicons name="bookmark-outline" size={22} color="#666" />
-  )}
-</TouchableOpacity>
+  <TouchableOpacity style={styles.engagementBtn} onPress={handleSave}>
+    <View style={styles.engagementIcon}>
+      {isSaved ? (
+        <GradientBookmark size={18} />
+      ) : (
+        <Ionicons name="bookmark-outline" size={18} color="#888" />
+      )}
+    </View>
+  </TouchableOpacity>
 </View>
 
 {/* Share to Users Modal (Cofau) */}
@@ -1088,6 +1069,8 @@ post={post}
 onShare={async (userIds) => {
 try {
 await sharePostToUsers(post.id, userIds);
+setSharesCount(prev => prev + 1);
+incrementShareCount(post.id);
 Alert.alert("Success", `Post shared to ${userIds.length} user(s)`);
 } catch (error) {
 Alert.alert("Error", "Failed to share post. Please try again.");
@@ -1561,6 +1544,74 @@ optionsMenuText: {
 fontSize: 16,
 color: '#333',
 fontWeight: '500',
+},
+
+// ─── Glass Card (all-in-one) ───
+glassCardShadow: {
+  marginHorizontal: 10,
+  marginTop: 10,
+  marginBottom: 4,
+  borderRadius: 20,
+  backgroundColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.15,
+  shadowRadius: 16,
+  elevation: 6,
+},
+glassCardClipper: {
+  borderRadius: 20,
+  overflow: 'hidden',
+},
+glassCard: {
+  overflow: 'hidden',
+  backgroundColor: 'rgba(255, 255, 255, 0.93)',
+},
+glassCardInner: {
+  padding: 14,
+  gap: 0,
+},
+glassSection: {
+  paddingVertical: 10,
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+},
+
+locationGradientWrap: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  gap: 8,
+},
+
+// ─── Engagement Icons ───
+engagementRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  gap: 16,
+},
+engagementBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+},
+engagementIcon: {
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  backgroundColor: '#F3F3F3',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+engagementCount: {
+  fontSize: 12,
+  fontWeight: '700',
+  color: '#333',
 },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -53,6 +53,29 @@ export default function LikedPostsScreen() {
     setRefreshing(false);
   };
 
+  // Group posts by location, sorted latest to oldest
+  const groupedByLocation = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+
+    // Posts are already sorted latest-first from API (by liked_at / created_at desc)
+    for (const post of likedPosts) {
+      const location = post.location_name?.trim() || 'Other';
+      if (!groups[location]) {
+        groups[location] = [];
+      }
+      groups[location].push(post);
+    }
+
+    // Sort groups: the group whose first (most recent) post was liked most recently comes first
+    const sortedEntries = Object.entries(groups).sort(([, postsA], [, postsB]) => {
+      const dateA = new Date(postsA[0]?.liked_at || postsA[0]?.created_at || 0).getTime();
+      const dateB = new Date(postsB[0]?.liked_at || postsB[0]?.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
+    return sortedEntries;
+  }, [likedPosts]);
+
   const renderPost = (post: any) => {
     const mediaUrl = normalizeMediaUrl(post.media_url);
     const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
@@ -81,6 +104,11 @@ export default function LikedPostsScreen() {
             {isVideo && (
               <View style={styles.videoOverlay}>
                 <Ionicons name="play-circle" size={40} color="#fff" />
+              </View>
+            )}
+            {post.dish_name && (
+              <View style={styles.dishNameTag}>
+                <Text style={styles.dishNameText} numberOfLines={1}>{post.dish_name.toUpperCase()}</Text>
               </View>
             )}
           </View>
@@ -139,8 +167,21 @@ export default function LikedPostsScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.gridContainer}>
-            {likedPosts.map(renderPost)}
+          <View style={styles.locationList}>
+            {groupedByLocation.map(([location, posts]) => (
+              <View key={location} style={styles.locationSection}>
+                <View style={styles.locationHeader}>
+                  <Ionicons name="location-sharp" size={18} color="#E74C3C" />
+                  <Text style={styles.locationTitle}>{location}</Text>
+                  <Text style={styles.locationCount}>
+                    {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                  </Text>
+                </View>
+                <View style={styles.gridContainer}>
+                  {posts.map(renderPost)}
+                </View>
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>
@@ -180,6 +221,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  locationList: {
+    paddingBottom: 20,
+  },
+  locationSection: {
+    marginBottom: 16,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F8F8F8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECECEC',
+  },
+  locationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#222',
+    marginLeft: 8,
+    flex: 1,
+  },
+  locationCount: {
+    fontSize: 13,
+    color: '#888',
   },
   gridContainer: {
     flexDirection: 'row',
@@ -235,5 +302,20 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 8,
     textAlign: 'center',
+  },
+  dishNameTag: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(233, 74, 55, 0.85)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 5,
+    maxWidth: '75%',
+  },
+  dishNameText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '600',
   },
 });

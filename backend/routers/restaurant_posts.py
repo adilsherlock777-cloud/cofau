@@ -200,6 +200,7 @@ async def create_restaurant_post(
         "dish_name": dish_name.strip() if dish_name else None,
         "likes_count": 0,
         "comments_count": 0,
+        "shares_count": 0,
         "account_type": "restaurant",
         "created_at": datetime.utcnow(),
     }
@@ -272,6 +273,7 @@ async def get_restaurant_posts_feed(
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "account_type": "restaurant",
@@ -313,6 +315,7 @@ async def get_my_restaurant_posts(
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "account_type": "restaurant",
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
@@ -361,6 +364,7 @@ async def get_restaurant_post(
         "dish_name": post.get("dish_name"),
         "likes_count": post.get("likes_count", 0),
         "comments_count": post.get("comments_count", 0),
+        "shares_count": post.get("shares_count", 0),
         "is_liked_by_user": is_liked,
         "is_saved_by_user": is_saved,
         "account_type": "restaurant",
@@ -655,6 +659,7 @@ async def get_all_restaurant_posts_public(
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "account_type": "restaurant",
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
@@ -698,6 +703,7 @@ async def get_restaurant_posts_by_id_public(
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "account_type": "restaurant",
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
@@ -1065,6 +1071,7 @@ async def get_restaurant_reviews(
             "location_name": post.get("location_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             # ADD THESE NEW FIELDS FOR RESTAURANT REPLY
             "restaurant_reply": post.get("restaurant_reply"),
             "restaurant_reply_at": post.get("restaurant_reply_at").isoformat() if post.get("restaurant_reply_at") else None,

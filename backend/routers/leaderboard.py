@@ -1080,10 +1080,152 @@ async def get_top_contributor_restaurants(
         })
     
     logger.info(f"✅ Top Contributors (Restaurants): Returned {len(contributors)} restaurants from last 3 days")
-    
+
     return {
         "contributors": contributors,
         "from_date": from_date.isoformat(),
         "to_date": to_date.isoformat(),
         "window_days": 3
     }
+
+
+# ======================================================
+# LEADERBOARD RANK NOTIFICATIONS
+# ======================================================
+
+RANK_APPRECIATION_MESSAGES = {
+    1: "You're #1! Your post is the top-rated on Cofau right now. Keep creating amazing content!",
+    2: "Incredible! You've earned the #2 spot on Cofau's Top Posts. You're on fire!",
+    3: "Amazing work! Your post is ranked #3 on Cofau. The community loves your taste!",
+    4: "Your post is ranked #4 on Cofau's Top Posts! Your content stands out.",
+    5: "Top 5! Your post is ranked #5 on Cofau. Great eye for food!",
+    6: "You made it to #6 on Cofau's Top Posts! Your reviews are inspiring others.",
+    7: "Ranked #7 on Cofau! Your food content is making waves.",
+    8: "You're in the Top 10! Ranked #8 on Cofau's Top Posts. Keep it up!",
+    9: "Nice! Your post is ranked #9 on Cofau. The community appreciates your taste!",
+    10: "You cracked the Top 10! Ranked #10 on Cofau's Top Posts. Well done!",
+}
+
+
+async def send_leaderboard_rank_notifications():
+    """
+    Compute the current top 10 posts (same logic as /api/posts/last-3-days)
+    and send push notifications + in-app notifications to ranked users.
+    Tracks previously notified ranks to avoid duplicate notifications.
+    """
+    from utils.push_notifications import send_push_notification, get_user_device_tokens
+
+    db = get_database()
+
+    two_days_ago = datetime.utcnow() - timedelta(days=2)
+    posts = await db.posts.find({"created_at": {"$gte": two_days_ago}}).sort("created_at", -1).to_list(None)
+
+    if not posts:
+        logger.info("⚠️ No posts in last 2 days for rank notifications")
+        return
+
+    # Build scored list
+    scored = []
+    for post in posts:
+        quality = post.get("quality_score", 50.0)
+        likes = post.get("likes_count", 0)
+        scored.append({
+            "post_id": str(post["_id"]),
+            "user_id": post.get("user_id"),
+            "quality_score": quality,
+            "likes_count": likes,
+        })
+
+    max_likes = max((p["likes_count"] for p in scored), default=1) or 1
+
+    for p in scored:
+        engagement = calculate_engagement_score(p["likes_count"], max_likes)
+        combined = calculate_combined_score(p["quality_score"], engagement)
+        p["combined_score"] = combined
+
+    scored.sort(key=lambda x: x["combined_score"], reverse=True)
+    top_10 = scored[:10]
+
+    for idx, entry in enumerate(top_10, start=1):
+        entry["rank"] = idx
+
+    logger.info(f"🏆 Sending rank notifications for {len(top_10)} top posts")
+
+    # Get last notified snapshot to avoid re-notifying same ranks
+    last_notified = await db.leaderboard_notifications_log.find_one(
+        sort=[("created_at", -1)]
+    )
+    previous_ranks = {}
+    if last_notified:
+        for e in last_notified.get("entries", []):
+            previous_ranks[e["post_id"]] = e["rank"]
+
+    notified_entries = []
+
+    for entry in top_10:
+        user_id = entry["user_id"]
+        rank = entry["rank"]
+        post_id = entry["post_id"]
+
+        if not user_id:
+            continue
+
+        # Skip if user already got notified for this exact post+rank
+        prev_rank = previous_ranks.get(post_id)
+        if prev_rank == rank:
+            logger.info(f"⏭️ Skipping notification for user {user_id} - already notified for rank #{rank}")
+            notified_entries.append({"post_id": post_id, "user_id": user_id, "rank": rank})
+            continue
+
+        message = RANK_APPRECIATION_MESSAGES.get(rank, f"Your post is ranked #{rank} on Cofau's Top Posts!")
+        push_title = f"🏆 You're Ranked #{rank}!"
+
+        # Create in-app notification
+        try:
+            notification_doc = {
+                "type": "leaderboard_rank",
+                "fromUserId": "system",
+                "fromUserName": "Cofau",
+                "fromUserProfilePicture": None,
+                "toUserId": user_id,
+                "postId": post_id,
+                "message": message,
+                "isRead": False,
+                "createdAt": datetime.utcnow(),
+                "rank": rank,
+            }
+            await db.notifications.insert_one(notification_doc)
+            logger.info(f"✅ In-app notification created for user {user_id} rank #{rank}")
+        except Exception as e:
+            logger.error(f"❌ Error creating notification for user {user_id}: {e}")
+
+        # Send push notification
+        try:
+            device_tokens = await get_user_device_tokens(user_id)
+            if device_tokens:
+                await send_push_notification(
+                    device_tokens=device_tokens,
+                    title=push_title,
+                    body=message,
+                    data={
+                        "type": "leaderboard_rank",
+                        "postId": post_id,
+                        "rank": str(rank),
+                        "screen": "explore",
+                        "tab": "topPosts",
+                    },
+                    user_id=user_id,
+                )
+                logger.info(f"📤 Push notification sent to user {user_id} for rank #{rank}")
+        except Exception as e:
+            logger.error(f"❌ Error sending push to user {user_id}: {e}")
+
+        notified_entries.append({"post_id": post_id, "user_id": user_id, "rank": rank})
+
+    # Log this notification run to avoid duplicates
+    await db.leaderboard_notifications_log.insert_one({
+        "entries": notified_entries,
+        "created_at": datetime.utcnow(),
+    })
+
+    logger.info(f"✅ Leaderboard rank notifications complete. Notified {len(notified_entries)} users.")

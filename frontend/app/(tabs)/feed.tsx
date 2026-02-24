@@ -51,29 +51,61 @@ import {
 
 // ⭐ ADD THIS IMPORT - adjust path based on where you place the file
 import { FeedSkeleton } from "../../components/FeedSkeleton";
-import MysteryBoxIcon from "../../components/MysteryBoxIcon";
 import CofauWalletModal from "../../components/CofauWalletModal";
 
 const BACKEND = BACKEND_URL;
 let globalMuteState = true;
 
 /* -------------------------
-   Level System Helper
+   Animated Typewriter Pill
 ------------------------- */
-const LEVEL_TABLE = [
-  { level: 1, required_points: 1250 },
-  { level: 2, required_points: 2500 },
-  { level: 3, required_points: 3750 },
-  { level: 4, required_points: 5000 },
-  { level: 5, required_points: 5750 },
-  { level: 6, required_points: 6500 },
-  { level: 7, required_points: 7250 },
-  { level: 8, required_points: 8000 },
-  { level: 9, required_points: 9000 },
-  { level: 10, required_points: 10000 },
-  { level: 11, required_points: 11000 },
-  { level: 12, required_points: 12000 },
-];
+const PILL_WORDS = ['EARN REWARDS', 'GET FEATURED', 'LEVEL UP', 'EXPLORE DISHES'];
+
+const AnimatedPillText = React.memo(() => {
+  const [text, setText] = useState('');
+  const ref = useRef({ wordIdx: 0, charIdx: 0, deleting: false, wait: 0 });
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const s = ref.current;
+      if (s.wait > 0) { s.wait--; return; }
+      const word = PILL_WORDS[s.wordIdx];
+      if (!s.deleting) {
+        if (s.charIdx < word.length) {
+          s.charIdx++;
+          setText(word.substring(0, s.charIdx));
+        } else {
+          s.deleting = true;
+          s.wait = 12;
+        }
+      } else {
+        if (s.charIdx > 0) {
+          s.charIdx--;
+          setText(word.substring(0, s.charIdx));
+        } else {
+          s.deleting = false;
+          s.wordIdx = (s.wordIdx + 1) % PILL_WORDS.length;
+          s.wait = 3;
+        }
+      }
+    }, 100);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '700', color: '#AAAAAA', letterSpacing: 0.3, lineHeight: 14 }}>
+        SHARE YOUR FOOD EXPERIENCE &
+      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 3 }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: '#E94A37', letterSpacing: 0.4, lineHeight: 18 }}>
+          {text}
+        </Text>
+        <Text style={{ fontSize: 13, fontWeight: '300', color: '#E94A37', lineHeight: 18 }}>|</Text>
+      </View>
+    </View>
+  );
+});
 
 /* -------------------------
    Normalize DP
@@ -575,12 +607,7 @@ const renderPost = useCallback(
   const ListHeader = useCallback(() => (
     <>
       <View style={styles.headerContainer}>
-        <LinearGradient
-          colors={["#FFF5F0", "#FFE5D9"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.whiteHeader}
-        >
+        <View style={styles.whiteHeader}>
           <View style={styles.headerRow}>
       {/* Chat Icon with Gradient */}
       <TouchableOpacity
@@ -630,26 +657,6 @@ const renderPost = useCallback(
 
       {/* Right Icons Container */}
       <View style={styles.headerIcons}>
-        {/* Mystery Box Icon - Only show for non-restaurant accounts */}
-        {accountType !== 'restaurant' && (
-          <MysteryBoxIcon
-            onPress={async () => {
-              setShowWalletModal(true);
-              // Mark wallet as viewed
-              try {
-                await axios.post(
-                  `${BACKEND}/api/wallet/mark-viewed`,
-                  {},
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
-                setWalletUnreadCount(0);
-              } catch (err) {
-              }
-            }}
-            badgeCount={walletUnreadCount}
-          />
-        )}
-
         {/* Notifications Icon with Gradient */}
         <TouchableOpacity
           style={styles.leftIcon}
@@ -680,10 +687,116 @@ const renderPost = useCallback(
         </TouchableOpacity>
       </View>
           </View>
-        </LinearGradient>
+
+        </View>
       </View>
 
-      {/* ===== LEVEL CARD ===== */}
+      {/* Share bar - half in gradient, half in white */}
+      {user && accountType !== 'restaurant' && (
+        <View style={styles.shareBarDivider}>
+          <View style={styles.dividerLineFull} />
+          <View style={styles.shareBar}>
+            <View style={styles.shareBarAvatarWrap}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (ownStoryData) {
+                    router.push({
+                      pathname: "/story-viewer",
+                      params: {
+                        userId: user.id,
+                        stories: JSON.stringify(ownStoryData.stories),
+                        user: JSON.stringify(ownStoryData.user),
+                      },
+                    });
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                {ownStoryData ? (
+                  <LinearGradient
+                    colors={["#FF2E2E", "#F2CF68", "#FF9A4D"]}
+                    locations={[0, 0.5, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.shareBarDpRing}
+                  >
+                    <View style={styles.shareBarDpInner}>
+                      <UserAvatar
+                        profilePicture={user.profile_picture}
+                        username={user.username}
+                        size={65}
+                        showLevelBadge={false}
+                        level={user.level}
+                        style={{}}
+                      />
+                    </View>
+                  </LinearGradient>
+                ) : (
+                  <UserAvatar
+                    profilePicture={user.profile_picture}
+                    username={user.username}
+                    size={65}
+                    showLevelBadge={false}
+                    level={user.level}
+                    style={{}}
+                  />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.avatarCameraBadge}
+                onPress={() => setShowAddMenu(true)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={["#FF7A18", "#FF2E2E"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.avatarCameraBadgeGradient}
+                >
+                  <Ionicons name="camera" size={12} color="#fff" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.shareDescriptionBox}>
+              <AnimatedPillText />
+            </View>
+
+            <TouchableOpacity
+              onPress={async () => {
+                setShowWalletModal(true);
+                try {
+                  await axios.post(
+                    `${BACKEND}/api/wallet/mark-viewed`,
+                    {},
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  setWalletUnreadCount(0);
+                } catch (err) {
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#FF7A18", "#FF2E2E"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.walletGradientButton}
+              >
+                <Ionicons name="gift" size={18} color="#fff" />
+              </LinearGradient>
+              {walletUnreadCount > 0 && (
+                <View style={styles.walletPillBadge}>
+                  <Text style={styles.walletPillBadgeText}>
+                    {walletUnreadCount > 99 ? "99+" : walletUnreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* ===== RESTAURANT CARD (for restaurant accounts) ===== */}
       {user && accountType === 'restaurant' && (
         <View style={styles.levelCardWrapper}>
@@ -789,261 +902,6 @@ const renderPost = useCallback(
           </View>
         </View>
       )}
-        {user && accountType !== 'restaurant' && (
-           <View style={styles.levelCardWrapper}>
-            {Platform.OS === "ios" ? (
-              <BlurView intensity={60} tint="light" style={styles.levelCard}>
-                <View style={styles.dpContainer}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (ownStoryData) {
-                        router.push({
-                          pathname: "/story-viewer",
-                          params: {
-                            userId: user.id,
-                            stories: JSON.stringify(ownStoryData.stories),
-                            user: JSON.stringify(ownStoryData.user),
-                          },
-                        });
-                      } else {
-                        setShowAddMenu(true);
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    {ownStoryData ? (
-                      <LinearGradient
-                        colors={["#FF2E2E", "#F2CF68", "#FF9A4D"]}
-                        locations={[0, 0.5, 1]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.dpGradientRing}
-                      >
-                        <View style={styles.dpWhiteRing}>
-                          <UserAvatar
-                            profilePicture={user.profile_picture}
-                            username={user.username}
-                            size={66}
-                            showLevelBadge={false}
-                            level={user.level}
-                            style={{}}
-                          />
-                        </View>
-                      </LinearGradient>
-                    ) : (
-                      <UserAvatar
-                        profilePicture={user.profile_picture}
-                        username={user.username}
-                        size={70}
-                        showLevelBadge={false}
-                        level={user.level}
-                        style={{}}
-                      />
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.dpAddButton}
-                    onPress={() => setShowAddMenu(true)}
-                  >
-                    <Ionicons name="add" size={19} color="#0f0303ff" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.levelContent}>
-                  <Text style={styles.levelLabel}>Level {user.level}</Text>
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      {(() => {
-                        const currentLevel = user.level || 1;
-                        const currentPoints = user.currentPoints || 0;
-                        const prevLevelData = LEVEL_TABLE.find(
-                          (l) => l.level === currentLevel - 1
-                        );
-                        const prevThreshold = prevLevelData?.required_points || 0;
-                        const currentLevelData = LEVEL_TABLE.find(
-                          (l) => l.level === currentLevel
-                        );
-                        const currentThreshold =
-                          currentLevelData?.required_points || 1250;
-                        const pointsNeededForLevel =
-                          currentThreshold - prevThreshold;
-                        const progressPercent =
-                          pointsNeededForLevel > 0
-                            ? Math.min(
-                                (currentPoints / pointsNeededForLevel) * 100,
-                                100
-                              )
-                            : 0;
-
-                        let gradientColors;
-                        let gradientLocations;
-
-                        if (progressPercent <= 50) {
-  gradientColors = ["#FF9A4D", "#FF9A4D"];
-  gradientLocations = [0, 1];
-} else {
-  gradientColors = ["#FF9A4D", "#FF5C5C"];
-  gradientLocations = [0, 1];
-}
-
-                        return (
-                          <LinearGradient
-                            colors={gradientColors}
-                            locations={gradientLocations}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={[
-                              styles.progressFill,
-                              { width: `${progressPercent}%` },
-                            ]}
-                          />
-                        );
-                      })()}
-                    </View>
-                    <Text style={styles.progressText}>
-                      {user.total_points || user.points || 0}/
-                      {(() => {
-                        const currentLevel = user.level || 1;
-                        const currentLevelData = LEVEL_TABLE.find(
-                          (l) => l.level === currentLevel
-                        );
-                        return currentLevelData?.required_points || 1250;
-                      })()}
-                    </Text>
-                  </View>
-                </View>
-              </BlurView>
-            ) : (
-              <View style={[styles.levelCard, styles.levelCardAndroid]}>
-                <View style={styles.dpContainer}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (ownStoryData) {
-                        router.push({
-                          pathname: "/story-viewer",
-                          params: {
-                            userId: user.id,
-                            stories: JSON.stringify(ownStoryData.stories),
-                            user: JSON.stringify(ownStoryData.user),
-                          },
-                        });
-                      } else {
-                        setShowAddMenu(true);
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    {ownStoryData ? (
-                      <LinearGradient
-                        colors={["#FF2E2E", "#F2CF68", "#FF9A4D"]}
-                        locations={[0, 0.5, 1]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.dpGradientRing}
-                      >
-                        <View style={styles.dpWhiteRing}>
-                          <UserAvatar
-                            profilePicture={user.profile_picture}
-                            username={user.username}
-                            size={66}
-                            showLevelBadge={false}
-                            level={user.level}
-                            style={{}}
-                          />
-                        </View>
-                      </LinearGradient>
-                    ) : (
-                      <UserAvatar
-                        profilePicture={user.profile_picture}
-                        username={user.username}
-                        size={70}
-                        showLevelBadge={false}
-                        level={user.level}
-                        style={{}}
-                      />
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.dpAddButton}
-                    onPress={() => setShowAddMenu(true)}
-                  >
-                    <Ionicons name="add" size={19} color="#0f0303ff" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.levelContent}>
-                  <Text style={styles.levelLabel}>Level {user.level}</Text>
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      {(() => {
-                        const currentLevel = user.level || 1;
-                        const currentPoints = user.currentPoints || 0;
-                        const prevLevelData = LEVEL_TABLE.find(
-                          (l) => l.level === currentLevel - 1
-                        );
-                        const prevThreshold = prevLevelData?.required_points || 0;
-                        const currentLevelData = LEVEL_TABLE.find(
-                          (l) => l.level === currentLevel
-                        );
-                        const currentThreshold =
-                          currentLevelData?.required_points || 1250;
-                        const pointsNeededForLevel =
-                          currentThreshold - prevThreshold;
-                        const progressPercent =
-                          pointsNeededForLevel > 0
-                            ? Math.min(
-                                (currentPoints / pointsNeededForLevel) * 100,
-                                100
-                              )
-                            : 0;
-
-                        let gradientColors;
-                        let gradientLocations;
-
-                        if (progressPercent <= 33) {
-                          gradientColors = ["#FF2E2E", "#FF2E2E"];
-                          gradientLocations = [0, 1];
-                        } else if (progressPercent <= 66) {
-                          gradientColors = ["#FF2E2E", "#F2CF68"];
-                          gradientLocations = [0, 1];
-                        } else {
-                          gradientColors = ["#FF2E2E", "#F2CF68", "#FF9A4D"];
-                          gradientLocations = [0, 0.5, 1];
-                        }
-
-                        return (
-                          <LinearGradient
-                            colors={gradientColors}
-                            locations={gradientLocations}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={[
-                              styles.progressFill,
-                              { width: `${progressPercent}%` },
-                            ]}
-                          />
-                        );
-                      })()}
-                    </View>
-                    <Text style={styles.progressText}>
-                      {user.total_points || user.points || 0}/
-                      {(() => {
-                        const currentLevel = user.level || 1;
-                        const currentLevelData = LEVEL_TABLE.find(
-                          (l) => l.level === currentLevel
-                        );
-                        return currentLevelData?.required_points || 1250;
-                      })()}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-
       {/* ================= STORIES ================= */}
       <StoriesBar refreshTrigger={refreshing} />
 
@@ -1203,19 +1061,13 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     position: "relative",
-    marginBottom: 4,
+    marginBottom: 0,
   },
   whiteHeader: {
   paddingTop: 60,
-  paddingBottom: 60,
+  paddingBottom: 50,
   paddingHorizontal: 20,
-  borderBottomLeftRadius: 30,
-  borderBottomRightRadius: 30,
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.1,
-  shadowRadius: 8,
-  elevation: 6,
+  backgroundColor: "#FFE5D9",
 },
   headerRow: {
     flexDirection: "row",
@@ -1299,14 +1151,14 @@ restaurantLogo: {
 
 cofauTitleMask: {
   fontFamily: "Lobster",
-  fontSize: 32,
+  fontSize: 36,
   letterSpacing: 1,
   textAlign: "center",
 },
 
 cofauTitleTransparent: {
   fontFamily: "Lobster",
-  fontSize: 32,
+  fontSize: 36,
   letterSpacing: 1,
   opacity: 0,
 },
@@ -1319,6 +1171,113 @@ cofauGradient: {
     flexDirection: "row",
     gap: 20,
     zIndex: 10,
+  },
+  shareBarDivider: {
+    position: "relative",
+    alignItems: "center",
+    marginTop: -40,
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  dividerLineFull: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: "50%",
+    height: 1,
+    backgroundColor: "#E0E0E0",
+  },
+  shareBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 35,
+    paddingVertical: 6,
+    paddingLeft: 6,
+    paddingRight: 12,
+    gap: 10,
+  },
+  shareBarAvatarWrap: {
+    position: "relative",
+  },
+  avatarCameraBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    zIndex: 5,
+  },
+  avatarCameraBadgeGradient: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  shareBarDpRing: {
+    width: 70,
+    height: 70,
+    borderRadius: 55,
+    padding: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  shareBarDpInner: {
+    width: 66,
+    height: 66,
+    borderRadius: 38,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  shareDescriptionBox: {
+    flex: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    overflow: "hidden",
+  },
+  shareDescriptionText: {
+    fontSize: 8,
+    fontWeight: "700",
+    color: "#AAAAAA",
+    letterSpacing: 0.2,
+  },
+  cameraGradientButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  walletGradientButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  walletPillBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#FF3B30",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 16,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+  },
+  walletPillBadgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "700",
   },
   levelCardWrapper: {
     marginHorizontal: 20,
@@ -1353,11 +1312,11 @@ cofauGradient: {
   dpContainer: {
     position: "absolute",
     left: 10,
-    top: "133%",
-    transform: [{ translateY: -40 }],
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
     zIndex: 6,
   },
- 
   dpAddButton: {
     position: "absolute",
     bottom: 0,

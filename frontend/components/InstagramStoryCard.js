@@ -5,7 +5,6 @@ import {
   Image,
   StyleSheet,
   Dimensions,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -214,11 +213,10 @@ const storyCardStyles = StyleSheet.create({
         borderRadius: 8,
     },
     watermarkText: {
-        fontSize: 18,
+        fontSize: 12,
         fontWeight: '700',
-        fontFamily: Platform.OS === 'ios' ? 'Lobster-Regular' : 'Lobster-Regular',
-        // If Lobster font is not loaded, use a fallback
-        // You may need to load the font separately
+        fontFamily: 'Lobster',
+        letterSpacing: 1,
     },
     infoBoxesContainer: {
         flexDirection: 'row',

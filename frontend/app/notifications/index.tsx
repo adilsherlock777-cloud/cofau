@@ -112,6 +112,10 @@ export default function NotificationsScreen() {
       // Route to leaderboard which shows orders for restaurants
       router.push('/(tabs)/leaderboard');
     }
+    // Leaderboard rank notifications - route to explore Top Posts tab
+    else if (type === 'leaderboard_rank') {
+      router.push({ pathname: '/(tabs)/explore', params: { tab: 'topPosts' } });
+    }
     // Badge notifications
     else if (type === 'badge_approved' || type === 'badge_rejected') {
       router.push('/(tabs)/profile');

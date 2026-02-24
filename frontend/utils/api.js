@@ -147,6 +147,18 @@ export const unlikePost = async (postId, accountType) => {
 };
 
 /**
+ * Increment share count for a post
+ */
+export const incrementShareCount = async (postId) => {
+  try {
+    const response = await axios.post(`${API_URL}/posts/${postId}/share`);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating share count:', error.response?.data || error.message);
+  }
+};
+
+/**
  * Add a comment to a post
  */
 export const addComment = async (postId, commentText, token, accountType) => {

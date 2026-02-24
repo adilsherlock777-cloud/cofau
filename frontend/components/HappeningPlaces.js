@@ -15,10 +15,10 @@ import {
 import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { BlurView } from 'expo-blur';
 import * as Location from 'expo-location';
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { Platform } from 'react-native';
@@ -677,35 +677,44 @@ export default function HappeningPlaces() {
         <View style={styles.container}>
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
             {/* Header */}
-            <View style={styles.headerContainer}>
-              <LinearGradient
-                colors={["#FFF5F0", "#FFE5D9"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientHeader}
-              >
-              </LinearGradient>
-            </View>
-            
-            {/* Title Box */}
-            <View style={styles.titleBoxWrapper}>
-              <BlurView intensity={60} tint="light" style={styles.titleBox}>
-                <Text style={[styles.titleMain, isRestaurant && styles.titleMainLarge]}>
-                  {isRestaurant ? 'Sales Dashboard' : 'Happening places'}
-                </Text>
-                {!isRestaurant && (
+            <View style={styles.plainHeader}>
+              {isRestaurant ? (
+                <MaskedView
+                  maskElement={
+                    <Text style={styles.headerTitleLobster}>Sales Dashboard</Text>
+                  }
+                >
+                  <LinearGradient
+                    colors={['#FF2E2E', '#FF7A18']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Sales Dashboard</Text>
+                  </LinearGradient>
+                </MaskedView>
+              ) : (
+                <>
+                  <MaskedView
+                    maskElement={
+                      <Text style={styles.headerTitleLobster}>Happening Places</Text>
+                    }
+                  >
+                    <LinearGradient
+                      colors={['#FF2E2E', '#FF7A18']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Happening Places</Text>
+                    </LinearGradient>
+                  </MaskedView>
                   <View style={styles.subtitleRow}>
-                    <Ionicons
-                      name="location"
-                      size={16}
-                      color="#E94A37"
-                    />
+                    <Ionicons name="location" size={16} color="#E94A37" />
                     <Text style={styles.titleSub}>
                       Most Visited Places Around you
                     </Text>
                   </View>
-                )}
-              </BlurView>
+                </>
+              )}
             </View>
             
             {/* Skeleton Cards */}
@@ -732,22 +741,21 @@ export default function HappeningPlaces() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Header Container - Gradient with Premium Finish */}
-            <View style={styles.headerContainer}>
-              <LinearGradient
-                colors={["#FFF5F0", "#FFE5D9"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientHeader}
+            {/* Header */}
+            <View style={styles.plainHeader}>
+              <MaskedView
+                maskElement={
+                  <Text style={styles.headerTitleLobster}>Sales Dashboard</Text>
+                }
               >
-              </LinearGradient>
-            </View>
-
-            {/* Title Box */}
-            <View style={styles.titleBoxWrapper}>
-              <BlurView intensity={60} tint="light" style={styles.titleBox}>
-                <Text style={[styles.titleMain, styles.titleMainLarge]}>Sales Dashboard</Text>
-              </BlurView>
+                <LinearGradient
+                  colors={['#FF2E2E', '#FF7A18']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Sales Dashboard</Text>
+                </LinearGradient>
+              </MaskedView>
             </View>
 
             {/* Sales Dashboard Component */}
@@ -777,28 +785,27 @@ export default function HappeningPlaces() {
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
-          {/* Header Container - Gradient with Premium Finish */}
-          <View style={styles.headerContainer}>
-            <LinearGradient
-              colors={["#FFF5F0", "#FFE5D9"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientHeader}
+          {/* Header */}
+          <View style={styles.plainHeader}>
+            <MaskedView
+              maskElement={
+                <Text style={styles.headerTitleLobster}>Happening Places</Text>
+              }
             >
-            </LinearGradient>
-          </View>
-
-          {/* Title Box */}
-          <View style={styles.titleBoxWrapper}>
-            <BlurView intensity={60} tint="light" style={styles.titleBox}>
-              <Text style={styles.titleMain}>Happening places</Text>
-              <View style={styles.subtitleRow}>
-                <Ionicons name="location" size={16} color="#E94A37" />
-                <Text style={styles.titleSub}>
-                  Most Visited Places Around you
-                </Text>
-              </View>
-            </BlurView>
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Happening Places</Text>
+              </LinearGradient>
+            </MaskedView>
+            <View style={styles.subtitleRow}>
+              <Ionicons name="location" size={16} color="#E94A37" />
+              <Text style={styles.titleSub}>
+                Most Visited Places Around you
+              </Text>
+            </View>
           </View>
 
           {/* SELECT YOUR FOOD SPOT Dropdown */}
@@ -1381,35 +1388,20 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  /* Header Container */
-  headerContainer: {
-    marginBottom: -40,
-  },
-
-  /* Gradient Header - PREMIUM FINISH */
-  gradientHeader: {
+  /* Plain Header - white background */
+  plainHeader: {
     paddingTop: 60,
-    paddingBottom: 60,
+    paddingBottom: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    backgroundColor: '#fff',
   },
 
-  headerTitle: {
+  headerTitleLobster: {
     fontFamily: 'Lobster',
-    fontSize: 32,
-    color: '#fff',
-    textAlign: 'center',
+    fontSize: 36,
     letterSpacing: 1,
-    textShadowColor: 'rgba(0, 0, 0, 0.15)',
-    textShadowOffset: { width: 4, height: 6 },
-    textShadowRadius: 4,
+    textAlign: 'center',
   },
 
   scrollView: {
@@ -1419,19 +1411,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  titleBoxWrapper: {
-    marginHorizontal: 40,
-    marginBottom: 16,
-    borderRadius: 30,
-    overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: '#FF8C00',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
 
   cardOuter: {
     marginHorizontal: 4,
@@ -1454,15 +1433,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  titleBox: {
-    paddingVertical: 18,
-    paddingHorizontal: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(200, 200, 200, 0.3)',
-  },
 
   gridImageContainer: {
     flex: 1,
@@ -1483,15 +1453,6 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  titleMain: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  titleMainLarge: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
 
   subtitleRow: {
     flexDirection: 'row',

@@ -426,6 +426,7 @@ export default function ProfileScreen() {
   const [menuItemImages, setMenuItemImages] = useState<{ [key: string]: string }>({});
   const [fullImageModalVisible, setFullImageModalVisible] = useState(false);
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
+  const [dpViewerVisible, setDpViewerVisible] = useState(false);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [restaurantActiveTab, setRestaurantActiveTab] = useState<'posts' | 'reviews' | 'menu'>('posts');
   const [menuUploadModalVisible, setMenuUploadModalVisible] = useState(false);
@@ -453,6 +454,17 @@ export default function ProfileScreen() {
   const [confirm, setConfirm] = useState<any>(null);
   const [updatingPhone, setUpdatingPhone] = useState(false);
   const [reviewFilterModalVisible, setReviewFilterModalVisible] = useState(false);
+  const [priceEditModalVisible, setPriceEditModalVisible] = useState(false);
+  const [editingMenuItem, setEditingMenuItem] = useState<any>(null);
+  const [editingPrice, setEditingPrice] = useState('');
+  const [savingPrice, setSavingPrice] = useState(false);
+  const [manualMenuModalVisible, setManualMenuModalVisible] = useState(false);
+  const [manualMenuName, setManualMenuName] = useState('');
+  const [manualMenuPrice, setManualMenuPrice] = useState('');
+  const [manualMenuCategory, setManualMenuCategory] = useState('');
+  const [manualMenuDescription, setManualMenuDescription] = useState('');
+  const [savingManualMenu, setSavingManualMenu] = useState(false);
+  const [menuAddOptionsVisible, setMenuAddOptionsVisible] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -1326,6 +1338,12 @@ useEffect(() => {
     }
   };
 
+  const handleViewProfilePicture = () => {
+    if (userData?.profile_picture) {
+      setDpViewerVisible(true);
+    }
+  };
+
   const handleBannerPress = () => {
   if (!isOwnProfile) return;
 
@@ -1992,10 +2010,8 @@ const renderMenuByCategory = () => {
                       )}
                     </View>
 
-                    {/* Photo and Price Section - Stacked vertically */}
+                    {/* Photo and Price Section - Zomato style */}
                     <View style={styles.menuItemRightSection}>
-                      {/* Photo Section - Always show image or placeholder */}
-                      <View style={styles.menuItemPhotoSection}>
                         {itemImageUrl ? (
                           <View style={styles.menuItemImageContainer}>
                             <TouchableOpacity
@@ -2010,27 +2026,24 @@ const renderMenuByCategory = () => {
                                 style={styles.menuItemImage}
                                 resizeMode="cover"
                                 onError={() => {
-                                  // Image failed to load - remove from valid images
                                   setMenuItemImages(prev => {
                                     const updated = { ...prev };
                                     delete updated[item.id];
                                     return updated;
                                   });
-                                  // Clear image_url on the item so placeholder shows
                                   setMenuItems(prev => prev.map(mi =>
                                     mi.id === item.id ? { ...mi, image_url: null } : mi
                                   ));
                                 }}
                               />
                             </TouchableOpacity>
-                            {/* Edit button only for own restaurant profile */}
                             {isOwnProfile && (
                               <TouchableOpacity
                                 style={styles.menuItemImageEditIcon}
                                 onPress={() => handleMenuItemImagePick(item.id)}
                                 disabled={isUploadingThis}
                               >
-                                <Ionicons name="pencil" size={10} color="#fff" />
+                                <Ionicons name="pencil" size={12} color="#fff" />
                               </TouchableOpacity>
                             )}
                             {isUploadingThis && (
@@ -2038,8 +2051,25 @@ const renderMenuByCategory = () => {
                                 <ActivityIndicator size="small" color="#fff" />
                               </View>
                             )}
+                            {/* Price overlaid on bottom of image - Zomato style */}
+                            {item.price != null ? (
+                              isOwnProfile ? (
+                                <TouchableOpacity style={styles.menuItemPriceContainer} activeOpacity={0.7} onPress={() => { setEditingMenuItem(item); setEditingPrice(String(item.price)); setPriceEditModalVisible(true); }}>
+                                  <Text style={styles.menuItemPrice}>₹{item.price}</Text>
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={styles.menuItemPriceContainer}>
+                                  <Text style={styles.menuItemPrice}>₹{item.price}</Text>
+                                </View>
+                              )
+                            ) : isOwnProfile ? (
+                              <TouchableOpacity style={styles.menuItemPriceContainer} activeOpacity={0.7} onPress={() => { setEditingMenuItem(item); setEditingPrice(''); setPriceEditModalVisible(true); }}>
+                                <Text style={styles.menuItemPriceAdd}>+ Add Price</Text>
+                              </TouchableOpacity>
+                            ) : null}
                           </View>
                         ) : isOwnProfile ? (
+                          <View style={styles.menuItemImageContainer}>
                           <TouchableOpacity
                             style={styles.menuItemNoImagePlaceholder}
                             onPress={() => handleMenuItemImagePick(item.id)}
@@ -2049,26 +2079,35 @@ const renderMenuByCategory = () => {
                               <ActivityIndicator size="small" color="#FF8C00" />
                             ) : (
                               <>
-                                <Ionicons name="restaurant-outline" size={18} color="#ccc" />
+                                <Ionicons name="restaurant-outline" size={28} color="#ccc" />
                                 <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
                                 <Text style={[styles.menuItemNoImageText, { color: '#FF8C00', marginTop: 2 }]}>Tap to add</Text>
                               </>
                             )}
                           </TouchableOpacity>
+                            {item.price != null ? (
+                              <TouchableOpacity style={styles.menuItemPriceContainer} activeOpacity={0.7} onPress={() => { setEditingMenuItem(item); setEditingPrice(String(item.price)); setPriceEditModalVisible(true); }}>
+                                <Text style={styles.menuItemPrice}>₹{item.price}</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <TouchableOpacity style={styles.menuItemPriceContainer} activeOpacity={0.7} onPress={() => { setEditingMenuItem(item); setEditingPrice(''); setPriceEditModalVisible(true); }}>
+                                <Text style={styles.menuItemPriceAdd}>+ Add Price</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
                         ) : (
+                          <View style={styles.menuItemImageContainer}>
                           <View style={styles.menuItemNoImagePlaceholder}>
-                            <Ionicons name="restaurant-outline" size={18} color="#ccc" />
+                            <Ionicons name="restaurant-outline" size={28} color="#ccc" />
                             <Text style={styles.menuItemNoImageText}>Chef is crafting</Text>
                           </View>
+                            {item.price != null && (
+                              <View style={styles.menuItemPriceContainer}>
+                                <Text style={styles.menuItemPrice}>₹{item.price}</Text>
+                              </View>
+                            )}
+                          </View>
                         )}
-                      </View>
-
-                      {/* Price below image */}
-                      {item.price && (
-                        <View style={styles.menuItemPriceContainer}>
-                          <Text style={styles.menuItemPrice}>₹{item.price}</Text>
-                        </View>
-                      )}
                     </View>
                   </View>
                   );
@@ -2514,8 +2553,8 @@ const renderRestaurantProfile = () => {
           {/* Profile Picture */}
           <View style={restaurantStyles.profileOnBanner}>
             <TouchableOpacity
-              onPress={handleProfilePicturePress}
-              disabled={!isOwnProfile || uploadingImage}
+              onPress={isOwnProfile ? handleProfilePicturePress : handleViewProfilePicture}
+              disabled={isOwnProfile && uploadingImage}
               activeOpacity={0.8}
             >
               <UserAvatar
@@ -2820,7 +2859,14 @@ const renderRestaurantProfile = () => {
             </View>
           )}
         </View>
-        
+
+        {/* Dish Name Tag */}
+        {item.dish_name && (
+          <View style={restaurantStyles.reviewDishNameTag}>
+            <Text style={restaurantStyles.reviewDishNameText} numberOfLines={1}>{item.dish_name.toUpperCase()}</Text>
+          </View>
+        )}
+
         {/* Likes Badge */}
         <View style={restaurantStyles.reviewLikesBadge}>
           {(item.likes_count || 0) > 0 ? (
@@ -2937,7 +2983,7 @@ const renderRestaurantProfile = () => {
           <TouchableOpacity
             style={styles.uploadMenuButton}
             onPress={() => {
-              setMenuUploadModalVisible(true);
+              setMenuAddOptionsVisible(true);
             }}
           >
             <Ionicons name="cloud-upload-outline" size={20} color="#FFF" />
@@ -2947,13 +2993,11 @@ const renderRestaurantProfile = () => {
       </View>
     )}
 
-    {/* Upload Button - Floating */}
+    {/* Add Menu Item Button - Floating */}
     {isOwnProfile && menuItems.length > 0 && (
       <TouchableOpacity
         style={styles.floatingUploadButton}
-        onPress={() => {
-          setMenuUploadModalVisible(true);
-        }}
+        onPress={() => setMenuAddOptionsVisible(true)}
       >
         <Ionicons name="add" size={28} color="#FFF" />
       </TouchableOpacity>
@@ -3088,6 +3132,137 @@ const renderRestaurantProfile = () => {
               </TouchableOpacity>
             </ScrollView>
           </Animated.View>
+        </View>
+      </Modal>
+
+      {/* ================= SETTINGS MODAL (RESTAURANT) ================= */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={levelDetailsModalVisible}
+        onRequestClose={() => setLevelDetailsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Settings</Text>
+              <TouchableOpacity onPress={() => setLevelDetailsModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.levelDetailsContent}>
+              {/* BLOCKED USERS */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  router.push('/blocked-users');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="ban-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={styles.sidebarMenuText}>Blocked Users</Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
+              {/* CHANGE PHONE */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  resetPhoneModal();
+                  setPhoneUpdateStep(userData?.phone_number ? 'verify_old' : 'verify_new');
+                  setPhoneModalVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sidebarMenuIconContainer}>
+                  <Ionicons name="call-outline" size={24} color="#333" />
+                </View>
+                <Text style={styles.sidebarMenuText}>
+                  {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
+              <View style={styles.sidebarDivider} />
+
+              {/* DELETE ACCOUNT */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  if (Platform.OS === 'web') {
+                    const confirmed = window.confirm(
+                      'Are you sure you want to delete your account? This action is permanent and cannot be undone.'
+                    );
+                    if (confirmed) {
+                      const doubleConfirm = window.confirm(
+                        'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?'
+                      );
+                      if (doubleConfirm) handleDeleteAccount();
+                    }
+                  } else {
+                    Alert.alert(
+                      'Delete Account',
+                      'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          onPress: () => {
+                            Alert.alert(
+                              'Final Confirmation',
+                              'This will permanently delete all your data including posts, comments, and followers. Are you absolutely sure?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Delete Forever', onPress: () => handleDeleteAccount(), style: 'destructive' },
+                              ]
+                            );
+                          },
+                          style: 'destructive',
+                        },
+                      ]
+                    );
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
+                  <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Delete Account</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+              </TouchableOpacity>
+
+              {/* LOGOUT */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setLevelDetailsModalVisible(false);
+                  if (Platform.OS === 'web') {
+                    const confirmed = window.confirm('Are you sure you want to logout?');
+                    if (confirmed) handleLogout();
+                  } else {
+                    Alert.alert('Logout', 'Are you sure you want to logout?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Logout', onPress: () => handleLogout(), style: 'destructive' },
+                    ]);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.sidebarMenuIconContainer, styles.logoutIconContainer]}>
+                  <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
+                </View>
+                <Text style={[styles.sidebarMenuText, styles.logoutMenuText]}>Logout</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FF6B6B" />
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
 
@@ -3667,6 +3842,35 @@ const renderRestaurantProfile = () => {
   </View>
 </Modal>
 
+{/* ================= DP VIEWER MODAL ================= */}
+<Modal
+  animationType="fade"
+  transparent={true}
+  visible={dpViewerVisible}
+  onRequestClose={() => setDpViewerVisible(false)}
+>
+  <TouchableOpacity
+    style={styles.dpViewerOverlay}
+    activeOpacity={1}
+    onPress={() => setDpViewerVisible(false)}
+  >
+    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+    <TouchableOpacity
+      style={styles.dpViewerCloseButton}
+      onPress={() => setDpViewerVisible(false)}
+    >
+      <Ionicons name="close-circle" size={36} color="#fff" />
+    </TouchableOpacity>
+    {userData?.profile_picture && (
+      <RNImage
+        source={{ uri: userData.profile_picture }}
+        style={styles.dpViewerImage}
+        resizeMode="contain"
+      />
+    )}
+  </TouchableOpacity>
+</Modal>
+
 {/* ================= REPLY TO REVIEW MODAL ================= */}
 <Modal
   animationType="slide"
@@ -3763,6 +3967,303 @@ const renderRestaurantProfile = () => {
         )}
       </TouchableOpacity>
     </View>
+  </KeyboardAvoidingView>
+</Modal>
+
+{/* ================= EDIT PRICE MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={priceEditModalVisible}
+  onRequestClose={() => {
+    setPriceEditModalVisible(false);
+    setEditingMenuItem(null);
+    setEditingPrice('');
+  }}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalContainer}
+  >
+    <View style={styles.modalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>
+          {editingMenuItem?.price != null ? 'Edit Price' : 'Add Price'}
+        </Text>
+        <TouchableOpacity onPress={() => {
+          setPriceEditModalVisible(false);
+          setEditingMenuItem(null);
+          setEditingPrice('');
+        }}>
+          <Ionicons name="close" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {editingMenuItem && (
+        <Text style={{ fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 16 }}>
+          {editingMenuItem.name}
+        </Text>
+      )}
+
+      <Text style={styles.inputLabel}>Price (₹)</Text>
+      <TextInput
+        style={styles.input}
+        value={editingPrice}
+        onChangeText={setEditingPrice}
+        placeholder="Enter price"
+        keyboardType="numeric"
+        autoFocus={true}
+      />
+
+      <TouchableOpacity
+        style={[styles.saveButton, { backgroundColor: '#E94A37' }]}
+        onPress={async () => {
+          if (!editingMenuItem) return;
+          const priceNum = parseFloat(editingPrice);
+          if (isNaN(priceNum) || priceNum < 0) {
+            Alert.alert('Invalid Price', 'Please enter a valid price.');
+            return;
+          }
+
+          setSavingPrice(true);
+          try {
+            await axios.put(
+              `${API_URL}/restaurant/menu/items/${editingMenuItem.id}`,
+              { price: priceNum },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            // Update local state immediately
+            setMenuItems(prev => prev.map(mi =>
+              mi.id === editingMenuItem.id ? { ...mi, price: priceNum } : mi
+            ));
+
+            setPriceEditModalVisible(false);
+            setEditingMenuItem(null);
+            setEditingPrice('');
+          } catch (error: any) {
+            console.error('Error updating price:', error);
+            Alert.alert('Error', 'Failed to update price. Please try again.');
+          } finally {
+            setSavingPrice(false);
+          }
+        }}
+        disabled={savingPrice || !editingPrice.trim()}
+      >
+        {savingPrice ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.saveButtonText}>Save Price</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
+
+{/* ================= MENU ADD OPTIONS MODAL ================= */}
+<Modal
+  animationType="fade"
+  transparent={true}
+  visible={menuAddOptionsVisible}
+  onRequestClose={() => setMenuAddOptionsVisible(false)}
+>
+  <TouchableOpacity
+    style={styles.menuAddOptionsOverlay}
+    activeOpacity={1}
+    onPress={() => setMenuAddOptionsVisible(false)}
+  >
+    <View style={styles.menuAddOptionsContainer}>
+      <Text style={styles.menuAddOptionsTitle}>Add Menu Items</Text>
+
+      <TouchableOpacity
+        style={styles.menuAddOption}
+        activeOpacity={0.7}
+        onPress={() => {
+          setMenuAddOptionsVisible(false);
+          setMenuUploadModalVisible(true);
+        }}
+      >
+        <View style={[styles.menuAddOptionIcon, { backgroundColor: '#FFF5EB' }]}>
+          <Ionicons name="sparkles" size={22} color="#FF8C00" />
+        </View>
+        <View style={styles.menuAddOptionTextContainer}>
+          <Text style={styles.menuAddOptionLabel}>AI Menu Extraction</Text>
+          <Text style={styles.menuAddOptionDesc}>Upload menu photo & auto-extract items</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#999" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.menuAddOption}
+        activeOpacity={0.7}
+        onPress={() => {
+          setMenuAddOptionsVisible(false);
+          setManualMenuModalVisible(true);
+        }}
+      >
+        <View style={[styles.menuAddOptionIcon, { backgroundColor: '#F0F5FF' }]}>
+          <Ionicons name="create-outline" size={22} color="#4A90D9" />
+        </View>
+        <View style={styles.menuAddOptionTextContainer}>
+          <Text style={styles.menuAddOptionLabel}>Add Manually</Text>
+          <Text style={styles.menuAddOptionDesc}>Enter item name, price & category</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#999" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.menuAddOptionsCancel}
+        onPress={() => setMenuAddOptionsVisible(false)}
+      >
+        <Text style={styles.menuAddOptionsCancelText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
+</Modal>
+
+{/* ================= MANUAL MENU ITEM MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={manualMenuModalVisible}
+  onRequestClose={() => {
+    setManualMenuModalVisible(false);
+    setManualMenuName('');
+    setManualMenuPrice('');
+    setManualMenuCategory('');
+    setManualMenuDescription('');
+  }}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.menuAddManualOverlay}
+  >
+    <TouchableOpacity
+      style={styles.menuAddManualOverlay}
+      activeOpacity={1}
+      onPress={() => {
+        setManualMenuModalVisible(false);
+        setManualMenuName('');
+        setManualMenuPrice('');
+        setManualMenuCategory('');
+        setManualMenuDescription('');
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={(e) => e.stopPropagation()}
+        style={styles.menuAddManualContent}
+      >
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Text style={styles.menuAddManualTitle}>Add Menu Item</Text>
+
+          <Text style={styles.menuAddManualLabel}>Dish Name *</Text>
+          <TextInput
+            style={styles.menuAddManualInput}
+            value={manualMenuName}
+            onChangeText={setManualMenuName}
+            placeholder="e.g. Paneer Butter Masala"
+            placeholderTextColor="#999"
+          />
+
+          <Text style={styles.menuAddManualLabel}>Price (₹)</Text>
+          <TextInput
+            style={styles.menuAddManualInput}
+            value={manualMenuPrice}
+            onChangeText={setManualMenuPrice}
+            placeholder="e.g. 250"
+            keyboardType="numeric"
+            placeholderTextColor="#999"
+          />
+
+          <Text style={styles.menuAddManualLabel}>Category</Text>
+          <TextInput
+            style={styles.menuAddManualInput}
+            value={manualMenuCategory}
+            onChangeText={setManualMenuCategory}
+            placeholder="e.g. Main Course, Starters, Desserts"
+            placeholderTextColor="#999"
+          />
+
+          <Text style={styles.menuAddManualLabel}>Description (optional)</Text>
+          <TextInput
+            style={[styles.menuAddManualInput, { height: 80, textAlignVertical: 'top' }]}
+            value={manualMenuDescription}
+            onChangeText={setManualMenuDescription}
+            placeholder="Brief description of the dish"
+            multiline
+            numberOfLines={3}
+            placeholderTextColor="#999"
+          />
+
+          <View style={styles.menuAddManualButtons}>
+            <TouchableOpacity
+              style={styles.menuAddManualCancelBtn}
+              onPress={() => {
+                setManualMenuModalVisible(false);
+                setManualMenuName('');
+                setManualMenuPrice('');
+                setManualMenuCategory('');
+                setManualMenuDescription('');
+              }}
+            >
+              <Text style={styles.menuAddManualCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuAddManualSaveBtn, (!manualMenuName.trim()) && { opacity: 0.5 }]}
+              disabled={savingManualMenu || !manualMenuName.trim()}
+              onPress={async () => {
+                if (!manualMenuName.trim()) return;
+                setSavingManualMenu(true);
+                try {
+                  const formData = new FormData();
+                  formData.append('name', manualMenuName.trim());
+                  if (manualMenuPrice.trim()) {
+                    formData.append('price', manualMenuPrice.trim());
+                  }
+                  if (manualMenuCategory.trim()) {
+                    formData.append('category', manualMenuCategory.trim());
+                  }
+                  if (manualMenuDescription.trim()) {
+                    formData.append('description', manualMenuDescription.trim());
+                  }
+
+                  await axios.post(
+                    `${API_URL}/restaurant/menu/add-manual`,
+                    formData,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data',
+                      },
+                    }
+                  );
+
+                  setManualMenuModalVisible(false);
+                  setManualMenuName('');
+                  setManualMenuPrice('');
+                  setManualMenuCategory('');
+                  setManualMenuDescription('');
+                  fetchMenuItems();
+                  Alert.alert('Success', 'Menu item added successfully!');
+                } catch (error: any) {
+                  console.error('Error adding menu item:', error);
+                  Alert.alert('Error', 'Failed to add menu item. Please try again.');
+                } finally {
+                  setSavingManualMenu(false);
+                }
+              }}
+            >
+              {savingManualMenu ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.menuAddManualSaveText}>Add Item</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </TouchableOpacity>
+    </TouchableOpacity>
   </KeyboardAvoidingView>
 </Modal>
     </View>
@@ -4216,18 +4717,27 @@ if (isRestaurantProfile) {
   badgeSize={140}
   isOwnProfile={isOwnProfile}
   badge={userData.badge}
+  totalPoints={userData.total_points || userData.points || 0}
+  currentPoints={userData.currentPoints || 0}
+  onImagePress={!isOwnProfile ? handleViewProfilePicture : undefined}
   cameraIcon={
     isOwnProfile ? (
       <TouchableOpacity
-        style={styles.cameraIcon}
         onPress={handleProfilePicturePress}
         disabled={uploadingImage}
       >
-        {uploadingImage ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Ionicons name="camera" size={16} color="#fff" />
-        )}
+        <LinearGradient
+          colors={['#FF6B00', '#FF0000']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cameraIcon}
+        >
+          {uploadingImage ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="camera" size={12} color="#fff" />
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     ) : null
   }
@@ -4283,18 +4793,27 @@ if (isRestaurantProfile) {
   badgeSize={140}
   isOwnProfile={isOwnProfile}
   badge={userData.badge}
+  totalPoints={userData.total_points || userData.points || 0}
+  currentPoints={userData.currentPoints || 0}
+  onImagePress={!isOwnProfile ? handleViewProfilePicture : undefined}
   cameraIcon={
     isOwnProfile ? (
       <TouchableOpacity
-        style={styles.cameraIcon}
         onPress={handleProfilePicturePress}
         disabled={uploadingImage}
       >
-        {uploadingImage ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Ionicons name="camera" size={16} color="#fff" />
-        )}
+        <LinearGradient
+          colors={['#FF6B00', '#FF0000']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cameraIcon}
+        >
+          {uploadingImage ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="camera" size={12} color="#fff" />
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     ) : null
   }
@@ -5716,6 +6235,36 @@ if (isRestaurantProfile) {
     </View>
   </View>
 </Modal>
+
+{/* ================= DP VIEWER MODAL (Regular User) ================= */}
+<Modal
+  animationType="fade"
+  transparent={true}
+  visible={dpViewerVisible}
+  onRequestClose={() => setDpViewerVisible(false)}
+>
+  <TouchableOpacity
+    style={styles.dpViewerOverlay}
+    activeOpacity={1}
+    onPress={() => setDpViewerVisible(false)}
+  >
+    <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+    <TouchableOpacity
+      style={styles.dpViewerCloseButton}
+      onPress={() => setDpViewerVisible(false)}
+    >
+      <Ionicons name="close-circle" size={36} color="#fff" />
+    </TouchableOpacity>
+    {userData?.profile_picture && (
+      <RNImage
+        source={{ uri: userData.profile_picture }}
+        style={styles.dpViewerImage}
+        resizeMode="contain"
+      />
+    )}
+  </TouchableOpacity>
+</Modal>
+
     </View>
   );
 }
@@ -5924,6 +6473,22 @@ reviewLikesBadge: {
 reviewLikesText: {
   color: '#fff',
   fontSize: 12,
+  fontWeight: '600',
+},
+reviewDishNameTag: {
+  position: 'absolute',
+  bottom: 6,
+  left: 6,
+  backgroundColor: 'rgba(233, 74, 55, 0.85)',
+  paddingHorizontal: 6,
+  paddingVertical: 3,
+  borderRadius: 5,
+  maxWidth: '75%',
+  zIndex: 10,
+},
+reviewDishNameText: {
+  color: '#fff',
+  fontSize: 9,
   fontWeight: '600',
 },
 reviewFullText: {
@@ -6642,74 +7207,87 @@ favouriteGridImage: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: '#F0F0F0',
   },
   menuItemRowLast: {
     borderBottomWidth: 0,
   },
   menuItemInfo: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
   },
   menuItemName: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 2,
+    marginBottom: 4,
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,
       textAlignVertical: 'center',
     }),
   },
   menuItemDescription: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#666',
-    lineHeight: 14,
+    lineHeight: 17,
   },
   menuItemPriceContainer: {
-    backgroundColor: '#E94A37',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E94A37',
+    position: 'absolute',
+    bottom: -1,
+    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
   },
   menuItemPrice: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#fff',
+    backgroundColor: '#E94A37',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+    textAlign: 'center',
+  },
+  menuItemPriceAdd: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+    textAlign: 'center',
   },
   menuItemRightSection: {
-    flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
-  },
-  menuItemPhotoSection: {
-    marginBottom: 2,
   },
   menuItemImageContainer: {
     position: 'relative',
-    width: 65,
-    height: 65,
-    borderRadius: 8,
+    width: 140,
+    height: 130,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   menuItemImage: {
-    width: 65,
-    height: 65,
-    borderRadius: 8,
+    width: 140,
+    height: 130,
+    borderRadius: 14,
   },
   menuItemImageEditIcon: {
     position: 'absolute',
-    bottom: 3,
-    right: 3,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 9,
-    width: 18,
-    height: 18,
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -6722,12 +7300,12 @@ favouriteGridImage: {
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 14,
   },
   menuItemAddPhotoButton: {
-    width: 65,
-    height: 65,
-    borderRadius: 8,
+    width: 140,
+    height: 130,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#FF8C00',
     borderStyle: 'dashed',
@@ -6736,34 +7314,32 @@ favouriteGridImage: {
     backgroundColor: '#FFF5EB',
   },
   menuItemAddPhotoText: {
-    fontSize: 8,
+    fontSize: 11,
     color: '#FF8C00',
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 3,
   },
   menuItemImageReadOnly: {
-    width: 65,
-    height: 65,
-    borderRadius: 8,
-    marginBottom: 2,
+    width: 140,
+    height: 130,
+    borderRadius: 14,
   },
   menuItemNoImagePlaceholder: {
-    width: 65,
-    height: 65,
-    borderRadius: 8,
+    width: 140,
+    height: 130,
+    borderRadius: 14,
     backgroundColor: '#f8f8f8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
     borderWidth: 1,
     borderColor: '#eee',
   },
   menuItemNoImageText: {
-    fontSize: 7,
+    fontSize: 10,
     color: '#999',
     textAlign: 'center',
-    marginTop: 2,
-    paddingHorizontal: 2,
+    marginTop: 3,
+    paddingHorizontal: 6,
   },
   fullImageModalContainer: {
     flex: 1,
@@ -6780,6 +7356,22 @@ favouriteGridImage: {
   fullImageView: {
     width: '90%',
     height: '70%',
+  },
+  dpViewerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dpViewerCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
+  dpViewerImage: {
+    width: 280,
+    height: 280,
+    borderRadius: 140,
   },
   uploadMenuButton: {
     marginTop: 20,
@@ -6811,6 +7403,137 @@ favouriteGridImage: {
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+
+  // Menu Add Options Modal
+  menuAddOptionsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  menuAddOptionsContainer: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+  },
+  menuAddOptionsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  menuAddOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  menuAddOptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  menuAddOptionTextContainer: {
+    flex: 1,
+  },
+  menuAddOptionLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 2,
+  },
+  menuAddOptionDesc: {
+    fontSize: 12,
+    color: '#888',
+  },
+  menuAddOptionsCancel: {
+    marginTop: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+  },
+  menuAddOptionsCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+
+  // Manual Menu Item Modal
+  menuAddManualOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  menuAddManualContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  menuAddManualTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  menuAddManualLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  menuAddManualInput: {
+    backgroundColor: '#F5F5F5',
+    padding: 14,
+    borderRadius: 10,
+    fontSize: 15,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    color: '#1A1A1A',
+  },
+  menuAddManualButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  menuAddManualCancelBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+  },
+  menuAddManualCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+  menuAddManualSaveBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: '#FF8C00',
+    alignItems: 'center',
+  },
+  menuAddManualSaveText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFF',
   },
 
   // Sidebar Styles
@@ -7196,15 +7919,14 @@ profilePictureContainer: {
 },
   cameraIcon: {
     position: 'absolute',
-    right: 0,
+    right: 4,
     bottom: 0,
-    backgroundColor: '#4dd0e1',
-    borderRadius: 10,
-    width: 22,
-    height: 22,
+    borderRadius: 8,
+    width: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#fff',
   },
   profileInfo: {

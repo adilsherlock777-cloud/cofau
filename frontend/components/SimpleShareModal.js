@@ -187,13 +187,11 @@ const storyCardStyles = StyleSheet.create({
         borderRadius: 12,
     },
     watermarkText: {
-        fontSize: 22,
+        fontSize: 12,
         fontWeight: '700',
         color: '#FFFFFF',
-        fontStyle: 'italic',
+        fontFamily: 'Lobster',
         letterSpacing: 1,
-        // If you have Lobster font loaded, use:
-        // fontFamily: 'Lobster_400Regular',
     },
     infoBoxesContainer: {
         flexDirection: 'row',

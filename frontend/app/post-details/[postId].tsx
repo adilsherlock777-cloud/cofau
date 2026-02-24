@@ -44,7 +44,6 @@ const API_URL = `${BACKEND}/api`;
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 const SHEET_HEIGHT_RATIO = 0.5;
 const SHEET_OPEN_TOP = SCREEN_HEIGHT * (1 - SHEET_HEIGHT_RATIO);
-const MEDIA_SHRINK_SCALE = 1;
 
 /* ---------------------------------------------------------
    🔥 UNIVERSAL URL NORMALIZER
@@ -71,6 +70,23 @@ const GradientHeart = ({ size = 18 }) => (
   >
     <LinearGradient
       colors={["#FF2E2E", "#FF7A18"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size }}
+    />
+  </MaskedView>
+);
+
+const GradientLocation = ({ size = 18 }) => (
+  <MaskedView
+    maskElement={
+      <View style={{ backgroundColor: 'transparent' }}>
+        <Ionicons name="location" size={size} color="#000" />
+      </View>
+    }
+  >
+    <LinearGradient
+      colors={["#FF2E2E", "#FF5722", "#FF7A18"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ width: size, height: size }}
@@ -137,9 +153,15 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
     }))
   ).current;
 
-  // Animation values for Instagram-style bottom sheet
-  const bottomSheetAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const mediaScaleAnim = useRef(new Animated.Value(1)).current;
+  // Animation values for expand-from-card bottom sheet
+  const BOTTOM_NAV_HEIGHT_CONST = 130;
+  const CARD_ORIGIN_Y = SCREEN_HEIGHT - BOTTOM_NAV_HEIGHT_CONST - 25; // center of white card
+  const SHEET_CENTER_OFFSET = (SCREEN_HEIGHT * SHEET_HEIGHT_RATIO) / 2;
+  const ORIGIN_TRANSLATE_Y = CARD_ORIGIN_Y - SHEET_CENTER_OFFSET; // translateY so sheet center = card center
+
+  const bottomSheetAnim = useRef(new Animated.Value(ORIGIN_TRANSLATE_Y)).current;
+  const sheetScaleAnim = useRef(new Animated.Value(0.02)).current;
+  const sheetOpacityAnim = useRef(new Animated.Value(0)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   // Update isFollowing state when post data changes
@@ -150,20 +172,33 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   // Check if this is the current user's own post
   const isOwnPost = user?.id === post.user_id;
 
-  // Animate bottom sheet when showDetails changes
+  // Animate bottom sheet — expand from card / shrink back to card
   useEffect(() => {
     if (showDetails) {
-      // Show bottom sheet - slide up from bottom
+      // Start tiny at the card's position
+      bottomSheetAnim.setValue(ORIGIN_TRANSLATE_Y);
+      sheetScaleAnim.setValue(0.02);
+      sheetOpacityAnim.setValue(0);
+
       Animated.parallel([
+        // Move from card center to open position
         Animated.spring(bottomSheetAnim, {
           toValue: SHEET_OPEN_TOP,
           useNativeDriver: true,
-          tension: 50,
-          friction: 8,
+          tension: 55,
+          friction: 11,
         }),
-        Animated.timing(mediaScaleAnim, {
-          toValue: MEDIA_SHRINK_SCALE,
-          duration: 300,
+        // Scale from dot to full size
+        Animated.spring(sheetScaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 55,
+          friction: 11,
+        }),
+        // Quick fade in
+        Animated.timing(sheetOpacityAnim, {
+          toValue: 1,
+          duration: 150,
           useNativeDriver: true,
         }),
         Animated.timing(backdropOpacity, {
@@ -173,22 +208,26 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
         }),
       ]).start();
     } else {
-      // Hide bottom sheet - slide down
+      // Shrink back to the card's position
       Animated.parallel([
-        Animated.spring(bottomSheetAnim, {
-          toValue: SCREEN_HEIGHT,
+        Animated.timing(bottomSheetAnim, {
+          toValue: ORIGIN_TRANSLATE_Y,
+          duration: 280,
           useNativeDriver: true,
-          tension: 50,
-          friction: 8,
         }),
-        Animated.timing(mediaScaleAnim, {
-          toValue: 1,
-          duration: 300,
+        Animated.timing(sheetScaleAnim, {
+          toValue: 0.02,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetOpacityAnim, {
+          toValue: 0,
+          duration: 220,
           useNativeDriver: true,
         }),
         Animated.timing(backdropOpacity, {
           toValue: 0,
-          duration: 300,
+          duration: 280,
           useNativeDriver: true,
         }),
       ]).start();
@@ -208,32 +247,32 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
           const newValue = SHEET_OPEN_TOP + gestureState.dy;
           bottomSheetAnim.setValue(newValue);
 
-          // Scale media proportionally as sheet is dragged
-          const dragProgress = gestureState.dy / SHEET_OPEN_TOP;
-          const scale = MEDIA_SHRINK_SCALE;
-          mediaScaleAnim.setValue(scale);
+          // Shrink slightly as dragged down
+          const dragProgress = Math.min(gestureState.dy / 300, 1);
+          sheetScaleAnim.setValue(1 - dragProgress * 0.3);
 
           const opacity = 0.3 * (1 - dragProgress);
           backdropOpacity.setValue(Math.max(0, opacity));
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        // If dragged down more than 100px, close the sheet
+        // If dragged down more than 100px, close (shrink to card)
         if (gestureState.dy > 100) {
           setShowDetails(false);
         } else {
-          // Otherwise, snap back to half screen
+          // Snap back to open position
           Animated.parallel([
             Animated.spring(bottomSheetAnim, {
               toValue: SHEET_OPEN_TOP,
               useNativeDriver: true,
-              tension: 50,
-              friction: 8,
+              tension: 55,
+              friction: 11,
             }),
-            Animated.timing(mediaScaleAnim, {
-              toValue: MEDIA_SHRINK_SCALE,
-              duration: 200,
+            Animated.spring(sheetScaleAnim, {
+              toValue: 1,
               useNativeDriver: true,
+              tension: 55,
+              friction: 11,
             }),
             Animated.timing(backdropOpacity, {
               toValue: 0.3,
@@ -561,13 +600,8 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   return (
     <View style={styles.postItem}>
       {/* MEDIA CONTAINER - Animated for Instagram-style scaling */}
-      <Animated.View
-        style={[
-          styles.responsiveMediaContainer,
-          {
-            transform: [{ scale: mediaScaleAnim }],
-          },
-        ]}
+      <View
+        style={styles.responsiveMediaContainer}
       >
         {/* BLURRED BACKGROUND LAYER */}
         {!isVideo ? (
@@ -973,58 +1007,69 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
           postId={post.id}
         />
 
-        {/* Glass Bottom Overlay - Evenly Distributed Items */}
+        {/* Right Side Action Bar */}
 {!showDetails && (
-  <TouchableOpacity 
-    style={[styles.glassBottomOverlay, { bottom: BOTTOM_NAV_HEIGHT + 10 }]}
-    activeOpacity={0.7}
+  <View style={[styles.rightActionBar, { bottom: BOTTOM_NAV_HEIGHT + 70 }]}>
+    {/* Heart / Like */}
+    <TouchableOpacity style={styles.rightActionBtn} onPress={handleLikeToggle}>
+      {isLiked ? (
+        <GradientHeart size={28} />
+      ) : (
+        <Ionicons name="heart-outline" size={28} color="#FFF" />
+      )}
+      <Text style={styles.rightActionCount}>{likesCount}</Text>
+    </TouchableOpacity>
+
+    {/* Comment */}
+    <TouchableOpacity style={styles.rightActionBtn} onPress={() => setShowComments(true)}>
+      <Ionicons name="chatbubble-outline" size={26} color="#FFF" />
+      <Text style={styles.rightActionCount}>{commentCount}</Text>
+    </TouchableOpacity>
+
+    {/* Share */}
+    <TouchableOpacity style={styles.rightActionBtn} onPress={() => setShowShareModal(true)}>
+      <Ionicons name="paper-plane-outline" size={26} color="#FFF" />
+      <Text style={styles.rightActionCount}>{post.shares_count || 0}</Text>
+    </TouchableOpacity>
+
+    {/* Location - opens Google Maps */}
+    <TouchableOpacity
+      style={styles.rightActionBtn}
+      onPress={() => {
+        if (post.map_link) {
+          Linking.openURL(post.map_link);
+        } else if (post.location_name) {
+          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+          Linking.openURL(searchUrl);
+        } else {
+          Alert.alert("Location", "No location available for this post");
+        }
+      }}
+    >
+      <GradientLocation size={30} />
+    </TouchableOpacity>
+  </View>
+)}
+
+        {/* Bottom Overlay - Review + Tap to expand */}
+{!showDetails && (
+  <TouchableOpacity
+    style={[styles.bottomOverlay, { bottom: BOTTOM_NAV_HEIGHT }]}
+    activeOpacity={0.9}
     onPress={() => setShowDetails(true)}
   >
-    <View style={styles.glassBackground} />
-    <View style={styles.glassContentRow}>
-      {/* Rating (Regular User) OR Price (Restaurant) */}
-      <View style={styles.glassInfoItem}>
-        {post.account_type === 'restaurant' || post.is_restaurant_post ? (
-          <>
-            <Ionicons name="pricetag" size={12} color="#FFD700" />
-            <Text style={styles.glassInfoText}>₹{post.price || "N/A"}</Text>
-          </>
-        ) : (
-          <>
-            <Ionicons name="star" size={12} color="#FFD700" />
-            <Text style={styles.glassInfoText}>{post.rating || "N/A"}/10</Text>
-          </>
-        )}
-      </View>
-      
-      {/* Location */}
-      <View style={styles.glassInfoItem}>
-        <Ionicons name="location" size={12} color="#FFD700" />
-        <Text
-          style={styles.glassInfoText}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {(post.location_name || "N/A").slice(0, 15)}
-        </Text>
-      </View>
-      
-      {/* Username */}
-      <View style={styles.glassInfoItem}>
-        <Ionicons name="person" size={12} color="#FFD700" />
-        <Text
-          style={styles.glassInfoText}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {post.username || "N/A"}
-        </Text>
-      </View>
-      
-      {/* Chevron */}
-      <View style={styles.glassChevronContainer}>
-        <Ionicons name="chevron-up" size={18} color="#FFF" />
-      </View>
+    <View style={styles.bottomOverlayIconWrap}>
+      <Ionicons name="create-outline" size={16} color="#FF5722" />
+    </View>
+    <View style={{ flex: 1, marginRight: 10 }}>
+      <Text style={styles.bottomOverlayText} numberOfLines={2} ellipsizeMode="tail">
+        {(post.account_type === 'restaurant' || post.is_restaurant_post)
+          ? (post.dish_details || post.description || post.review_text || post.dish_name || "Tap for details")
+          : (post.review_text || post.dish_name || "Tap for details")}
+      </Text>
+    </View>
+    <View style={styles.bottomOverlayArrow}>
+      <Ionicons name="chevron-up" size={16} color="#333" />
     </View>
   </TouchableOpacity>
 )}
@@ -1054,19 +1099,25 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
           style={[
             styles.bottomSheetDetails,
             {
-              transform: [{ translateY: bottomSheetAnim }],
+              opacity: sheetOpacityAnim,
+              transform: [
+                { translateY: bottomSheetAnim },
+                { scale: sheetScaleAnim },
+              ],
             },
           ]}
         >
           <View style={styles.glassDetailsBackground} />
 
-          {/* Drag Handle - swipeable */}
-          <View
+          {/* Drag Handle - tap to close or swipe down */}
+          <TouchableOpacity
             style={styles.dragHandleContainer}
+            activeOpacity={0.7}
+            onPress={() => setShowDetails(false)}
             {...panResponder.panHandlers}
           >
             <View style={styles.dragHandle} />
-          </View>
+          </TouchableOpacity>
             
             {/* Scrollable Details Content */}
             <ScrollView 
@@ -1113,145 +1164,126 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                 )}
               </View>
 
-              {/* Action Buttons with Cofau Theme */}
-              <View style={styles.detailsActions}>
-                <TouchableOpacity style={styles.detailsActionBtn} onPress={handleLikeToggle}>
-                  {isLiked ? (
-                    <GradientHeart size={18} />
-                  ) : (
-                    <Ionicons name="heart-outline" size={18} color="#000" />
-                  )}
-                  <Text style={styles.detailsActionText}>{likesCount}</Text>
-                </TouchableOpacity>
+              {/* ALL-IN-ONE DETAILS CARD */}
+              <View style={styles.detailsSingleCard}>
+                {/* RATING or PRICE */}
+{post.account_type === 'restaurant' || post.is_restaurant_post ? (
+  post.price ? (
+    <View style={styles.detailsSection}>
+      <Text style={styles.detailsSectionLabel}>PRICE</Text>
+      <View style={styles.detailsSectionRow}>
+        <Ionicons name="pricetag" size={19} color="#FFD700" />
+        <Text style={styles.detailsSectionValue}>₹{post.price}</Text>
+      </View>
+    </View>
+  ) : null
+) : (
+  post.rating ? (
+    <View style={styles.detailsSection}>
+      <Text style={styles.detailsSectionLabel}>RATING</Text>
+      <View style={styles.detailsSectionRow}>
+        <Ionicons name="star" size={19} color="#FFD700" />
+        <Text style={styles.detailsSectionValue}>{post.rating}/10</Text>
+      </View>
+    </View>
+  ) : null
+)}
 
-                <TouchableOpacity
-                  style={styles.detailsActionBtn}
-                  onPress={() => setShowComments(true)}
-                >
-                  <Ionicons name="chatbubble-outline" size={18} color="#000" />
-                  <Text style={styles.detailsActionText}>{commentCount}</Text>
-                </TouchableOpacity>
+                {/* DISH NAME */}
+                {post.dish_name && (
+                  <View style={styles.detailsSection}>
+                    <Text style={styles.detailsSectionLabel}>DISH NAME</Text>
+                    <View style={styles.detailsSectionRow}>
+                      <Ionicons name="fast-food" size={19} color="#FFD700" />
+                      <Text style={styles.detailsSectionValue}>{post.dish_name}</Text>
+                    </View>
+                  </View>
+                )}
 
-                <TouchableOpacity 
-                  style={styles.detailsActionBtn}
-                  onPress={() => {
-                    setShowDetails(false);
-                    setShowShareModal(true);
-                  }}
-                >
-                  <Ionicons name="share-outline" size={18} color="#000" />
-                  <Text style={styles.detailsActionText}>{post.shares_count || 0}</Text>
-                </TouchableOpacity>
+                {/* REVIEW / ABOUT */}
+{post.account_type === 'restaurant' || post.is_restaurant_post ? (
+  (post.dish_details || post.description || post.review_text) ? (
+    <View style={styles.detailsSection}>
+      <Text style={styles.detailsSectionLabel}>ABOUT</Text>
+      <View style={styles.detailsSectionRow}>
+        <Ionicons name="information-circle" size={19} color="#FFD700" />
+        <Text style={styles.detailsSectionText}>
+          {post.dish_details || post.description || post.review_text}
+        </Text>
+      </View>
+    </View>
+  ) : null
+) : (
+  post.review_text ? (
+    <View style={styles.detailsSection}>
+      <Text style={styles.detailsSectionLabel}>REVIEW</Text>
+      <View style={styles.detailsSectionRow}>
+        <Ionicons name="create" size={19} color="#FFD700" />
+        <Text style={styles.detailsSectionText}>{post.review_text}</Text>
+      </View>
+    </View>
+  ) : null
+)}
 
-                <TouchableOpacity style={styles.detailsActionBtn} onPress={handleSaveToggle}>
+                {/* LOCATION */}
+                {post.location_name && (
+                  <View style={[styles.detailsSection, { borderBottomWidth: 0 }]}>
+                    <Text style={styles.detailsSectionLabel}>LOCATION</Text>
+                    <Pressable
+                      onPress={() => {
+                        if (post.map_link) {
+                          Linking.openURL(post.map_link);
+                        } else if (post.location_name) {
+                          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
+                          Linking.openURL(searchUrl);
+                        }
+                      }}
+                      style={({ pressed }: any) => [{ opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+                    >
+                      <LinearGradient
+                        colors={['rgba(255,46,46,0.10)', 'rgba(255,122,24,0.08)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.detailsLocationGradient}
+                      >
+                        <Ionicons name="location" size={18} color="#FF2E2E" />
+                        <Text style={styles.detailsLocationText} numberOfLines={1}>{post.location_name}</Text>
+                        <View style={{ flex: 1 }} />
+                        <View style={styles.detailsLocationArrow}>
+                          <Ionicons name="chevron-forward" size={14} color="#fff" />
+                        </View>
+                      </LinearGradient>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+
+              {/* SAVE BUTTON - FeedCard style */}
+              <TouchableOpacity style={styles.detailsSaveBtn} onPress={handleSaveToggle} activeOpacity={0.8}>
+                <View style={styles.detailsSaveIconWrap}>
                   {isSaved ? (
                     <GradientBookmark size={18} />
                   ) : (
-                    <Ionicons name="bookmark-outline" size={18} color="#000" />
+                    <Ionicons name="bookmark-outline" size={18} color="#888" />
                   )}
-                  <Text style={styles.detailsActionText}>Save</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* RATING Section (Regular User) OR PRICE Section (Restaurant) */}
-{post.account_type === 'restaurant' || post.is_restaurant_post ? (
-  // Restaurant Post - Show PRICE
-  post.price && (
-    <View style={styles.detailsCard}>
-      <View style={styles.detailsCardHeader}>
-        <Ionicons name="pricetag" size={16} color="#FFD700" />
-        <Text style={styles.detailsCardLabel}>PRICE</Text>
-      </View>
-      <Text style={styles.detailsRatingValue}>₹{post.price}</Text>
-    </View>
-  )
-) : (
-  // Regular User Post - Show RATING
-  post.rating && (
-    <View style={styles.detailsCard}>
-      <View style={styles.detailsCardHeader}>
-        <Ionicons name="star" size={16} color="#FFD700" />
-        <Text style={styles.detailsCardLabel}>RATING</Text>
-      </View>
-      <Text style={styles.detailsRatingValue}>{post.rating}/10</Text>
-    </View>
-  )
-)}
-
-              {/* DISH NAME Section */}
-              {post.dish_name && (
-                <View style={styles.detailsCard}>
-                  <View style={styles.detailsCardHeader}>
-                    <Ionicons name="restaurant" size={16} color="#FFD700" />
-                    <Text style={styles.detailsCardLabel}>DISH NAME</Text>
-                  </View>
-                  <Text style={styles.detailsDishName}>{post.dish_name}</Text>
                 </View>
-              )}
-
-              {/* REVIEW Section (Regular User) OR ABOUT Section (Restaurant) */}
-{post.account_type === 'restaurant' || post.is_restaurant_post ? (
-  // Restaurant Post - Show ABOUT (Dish Details)
-  (post.dish_details || post.description || post.review_text) && (
-    <View style={styles.detailsCard}>
-      <View style={styles.detailsCardHeader}>
-        <Ionicons name="information-circle" size={16} color="#FFD700" />
-        <Text style={styles.detailsCardLabel}>ABOUT</Text>
-      </View>
-      <Text style={styles.detailsReviewText}>
-        {post.dish_details || post.description || post.review_text}
-      </Text>
-    </View>
-  )
-) : (
-  // Regular User Post - Show REVIEW
-  post.review_text && (
-    <View style={styles.detailsCard}>
-      <View style={styles.detailsCardHeader}>
-        <Ionicons name="create" size={16} color="#FFD700" />
-        <Text style={styles.detailsCardLabel}>REVIEW</Text>
-      </View>
-      <Text style={styles.detailsReviewText}>{post.review_text}</Text>
-    </View>
-  )
-)}
-
-              {/* LOCATION Section */}
-              {post.location_name && (
-                <TouchableOpacity 
-                  style={styles.detailsCard}
-                  onPress={() => {
-                    if (post.map_link) {
-                      Linking.openURL(post.map_link);
-                    } else if (post.location_name) {
-                      const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location_name)}`;
-                      Linking.openURL(searchUrl);
-                    }
-                  }}
-                >
-                  <View style={styles.detailsCardHeader}>
-                    <Ionicons name="location" size={16} color="#FFD700" />
-                    <Text style={styles.detailsCardLabel}>LOCATION</Text>
-                  </View>
-                  <View style={styles.locationRow}>
-                    <Text style={styles.detailsLocationText}>{post.location_name}</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#999" />
-                  </View>
-                </TouchableOpacity>
-              )}
+                <Text style={[styles.detailsSaveText, isSaved && { color: '#FF5722' }]}>
+                  {isSaved ? "Saved" : "Save"}
+                </Text>
+              </TouchableOpacity>
 
               <View style={{ height: 100 }} />
             </ScrollView>
 
           </Animated.View>
         </>
-       </Animated.View>
+       </View>
 
       {/* Comments Modal */}
       <Modal
         visible={showComments}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowComments(false)}
       >
         <KeyboardAvoidingView
@@ -1265,8 +1297,12 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
             onPress={() => setShowComments(false)}
           />
           <View style={styles.commentsModalSheet}>
-            <View style={styles.commentsHeader}>
+            {/* Handle bar */}
+            <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
               <View style={styles.commentsHandleBar} />
+            </View>
+
+            <View style={styles.commentsHeader}>
               <Text style={styles.commentsHeaderTitle}>
                 Comments ({commentCount})
               </Text>
@@ -1274,7 +1310,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                 style={styles.commentsCloseButton}
                 onPress={() => setShowComments(false)}
               >
-                <Ionicons name="close" size={22} color="#000" />
+                <Ionicons name="close" size={22} color="#333" />
               </TouchableOpacity>
             </View>
 
@@ -1309,7 +1345,8 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
               <TextInput
                 value={commentText}
                 onChangeText={setCommentText}
-                placeholder="Add a comment…"
+                placeholder="Add a comment..."
+                placeholderTextColor="#999"
                 style={styles.commentInput}
               />
               <TouchableOpacity
@@ -1413,11 +1450,12 @@ export default function PostDetailsScreen() {
       try {
         singlePost = await fetchSinglePost(primaryEndpoint);
       } catch (primaryError) {
-        if (accountType === 'restaurant') {
-          singlePost = await fetchSinglePost(`${API_URL}/posts/${postId}`);
-        } else {
-          throw primaryError;
-        }
+        // Try the other endpoint as fallback
+        const fallbackEndpoint =
+          accountType === 'restaurant'
+            ? `${API_URL}/posts/${postId}`
+            : `${API_URL}/restaurant/posts/${postId}`;
+        singlePost = await fetchSinglePost(fallbackEndpoint);
       }
       
       // Set the single post immediately - FAST LOAD!
@@ -1546,11 +1584,12 @@ user_level: p.user_level || (profileUserId ? Number(profileLevel) || 1 : null),
   user_id: p.user_id || p.restaurant_id || profileUserId,
 }));
 
+      if (res.data.length < LIMIT) setHasMore(false);
+      setSkip((s) => s + res.data.length);
+
       setPosts((prev) => {
         const existingIds = new Set(prev.map((p: any) => p.id));
         const newPosts = normalized.filter((p: any) => !existingIds.has(p.id));
-        if (newPosts.length < LIMIT) setHasMore(false);
-        setSkip((s) => s + newPosts.length);
         return [...prev, ...newPosts];
       });
     } catch (e) {
@@ -1830,55 +1869,79 @@ heartAnimationContainer: {
     fontWeight: "500",
   },
 
-  /* Glass Bottom Overlay - Evenly Distributed */
-  glassBottomOverlay: {
+  /* Right Side Action Bar */
+  rightActionBar: {
     position: "absolute",
-    left: 20,
-    right: 20,
-    zIndex: 10,
-    borderRadius: 25,
-    overflow: "hidden",
-  },
-
-  glassBackground: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(120, 120, 120, 0.4)",
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-  },
-
-  glassContentRow: {
-    flexDirection: "row",
+    right: 12,
+    zIndex: 15,
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    gap: 20,
   },
 
-  glassInfoItem: {
-    flex: 1,
-    flexDirection: "row",
+  rightActionBtn: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    minWidth: 0,
   },
 
-  glassInfoText: {
+  rightActionCount: {
     color: "#FFF",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
-    flexShrink: 1,
-    minWidth: 0,
+    marginTop: 2,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
 
-  glassChevronContainer: {
-    width: 30,
+  /* Bottom Overlay - 3D White card */
+  bottomOverlay: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    zIndex: 10,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.06)",
+    borderBottomWidth: 4,
+    borderBottomColor: "rgba(0, 0, 0, 0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+
+  bottomOverlayIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(255, 87, 34, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+
+  bottomOverlayText: {
+    color: "#222",
+    fontSize: 12.5,
+    fontWeight: "500",
+    lineHeight: 17,
+  },
+
+  bottomOverlayArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F5F5F5",
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.06)",
+    borderBottomWidth: 2.5,
+    borderBottomColor: "rgba(0, 0, 0, 0.1)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1897,13 +1960,17 @@ heartAnimationContainer: {
   bottomSheetDetails: {
     position: "absolute",
     top: 0,
-    left: 0,
-    right: 0,
+    left: 10,
+    right: 10,
     height: SCREEN_HEIGHT * SHEET_HEIGHT_RATIO,
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    borderRadius: 24,
     overflow: "hidden",
     zIndex: 100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
   },
 
   glassDetailsBackground: {
@@ -1912,20 +1979,19 @@ heartAnimationContainer: {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    backgroundColor: "#FFFFFF",
   },
 
   dragHandleContainer: {
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 50,
     alignItems: "center",
-    backgroundColor: "rgba(200, 200, 200, 0)",
   },
 
   dragHandle: {
-    width: 50,
-    height: 6,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    width: 40,
+    height: 5,
+    backgroundColor: "#DDD",
     borderRadius: 3,
   },
 
@@ -1937,8 +2003,9 @@ heartAnimationContainer: {
   detailsUserRowContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 8,
-    borderBottomWidth: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
     justifyContent: "space-between",
   },
@@ -1969,15 +2036,15 @@ heartAnimationContainer: {
   },
 
   detailsUsername: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#000",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#222",
   },
 
   detailsTimestamp: {
     fontSize: 11,
     color: "#999",
-    marginTop: 2,
+    marginTop: 3,
   },
 
   detailsActions: {
@@ -1999,61 +2066,109 @@ heartAnimationContainer: {
     fontWeight: "500",
   },
 
-  /* Details Cards */
-  detailsCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.3)", 
+  /* Single Details Card (FeedCard style) */
+  detailsSingleCard: {
     marginHorizontal: 12,
     marginTop: 8,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.5)",
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
   },
 
-  detailsCardHeader: {
+  detailsSection: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(0, 0, 0, 0.06)",
+  },
+
+  detailsSectionLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 4,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+
+  detailsSectionRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 6,
   },
 
-  detailsCardLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#888",
-    letterSpacing: 0.5,
-  },
-
-  detailsRatingValue: {
+  detailsSectionValue: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#333",
+    fontWeight: "500",
+    color: "#000",
   },
 
-  detailsDishName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#333",
+  detailsSectionText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#000",
+    flex: 1,
   },
 
-  detailsReviewText: {
-    fontSize: 14,
-    color: "#333",
-    fontWeight: "700",
-    lineHeight: 19,
-  },
-
-  locationRow: {
+  detailsLocationGradient: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 8,
   },
 
   detailsLocationText: {
-    fontSize: 16,
-    color: "#333",
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#000",
+  },
+
+  detailsLocationArrow: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#FF2E2E",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  detailsSaveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 12,
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+    gap: 8,
+  },
+
+  detailsSaveIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#F3F3F3",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  detailsSaveText: {
+    fontSize: 14,
     fontWeight: "700",
-    flex: 1,
+    color: "#333",
   },
 
   detailsCommentsSection: {
@@ -2077,27 +2192,28 @@ heartAnimationContainer: {
 
   commentsModalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
 
   commentsModalSheet: {
-    height: SCREEN_HEIGHT * 0.5,
+    height: SCREEN_HEIGHT * 0.55,
+    marginHorizontal: 12,
+    marginBottom: Platform.OS === "ios" ? 30 : 16,
     backgroundColor: "#FFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    overflow: "hidden",
   },
 
   commentsHandleBar: {
     width: 40,
-    height: 4,
+    height: 5,
     backgroundColor: "#DDD",
-    borderRadius: 2,
-    marginBottom: 8,
+    borderRadius: 3,
   },
 
   commentsHeader: {
@@ -2105,21 +2221,23 @@ heartAnimationContainer: {
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 4,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "#F0F0F0",
   },
 
   commentsHeaderTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#000",
+    color: "#222",
   },
 
   commentsCloseButton: {
     width: 32,
     height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F0F0F0",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2132,10 +2250,10 @@ heartAnimationContainer: {
 
   commentItem: {
     flexDirection: "row",
-    marginBottom: 20,
-    paddingBottom: 20,
+    marginBottom: 16,
+    paddingBottom: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: "#EFEFEF",
+    borderBottomColor: "#F0F0F0",
   },
 
   commentContent: {
@@ -2165,33 +2283,33 @@ heartAnimationContainer: {
   commentInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 12,
-    paddingBottom: Platform.OS === "ios" ? 30 : 16,
-    paddingHorizontal: 16,
-    borderTopWidth: 0.5,
-    borderColor: "#DBDBDB",
-    backgroundColor: "rgba(255, 255, 255, 0.98)",
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 24 : 14,
+    paddingHorizontal: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+    backgroundColor: "#FFF",
   },
 
   commentInput: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    paddingRight: 18,
-    marginRight: 12,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 10,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: "#DBDBDB",
+    borderColor: "#EBEBEB",
     maxHeight: 100,
+    color: "#222",
   },
 
   sendButton: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     backgroundColor: "#FF4500",
-    borderRadius: 22,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },

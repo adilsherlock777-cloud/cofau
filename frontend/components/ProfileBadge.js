@@ -32,6 +32,22 @@ const InfluencerBadge = require('../assets/badges/influencer.png');
  * @param {number} badgeSize - Size of the badge (default: 100)
  * @param {boolean} isOwnProfile - Whether viewing own profile (shows info button)
  */
+// Level thresholds matching backend
+const LEVEL_TABLE = [
+  { level: 1, required_points: 1250 },
+  { level: 2, required_points: 2500 },
+  { level: 3, required_points: 3750 },
+  { level: 4, required_points: 5000 },
+  { level: 5, required_points: 5750 },
+  { level: 6, required_points: 6500 },
+  { level: 7, required_points: 7250 },
+  { level: 8, required_points: 8000 },
+  { level: 9, required_points: 9000 },
+  { level: 10, required_points: 10000 },
+  { level: 11, required_points: 11000 },
+  { level: 12, required_points: 12000 },
+];
+
 export default function ProfileBadge({
   profilePicture,
   username,
@@ -41,6 +57,9 @@ export default function ProfileBadge({
   cameraIcon = null,
   isOwnProfile = false,
   badge = null,
+  totalPoints = 0,
+  currentPoints = 0,
+  onImagePress = null,
 }) {
   const [showLevelInfo, setShowLevelInfo] = useState(false);
 
@@ -71,12 +90,23 @@ export default function ProfileBadge({
       <View style={styles.leftSection}>
         {/* Profile Picture Container */}
         <View style={styles.avatarContainer}>
-          <UserAvatar
-            profilePicture={profilePicture}
-            username={username}
-            size={dpSize}
-            showLevelBadge={false}
-          />
+          {onImagePress ? (
+            <TouchableOpacity onPress={onImagePress} activeOpacity={0.8}>
+              <UserAvatar
+                profilePicture={profilePicture}
+                username={username}
+                size={dpSize}
+                showLevelBadge={false}
+              />
+            </TouchableOpacity>
+          ) : (
+            <UserAvatar
+              profilePicture={profilePicture}
+              username={username}
+              size={dpSize}
+              showLevelBadge={false}
+            />
+          )}
           {cameraIcon}
         </View>
 
@@ -134,6 +164,42 @@ export default function ProfileBadge({
             onPress={(e) => e.stopPropagation()}
           >
             <Text style={styles.modalTitle}>Level System</Text>
+
+            {/* Current Level Progress Bar */}
+            {(() => {
+              const currentLevel = level || 1;
+              const pts = currentPoints || 0;
+              const prevLevelData = LEVEL_TABLE.find(l => l.level === currentLevel - 1);
+              const prevThreshold = prevLevelData?.required_points || 0;
+              const currentLevelData = LEVEL_TABLE.find(l => l.level === currentLevel);
+              const currentThreshold = currentLevelData?.required_points || 1250;
+              const pointsNeededForLevel = currentThreshold - prevThreshold;
+              const progressPercent = pointsNeededForLevel > 0
+                ? Math.min((pts / pointsNeededForLevel) * 100, 100)
+                : 0;
+
+              return (
+                <View style={styles.levelProgressSection}>
+                  <Text style={styles.levelProgressLabel}>Level {currentLevel}</Text>
+                  <View style={styles.levelProgressBarContainer}>
+                    <View style={styles.levelProgressBar}>
+                      <LinearGradient
+                        colors={progressPercent <= 50 ? ['#FF9A4D', '#FF9A4D'] : ['#FF9A4D', '#FF5C5C']}
+                        locations={[0, 1]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[styles.levelProgressFill, { width: `${Math.max(progressPercent, 1)}%` }]}
+                      />
+                    </View>
+                    <Text style={styles.levelProgressText}>
+                      {totalPoints || 0}/{currentThreshold}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
+
+            <View style={styles.levelDivider} />
 
             {/* Reviewer Level */}
             <View style={styles.levelRow}>
@@ -256,6 +322,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#666',
     fontStyle: 'italic',
+  },
+  // Level progress bar styles
+  levelProgressSection: {
+    marginBottom: 16,
+  },
+  levelProgressLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 6,
+  },
+  levelProgressBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  levelProgressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E8E8E8',
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  levelProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  levelProgressText: {
+    fontSize: 12,
+    color: 'rgba(10, 10, 10, 1)',
+    fontWeight: '600',
+  },
+  levelDivider: {
+    height: 1,
+    backgroundColor: '#E8E8E8',
+    marginBottom: 16,
   },
   // Modal styles
   modalOverlay: {

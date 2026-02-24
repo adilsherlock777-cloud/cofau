@@ -1829,6 +1829,12 @@ export default function LeaderboardScreen() {
                 <Text style={{ fontSize: 12, color: '#FF8C00', fontWeight: '600' }}>Within 3km</Text>
               </View>
             </View>
+            <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="checkmark-circle" size={16} color="#2E7D32" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 12.5, color: '#2E7D32', fontWeight: '500', flex: 1 }}>
+                Same prices as the restaurant menu — no markup on COFAU
+              </Text>
+            </View>
 
             {loadingPosts ? (
               <View style={styles.loadingContainer}>

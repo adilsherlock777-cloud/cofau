@@ -21,5 +21,6 @@ class PostResponse(BaseModel):
     map_link: Optional[str] = None
     likes_count: int = 0
     comments_count: int = 0
+    shares_count: int = 0
     popular_photos: List[str] = []
     created_at: datetime

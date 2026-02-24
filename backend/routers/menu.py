@@ -137,6 +137,51 @@ async def upload_menu_images(
     )
 
 
+@router.post("/add-manual")
+async def add_manual_menu_item(
+    name: str = Form(...),
+    price: Optional[float] = Form(None),
+    category: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """
+    Manually add a single menu item without AI extraction.
+    Item is created with status 'approved' directly.
+    """
+    db = get_database()
+    restaurant_id = str(current_restaurant["_id"])
+
+    item_doc = {
+        "_id": ObjectId(),
+        "restaurant_id": restaurant_id,
+        "name": name.strip(),
+        "price": price,
+        "category": category.strip() if category else None,
+        "description": description.strip() if description else None,
+        "confidence": 1.0,
+        "needs_review": False,
+        "status": "approved",
+        "image_url": None,
+        "extraction_id": f"manual_{ObjectId()}",
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+
+    await db.menu_items.insert_one(item_doc)
+
+    return {
+        "id": str(item_doc["_id"]),
+        "restaurant_id": item_doc["restaurant_id"],
+        "name": item_doc["name"],
+        "price": item_doc.get("price"),
+        "category": item_doc.get("category"),
+        "description": item_doc.get("description"),
+        "status": "approved",
+        "message": "Menu item added successfully"
+    }
+
+
 @router.get("/pending", response_model=List[MenuItemDB])
 async def get_pending_items(
     extraction_id: Optional[str] = None,

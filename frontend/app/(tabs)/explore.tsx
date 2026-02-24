@@ -18,7 +18,7 @@ import {
   Easing,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 import { Image } from "expo-image";
@@ -1317,6 +1317,7 @@ const DashboardContent = memo(({ analytics, loading, onRefresh }: { analytics: a
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
   const auth = useAuth() as { user: any; token: string | null; accountType: string | null };
   const { user, token, accountType } = auth;
 
@@ -1339,39 +1340,18 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // Animated placeholder typing effect
-  const PLACEHOLDER_WORDS = ['Biryani', 'Desserts', 'Pizza', 'Dosa', 'Chinese', 'BBQ', 'Coffee', 'Salad'];
-  const [placeholderText, setPlaceholderText] = useState('');
-  const placeholderRef = useRef({ wordIndex: 0, charIndex: 0, isDeleting: false });
+  // Animated placeholder emoji cycling effect
+  const PLACEHOLDER_EMOJIS = ['\uD83C\uDF5B', '\uD83C\uDF55', '\uD83C\uDF54', '\uD83C\uDF69', '\uD83C\uDF63', '\u2615', '\uD83C\uDF70', '\uD83C\uDF2E', '\uD83C\uDF5C', '\uD83E\uDD24'];
+  const [placeholderEmoji, setPlaceholderEmoji] = useState(PLACEHOLDER_EMOJIS[0]);
+  const emojiIndexRef = useRef(0);
 
   useEffect(() => {
     if (searchQuery || searchFocused) return;
 
     const timer = setInterval(() => {
-      const { wordIndex, charIndex, isDeleting } = placeholderRef.current;
-      const currentWord = PLACEHOLDER_WORDS[wordIndex];
-
-      if (!isDeleting) {
-        // Typing
-        if (charIndex < currentWord.length) {
-          setPlaceholderText(currentWord.substring(0, charIndex + 1));
-          placeholderRef.current.charIndex = charIndex + 1;
-        } else {
-          // Pause at full word, then start deleting
-          placeholderRef.current.isDeleting = true;
-        }
-      } else {
-        // Deleting
-        if (charIndex > 0) {
-          setPlaceholderText(currentWord.substring(0, charIndex - 1));
-          placeholderRef.current.charIndex = charIndex - 1;
-        } else {
-          // Move to next word
-          placeholderRef.current.isDeleting = false;
-          placeholderRef.current.wordIndex = (wordIndex + 1) % PLACEHOLDER_WORDS.length;
-        }
-      }
-    }, placeholderRef.current.isDeleting ? 80 : 180);
+      emojiIndexRef.current = (emojiIndexRef.current + 1) % PLACEHOLDER_EMOJIS.length;
+      setPlaceholderEmoji(PLACEHOLDER_EMOJIS[emojiIndexRef.current]);
+    }, 1500);
 
     return () => clearInterval(timer);
   }, [searchQuery, searchFocused]);
@@ -2088,6 +2068,16 @@ useFocusEffect(
       if (mountedRef.current) setTopPostsLoading(false);
     }
   };
+
+  // Deep link: switch to topPosts tab when navigated with ?tab=topPosts
+  useEffect(() => {
+    if (tab === 'topPosts' && activeTab !== 'topPosts') {
+      setActiveTab('topPosts');
+      setPlayingVideos([]);
+      fetchTopPosts();
+    }
+  }, [tab]);
+
   const performSearch = () => { if (searchQuery.trim()) { const q = searchQuery.trim(); setSearchQuery(''); router.push({ pathname: "/search-results", params: { query: q } }); } };
   const toggleCategory = (itemName: string) => { 
   setSelectedCategories((prev) => 
@@ -2150,82 +2140,6 @@ return (
   <View style={styles.container}>
     <View style={styles.headerContainer}>
       {/* GRADIENT HEADER REMOVED - START DIRECTLY WITH SEARCH */}
-
-      {/* Search Box and Categories - Hidden for restaurant users and Top tab */}
-      {accountType !== 'restaurant' && activeTab !== 'topPosts' && (
-        <>
-          {/* Search Box - Now at the top */}
-          <View style={styles.searchBoxWrapper}>
-            <View style={styles.searchBox}>
-              <TouchableOpacity onPress={performSearch} activeOpacity={0.7}>
-                <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
-              </TouchableOpacity>
-              <View style={{ flex: 1, justifyContent: 'center' }}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder=""
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  returnKeyType="search"
-                  onSubmitEditing={performSearch}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                />
-                {!searchQuery && !searchFocused && (
-                  <View style={styles.animatedPlaceholder} pointerEvents="none">
-                    <Text style={styles.animatedPlaceholderStatic}>Search for </Text>
-                    <Text style={styles.animatedPlaceholderTyping}>{placeholderText}</Text>
-                    <Text style={styles.animatedPlaceholderCursor}>|</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* UPDATED CATEGORY BUTTON - NEW BRAND COLORS */}
-              <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
-                <LinearGradient
-                  colors={["#FF2E2E", "#FF7A18"]}  // NEW BRAND COLORS
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.categoryButtonGradient}
-                >
-                  <Text style={styles.categoryButtonEmoji}>🍽️</Text>
-                  <Text style={styles.categoryButtonText}>
-                    {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* QUICK CATEGORY CHIPS */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.quickCategoryScroll}
-            contentContainerStyle={styles.quickCategoryContainer}
-          >
-            {QUICK_CATEGORIES.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.quickCategoryChip,
-                  selectedQuickCategory === category.id && styles.quickCategoryChipActive
-                ]}
-                onPress={() => handleQuickCategoryPress(category)}
-                activeOpacity={0.7}
-              >
-                {renderCategoryIcon(category.emoji, 13, 4)}
-                <Text style={[
-                  styles.quickCategoryText,
-                  selectedQuickCategory === category.id && styles.quickCategoryTextActive
-                ]}>
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </>
-      )}
 
       {/* TOP POSTS | DASHBOARD/MAP | USERS TOGGLE */}
 <View style={styles.toggleContainer}>
@@ -2298,6 +2212,81 @@ return (
     </TouchableOpacity>
   </View>
 </View>
+
+      {/* Search Box and Categories - Shown for MAP and USERS tabs, hidden for TOP and restaurant users */}
+      {accountType !== 'restaurant' && activeTab !== 'topPosts' && (
+        <>
+          {/* Search Box */}
+          <View style={styles.searchBoxWrapper}>
+            <View style={styles.searchBox}>
+              <TouchableOpacity onPress={performSearch} activeOpacity={0.7}>
+                <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+              </TouchableOpacity>
+              <View style={{ flex: 1, justifyContent: 'center' }}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder=""
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  returnKeyType="search"
+                  onSubmitEditing={performSearch}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                />
+                {!searchQuery && !searchFocused && (
+                  <View style={styles.animatedPlaceholder} pointerEvents="none">
+                    <Text style={styles.animatedPlaceholderStatic}>Search for </Text>
+                    <Text style={{ fontSize: 18 }}>{placeholderEmoji}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* UPDATED CATEGORY BUTTON - NEW BRAND COLORS */}
+              <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
+                <LinearGradient
+                  colors={["#FF2E2E", "#FF7A18"]}  // NEW BRAND COLORS
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.categoryButtonGradient}
+                >
+                  <Text style={styles.categoryButtonEmoji}>🍽️</Text>
+                  <Text style={styles.categoryButtonText}>
+                    {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* QUICK CATEGORY CHIPS */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.quickCategoryScroll}
+            contentContainerStyle={styles.quickCategoryContainer}
+          >
+            {QUICK_CATEGORIES.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.quickCategoryChip,
+                  selectedQuickCategory === category.id && styles.quickCategoryChipActive
+                ]}
+                onPress={() => handleQuickCategoryPress(category)}
+                activeOpacity={0.7}
+              >
+                {renderCategoryIcon(category.emoji, 13, 4)}
+                <Text style={[
+                  styles.quickCategoryText,
+                  selectedQuickCategory === category.id && styles.quickCategoryTextActive
+                ]}>
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
+      )}
 </View>
 
       {/* USERS TAB: Category Tags - Hidden for restaurant users */}
@@ -2547,12 +2536,7 @@ return (
                 onPress={() => router.push(`/post-details/${item.id}`)}
                 activeOpacity={0.9}
               >
-                <LinearGradient
-                  colors={['#FF2E2E', '#FF7A18']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.regularCardBorder}
-                >
+                <View style={styles.regularCardBorder}>
                   <View style={styles.regularCardInner}>
                     {/* Rank badge - corner style like hero */}
                     <LinearGradient
@@ -2625,7 +2609,7 @@ return (
                       </View>
                     </View>
                   </View>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -2839,7 +2823,7 @@ const styles = StyleSheet.create({
     position: "relative", 
     marginBottom: 0,  // Reduced from 30 since no gradient
     zIndex: 10,
-    paddingTop: Platform.OS === 'ios' ? 50 : 35,  // Add safe area padding
+    paddingTop: Platform.OS === 'ios' ? 62 : 40,  // Add safe area padding for Dynamic Island
   },
   
   tabContainer: {
@@ -3111,7 +3095,7 @@ const styles = StyleSheet.create({
   },
   heroImageWrapper: {
     width: 'auto' as any,
-    height: 200,
+    height: 300,
     marginHorizontal: -16,
     marginBottom: 12,
     overflow: 'hidden' as const,
@@ -3156,18 +3140,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5E5',
   },
   regularCardBorder: {
-    borderRadius: 12,
-    padding: 2,
-    marginBottom: 10,
+    borderRadius: 14,
+    marginBottom: 12,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
   },
   regularCardInner: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 13,
     padding: 12,
   },
   regularCardHeader: {

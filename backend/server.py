@@ -1101,6 +1101,7 @@ async def create_post(
         "tagged_restaurant_id": tagged_restaurant_id if tagged_restaurant_id else None,
         "likes_count": 0,
         "comments_count": 0,
+        "shares_count": 0,
         "popular_photos": [],
         "quality_score": quality_score,
         "engagement_score": 0.0,
@@ -1470,6 +1471,7 @@ async def get_feed(
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
+                "shares_count": post.get("shares_count", 0),
                 "clicks_count": post.get("clicks_count", 0),
                 "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
@@ -1549,6 +1551,7 @@ async def get_feed(
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
+                "shares_count": post.get("shares_count", 0),
                 "clicks_count": post.get("clicks_count", 0),
                 "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
@@ -1635,6 +1638,7 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "is_following": is_following,
@@ -1803,6 +1807,30 @@ async def unlike_post(post_id: str, current_user: dict = Depends(get_current_use
     
     return {"message": "Post unliked"}
 
+# ==================== SHARE POST ENDPOINT ====================
+
+@app.post("/api/posts/{post_id}/share")
+async def share_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Increment share count for a post"""
+    db = get_database()
+
+    # Try user post first, then restaurant post
+    result = await db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"shares_count": 1}}
+    )
+
+    if result.matched_count == 0:
+        result = await db.restaurant_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"shares_count": 1}}
+        )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    return {"message": "Share count updated"}
+
 # ==================== SAVE POSTS ENDPOINTS ====================
 
 @app.post("/api/posts/{post_id}/save")
@@ -1938,8 +1966,11 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+            "dish_name": post.get("dish_name"),
+            "thumbnail_url": post.get("thumbnail_url"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": True,
             "created_at": post["created_at"],
@@ -1985,6 +2016,7 @@ async def list_liked_posts(skip: int = 0, limit: int = 100, current_user: dict =
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "created_at": post["created_at"],
             "liked_at": like.get("created_at"),
         })
@@ -2126,6 +2158,7 @@ async def get_saved_posts(user_id: str, skip: int = 0, limit: int = 50, current_
             "location_name": post.get("location_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": True,  # Always true for saved posts
             "created_at": post["created_at"],
@@ -2275,6 +2308,7 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2345,6 +2379,7 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2448,6 +2483,7 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2528,6 +2564,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2616,8 +2653,23 @@ async def search_posts(
         search_query["user_id"] = {"$nin": blocked_user_ids}
     
     # Get all posts that match the search query
-    all_posts = await db.posts.find(search_query).to_list(None)  # ✅ FIXED: Use search_query
-    
+    all_posts = await db.posts.find(search_query).to_list(None)
+
+    # Also search restaurant_posts collection
+    restaurant_search_query = {
+        "$or": [
+            {"review_text": search_regex},
+            {"caption": search_regex},
+            {"location_name": search_regex},
+            {"dish_name": search_regex},
+        ]
+    }
+    restaurant_posts_matched = await db.restaurant_posts.find(restaurant_search_query).to_list(None)
+    # Tag them so we can handle them differently in the result building
+    for rp in restaurant_posts_matched:
+        rp["_is_restaurant_post"] = True
+    all_posts.extend(restaurant_posts_matched)
+
     # Also search by username
     users_matching = await db.users.find({
         "full_name": search_regex
@@ -2733,43 +2785,91 @@ async def search_posts(
     # Build result
     result = []
     for post, score in paginated_posts:
-        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-        is_liked = await db.likes.find_one({
-            "post_id": str(post["_id"]),
-            "user_id": str(current_user["_id"])
-        }) is not None
-        
-        is_saved = await db.saved_posts.find_one({
-            "post_id": str(post["_id"]),
-            "user_id": str(current_user["_id"])
-        }) is not None
-        
-        media_type = post.get("media_type", "image")
-        image_url = post.get("image_url") if media_type == "image" else None
-        
-        result.append({
-            "id": str(post["_id"]),
-            "user_id": post["user_id"],
-            "username": user["full_name"] if user else "Unknown",
-            "user_profile_picture": user.get("profile_picture") if user else None,
-            "user_badge": user.get("badge") if user else None,
-            "media_url": post.get("media_url", ""),
-            "image_url": image_url,
-            "rating": post.get("rating", 0),
-            "review_text": post.get("review_text", ""),
-            "caption": post.get("review_text", ""),  # Alias for frontend compatibility
-            "location_name": post.get("location_name"),
-            "map_link": post.get("map_link"),
-            "likes_count": post.get("likes_count", 0),
-            "comments_count": post.get("comments_count", 0),
-            "clicks_count": post.get("clicks_count", 0),
-            "views_count": post.get("views_count", 0),
-            "is_liked_by_user": is_liked,
-            "is_saved_by_user": is_saved,
-            "created_at": post["created_at"],
-            "media_type": post.get("media_type", "image"),
-            "relevance_score": score  # For debugging/analytics
-        })
+        post_id_str = str(post["_id"])
+        current_user_id = str(current_user["_id"])
+        is_restaurant_post = post.get("_is_restaurant_post", False)
+
+        if is_restaurant_post:
+            restaurant_id = post.get("restaurant_id")
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)}) if restaurant_id else None
+
+            is_liked = await db.restaurant_likes.find_one({
+                "post_id": post_id_str,
+                "user_id": current_user_id
+            }) is not None
+
+            is_saved = await db.restaurant_saved_posts.find_one({
+                "post_id": post_id_str,
+                "user_id": current_user_id
+            }) is not None
+
+            media_type = post.get("media_type", "image")
+            result.append({
+                "id": post_id_str,
+                "user_id": restaurant_id,
+                "username": restaurant.get("restaurant_name", "Restaurant") if restaurant else "Restaurant",
+                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "user_badge": None,
+                "media_url": post.get("media_url", ""),
+                "image_url": post.get("image_url") if media_type == "image" else None,
+                "rating": post.get("rating", 0),
+                "review_text": post.get("review_text") or post.get("caption", ""),
+                "caption": post.get("review_text") or post.get("caption", ""),
+                "location_name": post.get("location_name"),
+                "map_link": post.get("map_link"),
+                "dish_name": post.get("dish_name"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "shares_count": post.get("shares_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
+                "views_count": post.get("views_count", 0),
+                "is_liked_by_user": is_liked,
+                "is_saved_by_user": is_saved,
+                "created_at": post.get("created_at"),
+                "media_type": media_type,
+                "account_type": "restaurant",
+                "relevance_score": score,
+            })
+        else:
+            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+            is_liked = await db.likes.find_one({
+                "post_id": post_id_str,
+                "user_id": current_user_id
+            }) is not None
+
+            is_saved = await db.saved_posts.find_one({
+                "post_id": post_id_str,
+                "user_id": current_user_id
+            }) is not None
+
+            media_type = post.get("media_type", "image")
+            image_url = post.get("image_url") if media_type == "image" else None
+
+            result.append({
+                "id": post_id_str,
+                "user_id": post["user_id"],
+                "username": user["full_name"] if user else "Unknown",
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "user_badge": user.get("badge") if user else None,
+                "media_url": post.get("media_url", ""),
+                "image_url": image_url,
+                "rating": post.get("rating", 0),
+                "review_text": post.get("review_text", ""),
+                "caption": post.get("review_text", ""),
+                "location_name": post.get("location_name"),
+                "map_link": post.get("map_link"),
+                "dish_name": post.get("dish_name"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "shares_count": post.get("shares_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
+                "views_count": post.get("views_count", 0),
+                "is_liked_by_user": is_liked,
+                "is_saved_by_user": is_saved,
+                "created_at": post["created_at"],
+                "media_type": post.get("media_type", "image"),
+                "relevance_score": score,
+            })
     
     return result
 
@@ -3076,9 +3176,11 @@ async def get_restaurant_reviews(
             "location_name": post.get("location_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
+            "dish_name": post.get("dish_name"),
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
-    
+
     return result
 
 # ==================== FOLLOW ENDPOINTS ====================
@@ -3784,37 +3886,92 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
     
     try:
         post = await db.posts.find_one({"_id": ObjectId(post_id)})
+        is_restaurant_post = False
+
         if not post:
-            raise HTTPException(status_code=404, detail="Post not found")
-        
+            # Also check restaurant_posts collection
+            post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+            if post:
+                is_restaurant_post = True
+            else:
+                raise HTTPException(status_code=404, detail="Post not found")
+
+        current_user_id = str(current_user["_id"])
+        post_id_str = str(post["_id"])
+
+        if is_restaurant_post:
+            restaurant_id = post.get("restaurant_id")
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(restaurant_id)}) if restaurant_id else None
+
+            is_liked = await db.restaurant_likes.find_one({
+                "post_id": post_id_str,
+                "user_id": current_user_id
+            }) is not None
+
+            is_saved = await db.restaurant_saved_posts.find_one({
+                "post_id": post_id_str,
+                "user_id": current_user_id
+            }) is not None
+
+            is_following = await db.follows.find_one({
+                "followerId": current_user_id,
+                "followingId": restaurant_id
+            }) is not None
+
+            media_type = post.get("media_type", "image")
+            return {
+                "id": post_id_str,
+                "user_id": restaurant_id,
+                "username": restaurant.get("restaurant_name", "Restaurant") if restaurant else "Restaurant",
+                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "restaurant_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "user_badge": None,
+                "user_level": 1,
+                "media_url": post.get("media_url", ""),
+                "image_url": post.get("image_url") if media_type == "image" else None,
+                "thumbnail_url": post.get("thumbnail_url"),
+                "media_type": media_type,
+                "rating": post.get("rating", 0),
+                "review_text": post.get("review_text") or post.get("caption", ""),
+                "map_link": post.get("map_link"),
+                "location_name": post.get("location_name"),
+                "category": post.get("category"),
+                "dish_name": post.get("dish_name"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "shares_count": post.get("shares_count", 0),
+                "is_liked_by_user": is_liked,
+                "is_saved_by_user": is_saved,
+                "is_following": is_following,
+                "account_type": "restaurant",
+                "created_at": post.get("created_at")
+            }
+
         user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
         if not user:
             raise HTTPException(status_code=404, detail="Post author not found")
-        
-        post_id_str = str(post["_id"])
-        current_user_id = str(current_user["_id"])
-        
+
         # Check if liked
         is_liked = await db.likes.find_one({
             "post_id": post_id_str,
             "user_id": current_user_id
         }) is not None
-        
+
         # Check if saved
         is_saved = await db.saved_posts.find_one({
             "post_id": post_id_str,
             "user_id": current_user_id
         }) is not None
-        
+
         # Check if current user is following the post author
         is_following = await db.follows.find_one({
             "followerId": current_user_id,
             "followingId": post["user_id"]
         }) is not None
-        
+
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
-        
+
         return {
             "id": post_id_str,
             "user_id": post["user_id"],
@@ -3834,6 +3991,7 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
+            "shares_count": post.get("shares_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "is_following": is_following,

@@ -1,12 +1,12 @@
 """
 Leaderboard Scheduler
 
-Automatically regenerates the leaderboard every 3 days at 10:00 AM.
+Automatically regenerates the leaderboard every 2 days at 10:00 AM.
 
 Uses APScheduler for reliable job scheduling.
 
-Schedule: Every 3 days at 10:00 AM (server local time)
-Cron Expression: 0 10 */3 * * (minute=0, hour=10, day=*/3)
+Schedule: Every 2 days at 10:00 AM (server local time)
+Cron Expression: 0 10 */2 * * (minute=0, hour=10, day=*/2)
 """
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -24,8 +24,8 @@ scheduler = None
 async def regenerate_leaderboard_job():
     """
     Scheduled job to regenerate the leaderboard.
-    
-    This function is called automatically every 3 days at 10:00 AM.
+
+    This function is called automatically every 2 days at 10:00 AM.
     It imports the leaderboard generation function and executes it.
     """
     try:
@@ -33,13 +33,13 @@ async def regenerate_leaderboard_job():
         logger.info("🏆 SCHEDULED LEADERBOARD REGENERATION STARTED")
         logger.info(f"🏆 Time: {datetime.now().isoformat()}")
         logger.info("🏆 ========================================")
-        
+
         # Import here to avoid circular dependencies
-        from routers.leaderboard import generate_leaderboard_snapshot
-        
+        from routers.leaderboard import generate_leaderboard_snapshot, send_leaderboard_rank_notifications
+
         # Generate new leaderboard snapshot
         snapshot = await generate_leaderboard_snapshot()
-        
+
         if snapshot:
             logger.info("✅ ========================================")
             logger.info("✅ LEADERBOARD REGENERATION COMPLETED")
@@ -49,7 +49,15 @@ async def regenerate_leaderboard_job():
             logger.info("✅ ========================================")
         else:
             logger.warning("⚠️ No posts available for leaderboard generation")
-            
+
+        # Send rank notifications to top 10 users
+        try:
+            logger.info("🔔 Sending leaderboard rank notifications...")
+            await send_leaderboard_rank_notifications()
+            logger.info("✅ Leaderboard rank notifications sent")
+        except Exception as e:
+            logger.error(f"❌ Error sending rank notifications: {e}")
+
     except Exception as e:
         logger.error(f"❌ ========================================")
         logger.error(f"❌ LEADERBOARD REGENERATION FAILED")
@@ -62,51 +70,51 @@ async def regenerate_leaderboard_job():
 def start_scheduler():
     """
     Initialize and start the APScheduler.
-    
+
     Schedule Configuration:
     - Trigger: CronTrigger
-    - Schedule: Every 3 days at 10:00 AM
+    - Schedule: Every 2 days at 10:00 AM
     - Timezone: Server local time
-    
+
     Cron Expression Breakdown:
     - minute=0: Run at minute 0 (top of the hour)
     - hour=10: Run at 10 AM
-    - day='*/3': Run every 3 days
+    - day='*/2': Run every 2 days
     - month='*': Every month
     - day_of_week='*': Any day of the week
     """
     global scheduler
-    
+
     if scheduler is not None:
         logger.warning("⚠️ Scheduler already running")
         return
-    
+
     scheduler = AsyncIOScheduler()
-    
+
     # Add the leaderboard regeneration job
-    # Schedule: Every 3 days at 10:00 AM
+    # Schedule: Every 2 days at 10:00 AM
     scheduler.add_job(
         regenerate_leaderboard_job,
         trigger=CronTrigger(
             minute=0,        # At minute 0
             hour=10,         # At 10 AM
-            day='*/3',       # Every 3 days
+            day='*/2',       # Every 2 days
             month='*',       # Every month
             day_of_week='*'  # Any day of week
         ),
         id='leaderboard_regeneration',
-        name='Leaderboard Regeneration (Every 3 days at 10:00 AM)',
+        name='Leaderboard Regeneration (Every 2 days at 10:00 AM)',
         replace_existing=True,
         max_instances=1  # Prevent overlapping executions
     )
-    
+
     # Start the scheduler
     scheduler.start()
-    
+
     logger.info("✅ ========================================")
     logger.info("✅ SCHEDULER STARTED")
     logger.info("✅ Job: Leaderboard Regeneration")
-    logger.info("✅ Schedule: Every 3 days at 10:00 AM")
+    logger.info("✅ Schedule: Every 2 days at 10:00 AM")
     logger.info("✅ Next run: " + str(scheduler.get_job('leaderboard_regeneration').next_run_time))
     logger.info("✅ ========================================")
 
@@ -116,7 +124,7 @@ def stop_scheduler():
     Stop the scheduler gracefully.
     """
     global scheduler
-    
+
     if scheduler is not None:
         scheduler.shutdown(wait=True)
         scheduler = None
@@ -126,26 +134,26 @@ def stop_scheduler():
 def get_scheduler_status():
     """
     Get the current status of the scheduler.
-    
+
     Returns:
         dict: Scheduler status information
     """
     global scheduler
-    
+
     if scheduler is None:
         return {
             "running": False,
             "message": "Scheduler not initialized"
         }
-    
+
     job = scheduler.get_job('leaderboard_regeneration')
-    
+
     if job is None:
         return {
             "running": False,
             "message": "Leaderboard job not found"
         }
-    
+
     return {
         "running": True,
         "job_id": job.id,
@@ -164,4 +172,3 @@ async def run_job_now():
     """
     logger.info("🔄 Manual job execution triggered")
     await regenerate_leaderboard_job()
-

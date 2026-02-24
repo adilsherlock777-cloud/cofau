@@ -14,6 +14,9 @@ import {
   Modal,
   KeyboardAvoidingView,
   FlatList,
+  PanResponder,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,6 +43,152 @@ const renderCategoryIcon = (emoji: string, size: number) => {
   if (emoji === '__veg__') return <FoodTypeIcon type="veg" size={size} />;
   if (emoji === '__nonveg__') return <FoodTypeIcon type="nonveg" size={size} />;
   return <Text style={{ fontSize: size }}>{emoji}</Text>;
+};
+
+// Slider Component - drag to rate
+const StarSlider = ({ value, onValueChange, maxStars = 10 }: {
+  value: number;
+  onValueChange: (val: number) => void;
+  maxStars?: number;
+}) => {
+  const trackRef = React.useRef<View>(null);
+  const layoutRef = React.useRef({ x: 0, width: 0 });
+  const onValueChangeRef = React.useRef(onValueChange);
+  onValueChangeRef.current = onValueChange;
+
+  // Star pop animation
+  const starScale = React.useRef(new Animated.Value(0)).current;
+  const starOpacity = React.useRef(new Animated.Value(0)).current;
+  const starTranslateY = React.useRef(new Animated.Value(0)).current;
+  const lastValueRef = React.useRef(value);
+  lastValueRef.current = value;
+
+  const calcValue = (pageX: number) => {
+    const { x, width } = layoutRef.current;
+    if (width === 0) return value;
+    const relativeX = pageX - x;
+    const ratio = Math.max(0, Math.min(1, relativeX / width));
+    return Math.max(0, Math.min(maxStars, Math.round(ratio * maxStars)));
+  };
+
+  const panResponder = React.useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > Math.abs(gs.dy),
+    onPanResponderGrant: (evt) => {
+      onValueChangeRef.current(calcValue(evt.nativeEvent.pageX));
+    },
+    onPanResponderMove: (evt) => {
+      onValueChangeRef.current(calcValue(evt.nativeEvent.pageX));
+    },
+    onPanResponderRelease: () => {
+      if (lastValueRef.current > 0) {
+        starScale.setValue(0);
+        starOpacity.setValue(1);
+        starTranslateY.setValue(0);
+        Animated.parallel([
+          Animated.spring(starScale, {
+            toValue: 1,
+            friction: 3,
+            tension: 200,
+            useNativeDriver: true,
+          }),
+          Animated.sequence([
+            Animated.delay(500),
+            Animated.parallel([
+              Animated.timing(starOpacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(starTranslateY, {
+                toValue: -10,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+            ]),
+          ]),
+        ]).start();
+      }
+    },
+  }), [maxStars]);
+
+  const fillPercent = (value / maxStars) * 100;
+
+  return (
+    <View
+      ref={trackRef}
+      onLayout={() => {
+        trackRef.current?.measureInWindow((x: number, _y: number, width: number) => {
+          layoutRef.current = { x, width };
+        });
+      }}
+      {...panResponder.panHandlers}
+      style={{ height: 32, justifyContent: 'center', marginTop: 4 }}
+    >
+      {/* Track background */}
+      <View style={{ height: 8, borderRadius: 4, backgroundColor: '#EBEBEB' }}>
+        {/* Filled portion */}
+        {value > 0 && (
+          <View style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: `${fillPercent}%`,
+            borderRadius: 4,
+            overflow: 'hidden',
+          }}>
+            <LinearGradient
+              colors={['#FF2E2E', '#FF7A18']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1 }}
+            />
+          </View>
+        )}
+      </View>
+      {/* Thumb */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: `${fillPercent}%`,
+          marginLeft: -11,
+          width: 22,
+          height: 14,
+          borderRadius: 4,
+          backgroundColor: '#FFF',
+          padding: 2,
+          elevation: 4,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.25,
+          shadowRadius: 3,
+        }}
+      >
+        <LinearGradient
+          colors={['#FF2E2E', '#FF7A18']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1, borderRadius: 2 }}
+        />
+      </View>
+      {/* Star pop animation */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: `${fillPercent}%`,
+          marginLeft: -12,
+          top: -16,
+          opacity: starOpacity,
+          transform: [{ scale: starScale }, { translateY: starTranslateY }],
+        }}
+      >
+        <Ionicons name="star" size={24} color="#FF7A18" />
+      </Animated.View>
+    </View>
+  );
 };
 
 export default function AddPostScreen() {
@@ -653,72 +802,45 @@ return (
     <Text style={styles.sectionLabel}>Rating</Text>
     
     {/* Average Rating Display */}
-    <View style={styles.avgRatingContainer}>
-      <Text style={styles.avgRatingLabel}>Average Rating</Text>
+    <LinearGradient
+      colors={['#FF2E2E', '#FF7A18']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.avgRatingContainer}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Ionicons name="star" size={18} color="#FFF" />
+        <Text style={styles.avgRatingLabel}>Average Rating</Text>
+      </View>
       <Text style={styles.avgRatingNumber}>{getAverageRating()} / 10</Text>
-    </View>
+    </LinearGradient>
 
-    {/* Taste Rating */}
+    {/* All Ratings in one box */}
     <View style={styles.ratingContainer}>
       <View style={styles.ratingHeader}>
-        <Text style={{ fontSize: 20 }}>😋</Text>
+        <Text style={{ fontSize: 14 }}>😋</Text>
         <Text style={styles.ratingTitle}>Taste</Text>
         <Text style={styles.ratingValue}>{tasteRating}/10</Text>
       </View>
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-          <TouchableOpacity key={num} onPress={() => setTasteRating(num)}>
-            <Ionicons
-              name={tasteRating >= num ? 'star' : 'star-outline'}
-              size={24}
-              color={tasteRating >= num ? '#E94A37' : '#CCC'}
-              style={{ marginRight: 2 }}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+      <StarSlider value={tasteRating} onValueChange={setTasteRating} />
 
-    {/* Value for Money Rating */}
-    <View style={styles.ratingContainer}>
+      <View style={styles.ratingDivider} />
+
       <View style={styles.ratingHeader}>
-       <Text style={{ fontSize: 20 }}>💰</Text>
+        <Text style={{ fontSize: 14 }}>💰</Text>
         <Text style={styles.ratingTitle}>Value for Money</Text>
         <Text style={styles.ratingValue}>{valueRating}/10</Text>
       </View>
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-          <TouchableOpacity key={num} onPress={() => setValueRating(num)}>
-            <Ionicons
-              name={tasteRating >= num ? 'star' : 'star-outline'}
-              size={24}
-              color={valueRating >= num ? '#4ECDC4' : '#CCC'}
-              style={{ marginRight: 2 }}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+      <StarSlider value={valueRating} onValueChange={setValueRating} />
 
-    {/* Portion Rating */}
-    <View style={styles.ratingContainer}>
+      <View style={styles.ratingDivider} />
+
       <View style={styles.ratingHeader}>
-        <Text style={{ fontSize: 20 }}>🍽️</Text>
+        <Text style={{ fontSize: 14 }}>🍽️</Text>
         <Text style={styles.ratingTitle}>Portion Size</Text>
         <Text style={styles.ratingValue}>{portionRating}/10</Text>
       </View>
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-          <TouchableOpacity key={num} onPress={() => setPortionRating(num)}>
-            <Ionicons
-              name={portionRating >= num ? 'star' : 'star-outline'}
-              size={24}
-              color={portionRating >= num ? '#F2CF68' : '#CCC'}
-              style={{ marginRight: 2 }}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
+      <StarSlider value={portionRating} onValueChange={setPortionRating} />
     </View>
   </View>
 )}
@@ -967,9 +1089,10 @@ return (
           style={styles.postButtonContainer}
           onPress={handlePost}
           disabled={loading}
+          activeOpacity={0.85}
         >
           <LinearGradient
-            colors={['#FF2E2E', '#F2CF68', '#FF9A4D']}
+            colors={['#FF2E2E', '#FF7A18']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.postButton}
@@ -977,7 +1100,10 @@ return (
             {loading ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
-              <Text style={styles.postButtonText}>POST</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="paper-plane" size={18} color="#FFF" />
+                <Text style={styles.postButtonText}>POST</Text>
+              </View>
             )}
           </LinearGradient>
         </TouchableOpacity>
@@ -1215,14 +1341,17 @@ const styles = StyleSheet.create({
 
   ratingContainer: {
     backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
-
-  ratingNumber: { fontSize: 22, fontWeight: 'bold', marginBottom: 12 },
-  starsContainer: { flexDirection: 'row', flexWrap: 'wrap' },
+  ratingDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 8,
+  },
 
   reviewInput: {
     backgroundColor: '#FFF',
@@ -1263,14 +1392,27 @@ const styles = StyleSheet.create({
     color: '#FF9A4D',
   },
 
-  postButtonContainer: { marginTop: 10 },
+  postButtonContainer: {
+    marginTop: 16,
+    borderRadius: 16,
+    shadowColor: '#FF2E2E',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
   postButton: {
-    paddingVertical: 18,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  postButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  postButtonText: {
+    color: '#FFF',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
 
   // Category Styles
   categoryButton: {
@@ -1281,7 +1423,6 @@ const styles = StyleSheet.create({
     borderColor: '#E5E5E5',
   },
   avgRatingContainer: {
-  backgroundColor: '#1B7C82',
   borderRadius: 12,
   padding: 16,
   marginBottom: 12,
@@ -1302,17 +1443,17 @@ avgRatingNumber: {
 ratingHeader: {
   flexDirection: 'row',
   alignItems: 'center',
-  marginBottom: 10,
-  gap: 8,
+  marginBottom: 2,
+  gap: 6,
 },
 ratingTitle: {
-  fontSize: 15,
+  fontSize: 13,
   fontWeight: '600',
   color: '#333',
   flex: 1,
 },
 ratingValue: {
-  fontSize: 14,
+  fontSize: 12,
   fontWeight: 'bold',
   color: '#666',
 },
