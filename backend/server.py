@@ -3025,20 +3025,51 @@ async def search_restaurants_by_menu(
 
     db = get_database()
     query = q.strip().lower()
-    search_regex = {"$regex": query, "$options": "i"}
 
-    # Search menu_items collection for matching item names
+    # Split query into individual words and build regex that matches ANY word
+    words = [w for w in query.split() if len(w) >= 2]
+    if not words:
+        return []
+
+    # Regex: match any of the words (e.g. "butter|chicken")
+    any_word_pattern = "|".join(words)
+    any_word_regex = {"$regex": any_word_pattern, "$options": "i"}
+    # Also keep the full query regex for restaurant name search
+    full_query_regex = {"$regex": query, "$options": "i"}
+
+    # Search menu_items collection - match ANY word from the query
+    menu_query = {"$or": [{"name": any_word_regex}, {"category": any_word_regex}, {"description": any_word_regex}]}
+    # Only filter by status if the field exists (some items might not have status)
     matching_items = await db.menu_items.find({
-        "name": search_regex,
-        "status": "approved",
+        **menu_query,
+        "$or": menu_query["$or"] + [{"name": any_word_regex}],
+    }).to_list(None)
+
+    # Deduplicate: re-query properly
+    matching_items = await db.menu_items.find({
+        "$and": [
+            {"$or": [
+                {"name": any_word_regex},
+                {"category": any_word_regex},
+                {"description": any_word_regex},
+            ]},
+        ]
     }).to_list(None)
 
     # Group by restaurant_id
     restaurant_items_map = {}
+    seen_items = set()
     for item in matching_items:
         rid = item.get("restaurant_id")
+        item_name = item.get("name", "")
         if not rid:
             continue
+        # Deduplicate items per restaurant
+        item_key = f"{rid}_{item_name}"
+        if item_key in seen_items:
+            continue
+        seen_items.add(item_key)
+
         if rid not in restaurant_items_map:
             restaurant_items_map[rid] = []
         restaurant_items_map[rid].append({
@@ -3048,9 +3079,13 @@ async def search_restaurants_by_menu(
             "image_url": item.get("image_url"),
         })
 
-    # Also search by restaurant_name directly
+    # Also search by restaurant_name directly (full query and individual words)
     matching_restaurants_by_name = await db.restaurants.find({
-        "restaurant_name": search_regex
+        "$or": [
+            {"restaurant_name": full_query_regex},
+            {"restaurant_name": any_word_regex},
+            {"cuisine_type": any_word_regex},
+        ]
     }).to_list(None)
 
     for r in matching_restaurants_by_name:
