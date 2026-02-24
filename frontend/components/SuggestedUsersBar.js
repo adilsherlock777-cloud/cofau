@@ -28,7 +28,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
   
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [followingIds, setFollowingIds] = useState(new Set());
   const [loadingFollow, setLoadingFollow] = useState(null);
 
   const fetchSuggestedUsers = useCallback(async () => {
@@ -53,25 +52,15 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
 
   const handleFollow = async (userId) => {
     if (!token || loadingFollow) return;
-    
+
     setLoadingFollow(userId);
-    
+
     try {
-      if (followingIds.has(userId)) {
-        await axios.delete(`${BACKEND_URL}/api/users/${userId}/follow`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setFollowingIds(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(userId);
-          return newSet;
-        });
-      } else {
-        await axios.post(`${BACKEND_URL}/api/users/${userId}/follow`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setFollowingIds(prev => new Set(prev).add(userId));
-      }
+      await axios.post(`${BACKEND_URL}/api/users/${userId}/follow`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Remove the user card immediately after following
+      setUsers(prev => prev.filter(u => u.id !== userId));
     } catch (error) {
     } finally {
       setLoadingFollow(null);
@@ -96,7 +85,6 @@ const handlePostPress = (userId) => {
   };
 
   const renderUserCard = ({ item }) => {
-    const isFollowing = followingIds.has(item.id);
     const isLoadingThis = loadingFollow === item.id;
     const mediaUrl = normalizeMediaUrl(item.latest_post?.media_url);
     const profilePic = normalizeProfilePicture(item.profile_picture);
@@ -174,28 +162,18 @@ const handlePostPress = (userId) => {
               onPress={() => handleFollow(item.id)}
               disabled={isLoadingThis}
             >
-              {isFollowing ? (
-                <View style={styles.followingButton}>
-                  {isLoadingThis ? (
-                    <ActivityIndicator size="small" color="#333" />
-                  ) : (
-                    <Text style={styles.followingButtonText}>Following</Text>
-                  )}
-                </View>
-              ) : (
-                <LinearGradient
-                  colors={["#FF2E2E", "#FF7A18"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.followButton}
-                >
-                  {isLoadingThis ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.followButtonText}>Follow</Text>
-                  )}
-                </LinearGradient>
-              )}
+              <LinearGradient
+                colors={["#FF2E2E", "#FF7A18"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.followButton}
+              >
+                {isLoadingThis ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.followButtonText}>Follow</Text>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -382,17 +360,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 30,
   },
-  followingButton: {
-    backgroundColor: "#f0f0f0",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
   followButtonText: {
     color: "#fff",
     fontSize: 13,
     fontWeight: "700",
-  },
-  followingButtonText: {
-    color: "#333",
   },
 });

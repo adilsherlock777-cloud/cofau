@@ -331,7 +331,7 @@ export default function SearchResultsScreen() {
         <TouchableOpacity
           style={styles.userItem}
           activeOpacity={0.7}
-          onPress={() => router.push(`/profile?userId=${item.id}`)}
+          onPress={() => router.push(`/user-profile/${item.id}`)}
         >
           <UserAvatar
             profilePicture={item.profile_picture}
@@ -548,7 +548,7 @@ export default function SearchResultsScreen() {
       <TouchableOpacity
         style={styles.restaurantCard}
         activeOpacity={0.7}
-        onPress={() => router.push(`/profile?userId=${item.id}`)}
+        onPress={() => router.push(`/user-profile/${item.id}`)}
       >
         <UserAvatar
           profilePicture={profilePic}
