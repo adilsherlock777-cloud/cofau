@@ -13,7 +13,7 @@ import {
   Easing,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
@@ -23,7 +23,6 @@ import * as Location from 'expo-location';
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SalesDashboard } from './SalesDashboard';
 
 export const options = {
   headerShown: false,
@@ -159,7 +158,7 @@ const VideoThumbnail = memo(({ videoUrl, thumbnailUrl, style, shouldPlay, onLayo
   );
 });
 
-export default function HappeningPlaces() {
+export default function HappeningPlaces({ embedded = false }) {
   const router = useRouter();
   const { token, accountType } = useAuth();
   const isRestaurant = accountType === 'restaurant';
@@ -573,11 +572,7 @@ export default function HappeningPlaces() {
     const overlayBadges = (
       <>
         <View style={styles.gridClicksBadge}>
-          {isVideo ? (
-            <Ionicons name="eye-outline" size={9} color="#fff" />
-          ) : (
-            <MaterialCommunityIcons name="gesture-tap" size={10} color="#fff" />
-          )}
+          <Ionicons name="eye-outline" size={13} color="#fff" />
           <Text style={styles.gridClicksText}>{formatCount(isVideo ? viewsCount : clicksCount)}</Text>
         </View>
         {dishName && (
@@ -673,12 +668,12 @@ export default function HappeningPlaces() {
   if (loading) {
     return (
       <>
-        <Stack.Screen options={{ headerShown: false }} />
+        {!embedded && <Stack.Screen options={{ headerShown: false }} />}
         <View style={styles.container}>
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
             {/* Header */}
-            <View style={styles.plainHeader}>
-              {isRestaurant ? (
+            <View style={[styles.plainHeader, embedded && { paddingTop: 8 }]}>
+              {isRestaurant && !embedded ? (
                 <MaskedView
                   maskElement={
                     <Text style={styles.headerTitleLobster}>Sales Dashboard</Text>
@@ -694,19 +689,21 @@ export default function HappeningPlaces() {
                 </MaskedView>
               ) : (
                 <>
-                  <MaskedView
-                    maskElement={
-                      <Text style={styles.headerTitleLobster}>Happening Places</Text>
-                    }
-                  >
-                    <LinearGradient
-                      colors={['#FF2E2E', '#FF7A18']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
+                  {!embedded && (
+                    <MaskedView
+                      maskElement={
+                        <Text style={styles.headerTitleLobster}>Happening Places</Text>
+                      }
                     >
-                      <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Happening Places</Text>
-                    </LinearGradient>
-                  </MaskedView>
+                      <LinearGradient
+                        colors={['#FF2E2E', '#FF7A18']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                      >
+                        <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Happening Places</Text>
+                      </LinearGradient>
+                    </MaskedView>
+                  )}
                   <View style={styles.subtitleRow}>
                     <Ionicons name="location" size={16} color="#E94A37" />
                     <Text style={styles.titleSub}>
@@ -716,11 +713,11 @@ export default function HappeningPlaces() {
                 </>
               )}
             </View>
-            
+
             {/* Skeleton Cards */}
             <SkeletonLoader />
           </ScrollView>
-          
+
         </View>
       </>
     );
@@ -730,51 +727,14 @@ export default function HappeningPlaces() {
   // MAIN RENDER
   // ============================================
 
-  // If restaurant user, show Sales Dashboard instead
-  if (isRestaurant) {
-    return (
-      <>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.container}>
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Header */}
-            <View style={styles.plainHeader}>
-              <MaskedView
-                maskElement={
-                  <Text style={styles.headerTitleLobster}>Sales Dashboard</Text>
-                }
-              >
-                <LinearGradient
-                  colors={['#FF2E2E', '#FF7A18']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Sales Dashboard</Text>
-                </LinearGradient>
-              </MaskedView>
-            </View>
-
-            {/* Sales Dashboard Component */}
-            <SalesDashboard token={token || ""} />
-          </ScrollView>
-
-        </View>
-      </>
-    );
-  }
-
   // Regular users see the normal happening places content
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
+      {!embedded && <Stack.Screen options={{ headerShown: false }} />}
 
       <View style={styles.container}>
         {/* Fixed Line - Shows only when scrolled */}
-        {showFixedLine && (
+        {showFixedLine && !embedded && (
           <View style={styles.fixedLine} />
         )}
 
@@ -786,20 +746,22 @@ export default function HappeningPlaces() {
           scrollEventThrottle={16}
         >
           {/* Header */}
-          <View style={styles.plainHeader}>
-            <MaskedView
-              maskElement={
-                <Text style={styles.headerTitleLobster}>Happening Places</Text>
-              }
-            >
-              <LinearGradient
-                colors={['#FF2E2E', '#FF7A18']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+          <View style={[styles.plainHeader, embedded && { paddingTop: 8 }]}>
+            {!embedded && (
+              <MaskedView
+                maskElement={
+                  <Text style={styles.headerTitleLobster}>Happening Places</Text>
+                }
               >
-                <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Happening Places</Text>
-              </LinearGradient>
-            </MaskedView>
+                <LinearGradient
+                  colors={['#FF2E2E', '#FF7A18']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Happening Places</Text>
+                </LinearGradient>
+              </MaskedView>
+            )}
             <View style={styles.subtitleRow}>
               <Ionicons name="location" size={16} color="#E94A37" />
               <Text style={styles.titleSub}>
@@ -1991,14 +1953,14 @@ skeletonImageLarge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 8,
-    gap: 2,
+    gap: 3,
   },
   gridClicksText: {
     color: '#fff',
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: '600',
   },
   gridDishTag: {
@@ -2006,14 +1968,23 @@ skeletonImageLarge: {
     bottom: 4,
     left: 4,
     backgroundColor: 'rgba(233, 74, 55, 0.85)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 5,
-    maxWidth: '80%',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    maxWidth: '65%',
+    borderBottomWidth: 1.5,
+    borderBottomColor: 'rgba(180, 40, 30, 0.9)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(200, 50, 35, 0.6)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
   },
   gridDishText: {
     color: '#fff',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '600',
   },
 

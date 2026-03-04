@@ -13,7 +13,7 @@
 // 3. Replace your loading UI section with the skeleton component
 // ============================================
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import {
   Platform,
   Modal,
   FlatList,
+  Animated,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -121,6 +122,85 @@ const getPostDP = (post: any) =>
     post.profilePicture
   );
 
+/* -------------------------
+   Spread apart consecutive
+   posts from the same user
+------------------------- */
+function spreadPosts(posts: any[]): any[] {
+  const result = [...posts];
+  for (let i = 1; i < result.length; i++) {
+    if (result[i].user_id === result[i - 1].user_id) {
+      let swapIdx = -1;
+      for (let j = i + 1; j < result.length; j++) {
+        if (result[j].user_id !== result[i].user_id) {
+          swapIdx = j;
+          break;
+        }
+      }
+      if (swapIdx !== -1) {
+        const temp = result[i];
+        result[i] = result[swapIdx];
+        result[swapIdx] = temp;
+      }
+    }
+  }
+  return result;
+}
+
+/* -------------------------
+   "You're All Caught Up"
+------------------------- */
+/* -------------------------
+   "Suggested Posts" Header
+------------------------- */
+const SuggestedPostsHeader = React.memo(() => (
+  <View style={styles.suggestedHeaderContainer}>
+    <LinearGradient
+      colors={['#FF2E2E', '#FF7A18']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.caughtUpAccentLine}
+    />
+    <View style={styles.suggestedHeaderContent}>
+      <Ionicons name="compass-outline" size={32} color="#FF7A18" />
+      <Text style={styles.suggestedHeaderTitle}>Suggested Posts</Text>
+      <Text style={styles.suggestedHeaderSubtitle}>
+        Posts you might like based on what's trending
+      </Text>
+    </View>
+    <LinearGradient
+      colors={['#FF7A18', '#FF2E2E']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.caughtUpAccentLine}
+    />
+  </View>
+));
+
+const CaughtUpDivider = React.memo(() => (
+  <View style={styles.caughtUpContainer}>
+    <LinearGradient
+      colors={['#FF2E2E', '#FF7A18']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.caughtUpAccentLine}
+    />
+    <View style={styles.caughtUpContent}>
+      <Ionicons name="checkmark-circle" size={40} color="#4CAF50" />
+      <Text style={styles.caughtUpTitle}>You're all caught up</Text>
+      <Text style={styles.caughtUpSubtitle}>
+        You've seen all new posts from the past 2 days
+      </Text>
+    </View>
+    <LinearGradient
+      colors={['#FF7A18', '#FF2E2E']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.caughtUpAccentLine}
+    />
+  </View>
+));
+
 export default function FeedScreen() {
   const router = useRouter();
   const { openWallet } = useLocalSearchParams<{ openWallet?: string }>();
@@ -152,6 +232,7 @@ export default function FeedScreen() {
   const [ownStoryData, setOwnStoryData] = useState<any>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletUnreadCount, setWalletUnreadCount] = useState(0);
+  const [suggestedPosts, setSuggestedPosts] = useState<any[]>([]);
 
   const flatListRef = useRef<FlatList>(null);
   const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
@@ -163,6 +244,10 @@ export default function FeedScreen() {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [restaurantReviewsCount, setRestaurantReviewsCount] = useState(0);
   const [suggestionsShown, setSuggestionsShown] = useState(false);
+  const [showNewPostsPill, setShowNewPostsPill] = useState(false);
+  const newestPostTimestampRef = useRef<string | null>(null);
+  const newPostsPillAnim = useRef(new Animated.Value(0)).current;
+  const justUploadedRef = useRef<boolean>(false);
 
   const POSTS_PER_PAGE = 30;
   const VISIBILITY_THRESHOLD = 0.2;
@@ -171,6 +256,55 @@ export default function FeedScreen() {
   const { register: registerFeedRefresh } = useFeedRefresh();
   const navigation = useNavigation();
   const fetchFeedRef = useRef<((forceRefresh?: boolean) => void) | null>(null);
+
+  // Build display data: deduplicate + insert "caught up" divider + suggested posts
+  const displayData = useMemo(() => {
+    let spread = spreadPosts(feedPosts);
+
+    // Pin user's own post to top right after they upload
+    if (justUploadedRef.current && user?.id && spread.length > 0) {
+      const ownIdx = spread.findIndex(
+        (p: any) =>
+          p.user_id === user.id &&
+          Date.now() - new Date(p.created_at).getTime() < 5 * 60 * 1000 // within 5 min
+      );
+      if (ownIdx > 0) {
+        const [ownPost] = spread.splice(ownIdx, 1);
+        spread.unshift(ownPost);
+      }
+      justUploadedRef.current = false;
+    }
+
+    const now = Date.now();
+    const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+
+    let dividerIndex = -1;
+    let hasRecent = false;
+    let hasOlder = false;
+
+    for (let i = 0; i < spread.length; i++) {
+      const postAge = now - new Date(spread[i].created_at).getTime();
+      if (postAge < FORTY_EIGHT_HOURS) {
+        hasRecent = true;
+      } else {
+        if (!hasOlder) dividerIndex = i;
+        hasOlder = true;
+      }
+    }
+
+    let result = [...spread];
+    if (hasRecent && hasOlder && dividerIndex > 0) {
+      result.splice(dividerIndex, 0, { type: 'caught_up_divider', id: 'caught_up_divider' });
+    }
+
+    // Append suggested posts when the regular feed has no more pages
+    if (!hasMore && suggestedPosts.length > 0) {
+      result.push({ type: 'suggested_header', id: 'suggested_header' });
+      result.push(...suggestedPosts);
+    }
+
+    return result;
+  }, [feedPosts, hasMore, suggestedPosts]);
 
   // Handle mute toggle
 const handleMuteToggle = useCallback((newMuteState: boolean) => {
@@ -228,6 +362,20 @@ const fetchWalletUnreadCount = async () => {
   }
 };
 
+const checkForNewPosts = useCallback(async () => {
+  if (!newestPostTimestampRef.current) return;
+  try {
+    const res = await axios.get(
+      `${BACKEND}/api/feed?skip=0&limit=1&sort=engagement&_t=${Date.now()}`
+    );
+    if (res.data && res.data.length > 0) {
+      if (res.data[0].created_at > newestPostTimestampRef.current) {
+        setShowNewPostsPill(true);
+      }
+    }
+  } catch (err) {}
+}, []);
+
 useFocusEffect(
   React.useCallback(() => {
     refreshUnreadCount();
@@ -235,6 +383,7 @@ useFocusEffect(
     fetchWalletUnreadCount();
     refreshUser();
     fetchOwnStory();
+    checkForNewPosts();
     if (accountType === 'restaurant') {
       fetchRestaurantReviewsCount();
     }
@@ -244,6 +393,50 @@ useFocusEffect(
       setVisibleVideoId(null);
     };
   }, [hasInitiallyLoaded, accountType])
+);
+
+// Animate "New Posts" pill
+useEffect(() => {
+  if (showNewPostsPill) {
+    Animated.spring(newPostsPillAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  } else {
+    Animated.timing(newPostsPillAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }
+}, [showNewPostsPill]);
+
+// Auto-refresh feed every 24 hours
+const lastAutoRefreshRef = useRef<number>(Date.now());
+useEffect(() => {
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+  const interval = setInterval(() => {
+    const elapsed = Date.now() - lastAutoRefreshRef.current;
+    if (elapsed >= TWENTY_FOUR_HOURS) {
+      lastAutoRefreshRef.current = Date.now();
+      fetchFeedRef.current?.(true);
+    }
+  }, 60 * 1000); // check every minute
+  return () => clearInterval(interval);
+}, []);
+
+// Also auto-refresh on tab focus if 24h has passed
+useFocusEffect(
+  React.useCallback(() => {
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    const elapsed = Date.now() - lastAutoRefreshRef.current;
+    if (elapsed >= TWENTY_FOUR_HOURS) {
+      lastAutoRefreshRef.current = Date.now();
+      fetchFeedRef.current?.(true);
+    }
+  }, [])
 );
 
 // Open wallet modal when navigated with openWallet param (e.g. from notifications)
@@ -260,6 +453,7 @@ useEffect(() => {
   if (lastUploadTimestamp > lastKnownUploadRef.current) {
     const prevLevel = previousLevelRef.current;
     lastKnownUploadRef.current = lastUploadTimestamp;
+    justUploadedRef.current = true;
     fetchFeed(true);
 
     // Show animations based on upload result
@@ -328,6 +522,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
   viewabilityDebounceRef.current = setTimeout(() => {
     const visibleVideo = viewableItems.find((item) => {
       const post = item.item;
+      if (post.type === 'caught_up_divider' || post.type === 'suggested_header') return false;
       const isVideo =
         post.media_type === "video" ||
         post.media_url?.toLowerCase().endsWith(".mp4");
@@ -377,12 +572,61 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
     }
   };
 
+  const fetchSuggestedPosts = async () => {
+    try {
+      const res = await axios.get(
+        `${BACKEND}/api/explore/trending?limit=20&_t=${Date.now()}`
+      );
+      if (!res.data || res.data.length === 0) return;
+
+      const feedIds = new Set(feedPosts.map((p: any) => String(p.id)));
+      const mapped = res.data
+        .filter((post: any) => !feedIds.has(String(post.id || post._id)))
+        .map((post: any) => ({
+          id: post.id || post._id,
+          user_id: post.user_id,
+          username: post.username,
+          user_profile_picture: getPostDP(post),
+          description: post.review_text || post.description || post.about,
+          rating: post.rating,
+          price: post.price,
+          about: post.about,
+          account_type: post.account_type,
+          media_url: normalizeMediaUrl(post.image_url || post.media_url),
+          thumbnail_url: post.thumbnail_url
+            ? normalizeMediaUrl(post.thumbnail_url)
+            : null,
+          media_type: post.media_type,
+          created_at: post.created_at,
+          user_level: post.user_level || post.level || post.userLevel,
+          location_name: post.location_name || post.location || post.place_name,
+          location_address: post.location_address || post.address,
+          map_link: post.map_link || post.google_maps_link,
+          likes: post.likes || post.likes_count || 0,
+          comments: post.comments || post.comments_count || 0,
+          shares_count: post.shares_count || post.shares || 0,
+          is_liked: post.is_liked || false,
+          is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
+          is_following: post.is_following || false,
+          tagged_restaurant: post.tagged_restaurant || null,
+          dish_name: post.dish_name || null,
+          user_badge: post.user_badge || null,
+          _isSuggested: true,
+        }));
+
+      setSuggestedPosts(mapped);
+    } catch (err) {
+      // silenced
+    }
+  };
+
   const fetchFeed = async (forceRefresh = false) => {
     try {
       if (forceRefresh) {
         setLoading(true);
         setPage(1);
         setHasMore(true);
+        setSuggestedPosts([]);
         paginationTriggeredRef.current = false;
       } else {
         if (!hasMore || loadingMore || paginationTriggeredRef.current) return;
@@ -393,7 +637,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
       const skip = forceRefresh ? 0 : (page - 1) * POSTS_PER_PAGE;
       const ts = forceRefresh ? `&_t=${Date.now()}` : "";
       const res = await axios.get(
-        `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}&sort=chronological${ts}`
+        `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}&sort=engagement${ts}`
       );
 
       if (res.data.length === 0) {
@@ -426,6 +670,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         map_link: post.map_link || post.google_maps_link,
         likes: post.likes || post.likes_count || 0,
         comments: post.comments || post.comments_count || 0,
+        shares_count: post.shares_count || post.shares || 0,
         is_liked: post.is_liked || false,
         is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
         is_following: post.is_following || false,
@@ -436,6 +681,10 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
 
       if (forceRefresh) {
         setFeedPosts(mapped);
+        if (mapped.length > 0) {
+          newestPostTimestampRef.current = mapped[0].created_at;
+        }
+        setShowNewPostsPill(false);
       } else {
         setFeedPosts((prev) => [...prev, ...mapped]);
         setPage((prev) => prev + 1);
@@ -452,6 +701,13 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
       setLoadingMore(false);
     }
   };
+
+  // Fetch suggested posts when feed runs out of pages
+  useEffect(() => {
+    if (!hasMore && feedPosts.length > 0 && suggestedPosts.length === 0) {
+      fetchSuggestedPosts();
+    }
+  }, [hasMore, feedPosts.length]);
 
   // Keep fetchFeed ref updated and register the Home tab double-tap handler
   fetchFeedRef.current = fetchFeed;
@@ -530,6 +786,11 @@ const handleScroll = useCallback(
 
     setShowFixedLine(scrollY > 100);
 
+    // Hide "New Posts" pill when scrolled near top
+    if (scrollY < 50 && showNewPostsPill) {
+      setShowNewPostsPill(false);
+    }
+
     if (scrollY < lastScrollYRef.current - 100) {
       paginationTriggeredRef.current = false;
     }
@@ -554,8 +815,15 @@ const handleScroll = useCallback(
       });
     }
   },
-  [hasMore, loadingMore, loading]
+  [hasMore, loadingMore, loading, showNewPostsPill]
 );
+
+const handleNewPostsPillPress = useCallback(() => {
+  flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  setRefreshing(true);
+  fetchFeed(true);
+  setShowNewPostsPill(false);
+}, []);
 
  useEffect(() => {
   return () => {
@@ -568,16 +836,26 @@ const handleScroll = useCallback(
   };
 }, []);
 
-// Update your renderPost function
+// Render post or divider
 const renderPost = useCallback(
   ({ item: post, index }) => {
+    if (post.type === 'caught_up_divider') {
+      return <CaughtUpDivider />;
+    }
+    if (post.type === 'suggested_header') {
+      return <SuggestedPostsHeader />;
+    }
+
     const isVideo =
       post.media_type === "video" ||
       post.media_url?.toLowerCase().endsWith(".mp4");
     const shouldPlay = isVideo && visibleVideoId === String(post.id);
 
-    // Show suggestions after every 5th post (index 4, 9, 14, etc.)
-    const showSuggestions = (index + 1) % 5 === 0;
+    // Count real posts (not dividers) for SuggestedUsersBar placement
+    const realPostIndex = displayData
+      .filter((item: any) => !item.type)
+      .indexOf(post);
+    const showSuggestions = realPostIndex >= 0 && (realPostIndex + 1) % 5 === 0;
 
     return (
       <View>
@@ -592,7 +870,7 @@ const renderPost = useCallback(
             onMuteToggle={handleMuteToggle}
           />
         </View>
-        
+
         {/* Show suggestions after every 5 posts */}
         {showSuggestions && (
           <SuggestedUsersBar refreshTrigger={refreshing} />
@@ -600,7 +878,7 @@ const renderPost = useCallback(
       </View>
     );
   },
-  [visibleVideoId, isMuted, handleMuteToggle, refreshing]
+  [visibleVideoId, isMuted, handleMuteToggle, refreshing, displayData]
 );
 
   // List Header Component
@@ -926,11 +1204,50 @@ const renderPost = useCallback(
       {/* Fixed Line */}
       {showFixedLine && <View style={styles.fixedLine} />}
 
+      {/* "New Posts" Floating Pill */}
+      {showNewPostsPill && (
+        <Animated.View
+          style={[
+            styles.newPostsPillWrapper,
+            {
+              opacity: newPostsPillAnim,
+              transform: [{
+                translateY: newPostsPillAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-30, 0],
+                }),
+              }],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleNewPostsPillPress}
+          >
+            <LinearGradient
+              colors={['#FF2E2E', '#FF7A18']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.newPostsPill}
+            >
+              <Ionicons name="arrow-up" size={14} color="#fff" />
+              <Text style={styles.newPostsPillText}>New Posts</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {/* FlatList */}
      <FlatList
   ref={flatListRef}
-  data={feedPosts}
-  keyExtractor={(item, index) => `post-${item.id}-${index}`}
+  data={displayData}
+  keyExtractor={(item, index) =>
+    item.type === 'caught_up_divider'
+      ? 'caught_up_divider'
+      : item.type === 'suggested_header'
+        ? 'suggested_header'
+        : `post-${item.id}-${index}`
+  }
   renderItem={renderPost}
   ListHeaderComponent={ListHeader}
   ListFooterComponent={ListFooter}
@@ -1510,5 +1827,83 @@ cofauGradient: {
     height: 1,
     backgroundColor: "#E8E8E8",
     marginHorizontal: 10,
+  },
+  // "You're All Caught Up" Divider
+  caughtUpContainer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  caughtUpAccentLine: {
+    height: 2,
+    width: '80%',
+    borderRadius: 1,
+  },
+  caughtUpContent: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  caughtUpTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginTop: 10,
+  },
+  caughtUpSubtitle: {
+    fontSize: 13,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  // "New Posts" Floating Pill
+  newPostsPillWrapper: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 1001,
+  },
+  newPostsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  newPostsPillText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  // "Suggested Posts" Header
+  suggestedHeaderContainer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  suggestedHeaderContent: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  suggestedHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginTop: 10,
+  },
+  suggestedHeaderSubtitle: {
+    fontSize: 13,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
 });

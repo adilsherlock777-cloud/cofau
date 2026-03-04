@@ -148,6 +148,12 @@ export default function NotificationsScreen() {
     }, [])
   );
 
+const SYSTEM_NOTIFICATION_TYPES = [
+  'wallet_reward', 'delivery_completed_reward', 'reward_earned',
+  'leaderboard_rank', 'badge_approved', 'badge_rejected',
+  'order_preparing', 'order_in_progress', 'order_completed', 'new_order',
+];
+
 const renderNotification = ({ item }: { item: any }) => {
   const isUnread = !item.isRead;
 
@@ -158,19 +164,28 @@ const renderNotification = ({ item }: { item: any }) => {
   };
 
   const isRewardNotification = item.type === 'wallet_reward' || item.type === 'delivery_completed_reward' || item.type === 'reward_earned';
+  const isSystemNotification = SYSTEM_NOTIFICATION_TYPES.includes(item.type);
 
   return (
     <TouchableOpacity
       style={[styles.notificationItem, isUnread && styles.unreadNotification]}
       onPress={() => handleNotificationPress(item)}
     >
-      <UserAvatar
-        profilePicture={item.fromUserProfilePicture}
-        username={item.fromUserName}
-        size={42}
-        level={item.fromUserLevel}
-        showLevelBadge={true}
-      />
+      {isSystemNotification ? (
+        <Image
+          source={require('../../assets/images/icon.png')}
+          style={styles.appIconAvatar}
+          resizeMode="cover"
+        />
+      ) : (
+        <UserAvatar
+          profilePicture={item.fromUserProfilePicture}
+          username={item.fromUserName}
+          size={42}
+          level={item.fromUserLevel}
+          showLevelBadge={true}
+        />
+      )}
 
       <View style={styles.notificationContent}>
         <Text style={[styles.notificationText, isUnread && styles.unreadText]}>
@@ -294,6 +309,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
+  },
+  appIconAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   notificationContent: {
     flex: 1,

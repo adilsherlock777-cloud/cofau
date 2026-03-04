@@ -28,6 +28,8 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { likePost, unlikePost } from "../../utils/api";
 import UserAvatar from "../../components/UserAvatar";
 import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
+import HappeningPlaces from "../../components/HappeningPlaces";
+import { SalesDashboard } from "../../components/SalesDashboard";
 let MapView: any;
 let Marker: any;
 let Callout: any;
@@ -170,6 +172,20 @@ const GradientHeart = ({ size = 18 }) => (
   </MaskedView>
 );
 
+const GradientText = ({ text, style }: { text: string; style: any }) => (
+  <MaskedView maskElement={<Text style={[style, { backgroundColor: 'transparent' }]}>{text}</Text>}>
+    <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+      <Text style={[style, { opacity: 0 }]}>{text}</Text>
+    </LinearGradient>
+  </MaskedView>
+);
+
+const GradientIcon = ({ name, size = 16 }: { name: any; size?: number }) => (
+  <MaskedView maskElement={<Ionicons name={name} size={size} color="#000" />}>
+    <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: size, height: size }} />
+  </MaskedView>
+);
+
 const distributePosts = (posts: any[]) => {
   const columns: any[][] = [[], [], []];
   const heights = [0, 0, 0];
@@ -247,7 +263,7 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
         </>
       )}
       <View style={styles.clicksBadge}>
-        <Ionicons name="eye-outline" size={9} color="#fff" />
+        <Ionicons name="eye-outline" size={13} color="#fff" />
         <Text style={styles.clicksText}>{(item.views_count || 0) > 1000 ? `${((item.views_count || 0) / 1000).toFixed(1)}K` : (item.views_count || 0)}</Text>
       </View>
       {item.dish_name && (
@@ -270,7 +286,7 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => {
         <View style={[styles.tileImage, styles.placeholderImage]}><Ionicons name="image-outline" size={32} color="#ccc" /></View>
       )}
       <View style={styles.clicksBadge}>
-        <MaterialCommunityIcons name="gesture-tap" size={10} color="#fff" />
+        <Ionicons name="eye-outline" size={13} color="#fff" />
         <Text style={styles.clicksText}>{(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}</Text>
       </View>
       {item.dish_name && (
@@ -417,6 +433,9 @@ const PostMarker = memo(({ post, onPress }: any) => {
     return () => clearTimeout(timer);
   }, []);
 
+  const viewCount = post.views_count || post.clicks_count || 0;
+  const viewCountDisplay = viewCount > 1000 ? `${(viewCount / 1000).toFixed(1)}K` : viewCount;
+
   // Android - Use expo-image for reliable rendering inside map markers
   if (Platform.OS === 'android') {
     const imageUrl = post.full_thumbnail_url || post.full_image_url;
@@ -451,6 +470,10 @@ const PostMarker = memo(({ post, onPress }: any) => {
               <Ionicons name="image" size={24} color="#fff" />
             </View>
           )}
+          <View style={styles.markerViewsBadge}>
+            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Text style={styles.markerViewsText}>{viewCountDisplay}</Text>
+          </View>
         </View>
       </Marker>
     );
@@ -486,6 +509,10 @@ const PostMarker = memo(({ post, onPress }: any) => {
               <Ionicons name="image" size={24} color="#fff" />
             </View>
           )}
+          <View style={styles.markerViewsBadge}>
+            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Text style={styles.markerViewsText}>{viewCountDisplay}</Text>
+          </View>
         </View>
         <View style={styles.postMarkerArrow} />
       </View>
@@ -864,7 +891,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
           style={[styles.mapToggleOption, filterType === 'posts' && styles.mapToggleOptionActive]}
           onPress={() => onFilterChange('posts')}
         >
-          <Text style={[styles.mapToggleText, filterType === 'posts' && styles.mapToggleTextActive]}>Posts</Text>
+          <Text style={[styles.mapToggleText, filterType === 'posts' && styles.mapToggleTextActive]}>Near me</Text>
         </TouchableOpacity>
         <View style={styles.mapToggleDivider} />
         <TouchableOpacity
@@ -1070,7 +1097,7 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
 
           <TouchableOpacity style={styles.viewProfileBtn} onPress={() => onViewPost(post)}>
             <LinearGradient
-              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+              colors={["#FF2E2E", "#FF7A18"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.viewProfileBtnGradient}
@@ -1333,7 +1360,7 @@ export default function ExploreScreen() {
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'map' | 'users' | 'topPosts'>(Platform.OS === 'android' ? 'users' : 'map');
+  const [activeTab, setActiveTab] = useState<'map' | 'users' | 'topPosts' | 'popular'>(Platform.OS === 'android' ? 'users' : 'map');
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -1790,9 +1817,20 @@ const handleQuickCategoryPress = (category: any) => {
     setShowRestaurantModal(true);
   };
 
-  const handlePostPress = (post: any) => {
+  const handlePostPress = async (post: any) => {
     setSelectedPost(post);
     setShowPostModal(true);
+
+    // Track click (same logic as grid tiles)
+    if (post && !post.is_clicked) {
+      setMapPosts((prev) => prev.map((p: any) => p.id === post.id ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true } : p));
+      try {
+        const tkn = await AsyncStorage.getItem('token');
+        axios.post(`${API_URL}/posts/${post.id}/click`, {}, {
+          headers: { Authorization: `Bearer ${tkn}` }
+        }).catch(() => {});
+      } catch {}
+    }
   };
 
   const handleClusterPress = (cluster: any) => {
@@ -2061,7 +2099,9 @@ useFocusEffect(
     try {
       const res = await axios.get(`${API_URL}/posts/last-3-days`, { headers: { Authorization: `Bearer ${token || ""}` } });
       if (!mountedRef.current) return;
-      setTopPosts(res.data);
+      // Only show images, not videos
+      const imageOnly = (res.data || []).filter((p: any) => !isVideoFile(p.image_url || p.media_url || '', p.media_type));
+      setTopPosts(imageOnly);
     } catch (err) {
       if (!mountedRef.current) return;
     } finally {
@@ -2144,6 +2184,7 @@ return (
       {/* TOP POSTS | DASHBOARD/MAP | USERS TOGGLE */}
 <View style={styles.toggleContainer}>
   <View style={styles.toggleBackground}>
+    {accountType !== 'restaurant' && (
     <TouchableOpacity
       style={[styles.toggleTab, activeTab === 'topPosts' && styles.toggleTabActive]}
       onPress={() => {
@@ -2154,16 +2195,14 @@ return (
         }
       }}
     >
-      <Ionicons
-        name="camera"
-        size={16}
-        color={activeTab === 'topPosts' ? '#E94A37' : '#999'}
-        style={{ marginRight: 6 }}
-      />
-      <Text style={[styles.toggleTabText, activeTab === 'topPosts' && styles.toggleTabTextActive]}>
-        Top
-      </Text>
+      <Text style={{ fontSize: 16, marginRight: 4 }}>⭐</Text>
+      {activeTab === 'topPosts' ? (
+        <GradientText text="Foodies" style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+      ) : (
+        <Text style={styles.toggleTabText}>Foodies</Text>
+      )}
     </TouchableOpacity>
+    )}
 
     <TouchableOpacity
       style={[styles.toggleTab, activeTab === 'map' && styles.toggleTabActive]}
@@ -2177,15 +2216,25 @@ return (
         }
       }}
     >
-      <Ionicons
-        name={accountType === 'restaurant' ? "analytics" : "location"}
-        size={16}
-        color={activeTab === 'map' ? '#E94A37' : '#999'}
-        style={{ marginRight: 6 }}
-      />
-      <Text style={[styles.toggleTabText, activeTab === 'map' && styles.toggleTabTextActive]}>
-        {accountType === 'restaurant' ? 'Dashboard' : 'Map'}
-      </Text>
+      {activeTab === 'map' ? (
+        <View style={{ marginRight: 6 }}>
+          <GradientIcon name={accountType === 'restaurant' ? "analytics" : "location"} size={16} />
+        </View>
+      ) : (
+        <Ionicons
+          name={accountType === 'restaurant' ? "analytics" : "location"}
+          size={16}
+          color="#999"
+          style={{ marginRight: 6 }}
+        />
+      )}
+      {activeTab === 'map' ? (
+        <GradientText text={accountType === 'restaurant' ? 'Dashboard' : 'Map'} style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+      ) : (
+        <Text style={styles.toggleTabText}>
+          {accountType === 'restaurant' ? 'Dashboard' : 'Map'}
+        </Text>
+      )}
     </TouchableOpacity>
 
     <TouchableOpacity
@@ -2200,21 +2249,35 @@ return (
         }
       }}
     >
-      <Ionicons
-        name="person"
-        size={16}
-        color={activeTab === 'users' ? '#E94A37' : '#999'}
-        style={{ marginRight: 6 }}
-      />
-      <Text style={[styles.toggleTabText, activeTab === 'users' && styles.toggleTabTextActive]}>
-        Users
-      </Text>
+      <Text style={{ fontSize: 16, marginRight: 4 }}>🍽️</Text>
+      {activeTab === 'users' ? (
+        <GradientText text="Dishes" style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+      ) : (
+        <Text style={styles.toggleTabText}>Dishes</Text>
+      )}
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[styles.toggleTab, activeTab === 'popular' && styles.toggleTabActive]}
+      onPress={() => {
+        if (activeTab !== 'popular') {
+          setActiveTab('popular');
+          setPlayingVideos([]);
+        }
+      }}
+    >
+      <Text style={{ fontSize: 16, marginRight: 4 }}>🔥</Text>
+      {activeTab === 'popular' ? (
+        <GradientText text="Popular" style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+      ) : (
+        <Text style={styles.toggleTabText}>Popular</Text>
+      )}
     </TouchableOpacity>
   </View>
 </View>
 
       {/* Search Box and Categories - Shown for MAP and USERS tabs, hidden for TOP and restaurant users */}
-      {accountType !== 'restaurant' && activeTab !== 'topPosts' && (
+      {accountType !== 'restaurant' && activeTab !== 'topPosts' && activeTab !== 'popular' && (
         <>
           {/* Search Box */}
           <View style={styles.searchBoxWrapper}>
@@ -2638,6 +2701,16 @@ return (
       selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
     />
   )
+) : activeTab === 'popular' ? (
+        // POPULAR / HAPPENING PLACES VIEW
+        <View style={{ flex: 1 }}>
+          <HappeningPlaces embedded />
+        </View>
+) : accountType === 'restaurant' ? (
+        // SALES DASHBOARD for restaurant users
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+          <SalesDashboard token={token || ""} />
+        </ScrollView>
 ) : (
         // USERS GRID VIEW
         <>
@@ -2925,8 +2998,8 @@ const styles = StyleSheet.create({
   placeholderImage: { backgroundColor: "#2a2a2a", justifyContent: "center", alignItems: "center" },
   playIconContainer: { position: "absolute", top: "50%", left: "50%", transform: [{ translateX: -20 }, { translateY: -20 }], width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   likeBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", padding: 8, borderRadius: 20 },
-  clicksBadge: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 5, paddingVertical: 2, borderRadius: 8, gap: 2 },
-  clicksText: { color: "#fff", fontSize: 8, fontWeight: "600" },
+  clicksBadge: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, gap: 3 },
+  clicksText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   topPostsButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF5E6", borderRadius: 22, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: "#F2CF68" },
   topPostsButtonText: { fontSize: 13, fontWeight: "600", color: "#E94A37" },
   topPostsModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%", minHeight: 400 },
@@ -3239,8 +3312,8 @@ const styles = StyleSheet.create({
 
   viewsContainer: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
   viewsText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  dishNameTag: { position: "absolute", bottom: 6, left: 6, backgroundColor: "rgba(233, 74, 55, 0.85)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, maxWidth: "75%" },
-  dishNameText: { color: "#fff", fontSize: 9, fontWeight: "600" },
+  dishNameTag: { position: "absolute", bottom: 4, left: 4, backgroundColor: "rgba(233, 74, 55, 0.85)", paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, maxWidth: "65%", borderBottomWidth: 1.5, borderBottomColor: "rgba(180, 40, 30, 0.9)", borderRightWidth: 1, borderRightColor: "rgba(200, 50, 35, 0.6)", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1, elevation: 2 },
+  dishNameText: { color: "#fff", fontSize: 8, fontWeight: "600" },
   loadingMore: { padding: 20, alignItems: "center" },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 },
   emptyStateText: { fontSize: 18, fontWeight: "600", color: "#333", marginTop: 16 },
@@ -3672,6 +3745,23 @@ postMarkerArrow: {
   borderTopColor: '#fff',
   marginTop: -2,
 },
+markerViewsBadge: {
+  position: 'absolute',
+  bottom: 2,
+  alignSelf: 'center',
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0,0,0,0.55)',
+  paddingHorizontal: 4,
+  paddingVertical: 1,
+  borderRadius: 6,
+  gap: 2,
+},
+markerViewsText: {
+  color: '#fff',
+  fontSize: 7,
+  fontWeight: '600',
+},
 // Android-specific PostMarker styles with explicit sizing
 postMarkerContainerAndroid: {
   alignItems: 'center',
@@ -3946,29 +4036,28 @@ quickCategoryTextActive: {
 toggleContainer: {
   alignItems: 'center' as const,
   marginBottom: 8,
-  paddingHorizontal: 16,
+  paddingHorizontal: 0,
 },
 toggleBackground: {
   flexDirection: 'row',
-  backgroundColor: '#F5F5F5',
-  borderRadius: 25,
+  backgroundColor: '#FFF',
+  borderRadius: 0,
   padding: 4,
+  width: '100%',
+  borderBottomWidth: 1,
+  borderBottomColor: '#E0E0E0',
 },
 toggleTab: {
+  flex: 1,
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
   paddingVertical: 10,
-  paddingHorizontal: 16,
+  paddingHorizontal: 8,
   borderRadius: 22,
 },
 toggleTabActive: {
-  backgroundColor: '#fff',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.1,
-  shadowRadius: 2,
-  elevation: 2,
+  backgroundColor: 'rgba(255, 46, 46, 0.15)',
 },
 toggleTabText: {
   fontSize: 14,

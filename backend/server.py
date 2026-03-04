@@ -1357,38 +1357,48 @@ async def get_feed(
         # Combine all posts
         all_posts = user_posts_raw + restaurant_posts_raw
         
-        # Calculate engagement scores
-        posts_with_scores = []
+        # Bucket posts into: popular (high engagement), new (< 48h), and older
+        popular_posts = []
+        new_posts = []
+        older_posts = []
+
         for post in all_posts:
-            score = calculate_engagement_score(post, current_time)
-            posts_with_scores.append((post, score))
-        
-        # Sort by engagement score
-        posts_with_scores.sort(key=lambda x: x[1], reverse=True)
-        
-        # Shuffle similar scores for variety
-        shuffled_posts_with_scores = []
-        if len(posts_with_scores) > 1:
-            i = 0
-            while i < len(posts_with_scores):
-                current_post, current_score = posts_with_scores[i]
-                similar_group = [(current_post, current_score)]
-                j = i + 1
-                while j < len(posts_with_scores):
-                    next_post, next_score = posts_with_scores[j]
-                    if abs(next_score - current_score) / max(current_score, 1) <= 0.1:
-                        similar_group.append((next_post, next_score))
-                        j += 1
-                    else:
-                        break
-                random.shuffle(similar_group)
-                shuffled_posts_with_scores.extend(similar_group)
-                i = j
-        else:
-            shuffled_posts_with_scores = posts_with_scores
-        
-        posts = [p[0] for p in shuffled_posts_with_scores]
-        posts = posts[skip:]
+            created_at = post.get("created_at")
+            likes = post.get("likes_count", 0)
+            comments = post.get("comments_count", 0)
+            engagement = likes + comments
+            hours_old = 0
+            if created_at and isinstance(created_at, datetime):
+                hours_old = (current_time - created_at).total_seconds() / 3600
+
+            if engagement >= 5:
+                popular_posts.append(post)
+            elif hours_old < 48:
+                new_posts.append(post)
+            else:
+                older_posts.append(post)
+
+        # Shuffle within each bucket for variety on every load
+        random.shuffle(popular_posts)
+        random.shuffle(new_posts)
+        random.shuffle(older_posts)
+
+        # Interleave: pattern of [popular, new, older, popular, new, older, ...]
+        # This ensures users see a mix of all types
+        mixed_posts = []
+        pi, ni, oi = 0, 0, 0
+        while pi < len(popular_posts) or ni < len(new_posts) or oi < len(older_posts):
+            if pi < len(popular_posts):
+                mixed_posts.append(popular_posts[pi])
+                pi += 1
+            if ni < len(new_posts):
+                mixed_posts.append(new_posts[ni])
+                ni += 1
+            if oi < len(older_posts):
+                mixed_posts.append(older_posts[oi])
+                oi += 1
+
+        posts = mixed_posts[skip:]
         if limit:
             posts = posts[:limit]
     else:
@@ -4049,7 +4059,11 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
                 "thumbnail_url": post.get("thumbnail_url"),
                 "media_type": media_type,
                 "rating": post.get("rating", 0),
+                "price": post.get("price", ""),
                 "review_text": post.get("review_text") or post.get("caption", ""),
+                "about": post.get("about", ""),
+                "description": post.get("about", ""),
+                "dish_details": post.get("dish_details", ""),
                 "map_link": post.get("map_link"),
                 "location_name": post.get("location_name"),
                 "category": post.get("category"),
@@ -4061,6 +4075,7 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
                 "is_saved_by_user": is_saved,
                 "is_following": is_following,
                 "account_type": "restaurant",
+                "is_restaurant_post": True,
                 "created_at": post.get("created_at")
             }
 

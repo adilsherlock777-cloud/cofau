@@ -757,6 +757,7 @@ async def get_restaurant_profile_public(restaurant_id: str):
         "cover_image": restaurant.get("cover_image"),
         "bio": restaurant.get("bio"),
         "phone": restaurant.get("phone"),
+        "phone_number": restaurant.get("phone_number"),
         "address": restaurant.get("address"),
         "cuisine_type": restaurant.get("cuisine_type"),
         "food_type": restaurant.get("food_type"),

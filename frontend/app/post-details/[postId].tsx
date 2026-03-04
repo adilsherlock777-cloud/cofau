@@ -1168,7 +1168,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
               <View style={styles.detailsSingleCard}>
                 {/* RATING or PRICE */}
 {post.account_type === 'restaurant' || post.is_restaurant_post ? (
-  post.price ? (
+  (post.price != null && post.price !== '') ? (
     <View style={styles.detailsSection}>
       <Text style={styles.detailsSectionLabel}>PRICE</Text>
       <View style={styles.detailsSectionRow}>
@@ -1202,13 +1202,13 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
 
                 {/* REVIEW / ABOUT */}
 {post.account_type === 'restaurant' || post.is_restaurant_post ? (
-  (post.dish_details || post.description || post.review_text) ? (
+  (post.about || post.dish_details || post.description || post.review_text) ? (
     <View style={styles.detailsSection}>
       <Text style={styles.detailsSectionLabel}>ABOUT</Text>
       <View style={styles.detailsSectionRow}>
         <Ionicons name="information-circle" size={19} color="#FFD700" />
         <Text style={styles.detailsSectionText}>
-          {post.dish_details || post.description || post.review_text}
+          {post.about || post.dish_details || post.description || post.review_text}
         </Text>
       </View>
     </View>
@@ -2121,6 +2121,21 @@ heartAnimationContainer: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 46, 46, 0.12)',
+    borderBottomWidth: 3,
+    borderBottomColor: 'rgba(255, 46, 46, 0.18)',
+    borderRightWidth: 2,
+    borderRightColor: 'rgba(255, 46, 46, 0.10)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FF2E2E',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {},
+    }),
   },
 
   detailsLocationText: {

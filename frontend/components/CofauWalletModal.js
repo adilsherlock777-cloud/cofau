@@ -227,7 +227,8 @@ const CofauWalletModal = ({ visible, onClose }) => {
               <View style={styles.unlockRow}>
                 <Text style={styles.unlockText}>
                   <Text style={styles.unlockAmount}>₹{walletData.amount_needed}</Text>
-                  <Text> more to unlock Amazon voucher</Text>
+                  <Text> more to unlock </Text>
+                  <Text style={styles.amazonVoucherHighlight}>Amazon Voucher</Text>
                 </Text>
                 <TouchableOpacity
                   style={styles.claimButtonActive}
@@ -772,6 +773,10 @@ const styles = StyleSheet.create({
   unlockAmount: {
     fontWeight: "700",
     color: "#222",
+  },
+  amazonVoucherHighlight: {
+    fontWeight: "800",
+    color: "#FF9800",
   },
   claimButtonActive: {
     flexDirection: "row",

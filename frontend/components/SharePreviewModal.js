@@ -21,9 +21,10 @@ import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { useAuth } from '../context/AuthContext';
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
-import { getFollowers, getFollowing } from '../utils/api';
+import { getFollowers, getFollowing, incrementShareCount } from '../utils/api';
 import UserAvatar from './UserAvatar';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -68,7 +69,11 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
             </View>
           )}
           <View style={storyCardStyles.watermarkContainer}>
-            <Text style={storyCardStyles.watermarkText}>Cofau</Text>
+            <MaskedView maskElement={<Text style={storyCardStyles.watermarkText}>Cofau</Text>}>
+              <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <Text style={[storyCardStyles.watermarkText, { opacity: 0 }]}>Cofau</Text>
+              </LinearGradient>
+            </MaskedView>
           </View>
         </View>
         <View style={storyCardStyles.infoBoxesContainer}>
@@ -109,8 +114,8 @@ const storyCardStyles = StyleSheet.create({
   imageWrapper: { width: '100%', aspectRatio: 1, position: 'relative' },
   foodImage: { width: '100%', height: '100%' },
   placeholderImage: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#E0E0E0' },
-  watermarkContainer: { position: 'absolute', bottom: 16, right: 16, backgroundColor: 'rgba(0, 0, 0, 0.6)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-  watermarkText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF', fontFamily: 'Lobster', letterSpacing: 1 },
+  watermarkContainer: { position: 'absolute', bottom: 16, right: 16, backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  watermarkText: { fontSize: 18, fontWeight: '700', color: '#000', fontFamily: 'Lobster', letterSpacing: 1 },
   infoBoxesContainer: { flexDirection: 'row', paddingVertical: 20, paddingHorizontal: 12, backgroundColor: '#FFFFFF' },
   infoBox: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
   reviewBox: { flex: 1.4 },
@@ -124,7 +129,7 @@ const storyCardStyles = StyleSheet.create({
 // =====================================================
 // MAIN COMPONENT
 // =====================================================
-export default function SharePreviewModal({ visible, onClose, post, onStoryCreated }) {
+export default function SharePreviewModal({ visible, onClose, post, onStoryCreated, onShareComplete }) {
   const [loading, setLoading] = useState(false);
   const [sharingPlatform, setSharingPlatform] = useState(null);
   const [users, setUsers] = useState([]);
@@ -203,6 +208,8 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
 
   const handleSendToUsers = () => {
     if (selectedUsers.length === 0) return;
+    incrementShareCount(post.id);
+    if (onShareComplete) onShareComplete();
     Alert.alert('Shared!', `Post shared with ${selectedUsers.length} user(s)`);
     setSelectedUsers([]);
   };
@@ -233,6 +240,8 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
         UTI: 'public.png',
       });
 
+      incrementShareCount(post.id);
+      if (onShareComplete) onShareComplete();
       onClose();
     } catch (error) {
       Alert.alert('Error', 'Failed to create story image. Please try again.');
@@ -290,6 +299,8 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
       message += `\nView on Cofau: ${shareUrl}`;
 
       await RNShare.share({ message, url: shareUrl, title: `${post.username} on Cofau` });
+      incrementShareCount(post.id);
+      if (onShareComplete) onShareComplete();
       onClose();
     } catch (error) {
       // user cancelled
@@ -307,6 +318,8 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
 
       let message = `Check out this post on Cofau!\n${shareUrl}`;
       await RNShare.share({ message, url: shareUrl });
+      incrementShareCount(post.id);
+      if (onShareComplete) onShareComplete();
       onClose();
     } catch (error) {
       // user cancelled
@@ -378,7 +391,11 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
               )}
               {/* Cofau watermark */}
               <View style={styles.imageWatermark}>
-                <Text style={styles.imageWatermarkText}>Cofau</Text>
+                <MaskedView maskElement={<Text style={styles.imageWatermarkText}>Cofau</Text>}>
+                  <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    <Text style={[styles.imageWatermarkText, { opacity: 0 }]}>Cofau</Text>
+                  </LinearGradient>
+                </MaskedView>
               </View>
             </View>
 
@@ -620,17 +637,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     right: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   imageWatermarkText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
-    fontStyle: 'italic',
-    letterSpacing: 0.5,
+    color: '#000',
+    fontFamily: 'Lobster',
+    letterSpacing: 1,
   },
 
   // Post info chips

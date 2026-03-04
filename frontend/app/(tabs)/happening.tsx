@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import HappeningPlaces from '../../components/HappeningPlaces';
+import LeaderboardScreen from './leaderboard';
 
 export default function HappeningScreen() {
   return (
     <View style={styles.container}>
-      <HappeningPlaces />
+      <LeaderboardScreen />
     </View>
   );
 }
@@ -13,6 +13,6 @@ export default function HappeningScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FFFFFF',
   },
 });

@@ -12,7 +12,7 @@ import {
   Alert,
 } from "react-native";
 import * as Location from "expo-location";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
@@ -406,11 +406,7 @@ export default function SearchResultsScreen() {
           </View>
         )}
         <View style={styles.clicksBadge}>
-          {item._isVideo ? (
-            <Ionicons name="eye-outline" size={9} color="#fff" />
-          ) : (
-            <MaterialCommunityIcons name="gesture-tap" size={10} color="#fff" />
-          )}
+          <Ionicons name="eye-outline" size={13} color="#fff" />
           <Text style={styles.clicksText}>{countDisplay}</Text>
         </View>
       </TouchableOpacity>
@@ -921,14 +917,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 8,
-    gap: 2,
+    gap: 3,
   },
   clicksText: {
     color: "#fff",
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: "600",
   },
   locationBadge: {

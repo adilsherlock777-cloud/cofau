@@ -480,8 +480,14 @@ async def check_restaurant_name(name: str):
 @router.get("/me", response_model=RestaurantResponse)
 async def get_restaurant_profile(current_restaurant: dict = Depends(get_current_restaurant)):
     """Get current restaurant profile"""
+    db = get_database()
+    restaurant_id = str(current_restaurant["_id"])
+
+    # Use dynamic count from follows collection for accurate follower count
+    followers_count = await db.follows.count_documents({"followingId": restaurant_id})
+
     return {
-        "id": str(current_restaurant["_id"]),
+        "id": restaurant_id,
         "restaurant_name": current_restaurant["restaurant_name"],
         "email": current_restaurant["email"],
         "profile_picture": current_restaurant.get("profile_picture"),
@@ -494,7 +500,7 @@ async def get_restaurant_profile(current_restaurant: dict = Depends(get_current_
         "food_type": current_restaurant.get("food_type"),  # veg, non_veg, or veg_and_non_veg
         "posts_count": current_restaurant.get("posts_count", 0),
         "reviews_count": current_restaurant.get("reviews_count", 0),
-        "followers_count": current_restaurant.get("followers_count", 0),
+        "followers_count": followers_count,
         "is_verified": current_restaurant.get("is_verified", False),
         "created_at": current_restaurant["created_at"]
     }

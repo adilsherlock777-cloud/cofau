@@ -16,6 +16,7 @@ import {
   Platform,
   Animated,
   KeyboardAvoidingView,
+  Linking,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -838,17 +839,24 @@ const response = await axios.get(endpoint, {
     : (user.full_name || user.username || '')
 );
 
-// Fetch stats - wrap in try-catch for restaurant accounts
-try {
-  const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
-  setUserStats(statsResponse.data);
-} catch (statsError) {
-  // Set default stats for restaurants
+// Fetch stats - restaurant accounts use profile data directly, regular users call stats endpoint
+if (isRestaurantProfile || user?.account_type === 'restaurant') {
   setUserStats({
-    total_posts: 0,
-    followers_count: userData?.followers_count || 0,
-    following_count: userData?.following_count || 0,
+    total_posts: user?.posts_count || 0,
+    followers_count: user?.followers_count || 0,
+    following_count: user?.following_count || 0,
   });
+} else {
+  try {
+    const statsResponse = await axios.get(`${API_URL}/users/${user.id}/stats`);
+    setUserStats(statsResponse.data);
+  } catch (statsError) {
+    setUserStats({
+      total_posts: 0,
+      followers_count: user?.followers_count || 0,
+      following_count: user?.following_count || 0,
+    });
+  }
 }
 
       setError(false);
@@ -2601,6 +2609,28 @@ const renderRestaurantProfile = () => {
                 </LinearGradient>
               </TouchableOpacity>
 
+              {/* Add/Change Phone - Gradient */}
+              <TouchableOpacity
+                style={restaurantStyles.actionButtonWrapperLight}
+                onPress={() => {
+                  resetPhoneModal();
+                  setPhoneUpdateStep(userData?.phone_number ? 'verify_old' : 'verify_new');
+                  setPhoneModalVisible(true);
+                }}
+              >
+                <LinearGradient
+                  colors={['#D62828', '#FF6B00']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={restaurantStyles.actionButtonGradient}
+                >
+                  <Ionicons name={userData?.phone_number ? 'call-outline' : 'add-circle-outline'} size={18} color="#fff" />
+                  <Text style={restaurantStyles.actionButtonTextGradient}>
+                    {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
               {/* Messages - Gradient */}
               <TouchableOpacity
                 style={restaurantStyles.actionButtonWrapperLight}
@@ -2648,6 +2678,27 @@ const renderRestaurantProfile = () => {
                   )}
                 </LinearGradient>
               </TouchableOpacity>
+
+              {(userData?.phone_number || userData?.phone) ? (
+                <TouchableOpacity
+                  style={styles.actionButtonWrapper}
+                  onPress={() => {
+                    const phone = userData?.phone_number || userData?.phone;
+                    Linking.openURL(`tel:${phone}`);
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#FF2E2E', '#FF7A18']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    locations={[0, 0.35, 0.9]}
+                    style={styles.actionButton}
+                  >
+                    <Ionicons name="call" size={15} color="#fff" />
+                    <Text style={styles.actionButtonText}>Call</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : null}
 
               <TouchableOpacity
                 style={styles.actionButtonWrapper}
@@ -4767,7 +4818,7 @@ if (isRestaurantProfile) {
           activeOpacity={0.7}
         >
           <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
-          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>People</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Followers</Text>
         </TouchableOpacity>
         <View style={styles.statDivider} />
         <TouchableOpacity
@@ -4843,7 +4894,7 @@ if (isRestaurantProfile) {
           activeOpacity={0.7}
         >
           <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
-          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>People</Text>
+          <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Followers</Text>
         </TouchableOpacity>
         <View style={styles.statDivider} />
         <TouchableOpacity

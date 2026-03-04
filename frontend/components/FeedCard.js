@@ -107,6 +107,7 @@ const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 const [showShareModal, setShowShareModal] = useState(false);
 const [showSimpleShareModal, setShowSimpleShareModal] = useState(false);
 const [showShareToUsersModal, setShowShareToUsersModal] = useState(false);
+const [showSharePreviewModal, setShowSharePreviewModal] = useState(false);
 const [videoLoaded, setVideoLoaded] = useState(false);
 const [videoError, setVideoError] = useState(false);
 const [thumbnailError, setThumbnailError] = useState(false);
@@ -1007,42 +1008,7 @@ postId={post.id}
 
   <TouchableOpacity
     style={styles.engagementBtn}
-    onPress={() => {
-      Alert.alert(
-        "Share Post",
-        "Choose how you want to share",
-        [
-          {
-            text: "Add to Story",
-            onPress: async () => {
-              try {
-                await addPostToStory(
-                  post.id,
-                  mediaUrl,
-                  post.description || post.review_text || "",
-                  post.rating || 0,
-                  post.location_name || ""
-                );
-                setSharesCount(prev => prev + 1);
-                incrementShareCount(post.id);
-                Alert.alert(
-                  "Successfully Added!",
-                  "Post has been added to your story",
-                  [{ text: "OK", onPress: () => { if (onStoryCreated) onStoryCreated(); } }]
-                );
-              } catch (error) {
-                console.error("Error adding post to story:", error);
-                Alert.alert("Error", error.response?.data?.detail || "Failed to add post to story. Please try again.");
-              }
-            },
-          },
-          { text: "Add to Instagram Story", onPress: () => { setShowSimpleShareModal(true); setSharesCount(prev => prev + 1); incrementShareCount(post.id); } },
-          { text: "Share to Cofau Users", onPress: () => setShowShareToUsersModal(true) },
-          { text: "More Options", onPress: () => { setShowSimpleShareModal(true); setSharesCount(prev => prev + 1); incrementShareCount(post.id); } },
-          { text: "Cancel", style: "cancel" },
-        ]
-      );
-    }}
+    onPress={() => setShowSharePreviewModal(true)}
   >
     <View style={styles.engagementIcon}>
       <Ionicons name="arrow-redo-outline" size={18} color="#888" />
@@ -1086,6 +1052,19 @@ console.error("Error sharing post:", error);
   onClose={() => setShowCommentsModal(false)}
   accountType={post.account_type}
   onCommentCountChange={setCommentCount}
+/>
+
+{/* Share Preview Modal (Instagram-style bottom sheet) */}
+<SharePreviewModal
+  visible={showSharePreviewModal}
+  onClose={() => setShowSharePreviewModal(false)}
+  post={post}
+  onStoryCreated={() => {
+    if (onStoryCreated) onStoryCreated();
+  }}
+  onShareComplete={() => {
+    setSharesCount(prev => prev + 1);
+  }}
 />
 
 {/* Simple Share Modal (WhatsApp/Instagram) */}
@@ -1584,6 +1563,21 @@ locationGradientWrap: {
   paddingVertical: 10,
   paddingHorizontal: 12,
   gap: 8,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 46, 46, 0.12)',
+  borderBottomWidth: 3,
+  borderBottomColor: 'rgba(255, 46, 46, 0.18)',
+  borderRightWidth: 2,
+  borderRightColor: 'rgba(255, 46, 46, 0.10)',
+  ...Platform.select({
+    ios: {
+      shadowColor: '#FF2E2E',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+    },
+    android: {},
+  }),
 },
 
 // ─── Engagement Icons ───
