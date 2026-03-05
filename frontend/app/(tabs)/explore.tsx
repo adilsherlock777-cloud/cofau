@@ -2017,6 +2017,21 @@ useFocusEffect(
     }
   }, [posts.length]);
 
+  const mapPostData = (post: any) => {
+    const fullUrl = fixUrl(post.media_url || post.image_url);
+    return {
+      ...post,
+      full_image_url: fullUrl,
+      full_thumbnail_url: fixUrl(post.thumbnail_url),
+      is_liked: post.is_liked_by_user || false,
+      is_clicked: post.is_clicked_by_user || false,
+      is_viewed: post.is_viewed_by_user || false,
+      _isVideo: isVideoFile(fullUrl || "", post.media_type),
+      category: post.category?.trim() || null,
+      aspect_ratio: post.aspect_ratio || null
+    };
+  };
+
   const fetchPosts = async (refresh = false, categories?: string[], tab?: 'map' | 'users') => {
     try {
       if (refresh) { setLoading(true); setPage(1); setHasMore(true); videoPositions.current.clear(); }
@@ -2024,58 +2039,72 @@ useFocusEffect(
       const categoriesToUse = categories ?? appliedCategories;
       const currentTab = tab ?? activeTab;
       const skip = refresh ? 0 : (page - 1) * POSTS_PER_PAGE;
-      
-      // For USERS tab, fetch user posts only
-      let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}`;
-      
-      if (categoriesToUse.length > 0) {
-        feedUrl += `&categories=${encodeURIComponent(categoriesToUse.join(","))}`;
-      }
-      
-      const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
-      if (!mountedRef.current) return;
 
-      let postsData = res.data;
+      const categoryParam = categoriesToUse.length > 0
+        ? `&categories=${encodeURIComponent(categoriesToUse.join(","))}`
+        : '';
 
-      if (postsData.length === 0) {
-        setHasMore(false);
-        if (refresh) setPosts([]);
-        return;
-      }
-
-      const newPosts = postsData.map((post: any) => {
-        const fullUrl = fixUrl(post.media_url || post.image_url);
-        return {
-          ...post,
-          full_image_url: fullUrl,
-          full_thumbnail_url: fixUrl(post.thumbnail_url),
-          is_liked: post.is_liked_by_user || false,
-          is_clicked: post.is_clicked_by_user || false,
-          is_viewed: post.is_viewed_by_user || false,
-          _isVideo: isVideoFile(fullUrl || "", post.media_type),
-          category: post.category?.trim() || null,
-          aspect_ratio: post.aspect_ratio || null
-        };
-      });
-
+      // Progressive loading: on refresh, fetch first 6 posts fast, then load the rest
       if (refresh) {
-        setPosts(newPosts);
+        const INITIAL_BATCH = 6;
+        const firstUrl = `${API_URL}/feed?skip=0&limit=${INITIAL_BATCH}${categoryParam}`;
+        const firstRes = await axios.get(firstUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
+        if (!mountedRef.current) return;
+
+        if (firstRes.data.length === 0) {
+          setHasMore(false);
+          setPosts([]);
+          return;
+        }
+
+        const firstPosts = firstRes.data.map(mapPostData);
+        setPosts(firstPosts);
+        setLoading(false); // Show first cards immediately
+
+        // Pre-fetch thumbnails for visible cards
+        firstPosts.forEach((post: any) => {
+          const urlToPreFetch = post.full_thumbnail_url || post.full_image_url;
+          if (urlToPreFetch && !post._isVideo) {
+            Image.prefetch(urlToPreFetch);
+          }
+        });
+
+        if (firstRes.data.length < INITIAL_BATCH) {
+          setHasMore(false);
+          setPage(2);
+          return;
+        }
+
+        // Load remaining posts in background
+        const restUrl = `${API_URL}/feed?skip=${INITIAL_BATCH}&limit=${POSTS_PER_PAGE - INITIAL_BATCH}${categoryParam}`;
+        const restRes = await axios.get(restUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
+        if (!mountedRef.current) return;
+
+        if (restRes.data.length > 0) {
+          const restPosts = restRes.data.map(mapPostData);
+          setPosts(prev => [...prev, ...restPosts.filter((np: any) => !prev.some((ep) => ep.id === np.id))]);
+        }
+
+        const totalFetched = firstRes.data.length + (restRes.data?.length || 0);
+        if (totalFetched < POSTS_PER_PAGE) setHasMore(false);
         setPage(2);
       } else {
+        // Pagination: load next page normally
+        let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}`;
+        const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
+        if (!mountedRef.current) return;
+
+        if (res.data.length === 0) {
+          setHasMore(false);
+          return;
+        }
+
+        const newPosts = res.data.map(mapPostData);
         setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]);
         setPage((prev) => prev + 1);
+
+        if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
       }
-
-      // Pre-fetch thumbnails for grid view (much smaller than full images)
-      const postsToPreFetch = newPosts.slice(0, 6);
-      postsToPreFetch.forEach((post: any) => {
-        const urlToPreFetch = post.full_thumbnail_url || post.full_image_url;
-        if (urlToPreFetch && !post._isVideo) {
-          Image.prefetch(urlToPreFetch);
-        }
-      });
-
-      if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
     } catch (err) {
       if (!mountedRef.current) return;
       console.error("Fetch error:", err);
@@ -2249,11 +2278,11 @@ return (
         }
       }}
     >
-      <Text style={{ fontSize: 16, marginRight: 4 }}>🍽️</Text>
+      <Text style={{ fontSize: 16, marginRight: 4 }}>{accountType === 'restaurant' ? '💰' : '🍽️'}</Text>
       {activeTab === 'users' ? (
-        <GradientText text="Dishes" style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+        <GradientText text={accountType === 'restaurant' ? 'Sales' : 'Dishes'} style={[styles.toggleTabText, styles.toggleTabTextActive]} />
       ) : (
-        <Text style={styles.toggleTabText}>Dishes</Text>
+        <Text style={styles.toggleTabText}>{accountType === 'restaurant' ? 'Sales' : 'Dishes'}</Text>
       )}
     </TouchableOpacity>
 

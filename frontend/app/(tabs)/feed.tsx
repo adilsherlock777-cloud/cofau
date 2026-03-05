@@ -279,13 +279,13 @@ export default function FeedScreen() {
     const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
 
     let dividerIndex = -1;
-    let hasRecent = false;
+    let recentCount = 0;
     let hasOlder = false;
 
     for (let i = 0; i < spread.length; i++) {
       const postAge = now - new Date(spread[i].created_at).getTime();
       if (postAge < FORTY_EIGHT_HOURS) {
-        hasRecent = true;
+        recentCount++;
       } else {
         if (!hasOlder) dividerIndex = i;
         hasOlder = true;
@@ -293,7 +293,8 @@ export default function FeedScreen() {
     }
 
     let result = [...spread];
-    if (hasRecent && hasOlder && dividerIndex > 0) {
+    // Only show "caught up" divider when there are at least 3 recent posts
+    if (recentCount >= 3 && hasOlder && dividerIndex > 0) {
       result.splice(dividerIndex, 0, { type: 'caught_up_divider', id: 'caught_up_divider' });
     }
 

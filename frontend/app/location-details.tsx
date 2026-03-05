@@ -11,7 +11,7 @@ import {
   Modal,
   Linking,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../context/AuthContext";
@@ -328,11 +328,7 @@ export default function LocationDetailsScreen() {
         )}
 
         <View style={styles.clicksBadge}>
-          {item._isVideo ? (
-            <Ionicons name="eye-outline" size={10} color="#fff" />
-          ) : (
-            <MaterialCommunityIcons name="gesture-tap" size={11} color="#fff" />
-          )}
+          <Ionicons name="eye-outline" size={10} color="#fff" />
           <Text style={styles.clicksText}>{formatCount(item._isVideo ? viewsCount : clicksCount)}</Text>
         </View>
 
