@@ -16,6 +16,7 @@ import {
   Alert,
   Animated,
   Easing,
+  Keyboard,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -25,7 +26,7 @@ import { Image } from "expo-image";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
-import { likePost, unlikePost } from "../../utils/api";
+import { likePost, unlikePost, followUser } from "../../utils/api";
 import UserAvatar from "../../components/UserAvatar";
 import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
 import HappeningPlaces from "../../components/HappeningPlaces";
@@ -566,6 +567,10 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
                 cachePolicy="memory-disk"
                 onLoad={() => setImagesLoaded(prev => prev + 1)}
               />
+              <View style={styles.markerViewsBadge}>
+                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Text style={styles.markerViewsText}>{(latestPosts[1]?.clicks_count || 0) > 1000 ? `${((latestPosts[1]?.clicks_count || 0) / 1000).toFixed(1)}K` : (latestPosts[1]?.clicks_count || 0)}</Text>
+              </View>
             </View>
           )}
           {/* First image (front) */}
@@ -590,6 +595,10 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
                 <Ionicons name="image" size={20} color="#fff" />
               </View>
             )}
+            <View style={styles.markerViewsBadge}>
+              <Ionicons name="eye-outline" size={8} color="#fff" />
+              <Text style={styles.markerViewsText}>{(latestPosts[0]?.clicks_count || 0) > 1000 ? `${((latestPosts[0]?.clicks_count || 0) / 1000).toFixed(1)}K` : (latestPosts[0]?.clicks_count || 0)}</Text>
+            </View>
           </View>
           {/* Count badge */}
           <View style={{
@@ -652,6 +661,10 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
                   <Ionicons name="image" size={16} color="#fff" />
                 </View>
               )}
+              <View style={styles.markerViewsBadge}>
+                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Text style={styles.markerViewsText}>{(post.clicks_count || 0) > 1000 ? `${((post.clicks_count || 0) / 1000).toFixed(1)}K` : (post.clicks_count || 0)}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -1357,6 +1370,7 @@ export default function ExploreScreen() {
   const cachedMapPosts = useRef<any[]>([]);
   const cachedFollowersPosts = useRef<any[]>([]);
   const cachedUserLocation = useRef<{ latitude: number; longitude: number } | null>(null);
+  const feedPostsLoadedRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
@@ -1367,20 +1381,71 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // Animated placeholder emoji cycling effect
-  const PLACEHOLDER_EMOJIS = ['\uD83C\uDF5B', '\uD83C\uDF55', '\uD83C\uDF54', '\uD83C\uDF69', '\uD83C\uDF63', '\u2615', '\uD83C\uDF70', '\uD83C\uDF2E', '\uD83C\uDF5C', '\uD83E\uDD24'];
-  const [placeholderEmoji, setPlaceholderEmoji] = useState(PLACEHOLDER_EMOJIS[0]);
-  const emojiIndexRef = useRef(0);
+  // Typewriter animated placeholder
+  const PLACEHOLDER_PHRASES = [
+    'Best Shawarma in JP Nagar',
+    'Top Rated Biryani',
+    'Most Liked Desserts',
+    'Famous Pizza near Koramangala',
+    'Trending Momos in Indiranagar',
+    'Best Biryani Near Me',
+  ];
+  const [typedText, setTypedText] = useState('');
+  const phraseIndexRef = useRef(0);
+  const charIndexRef = useRef(0);
+  const isDeletingRef = useRef(false);
+  const pauseRef = useRef(false);
 
   useEffect(() => {
-    if (searchQuery || searchFocused) return;
+    if (searchQuery || searchFocused) {
+      // Reset so animation starts fresh when search bar loses focus
+      charIndexRef.current = 0;
+      isDeletingRef.current = false;
+      pauseRef.current = false;
+      setTypedText('');
+      return;
+    }
 
-    const timer = setInterval(() => {
-      emojiIndexRef.current = (emojiIndexRef.current + 1) % PLACEHOLDER_EMOJIS.length;
-      setPlaceholderEmoji(PLACEHOLDER_EMOJIS[emojiIndexRef.current]);
-    }, 1500);
+    const tick = () => {
+      const currentPhrase = PLACEHOLDER_PHRASES[phraseIndexRef.current];
 
-    return () => clearInterval(timer);
+      if (pauseRef.current) {
+        // Pause after typing completes, then start deleting
+        pauseRef.current = false;
+        isDeletingRef.current = true;
+        return 1200; // pause before deleting
+      }
+
+      if (!isDeletingRef.current) {
+        // Typing forward
+        charIndexRef.current++;
+        setTypedText(currentPhrase.slice(0, charIndexRef.current));
+        if (charIndexRef.current >= currentPhrase.length) {
+          pauseRef.current = true;
+          return 80;
+        }
+        return 60; // typing speed
+      } else {
+        // Deleting
+        charIndexRef.current--;
+        setTypedText(currentPhrase.slice(0, charIndexRef.current));
+        if (charIndexRef.current <= 0) {
+          isDeletingRef.current = false;
+          phraseIndexRef.current = (phraseIndexRef.current + 1) % PLACEHOLDER_PHRASES.length;
+          return 400; // pause before typing next phrase
+        }
+        return 35; // deleting speed (faster)
+      }
+    };
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const run = () => {
+      const delay = tick();
+      timeoutId = setTimeout(run, delay);
+    };
+    timeoutId = setTimeout(run, 500);
+
+    return () => clearTimeout(timeoutId);
   }, [searchQuery, searchFocused]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [appliedCategories, setAppliedCategories] = useState<string[]>([]);
@@ -1615,9 +1680,9 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
     let url: string;
 
     if (searchTerm && searchTerm.trim()) {
-      url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+      url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=50`;
     } else {
-      url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=10`;
+      url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=50`;
     }
 
     const response = await axios.get(url, {
@@ -1964,8 +2029,8 @@ useFocusEffect(
       // If mapPosts.length > 0, do nothing - data already there
     }
     
-    // Users tab logic
-    if (user && token && activeTab === 'users' && posts.length === 0) {
+    // Users tab logic - use ref to avoid stale closure triggering unnecessary refetches
+    if (user && token && activeTab === 'users' && !feedPostsLoadedRef.current) {
       fetchPosts(true);
     }
     
@@ -2054,11 +2119,13 @@ useFocusEffect(
         if (firstRes.data.length === 0) {
           setHasMore(false);
           setPosts([]);
+          feedPostsLoadedRef.current = true;
           return;
         }
 
         const firstPosts = firstRes.data.map(mapPostData);
         setPosts(firstPosts);
+        feedPostsLoadedRef.current = true;
         setLoading(false); // Show first cards immediately
 
         // Pre-fetch thumbnails for visible cards
@@ -2147,7 +2214,7 @@ useFocusEffect(
     }
   }, [tab]);
 
-  const performSearch = () => { if (searchQuery.trim()) { const q = searchQuery.trim(); setSearchQuery(''); router.push({ pathname: "/search-results", params: { query: q } }); } };
+  const performSearch = () => { if (searchQuery.trim()) { Keyboard.dismiss(); const q = searchQuery.trim(); setSearchQuery(''); router.push({ pathname: "/search-results", params: { query: q } }); } };
   const toggleCategory = (itemName: string) => { 
   setSelectedCategories((prev) => 
     prev.includes(itemName) 
@@ -2156,6 +2223,33 @@ useFocusEffect(
   ); 
 };
   const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch {} };
+  const [topPostFollowLoading, setTopPostFollowLoading] = useState<string | null>(null);
+  const handleTopPostFollow = (postItem: any) => {
+    if (!postItem.user_id || topPostFollowLoading) return;
+    Alert.alert(
+      "Follow User",
+      `Do you want to follow ${postItem.username || "this user"}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Follow",
+          onPress: async () => {
+            setTopPostFollowLoading(postItem.user_id);
+            setTopPosts((prev: any[]) => prev.map((p: any) => p.user_id === postItem.user_id ? { ...p, is_following: true } : p));
+            try {
+              await followUser(postItem.user_id, postItem.account_type);
+              Alert.alert("Success", `You are now following ${postItem.username || "this user"}`);
+            } catch {
+              setTopPosts((prev: any[]) => prev.map((p: any) => p.user_id === postItem.user_id ? { ...p, is_following: false } : p));
+              Alert.alert("Error", "Failed to follow user. Please try again.");
+            } finally {
+              setTopPostFollowLoading(null);
+            }
+          },
+        },
+      ]
+    );
+  };
   const handleView = async (postId: string) => {
     setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, views_count: (p.views_count || 0) + 1, is_viewed: true } : p));
     try {
@@ -2223,12 +2317,18 @@ return (
           fetchTopPosts();
         }
       }}
+      activeOpacity={0.7}
     >
-      <Text style={{ fontSize: 16, marginRight: 4 }}>⭐</Text>
       {activeTab === 'topPosts' ? (
-        <GradientText text="Foodies" style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+        <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.toggleTabGradient}>
+          <Text style={{ fontSize: 13, marginRight: 4 }}>⭐</Text>
+          <Text style={styles.toggleTabTextWhite}>Foodies</Text>
+        </LinearGradient>
       ) : (
-        <Text style={styles.toggleTabText}>Foodies</Text>
+        <View style={styles.toggleTabInner}>
+          <Text style={{ fontSize: 13, marginRight: 4 }}>⭐</Text>
+          <Text style={styles.toggleTabText}>Foodies</Text>
+        </View>
       )}
     </TouchableOpacity>
     )}
@@ -2244,25 +2344,18 @@ return (
           }
         }
       }}
+      activeOpacity={0.7}
     >
       {activeTab === 'map' ? (
-        <View style={{ marginRight: 6 }}>
-          <GradientIcon name={accountType === 'restaurant' ? "analytics" : "location"} size={16} />
+        <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.toggleTabGradient}>
+          <Ionicons name={accountType === 'restaurant' ? "analytics" : "location"} size={14} color="#FFF" style={{ marginRight: 5 }} />
+          <Text style={styles.toggleTabTextWhite}>{accountType === 'restaurant' ? 'Dashboard' : 'Map'}</Text>
+        </LinearGradient>
+      ) : (
+        <View style={styles.toggleTabInner}>
+          <Ionicons name={accountType === 'restaurant' ? "analytics-outline" : "location-outline"} size={14} color="#888" style={{ marginRight: 5 }} />
+          <Text style={styles.toggleTabText}>{accountType === 'restaurant' ? 'Dashboard' : 'Map'}</Text>
         </View>
-      ) : (
-        <Ionicons
-          name={accountType === 'restaurant' ? "analytics" : "location"}
-          size={16}
-          color="#999"
-          style={{ marginRight: 6 }}
-        />
-      )}
-      {activeTab === 'map' ? (
-        <GradientText text={accountType === 'restaurant' ? 'Dashboard' : 'Map'} style={[styles.toggleTabText, styles.toggleTabTextActive]} />
-      ) : (
-        <Text style={styles.toggleTabText}>
-          {accountType === 'restaurant' ? 'Dashboard' : 'Map'}
-        </Text>
       )}
     </TouchableOpacity>
 
@@ -2277,12 +2370,18 @@ return (
           }
         }
       }}
+      activeOpacity={0.7}
     >
-      <Text style={{ fontSize: 16, marginRight: 4 }}>{accountType === 'restaurant' ? '💰' : '🍽️'}</Text>
       {activeTab === 'users' ? (
-        <GradientText text={accountType === 'restaurant' ? 'Sales' : 'Dishes'} style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+        <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.toggleTabGradient}>
+          <Text style={{ fontSize: 13, marginRight: 4 }}>{accountType === 'restaurant' ? '💰' : '😋'}</Text>
+          <Text style={styles.toggleTabTextWhite}>{accountType === 'restaurant' ? 'Sales' : 'Dishes'}</Text>
+        </LinearGradient>
       ) : (
-        <Text style={styles.toggleTabText}>{accountType === 'restaurant' ? 'Sales' : 'Dishes'}</Text>
+        <View style={styles.toggleTabInner}>
+          <Text style={{ fontSize: 13, marginRight: 4 }}>{accountType === 'restaurant' ? '💰' : '😋'}</Text>
+          <Text style={styles.toggleTabText}>{accountType === 'restaurant' ? 'Sales' : 'Dishes'}</Text>
+        </View>
       )}
     </TouchableOpacity>
 
@@ -2294,12 +2393,18 @@ return (
           setPlayingVideos([]);
         }
       }}
+      activeOpacity={0.7}
     >
-      <Text style={{ fontSize: 16, marginRight: 4 }}>🔥</Text>
       {activeTab === 'popular' ? (
-        <GradientText text="Popular" style={[styles.toggleTabText, styles.toggleTabTextActive]} />
+        <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.toggleTabGradient}>
+          <Ionicons name="flame" size={14} color="#FFF" style={{ marginRight: 5 }} />
+          <Text style={styles.toggleTabTextWhite}>Popular</Text>
+        </LinearGradient>
       ) : (
-        <Text style={styles.toggleTabText}>Popular</Text>
+        <View style={styles.toggleTabInner}>
+          <Ionicons name="flame-outline" size={14} color="#888" style={{ marginRight: 5 }} />
+          <Text style={styles.toggleTabText}>Popular</Text>
+        </View>
       )}
     </TouchableOpacity>
   </View>
@@ -2311,7 +2416,7 @@ return (
           {/* Search Box */}
           <View style={styles.searchBoxWrapper}>
             <View style={styles.searchBox}>
-              <TouchableOpacity onPress={performSearch} activeOpacity={0.7}>
+              <TouchableOpacity onPress={performSearch} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ zIndex: 10 }}>
                 <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
               </TouchableOpacity>
               <View style={{ flex: 1, justifyContent: 'center' }}>
@@ -2328,23 +2433,24 @@ return (
                 {!searchQuery && !searchFocused && (
                   <View style={styles.animatedPlaceholder} pointerEvents="none">
                     <Text style={styles.animatedPlaceholderStatic}>Search for </Text>
-                    <Text style={{ fontSize: 18 }}>{placeholderEmoji}</Text>
+                    <Text style={styles.animatedPlaceholderTyping}>{typedText}</Text>
+                    <Text style={styles.animatedPlaceholderCursor}>|</Text>
                   </View>
                 )}
               </View>
 
-              {/* UPDATED CATEGORY BUTTON - NEW BRAND COLORS */}
+              {/* COMPACT CATEGORY FILTER BUTTON */}
               <TouchableOpacity onPress={() => setShowCategoryModal(true)} activeOpacity={0.8}>
                 <LinearGradient
-                  colors={["#FF2E2E", "#FF7A18"]}  // NEW BRAND COLORS
+                  colors={["#FF2E2E", "#FF7A18"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.categoryButtonGradient}
                 >
-                  <Text style={styles.categoryButtonEmoji}>🍽️</Text>
-                  <Text style={styles.categoryButtonText}>
-                    {appliedCategories.length > 0 ? `${appliedCategories.length} selected` : "Category"}
-                  </Text>
+                  <Ionicons name="grid-outline" size={16} color="#FFF" />
+                  {appliedCategories.length > 0 && (
+                    <Text style={styles.categoryButtonBadge}>{appliedCategories.length}</Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -2544,40 +2650,49 @@ return (
                   </LinearGradient>
 
                   {/* User info row */}
-                  <TouchableOpacity
-                    style={styles.heroUserRow}
-                    onPress={() => router.push(`/profile?userId=${topPosts[0].user_id}`)}
-                    activeOpacity={0.7}
-                  >
-                    <UserAvatar
-                      profilePicture={topPosts[0].user_profile_picture}
-                      username={topPosts[0].username}
-                      size={48}
-                      showLevelBadge={true}
-                      level={topPosts[0].user_level}
-                      style={undefined}
-                    />
-                    <View style={styles.heroUserInfo}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Text style={styles.heroUsername} numberOfLines={1}>
-                          {topPosts[0].username}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginLeft: 40 }}>
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                      onPress={() => router.push(`/profile?userId=${topPosts[0].user_id}`)}
+                      activeOpacity={0.7}
+                    >
+                      <UserAvatar
+                        profilePicture={topPosts[0].user_profile_picture}
+                        username={topPosts[0].username}
+                        size={48}
+                        showLevelBadge={true}
+                        level={topPosts[0].user_level}
+                        style={undefined}
+                      />
+                      <View style={styles.heroUserInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={styles.heroUsername} numberOfLines={1}>
+                            {topPosts[0].username}
+                          </Text>
+                          {topPosts[0].user_badge === 'verified' && <CofauVerifiedBadge size={16} />}
+                        </View>
+                        <Text style={styles.heroBadgeTitle}>
+                          {getBadgeTitle(topPosts[0].user_level)}
                         </Text>
-                        {topPosts[0].user_badge === 'verified' && <CofauVerifiedBadge size={16} />}
+                        <View style={styles.heroUserStats}>
+                          <Text style={styles.heroStatText}>
+                            {topPosts[0].user_posts_count ?? '—'} posts
+                          </Text>
+                          <View style={styles.heroStatDot} />
+                          <Text style={styles.heroStatText}>
+                            {topPosts[0].user_followers_count ?? '—'} followers
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={styles.heroBadgeTitle}>
-                        {getBadgeTitle(topPosts[0].user_level)}
-                      </Text>
-                      <View style={styles.heroUserStats}>
-                        <Text style={styles.heroStatText}>
-                          {topPosts[0].user_posts_count ?? '—'} posts
-                        </Text>
-                        <View style={styles.heroStatDot} />
-                        <Text style={styles.heroStatText}>
-                          {topPosts[0].user_followers_count ?? '—'} followers
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                    {user?.id !== topPosts[0].user_id && !topPosts[0].is_following && (
+                      <TouchableOpacity onPress={() => handleTopPostFollow(topPosts[0])} disabled={topPostFollowLoading === topPosts[0].user_id}>
+                        <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.topPostFollowButton}>
+                          <Text style={styles.topPostFollowButtonText}>{topPostFollowLoading === topPosts[0].user_id ? '...' : 'Follow'}</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    )}
+                  </View>
 
                   {/* Large Image Preview */}
                   <View style={styles.heroImageWrapper}>
@@ -2660,6 +2775,13 @@ return (
                           {item.user_badge === 'verified' && <CofauVerifiedBadge size={12} />}
                         </View>
                       </TouchableOpacity>
+                      {user?.id !== item.user_id && !item.is_following && (
+                        <TouchableOpacity onPress={() => handleTopPostFollow(item)} disabled={topPostFollowLoading === item.user_id}>
+                          <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.topPostFollowButton}>
+                            <Text style={styles.topPostFollowButtonText}>{topPostFollowLoading === item.user_id ? '...' : 'Follow'}</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      )}
                     </View>
 
                     {/* Image Preview - same as hero */}
@@ -3264,6 +3386,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 36,
   },
+  topPostFollowButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  topPostFollowButtonText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600' as const,
+  },
   regularRankBadge: {
     position: 'absolute' as const,
     top: -1,
@@ -3696,19 +3828,22 @@ markerArrow: {
   categoryButtonGradient: {
   flexDirection: 'row',
   alignItems: 'center',
-  borderRadius: 20,
-  paddingVertical: 8,
-  paddingHorizontal: 14,
-  gap: 6,
+  justifyContent: 'center',
+  borderRadius: 16,
+  padding: 7,
+  gap: 4,
 },
-categoryButtonEmoji: {
-  fontSize: 18,
-},
-categoryButtonText: {
-  fontSize: 12,
+categoryButtonBadge: {
+  fontSize: 10,
   color: '#FFF',
-  fontWeight: '600',
-  maxWidth: 80,
+  fontWeight: '700',
+  backgroundColor: 'rgba(0,0,0,0.25)',
+  borderRadius: 8,
+  minWidth: 16,
+  height: 16,
+  textAlign: 'center',
+  lineHeight: 16,
+  overflow: 'hidden',
 },
 
 // ======================================================
@@ -4064,38 +4199,57 @@ quickCategoryTextActive: {
 // ======================================================
 toggleContainer: {
   alignItems: 'center' as const,
-  marginBottom: 8,
-  paddingHorizontal: 0,
+  marginBottom: 6,
+  paddingHorizontal: 12,
+  paddingTop: 4,
 },
 toggleBackground: {
-  flexDirection: 'row',
-  backgroundColor: '#FFF',
-  borderRadius: 0,
-  padding: 4,
+  flexDirection: 'row' as const,
+  backgroundColor: '#F5F5F5',
+  borderRadius: 28,
+  padding: 3,
   width: '100%',
-  borderBottomWidth: 1,
-  borderBottomColor: '#E0E0E0',
+  gap: 3,
 },
 toggleTab: {
   flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 10,
-  paddingHorizontal: 8,
-  borderRadius: 22,
+  borderRadius: 24,
+  overflow: 'hidden' as const,
 },
-toggleTabActive: {
-  backgroundColor: 'rgba(255, 46, 46, 0.15)',
+toggleTabActive: {},
+toggleTabGradient: {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingVertical: 9,
+  paddingHorizontal: 6,
+  borderRadius: 24,
+  shadowColor: '#FF2E2E',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 4,
+  elevation: 3,
+},
+toggleTabInner: {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingVertical: 9,
+  paddingHorizontal: 6,
 },
 toggleTabText: {
-  fontSize: 14,
-  fontWeight: '500',
-  color: '#999',
+  fontSize: 12,
+  fontWeight: '500' as const,
+  color: '#888',
+},
+toggleTabTextWhite: {
+  fontSize: 12,
+  fontWeight: '700' as const,
+  color: '#FFF',
 },
 toggleTabTextActive: {
   color: '#E94A37',
-  fontWeight: '600',
+  fontWeight: '600' as const,
 },
 
   // ======================================================

@@ -24,7 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { useAuth } from '../context/AuthContext';
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
-import { getFollowers, getFollowing, incrementShareCount } from '../utils/api';
+import { getFollowers, getFollowing, incrementShareCount, sharePostToUsers } from '../utils/api';
 import UserAvatar from './UserAvatar';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -206,12 +206,18 @@ export default function SharePreviewModal({ visible, onClose, post, onStoryCreat
     );
   };
 
-  const handleSendToUsers = () => {
+  const handleSendToUsers = async () => {
     if (selectedUsers.length === 0) return;
-    incrementShareCount(post.id);
-    if (onShareComplete) onShareComplete();
-    Alert.alert('Shared!', `Post shared with ${selectedUsers.length} user(s)`);
-    setSelectedUsers([]);
+    try {
+      await sharePostToUsers(post.id, selectedUsers);
+      incrementShareCount(post.id);
+      if (onShareComplete) onShareComplete();
+      Alert.alert('Shared!', `Post shared with ${selectedUsers.length} user(s)`);
+      setSelectedUsers([]);
+      onClose();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share post. Please try again.');
+    }
   };
 
   // Share to Instagram Story

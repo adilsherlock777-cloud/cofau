@@ -122,6 +122,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [comments, setComments] = useState([]);
   const [commentCount, setCommentCount] = useState(post.comments_count || 0);
+  const [sharesCount, setSharesCount] = useState(post.shares_count || 0);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -1029,7 +1030,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
     {/* Share */}
     <TouchableOpacity style={styles.rightActionBtn} onPress={() => setShowShareModal(true)}>
       <Ionicons name="paper-plane-outline" size={26} color="#FFF" />
-      <Text style={styles.rightActionCount}>{post.shares_count || 0}</Text>
+      <Text style={styles.rightActionCount}>{sharesCount}</Text>
     </TouchableOpacity>
 
     {/* Location - opens Google Maps */}
@@ -1377,6 +1378,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
         visible={showShareModal}
         onClose={() => setShowShareModal(false)}
         post={post}
+        onShareComplete={() => setSharesCount((prev: number) => prev + 1)}
       />
     </View>
   );

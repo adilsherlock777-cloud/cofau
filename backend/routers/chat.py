@@ -299,10 +299,15 @@ async def share_post_to_users(
     
     post = await db.posts.find_one({"_id": ObjectId(request.post_id)})
     if not post:
+        post = await db.restaurant_posts.find_one({"_id": ObjectId(request.post_id)})
+    if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
-    post_owner = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-    post_username = post_owner.get("username") if post_owner else "Unknown"
+
+    owner_id = post.get("user_id") or post.get("restaurant_id")
+    post_owner = await db.users.find_one({"_id": ObjectId(owner_id)}) if owner_id else None
+    if not post_owner and owner_id:
+        post_owner = await db.restaurants.find_one({"_id": ObjectId(owner_id)})
+    post_username = post_owner.get("username") or post_owner.get("restaurant_name") if post_owner else "Unknown"
     
     now = datetime.utcnow()
     shared_count = 0

@@ -127,29 +127,26 @@ const getPostDP = (post: any) =>
    posts from the same user
 ------------------------- */
 function spreadPosts(posts: any[]): any[] {
-  const result = [...posts];
-  for (let i = 1; i < result.length; i++) {
-    if (result[i].user_id === result[i - 1].user_id) {
-      let swapIdx = -1;
-      for (let j = i + 1; j < result.length; j++) {
-        if (result[j].user_id !== result[i].user_id) {
-          swapIdx = j;
-          break;
-        }
-      }
-      if (swapIdx !== -1) {
-        const temp = result[i];
-        result[i] = result[swapIdx];
-        result[swapIdx] = temp;
-      }
+  if (posts.length <= 1) return [...posts];
+  const result: any[] = [];
+  const remaining = [...posts];
+  let lastUserId: any = null;
+
+  while (remaining.length > 0) {
+    const idx = remaining.findIndex((p) => p.user_id !== lastUserId);
+    if (idx !== -1) {
+      result.push(remaining[idx]);
+      lastUserId = remaining[idx].user_id;
+      remaining.splice(idx, 1);
+    } else {
+      result.push(remaining[0]);
+      lastUserId = remaining[0].user_id;
+      remaining.splice(0, 1);
     }
   }
   return result;
 }
 
-/* -------------------------
-   "You're All Caught Up"
-------------------------- */
 /* -------------------------
    "Suggested Posts" Header
 ------------------------- */
@@ -159,7 +156,7 @@ const SuggestedPostsHeader = React.memo(() => (
       colors={['#FF2E2E', '#FF7A18']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={styles.caughtUpAccentLine}
+      style={styles.suggestedAccentLine}
     />
     <View style={styles.suggestedHeaderContent}>
       <Ionicons name="compass-outline" size={32} color="#FF7A18" />
@@ -172,31 +169,7 @@ const SuggestedPostsHeader = React.memo(() => (
       colors={['#FF7A18', '#FF2E2E']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={styles.caughtUpAccentLine}
-    />
-  </View>
-));
-
-const CaughtUpDivider = React.memo(() => (
-  <View style={styles.caughtUpContainer}>
-    <LinearGradient
-      colors={['#FF2E2E', '#FF7A18']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.caughtUpAccentLine}
-    />
-    <View style={styles.caughtUpContent}>
-      <Ionicons name="checkmark-circle" size={40} color="#4CAF50" />
-      <Text style={styles.caughtUpTitle}>You're all caught up</Text>
-      <Text style={styles.caughtUpSubtitle}>
-        You've seen all new posts from the past 2 days
-      </Text>
-    </View>
-    <LinearGradient
-      colors={['#FF7A18', '#FF2E2E']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.caughtUpAccentLine}
+      style={styles.suggestedAccentLine}
     />
   </View>
 ));
@@ -275,28 +248,7 @@ export default function FeedScreen() {
       justUploadedRef.current = false;
     }
 
-    const now = Date.now();
-    const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
-
-    let dividerIndex = -1;
-    let recentCount = 0;
-    let hasOlder = false;
-
-    for (let i = 0; i < spread.length; i++) {
-      const postAge = now - new Date(spread[i].created_at).getTime();
-      if (postAge < FORTY_EIGHT_HOURS) {
-        recentCount++;
-      } else {
-        if (!hasOlder) dividerIndex = i;
-        hasOlder = true;
-      }
-    }
-
     let result = [...spread];
-    // Only show "caught up" divider when there are at least 3 recent posts
-    if (recentCount >= 3 && hasOlder && dividerIndex > 0) {
-      result.splice(dividerIndex, 0, { type: 'caught_up_divider', id: 'caught_up_divider' });
-    }
 
     // Append suggested posts when the regular feed has no more pages
     if (!hasMore && suggestedPosts.length > 0) {
@@ -328,10 +280,18 @@ useEffect(() => {
   refreshUnreadCount();
   loadUnreadMessagesCount();
   fetchWalletUnreadCount();
+  fetchOwnStory();
   if (accountType === 'restaurant') {
-    fetchRestaurantReviewsCount();  // ⬅️ ADD THIS
+    fetchRestaurantReviewsCount();
   }
 }, []);
+
+// Fetch own story as soon as auth is ready (token + user)
+useEffect(() => {
+  if (token && user?.id) {
+    fetchOwnStory();
+  }
+}, [token, user?.id]);
 
 const fetchRestaurantReviewsCount = async () => {
   if (!token || !user?.id || accountType !== 'restaurant') return;
@@ -523,7 +483,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
   viewabilityDebounceRef.current = setTimeout(() => {
     const visibleVideo = viewableItems.find((item) => {
       const post = item.item;
-      if (post.type === 'caught_up_divider' || post.type === 'suggested_header') return false;
+      if (post.type === 'suggested_header') return false;
       const isVideo =
         post.media_type === "video" ||
         post.media_url?.toLowerCase().endsWith(".mp4");
@@ -840,9 +800,6 @@ const handleNewPostsPillPress = useCallback(() => {
 // Render post or divider
 const renderPost = useCallback(
   ({ item: post, index }) => {
-    if (post.type === 'caught_up_divider') {
-      return <CaughtUpDivider />;
-    }
     if (post.type === 'suggested_header') {
       return <SuggestedPostsHeader />;
     }
@@ -1243,11 +1200,9 @@ const renderPost = useCallback(
   ref={flatListRef}
   data={displayData}
   keyExtractor={(item, index) =>
-    item.type === 'caught_up_divider'
-      ? 'caught_up_divider'
-      : item.type === 'suggested_header'
-        ? 'suggested_header'
-        : `post-${item.id}-${index}`
+    item.type === 'suggested_header'
+      ? 'suggested_header'
+      : `post-${item.id}-${index}`
   }
   renderItem={renderPost}
   ListHeaderComponent={ListHeader}
@@ -1502,19 +1457,23 @@ cofauGradient: {
     left: 0,
     right: 0,
     top: "50%",
-    height: 1,
-    backgroundColor: "#E0E0E0",
+    height: 0,
+    backgroundColor: "transparent",
   },
   shareBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
     borderRadius: 35,
     paddingVertical: 6,
     paddingLeft: 6,
     paddingRight: 12,
     gap: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderBottomWidth: 3.5,
+    borderBottomColor: "#C8C8C8",
   },
   shareBarAvatarWrap: {
     position: "relative",
@@ -1829,33 +1788,6 @@ cofauGradient: {
     backgroundColor: "#E8E8E8",
     marginHorizontal: 10,
   },
-  // "You're All Caught Up" Divider
-  caughtUpContainer: {
-    paddingVertical: 24,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  caughtUpAccentLine: {
-    height: 2,
-    width: '80%',
-    borderRadius: 1,
-  },
-  caughtUpContent: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  caughtUpTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-    marginTop: 10,
-  },
-  caughtUpSubtitle: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 4,
-    textAlign: 'center',
-  },
   // "New Posts" Floating Pill
   newPostsPillWrapper: {
     position: 'absolute',
@@ -1885,6 +1817,11 @@ cofauGradient: {
     letterSpacing: 0.3,
   },
   // "Suggested Posts" Header
+  suggestedAccentLine: {
+    height: 2,
+    width: '80%',
+    borderRadius: 1,
+  },
   suggestedHeaderContainer: {
     paddingVertical: 24,
     alignItems: 'center',

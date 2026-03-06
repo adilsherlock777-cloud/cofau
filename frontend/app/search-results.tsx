@@ -10,9 +10,13 @@ import {
   Dimensions,
   ScrollView,
   Alert,
+  Animated,
+  Easing,
+  Platform,
 } from "react-native";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
@@ -105,8 +109,15 @@ export default function SearchResultsScreen() {
     }
 
     try {
+      // Send user's location so backend can handle "near me" queries
+      const location = userLocation || await getUserLocation();
+      const params: any = { q: query.trim(), limit: 100 };
+      if (location) {
+        params.lat = location.latitude;
+        params.lng = location.longitude;
+      }
       const res = await axios.get(`${API_URL}/search/posts`, {
-        params: { q: query.trim(), limit: 100 },
+        params,
         headers: { Authorization: `Bearer ${token || ''}` },
       });
 
@@ -271,7 +282,9 @@ export default function SearchResultsScreen() {
 
     try {
       setLoading(true);
+      const minDelay = new Promise(resolve => setTimeout(resolve, 2000));
       await Promise.all([
+        minDelay,
         performUserSearch(query),
         performPostSearch(query),
         performNearbySearch(query),
@@ -385,6 +398,7 @@ export default function SearchResultsScreen() {
 
     const countValue = item._isVideo ? (item.views_count || 0) : (item.clicks_count || 0);
     const countDisplay = countValue > 1000 ? `${(countValue / 1000).toFixed(1)}K` : countValue;
+    const likesDisplay = (item.likes_count || 0) > 1000 ? `${((item.likes_count || 0) / 1000).toFixed(1)}K` : (item.likes_count || 0);
 
     return (
       <TouchableOpacity
@@ -400,14 +414,30 @@ export default function SearchResultsScreen() {
           contentFit="cover"
           transition={300}
         />
+        {/* Bottom gradient overlay */}
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.6)"]}
+          style={styles.tileGradientOverlay}
+        />
         {item._isVideo && (
           <View style={styles.playIcon}>
             <Ionicons name="play-circle" size={28} color="#fff" />
           </View>
         )}
+        {/* Top-right: views */}
         <View style={styles.clicksBadge}>
-          <Ionicons name="eye-outline" size={13} color="#fff" />
+          <Ionicons name={item._isVideo ? "play" : "eye-outline"} size={11} color="#fff" />
           <Text style={styles.clicksText}>{countDisplay}</Text>
+        </View>
+        {/* Bottom overlay: dish name + likes */}
+        <View style={styles.tileBottomRow}>
+          {item.dish_name ? (
+            <Text style={styles.tileDishName} numberOfLines={1}>{item.dish_name}</Text>
+          ) : null}
+          <View style={styles.tileLikesRow}>
+            <Ionicons name="heart" size={10} color="#FF4757" />
+            <Text style={styles.tileLikesText}>{likesDisplay}</Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -549,7 +579,7 @@ export default function SearchResultsScreen() {
         <UserAvatar
           profilePicture={profilePic}
           username={item.restaurant_name}
-          size={56}
+          size={50}
           showLevelBadge={false}
           style={{}}
         />
@@ -557,36 +587,116 @@ export default function SearchResultsScreen() {
           <Text style={styles.restaurantName} numberOfLines={1}>{item.restaurant_name}</Text>
           {item.location && (
             <View style={styles.restaurantLocationRow}>
-              <Ionicons name="location-outline" size={13} color="#999" />
+              <Ionicons name="location" size={12} color="#E94A37" />
               <Text style={styles.restaurantLocation} numberOfLines={1}>{item.location}</Text>
             </View>
           )}
           {item.matching_menu_items && item.matching_menu_items.length > 0 && (
             <View style={styles.menuMatchRow}>
-              <Ionicons name="restaurant-outline" size={13} color="#E94A37" />
+              <Ionicons name="restaurant-outline" size={12} color="#FF7A18" />
               <Text style={styles.menuMatchText} numberOfLines={1}>
                 {item.matching_menu_items.map((m: any) => m.name).join(", ")}
               </Text>
             </View>
           )}
           <View style={styles.restaurantStatsRow}>
-            <Text style={styles.restaurantStat}>{item.post_count || 0} posts</Text>
-            <Text style={styles.restaurantStatDot}> · </Text>
-            <Text style={styles.restaurantStat}>{item.follower_count || 0} followers</Text>
+            <View style={styles.restaurantStatChip}>
+              <Ionicons name="images-outline" size={11} color="#666" />
+              <Text style={styles.restaurantStat}>{item.post_count || 0}</Text>
+            </View>
+            <View style={styles.restaurantStatChip}>
+              <Ionicons name="people-outline" size={11} color="#666" />
+              <Text style={styles.restaurantStat}>{item.follower_count || 0}</Text>
+            </View>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#ccc" />
+        <Ionicons name="chevron-forward" size={18} color="#ccc" />
       </TouchableOpacity>
     );
   };
 
+  // AI search loading animation
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const dotAnim1 = useRef(new Animated.Value(0)).current;
+  const dotAnim2 = useRef(new Animated.Value(0)).current;
+  const dotAnim3 = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!loading) return;
+
+    // Fade in
+    Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+    // Pulse the search icon
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.2, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+
+    // Rotate the sparkle
+    const rotate = Animated.loop(
+      Animated.timing(rotateAnim, { toValue: 1, duration: 2000, easing: Easing.linear, useNativeDriver: true })
+    );
+
+    // Bouncing dots
+    const createDotAnim = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: -8, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 300, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+        ])
+      );
+
+    pulse.start();
+    rotate.start();
+    createDotAnim(dotAnim1, 0).start();
+    createDotAnim(dotAnim2, 150).start();
+    createDotAnim(dotAnim3, 300).start();
+
+    return () => {
+      pulse.stop();
+      rotate.stop();
+      pulseAnim.setValue(1);
+      rotateAnim.setValue(0);
+      fadeAnim.setValue(0);
+      dotAnim1.setValue(0);
+      dotAnim2.setValue(0);
+      dotAnim3.setValue(0);
+    };
+  }, [loading]);
+
+  const rotateInterpolate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
   const renderContent = () => {
     if (loading) {
       return (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#E94A37" />
-          <Text style={styles.loadingText}>Searching...</Text>
-        </View>
+        <Animated.View style={[styles.aiLoadingContainer, { opacity: fadeAnim }]}>
+          {/* Pulsing search icon */}
+          <View style={styles.aiIconRow}>
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Ionicons name="search" size={36} color="#E94A37" />
+            </Animated.View>
+            <Animated.View style={[styles.aiSparkle, { transform: [{ rotate: rotateInterpolate }] }]}>
+              <Ionicons name="sparkles" size={18} color="#FF7A18" />
+            </Animated.View>
+          </View>
+
+          {/* AI searching text */}
+          <Text style={styles.aiLoadingTitle}>Finding the best results</Text>
+          <Text style={styles.aiLoadingSubtitle}>Powered by AI</Text>
+
+          {/* Bouncing dots */}
+          <View style={styles.aiDotsRow}>
+            <Animated.View style={[styles.aiDot, { transform: [{ translateY: dotAnim1 }] }]} />
+            <Animated.View style={[styles.aiDot, styles.aiDotMiddle, { transform: [{ translateY: dotAnim2 }] }]} />
+            <Animated.View style={[styles.aiDot, { transform: [{ translateY: dotAnim3 }] }]} />
+          </View>
+        </Animated.View>
       );
     }
 
@@ -656,6 +766,13 @@ export default function SearchResultsScreen() {
     }
   };
 
+  const tabData: { key: TabType; label: string; icon: string; count: number }[] = [
+    { key: "posts", label: "Posts", icon: "grid-outline", count: posts.length },
+    { key: "nearby", label: "Nearby", icon: "location-outline", count: nearbyPosts.length },
+    { key: "restaurants", label: "Restaurants", icon: "storefront-outline", count: restaurants.length },
+    { key: "places", label: "Places", icon: "map-outline", count: locations.length },
+  ];
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -663,85 +780,68 @@ export default function SearchResultsScreen() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+          activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={22} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Search</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchBox}>
-        <Ionicons name="search" size={20} color="#777" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by dish, name, or location..."
-          placeholderTextColor="#999"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          returnKeyType="search"
-          autoFocus={!query}
-        />
+        <View style={styles.headerSearchBox}>
+          <Ionicons name="search" size={16} color="#999" />
+          <TextInput
+            style={styles.headerSearchInput}
+            placeholder="Search dishes, places, restaurants..."
+            placeholderTextColor="#bbb"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            autoFocus={!query}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7}>
+              <Ionicons name="close-circle" size={18} color="#ccc" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "posts" && styles.activeTab]}
-          onPress={() => setActiveTab("posts")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "posts" && styles.activeTabText,
-            ]}
-          >
-            Posts
-          </Text>
-          {activeTab === "posts" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "nearby" && styles.activeTab]}
-          onPress={() => setActiveTab("nearby")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "nearby" && styles.activeTabText,
-            ]}
-          >
-            Near me
-          </Text>
-          {activeTab === "nearby" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "restaurants" && styles.activeTab]}
-          onPress={() => setActiveTab("restaurants")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "restaurants" && styles.activeTabText,
-            ]}
-          >
-            Restaurants
-          </Text>
-          {activeTab === "restaurants" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "places" && styles.activeTab]}
-          onPress={() => setActiveTab("places")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "places" && styles.activeTabText,
-            ]}
-          >
-            Places
-          </Text>
-          {activeTab === "places" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
+          {tabData.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+              onPress={() => setActiveTab(tab.key)}
+              activeOpacity={0.7}
+            >
+              {activeTab === tab.key ? (
+                <LinearGradient
+                  colors={["#FF2E2E", "#FF7A18"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabGradient}
+                >
+                  <Ionicons name={tab.icon as any} size={14} color="#FFF" />
+                  <Text style={styles.tabTextActive}>{tab.label}</Text>
+                  {tab.count > 0 && (
+                    <View style={styles.tabBadge}>
+                      <Text style={styles.tabBadgeText}>{tab.count}</Text>
+                    </View>
+                  )}
+                </LinearGradient>
+              ) : (
+                <View style={styles.tabInner}>
+                  <Ionicons name={tab.icon as any} size={14} color="#888" />
+                  <Text style={styles.tabText}>{tab.label}</Text>
+                  {tab.count > 0 && (
+                    <View style={styles.tabBadgeInactive}>
+                      <Text style={styles.tabBadgeTextInactive}>{tab.count}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Results */}
@@ -753,75 +853,117 @@ export default function SearchResultsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FAFAFA",
   },
+  // ===== HEADER =====
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
+    paddingTop: Platform.OS === "ios" ? 54 : 40,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+    backgroundColor: "#FFF",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  searchBox: {
-    margin: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    backgroundColor: "#f2f2f2",
-    flexDirection: "row",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F2F2F2",
+    justifyContent: "center",
     alignItems: "center",
   },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
+  headerSearchBox: {
     flex: 1,
-    fontSize: 15,
-    color: "#333",
-  },
-  tabsContainer: {
     flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F2F2F2",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 10 : 6,
+    gap: 8,
+  },
+  headerSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#333",
+    padding: 0,
+  },
+  // ===== TABS =====
+  tabsContainer: {
+    backgroundColor: "#FFF",
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
-    paddingHorizontal: 16,
+    borderBottomColor: "#F0F0F0",
+  },
+  tabsScroll: {
+    paddingHorizontal: 12,
+    gap: 8,
   },
   tab: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    position: "relative",
+    borderRadius: 22,
+    overflow: "hidden",
   },
   activeTab: {},
+  tabGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    gap: 6,
+  },
+  tabInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: "#F2F2F2",
+    gap: 6,
+  },
   tabText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "500",
-    color: "#999",
+    color: "#777",
   },
-  activeTabText: {
-    color: "#333",
+  tabTextActive: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFF",
+  },
+  tabBadge: {
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFF",
+  },
+  tabBadgeInactive: {
+    backgroundColor: "#E0E0E0",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  tabBadgeTextInactive: {
+    fontSize: 11,
     fontWeight: "600",
-  },
-  tabIndicator: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: "#E94A37",
+    color: "#777",
   },
   center: {
     flex: 1,
@@ -833,24 +975,72 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
+  aiLoadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    paddingBottom: 60,
+  },
+  aiIconRow: {
+    position: "relative",
+    marginBottom: 20,
+  },
+  aiSparkle: {
+    position: "absolute",
+    top: -6,
+    right: -14,
+  },
+  aiLoadingTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#222",
+    marginBottom: 4,
+  },
+  aiLoadingSubtitle: {
+    fontSize: 13,
+    color: "#999",
+    marginBottom: 24,
+  },
+  aiDotsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  aiDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E94A37",
+  },
+  aiDotMiddle: {
+    backgroundColor: "#FF7A18",
+  },
   userItemContainer: {
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    backgroundColor: "#FFF",
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
+    overflow: "hidden",
   },
   userItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: 14,
   },
   userInfo: {
     flex: 1,
     marginLeft: 12,
   },
   userName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#222",
   },
   userLocationImagesContainer: {
     paddingHorizontal: 16,
@@ -893,58 +1083,76 @@ const styles = StyleSheet.create({
   // Grid styles for posts
   tile: {
     width: TILE_SIZE,
-    height: TILE_SIZE,
+    height: TILE_SIZE * 1.15,
     marginBottom: SPACING,
     position: "relative",
+    borderRadius: 8,
+    overflow: "hidden",
   },
   gridImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 2,
+  },
+  tileGradientOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "45%",
   },
   playIcon: {
     position: "absolute",
-    top: "50%",
+    top: "40%",
     left: "50%",
     transform: [{ translateX: -14 }, { translateY: -14 }],
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     borderRadius: 14,
   },
   clicksBadge: {
     position: "absolute",
-    top: 6,
-    right: 6,
+    top: 5,
+    right: 5,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
     borderRadius: 8,
     gap: 3,
   },
   clicksText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
   },
-  locationBadge: {
+  tileBottomRow: {
     position: "absolute",
     bottom: 4,
-    left: 4,
-    right: 4,
+    left: 5,
+    right: 5,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
+    justifyContent: "space-between",
   },
-  locationBadgeText: {
+  tileDishName: {
     color: "#fff",
     fontSize: 10,
-    fontWeight: "500",
-    marginLeft: 4,
+    fontWeight: "600",
     flex: 1,
+    marginRight: 4,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  tileLikesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  tileLikesText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
   },
   locationHeaderRow: {
     flexDirection: "row",
@@ -1033,13 +1241,14 @@ const styles = StyleSheet.create({
   },
   postsContainer: {
     flex: 1,
+    backgroundColor: "#FAFAFA",
   },
   postsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "flex-start",
     paddingHorizontal: SPACING,
-    marginBottom: SPACING,
+    paddingTop: 6,
   },
   gridItemWrapper: {
     width: TILE_SIZE,
@@ -1138,18 +1347,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 60,
+    paddingVertical: 80,
+    paddingHorizontal: 40,
   },
   emptyText: {
     marginTop: 16,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "600",
-    color: "#666",
+    color: "#555",
+    textAlign: "center",
   },
   emptySubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: "#999",
+    marginTop: 6,
+    fontSize: 13,
+    color: "#aaa",
+    textAlign: "center",
   },
   // Restaurant card styles
   restaurantCard: {
@@ -1157,27 +1369,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    marginHorizontal: 12,
+    marginTop: 8,
+    backgroundColor: "#FFF",
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
   },
   restaurantInfo: {
     flex: 1,
     marginLeft: 12,
   },
   restaurantName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
-    color: "#333",
+    color: "#222",
   },
   restaurantLocationRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    gap: 4,
     marginTop: 3,
   },
   restaurantLocation: {
-    fontSize: 13,
-    color: "#999",
+    fontSize: 12,
+    color: "#888",
     flex: 1,
   },
   menuMatchRow: {
@@ -1187,23 +1406,30 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   menuMatchText: {
-    fontSize: 13,
-    color: "#E94A37",
-    fontWeight: "500",
+    fontSize: 12,
+    color: "#FF7A18",
+    fontWeight: "600",
     flex: 1,
   },
   restaurantStatsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 6,
+    gap: 8,
+  },
+  restaurantStatChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   restaurantStat: {
-    fontSize: 12,
-    color: "#999",
-  },
-  restaurantStatDot: {
-    fontSize: 12,
-    color: "#ccc",
+    fontSize: 11,
+    color: "#666",
+    fontWeight: "500",
   },
 });
 

@@ -34,7 +34,7 @@ from routers.grammar import router as grammar_router
 from routers.wallet import router as wallet_router
 from routers.user_profile import router as user_profile_router
 from routers.places import router as places_router
-from routers.orders import router as orders_router
+
 from routers.menu import router as menu_router
 from routers.admin_auth import router as admin_auth_router
 from routers.badge_requests import router as badge_requests_router
@@ -477,34 +477,6 @@ app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs("static/uploads/restaurants", exist_ok=True)
 
-# ======================================================
-# PARTNER DASHBOARD - Serve at /orders
-# ======================================================
-PARTNER_DASHBOARD_DIR = os.path.join(BASE_DIR, "static", "partner-dashboard")
-os.makedirs(PARTNER_DASHBOARD_DIR, exist_ok=True)
-
-# ✅ Mount static assets for partner dashboard (CSS, JS, images)
-try:
-    app.mount("/orders/assets", StaticFiles(directory=os.path.join(PARTNER_DASHBOARD_DIR, "assets")), name="partner-assets")
-    print(f"✅ Mounted partner dashboard assets at /orders/assets")
-except Exception as e:
-    print(f"⚠️ Could not mount partner dashboard assets: {e}")
-
-# ✅ Serve partner dashboard SPA at /orders root only
-# NOTE: No catch-all route needed - React Router handles all client-side routing
-# The mount above will serve assets, and this route serves the HTML
-@app.get("/orders", response_class=HTMLResponse)
-async def serve_partner_dashboard_root():
-    """Serve the partner dashboard SPA at /orders (React Router handles client-side routing)"""
-    dashboard_index = os.path.join(PARTNER_DASHBOARD_DIR, "index.html")
-
-    if os.path.exists(dashboard_index):
-        return FileResponse(dashboard_index)
-    else:
-        return HTMLResponse(
-            content="<h1>Partner Dashboard Not Found</h1><p>Please build the dashboard first.</p>",
-            status_code=404
-        )
 
 # ======================================================
 # OPEN GRAPH (WhatsApp Preview) CONFIGURATION
@@ -597,7 +569,7 @@ app.include_router(grammar_router)
 app.include_router(wallet_router)
 app.include_router(user_profile_router)
 app.include_router(places_router)
-app.include_router(orders_router)
+
 app.include_router(menu_router)
 app.include_router(admin_auth_router)
 app.include_router(badge_requests_router)
@@ -1340,7 +1312,7 @@ async def get_feed(
     # Fetch from both collections
     if sort == "engagement":
         page_size = limit or 30
-        fetch_limit = min((skip + page_size) * 3, 3000)
+        fetch_limit = min((skip + page_size) * 8, 3000)
 
         # Fetch user posts
         user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
@@ -1581,6 +1553,7 @@ async def get_feed(
 @app.get("/api/posts/last-3-days")
 async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
     """Get top 10 posts from the last 2 days, ranked by quality + engagement."""
+    import asyncio
     db = get_database()
 
     blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
@@ -1595,34 +1568,75 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
 
     posts = await db.posts.find(query).sort("created_at", -1).to_list(None)
 
-    result = []
-    post_quality_map = {}
+    if not posts:
+        return []
 
+    # Score and rank using data already on the post documents (no extra queries)
+    max_likes = max((p.get("likes_count", 0) for p in posts), default=1) or 1
+    scored = []
     for post in posts:
+        quality = post.get("quality_score", 50.0)
+        engagement = lb_engagement_score(post.get("likes_count", 0), max_likes)
+        combined = lb_combined_score(quality, engagement)
+        scored.append((combined, quality, engagement, post))
+
+    # Sort by combined score descending, take top 10 BEFORE enriching
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_10 = scored[:10]
+
+    # Batch-fetch all unique users for the top 10 in one query
+    current_user_id = str(current_user["_id"])
+    top_user_ids = list({p["user_id"] for _, _, _, p in top_10})
+    top_post_ids = [str(p["_id"]) for _, _, _, p in top_10]
+
+    users_cursor = db.users.find({"_id": {"$in": [ObjectId(uid) for uid in top_user_ids]}})
+    users_list = await users_cursor.to_list(None)
+    users_map = {str(u["_id"]): u for u in users_list}
+
+    # Parallel batch queries for counts and interaction checks
+    async def get_user_posts_count(uid):
+        return uid, await db.posts.count_documents({"user_id": uid})
+
+    async def get_user_followers_count(uid):
+        return uid, await db.follows.count_documents({"followingId": uid})
+
+    async def get_is_liked(pid):
+        return pid, await db.likes.find_one({"post_id": pid, "user_id": current_user_id}) is not None
+
+    async def get_is_saved(pid):
+        return pid, await db.saved_posts.find_one({"post_id": pid, "user_id": current_user_id}) is not None
+
+    async def get_is_following(uid):
+        return uid, await db.follows.find_one({"followerId": current_user_id, "followingId": uid}) is not None
+
+    # Run all queries in parallel
+    posts_count_tasks = [get_user_posts_count(uid) for uid in top_user_ids]
+    followers_count_tasks = [get_user_followers_count(uid) for uid in top_user_ids]
+    liked_tasks = [get_is_liked(pid) for pid in top_post_ids]
+    saved_tasks = [get_is_saved(pid) for pid in top_post_ids]
+    following_tasks = [get_is_following(uid) for uid in top_user_ids]
+
+    all_results = await asyncio.gather(
+        *posts_count_tasks, *followers_count_tasks,
+        *liked_tasks, *saved_tasks, *following_tasks
+    )
+
+    # Unpack results into lookup dicts
+    n_users = len(top_user_ids)
+    n_posts = len(top_post_ids)
+    idx = 0
+    user_posts_count_map = dict(all_results[idx:idx + n_users]); idx += n_users
+    user_followers_count_map = dict(all_results[idx:idx + n_users]); idx += n_users
+    liked_map = dict(all_results[idx:idx + n_posts]); idx += n_posts
+    saved_map = dict(all_results[idx:idx + n_posts]); idx += n_posts
+    following_map = dict(all_results[idx:idx + n_users]); idx += n_users
+
+    # Build result
+    result = []
+    for rank, (combined, quality, engagement, post) in enumerate(top_10, start=1):
         post_id = str(post["_id"])
         user_id = post["user_id"]
-        user = await db.users.find_one({"_id": ObjectId(user_id)})
-        user_posts_count = await db.posts.count_documents({"user_id": user_id})
-        user_followers_count = await db.follows.count_documents({"followingId": user_id})
-
-        # Store quality_score from the raw post document
-        post_quality_map[post_id] = post.get("quality_score", 50.0)
-
-        is_liked = await db.likes.find_one({
-            "post_id": post_id,
-            "user_id": str(current_user["_id"])
-        }) is not None
-
-        is_saved = await db.saved_posts.find_one({
-            "post_id": post_id,
-            "user_id": str(current_user["_id"])
-        }) is not None
-
-        is_following = await db.follows.find_one({
-            "followerId": str(current_user["_id"]),
-            "followingId": user_id
-        }) is not None
-
+        user = users_map.get(user_id)
         media_url = post.get("media_url", "")
         media_type = post.get("media_type", "image")
         image_url = post.get("image_url") if media_type == "image" else None
@@ -1634,8 +1648,8 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "user_profile_picture": user.get("profile_picture") if user else None,
             "user_badge": user.get("badge") if user else None,
             "user_level": user.get("level", 1),
-            "user_followers_count": user_followers_count,
-            "user_posts_count": user_posts_count,
+            "user_followers_count": user_followers_count_map.get(user_id, 0),
+            "user_posts_count": user_posts_count_map.get(user_id, 0),
             "media_url": media_url,
             "image_url": image_url,
             "thumbnail_url": post.get("thumbnail_url"),
@@ -1649,31 +1663,15 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
-            "is_liked_by_user": is_liked,
-            "is_saved_by_user": is_saved,
-            "is_following": is_following,
+            "is_liked_by_user": liked_map.get(post_id, False),
+            "is_saved_by_user": saved_map.get(post_id, False),
+            "is_following": following_map.get(user_id, False),
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
+            "quality_score": quality,
+            "engagement_score": engagement,
+            "combined_score": combined,
+            "rank": rank,
         })
-
-    # Score and rank posts
-    if result:
-        max_likes = max((p["likes_count"] for p in result), default=1) or 1
-
-        for p in result:
-            quality = post_quality_map.get(p["id"], 50.0)
-            engagement = lb_engagement_score(p["likes_count"], max_likes)
-            combined = lb_combined_score(quality, engagement)
-            p["quality_score"] = quality
-            p["engagement_score"] = engagement
-            p["combined_score"] = combined
-
-        # Sort by combined score descending, take top 10
-        result.sort(key=lambda x: x["combined_score"], reverse=True)
-        result = result[:10]
-
-        # Assign rank 1-10
-        for idx, p in enumerate(result, start=1):
-            p["rank"] = idx
 
     return result
 
@@ -1767,33 +1765,40 @@ async def like_post(post_id: str, current_user: dict = Depends(get_current_user)
     if existing_like:
         raise HTTPException(status_code=400, detail="Already liked this post")
     
-    # Get post to find owner
+    # Get post to find owner - check both user posts and restaurant posts
     post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    is_restaurant_post = False
+    if not post:
+        post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+        is_restaurant_post = True
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
+
     # Add like
     await db.likes.insert_one({
         "post_id": post_id,
         "user_id": str(current_user["_id"]),
         "created_at": datetime.utcnow()
     })
-    
-    # Update post likes count
-    await db.posts.update_one(
+
+    # Update post likes count in the correct collection
+    collection = db.restaurant_posts if is_restaurant_post else db.posts
+    await collection.update_one(
         {"_id": ObjectId(post_id)},
         {"$inc": {"likes_count": 1}}
     )
-    
+
     # Create notification for post owner
-    await create_notification(
-        db=db,
-        notification_type="like",
-        from_user_id=str(current_user["_id"]),
-        to_user_id=post["user_id"],
-        post_id=post_id
-    )
-    
+    owner_id = post.get("user_id") or post.get("restaurant_id")
+    if owner_id:
+        await create_notification(
+            db=db,
+            notification_type="like",
+            from_user_id=str(current_user["_id"]),
+            to_user_id=owner_id,
+            post_id=post_id
+        )
+
     return {"message": "Post liked"}
 
 @app.delete("/api/posts/{post_id}/like")
@@ -1805,16 +1810,21 @@ async def unlike_post(post_id: str, current_user: dict = Depends(get_current_use
         "post_id": post_id,
         "user_id": str(current_user["_id"])
     })
-    
+
     if result.deleted_count == 0:
         raise HTTPException(status_code=400, detail="Like not found")
-    
-    # Update post likes count
-    await db.posts.update_one(
+
+    # Update post likes count - try user posts first, then restaurant posts
+    update_result = await db.posts.update_one(
         {"_id": ObjectId(post_id)},
         {"$inc": {"likes_count": -1}}
     )
-    
+    if update_result.matched_count == 0:
+        await db.restaurant_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"likes_count": -1}}
+        )
+
     return {"message": "Post unliked"}
 
 # ==================== SHARE POST ENDPOINT ====================
@@ -2628,16 +2638,76 @@ async def get_nearby_posts(lat: float, lng: float, radius_km: float = 10, skip: 
     
     return result
 
+def _is_natural_language_query(query: str) -> bool:
+    """Check if a query looks like natural language rather than a simple keyword search."""
+    nl_keywords = ["best", "top", "most", "popular", "famous", "good", "great", "amazing",
+                   "in", "near", "around", "at", "from", "of", "rated", "liked", "loved",
+                   "favourite", "favorite", "cheapest", "cheap", "expensive", "trending",
+                   "nearby", "me"]
+    words = query.lower().split()
+    # Needs at least 2 words and contain a natural language indicator
+    return len(words) >= 2 and any(w in nl_keywords for w in words)
+
+async def _parse_smart_query(query: str) -> dict:
+    """
+    Use OpenAI gpt-4o-mini to parse a natural language food search query
+    into structured filters: dish_name, location, sort_by.
+    Returns None if parsing fails (caller should fall back to regex search).
+    """
+    try:
+        from openai import OpenAI
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return None
+        client = OpenAI(api_key=api_key)
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You extract structured search filters from food search queries. "
+                        "Return a JSON object with these optional fields:\n"
+                        '- "dish_name": the food/dish being searched (e.g. "shawarma", "biryani", "momos")\n'
+                        '- "location": the area/place/neighborhood mentioned (e.g. "JP Nagar", "Koramangala", "Indiranagar"). Do NOT include "near me" or "nearby" as a location.\n'
+                        '- "nearby": set to true if the user says "near me", "nearby", "around me", "close to me", or similar phrases meaning the user\'s current location.\n'
+                        '- "sort_by": one of "popularity" (for best/top/most liked/famous), "rating" (for highest rated/top rated), "recent" (for latest/newest). Default to "popularity" if the user says best/top/good.\n'
+                        "Only include fields that are clearly present in the query. "
+                        "Return ONLY valid JSON, no markdown, no explanation."
+                    )
+                },
+                {"role": "user", "content": query}
+            ],
+            max_tokens=100,
+            temperature=0
+        )
+
+        raw = response.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        parsed = json.loads(raw)
+        print(f"🤖 Smart search parsed: '{query}' -> {parsed}")
+        return parsed
+    except Exception as e:
+        print(f"⚠️ Smart search parse failed: {e}")
+        return None
+
 @app.get("/api/search/posts")
 async def search_posts(
     q: str,
     skip: int = 0,
     limit: int = 30,
+    lat: float = None,
+    lng: float = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Search posts with intelligent ranking algorithm.
     Searches across: review_text, location_name, dish_name, and username.
+    Supports natural language queries like "Best Shawarma in JP Nagar" via AI parsing.
+    Supports "near me" queries when lat/lng are provided.
     """
     if not q or not q.strip():
         return []
@@ -2648,112 +2718,228 @@ async def search_posts(
     # ✅ ADD THIS: Get blocked user IDs
     blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
 
-    # Build MongoDB query to search across multiple fields
-    search_regex = {"$regex": query, "$options": "i"}  # ✅ FIXED: Use 'query' instead of 'query_text'
+    # --- Smart AI parsing for natural language queries ---
+    smart_filters = None
+    if _is_natural_language_query(query):
+        smart_filters = await _parse_smart_query(q.strip())
 
-    # ✅ MODIFY THIS: Exclude blocked users from search
-    search_query = {
-        "$or": [
-            {"review_text": search_regex},
-            {"location_name": search_regex},
-            {"dish_name": search_regex},
-        ]
-    }
-    if blocked_user_ids:
-        search_query["user_id"] = {"$nin": blocked_user_ids}
-    
-    # Get all posts that match the search query
-    all_posts = await db.posts.find(search_query).to_list(None)
+    is_nearby = smart_filters.get("nearby", False) if smart_filters else False
+    nearby_radius_km = 12  # 12km radius for "near me" queries
 
-    # Also search restaurant_posts collection
-    restaurant_search_query = {
-        "$or": [
-            {"review_text": search_regex},
-            {"caption": search_regex},
-            {"location_name": search_regex},
-            {"dish_name": search_regex},
-        ]
-    }
-    restaurant_posts_matched = await db.restaurant_posts.find(restaurant_search_query).to_list(None)
+    if smart_filters and (smart_filters.get("dish_name") or smart_filters.get("location") or is_nearby):
+        # Build targeted MongoDB query from AI-parsed filters
+        conditions = []
+        if smart_filters.get("dish_name"):
+            dish_regex = {"$regex": smart_filters["dish_name"], "$options": "i"}
+            conditions.append({"dish_name": dish_regex})
+            conditions.append({"review_text": dish_regex})
+        if smart_filters.get("location"):
+            loc_regex = {"$regex": smart_filters["location"], "$options": "i"}
+            conditions.append({"location_name": loc_regex})
+
+        search_query = {"$or": conditions} if len(conditions) > 1 else conditions[0]
+        if blocked_user_ids:
+            search_query = {"$and": [search_query, {"user_id": {"$nin": blocked_user_ids}}]}
+
+        # Fetch posts matching the smart filters
+        all_posts = await db.posts.find(search_query).to_list(None)
+
+        # If "near me" — filter posts by distance using lat/lng
+        if is_nearby and lat is not None and lng is not None:
+            from routers.map import calculate_distance_km
+            nearby_posts = []
+            for post in all_posts:
+                p_lat = post.get("latitude")
+                p_lng = post.get("longitude")
+                if p_lat is not None and p_lng is not None:
+                    dist = calculate_distance_km(lat, lng, p_lat, p_lng)
+                    if dist <= nearby_radius_km:
+                        post["_distance_km"] = dist
+                        nearby_posts.append(post)
+            all_posts = nearby_posts
+
+        # Also search restaurant_posts
+        restaurant_search_query = search_query.copy()
+        restaurant_posts_matched = await db.restaurant_posts.find(restaurant_search_query).to_list(None)
+
+        # Filter restaurant posts by proximity too
+        if is_nearby and lat is not None and lng is not None:
+            nearby_rp = []
+            for rp in restaurant_posts_matched:
+                p_lat = rp.get("latitude")
+                p_lng = rp.get("longitude")
+                if p_lat is not None and p_lng is not None:
+                    dist = calculate_distance_km(lat, lng, p_lat, p_lng)
+                    if dist <= nearby_radius_km:
+                        rp["_distance_km"] = dist
+                        nearby_rp.append(rp)
+            restaurant_posts_matched = nearby_rp
+
+        # If both dish and location were specified, boost posts matching BOTH
+        has_dish = bool(smart_filters.get("dish_name"))
+        has_location = bool(smart_filters.get("location"))
+        sort_by = smart_filters.get("sort_by", "popularity")
+    else:
+        # Fallback: original regex search
+        smart_filters = None
+        search_regex = {"$regex": query, "$options": "i"}
+
+        search_query = {
+            "$or": [
+                {"review_text": search_regex},
+                {"location_name": search_regex},
+                {"dish_name": search_regex},
+            ]
+        }
+        if blocked_user_ids:
+            search_query["user_id"] = {"$nin": blocked_user_ids}
+
+        all_posts = await db.posts.find(search_query).to_list(None)
+
+        restaurant_search_query = {
+            "$or": [
+                {"review_text": search_regex},
+                {"caption": search_regex},
+                {"location_name": search_regex},
+                {"dish_name": search_regex},
+            ]
+        }
+        restaurant_posts_matched = await db.restaurant_posts.find(restaurant_search_query).to_list(None)
+        has_dish = False
+        has_location = False
+        sort_by = None
     # Tag them so we can handle them differently in the result building
     for rp in restaurant_posts_matched:
         rp["_is_restaurant_post"] = True
     all_posts.extend(restaurant_posts_matched)
 
-    # Also search by username
-    users_matching = await db.users.find({
-        "full_name": search_regex
-    }).to_list(None)
-    
-    user_ids_matching = [str(u["_id"]) for u in users_matching]
-    
-    # Get posts from matching users (excluding blocked users)
-    posts_by_users_query = {"user_id": {"$in": user_ids_matching}}
-    if blocked_user_ids:
-        posts_by_users_query["user_id"] = {"$in": [uid for uid in user_ids_matching if uid not in blocked_user_ids]}
-    
-    posts_by_users = await db.posts.find(posts_by_users_query).to_list(None)
-    
+    # Also search by username (skip for smart filter queries — not relevant)
+    posts_by_users = []
+    if not smart_filters:
+        search_regex = {"$regex": query, "$options": "i"}
+        users_matching = await db.users.find({
+            "full_name": search_regex
+        }).to_list(None)
+
+        user_ids_matching = [str(u["_id"]) for u in users_matching]
+
+        # Get posts from matching users (excluding blocked users)
+        posts_by_users_query = {"user_id": {"$in": user_ids_matching}}
+        if blocked_user_ids:
+            posts_by_users_query["user_id"] = {"$in": [uid for uid in user_ids_matching if uid not in blocked_user_ids]}
+
+        posts_by_users = await db.posts.find(posts_by_users_query).to_list(None)
+
     # Combine and deduplicate posts
     all_post_ids = set()
     posts_with_scores = []
-    
+
     # Process posts matching review_text or location_name
     for post in all_posts:
         post_id = str(post["_id"])
         if post_id in all_post_ids:
             continue
         all_post_ids.add(post_id)
-        
+
         # Calculate relevance score
         score = 0
         review_text = (post.get("review_text") or "").lower()
         location_name = (post.get("location_name") or "").lower()
         dish_name = (post.get("dish_name") or "").lower()
 
-        # Exact match in dish_name (highest priority - most specific)
-        if query in dish_name:
-            if dish_name.startswith(query):
-                score += 110  # Dish name starts with query - highest relevance
-            else:
-                score += 95   # Dish name contains query
+        if smart_filters:
+            # --- Smart filter scoring: boost posts matching BOTH dish + location ---
+            dish_match = False
+            loc_match = False
+            sf_dish = (smart_filters.get("dish_name") or "").lower()
+            sf_loc = (smart_filters.get("location") or "").lower()
 
-        # Exact match in review_text
-        if query in review_text:
-            if review_text.startswith(query) or review_text.endswith(query):
-                score += 100  # Starts or ends with query
-            else:
-                score += 80   # Contains query
+            if sf_dish and sf_dish in dish_name:
+                dish_match = True
+                score += 100
+            elif sf_dish and sf_dish in review_text:
+                dish_match = True
+                score += 60
 
-        # Exact match in location_name
-        if query in location_name:
-            if location_name.startswith(query):
-                score += 90
-            else:
-                score += 70
-        
-        # Engagement score (likes + comments + rating * 2)
-        engagement = post.get("likes_count", 0) + post.get("comments_count", 0) + (post.get("rating", 0) * 2)
-        score += engagement * 0.1
-        
-        # Recency score (newer posts get higher score)
-        created_at = post.get("created_at")
-        if created_at:
-            try:
-                if isinstance(created_at, str):
-                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                elif not isinstance(created_at, datetime):
-                    created_at = None
-                
+            if sf_loc and sf_loc in location_name:
+                loc_match = True
+                score += 80
+
+            # Big bonus for matching BOTH dish and location
+            if dish_match and loc_match:
+                score += 150
+
+            # Proximity bonus — closer posts rank higher
+            if is_nearby and "_distance_km" in post:
+                dist = post["_distance_km"]
+                score += max(0, 100 - (dist * 8))  # closer = higher score
+
+            # Sort-based scoring
+            if sort_by == "popularity":
+                score += post.get("likes_count", 0) * 5
+                score += post.get("comments_count", 0) * 3
+            elif sort_by == "rating":
+                score += post.get("rating", 0) * 20
+            elif sort_by == "recent":
+                created_at = post.get("created_at")
                 if created_at:
-                    days_old = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
-                    recency_score = max(0, 50 - (days_old * 2))  # Decay over time
-                    score += recency_score
-            except (ValueError, TypeError):
-                pass  # Skip recency score if date parsing fails
-        
+                    try:
+                        if isinstance(created_at, str):
+                            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        if isinstance(created_at, datetime):
+                            days_old = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+                            score += max(0, 200 - (days_old * 5))
+                    except (ValueError, TypeError):
+                        pass
+            else:
+                # Default: mix of engagement
+                score += post.get("likes_count", 0) * 3
+                score += post.get("rating", 0) * 10
+        else:
+            # --- Original scoring for simple keyword searches ---
+            # Exact match in dish_name (highest priority - most specific)
+            if query in dish_name:
+                if dish_name.startswith(query):
+                    score += 110  # Dish name starts with query - highest relevance
+                else:
+                    score += 95   # Dish name contains query
+
+            # Exact match in review_text
+            if query in review_text:
+                if review_text.startswith(query) or review_text.endswith(query):
+                    score += 100  # Starts or ends with query
+                else:
+                    score += 80   # Contains query
+
+            # Exact match in location_name
+            if query in location_name:
+                if location_name.startswith(query):
+                    score += 90
+                else:
+                    score += 70
+
+            # Engagement score (likes + comments + rating * 2)
+            engagement = post.get("likes_count", 0) + post.get("comments_count", 0) + (post.get("rating", 0) * 2)
+            score += engagement * 0.1
+
+            # Recency score (newer posts get higher score)
+            created_at = post.get("created_at")
+            if created_at:
+                try:
+                    if isinstance(created_at, str):
+                        created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    elif not isinstance(created_at, datetime):
+                        created_at = None
+
+                    if created_at:
+                        days_old = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+                        recency_score = max(0, 50 - (days_old * 2))  # Decay over time
+                        score += recency_score
+                except (ValueError, TypeError):
+                    pass  # Skip recency score if date parsing fails
+
         posts_with_scores.append((post, score))
-    
+
     # Process posts from matching users
     for post in posts_by_users:
         post_id = str(post["_id"])

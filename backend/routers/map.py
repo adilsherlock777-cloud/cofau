@@ -229,7 +229,7 @@ async def get_coordinates_for_map_link(map_link: str, db=None) -> dict:
 async def get_map_pins(
     lat: float = Query(..., description="User's current latitude"),
     lng: float = Query(..., description="User's current longitude"),
-    radius_km: float = Query(10, description="Search radius in kilometers"),
+    radius_km: float = Query(50, description="Search radius in kilometers"),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -307,6 +307,7 @@ async def get_map_pins(
                 "category": post.get("category"),
                 "review_text": post.get("review_text", "")[:100],
                 "likes_count": post.get("likes_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
                 "map_link": post.get("map_link"),
                 "tagged_restaurant_id": post.get("tagged_restaurant_id"),
                 "account_type": "user",
@@ -347,6 +348,7 @@ async def get_map_pins(
                 "category": post.get("category"),
                 "review_text": post.get("about", "")[:100],
                 "likes_count": post.get("likes_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
                 "map_link": post.get("map_link"),
                 "price": post.get("price"),
                 "account_type": "restaurant",
@@ -372,7 +374,7 @@ async def search_map_pins(
     q: str = Query(..., description="Search query (e.g., 'biryani', 'pizza')"),
     lat: float = Query(..., description="User's current latitude"),
     lng: float = Query(..., description="User's current longitude"),
-    radius_km: float = Query(12, description="Search radius in kilometers"),
+    radius_km: float = Query(50, description="Search radius in kilometers"),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -434,6 +436,7 @@ async def search_map_pins(
                 "dish_name": post.get("dish_name"),
                 "review_text": post.get("review_text", ""),
                 "likes_count": post.get("likes_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "is_liked_by_user": is_liked,
                 "map_link": post.get("map_link"),
@@ -490,6 +493,7 @@ async def search_map_pins(
                     "dish_name": post.get("dish_name"),
                     "review_text": post.get("review_text", ""),
                     "likes_count": post.get("likes_count", 0),
+                    "clicks_count": post.get("clicks_count", 0),
                     "comments_count": post.get("comments_count", 0),
                     "is_liked_by_user": is_liked,
                     "map_link": post.get("map_link"),
@@ -536,6 +540,7 @@ async def search_map_pins(
                 "dish_name": post.get("dish_name"),
                 "review_text": post.get("about", "") or post.get("caption", ""),
                 "likes_count": post.get("likes_count", 0),
+                "clicks_count": post.get("clicks_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "is_liked_by_user": False,
                 "map_link": post.get("map_link"),
@@ -552,7 +557,7 @@ async def search_map_pins(
 async def get_nearby_restaurants(
     lat: float = Query(..., description="User's current latitude"),
     lng: float = Query(..., description="User's current longitude"),
-    radius_km: float = Query(10, description="Search radius in kilometers"),
+    radius_km: float = Query(50, description="Search radius in kilometers"),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -623,7 +628,7 @@ async def get_nearby_restaurants(
 async def get_nearby_posts(
     lat: float = Query(..., description="User's current latitude"),
     lng: float = Query(..., description="User's current longitude"),
-    radius_km: float = Query(10, description="Search radius in kilometers"),
+    radius_km: float = Query(50, description="Search radius in kilometers"),
     category: Optional[str] = Query(None, description="Filter by category"),
     current_user: dict = Depends(get_current_user)
 ):
@@ -907,6 +912,7 @@ async def get_followers_posts_on_map(
             "category": post.get("category"),
             "review_text": post.get("review_text", "")[:100],
             "likes_count": post.get("likes_count", 0),
+            "clicks_count": post.get("clicks_count", 0),
             "map_link": post.get("map_link"),
             "tagged_restaurant_id": post.get("tagged_restaurant_id"),
             "account_type": "user",
@@ -948,6 +954,7 @@ async def get_followers_posts_on_map(
             "category": post.get("category"),
             "review_text": post.get("caption", "")[:100],
             "likes_count": post.get("likes_count", 0),
+            "clicks_count": post.get("clicks_count", 0),
             "map_link": post.get("map_link"),
             "tagged_restaurant_id": post.get("restaurant_id"),
             "account_type": "restaurant",

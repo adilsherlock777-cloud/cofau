@@ -1,13 +1,25 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from typing import List
+from typing import List, Optional
 from collections import defaultdict
 from datetime import datetime
 from bson import ObjectId
+import re
 
 from database import get_database
 from math import radians, cos, sin, asin, sqrt
 from routers.auth import get_current_user
+
+# Food spot category mappings - maps UI category names to post category values
+FOOD_SPOT_CATEGORIES = {
+    "cafe": ["Pizza", "Italian", "Cafe", "Fast Food", "Continental"],
+    "biryani": ["Biryani"],
+    "pureveg": ["Vegetarian/Vegan"],
+    "nonveg": ["Non vegetarian", "SeaFood", "BBQ/Tandoor"],
+    "arabian": ["Arabic"],
+    "coffeetea": ["Tea/Coffee"],
+    "dessert": ["Desserts"],
+}
 
 router = APIRouter(prefix="/api/locations", tags=["locations"])
 
@@ -387,6 +399,126 @@ async def get_nearby_locations(
     
     # Sort by uploads (highest first)
     locations_list.sort(key=lambda x: x["uploads"], reverse=True)
-    
+
     # Limit results
+    return locations_list[:limit]
+
+
+@router.get("/by-food-spot")
+async def get_locations_by_food_spot(
+    spot: str = Query(..., description="Food spot type: cafe, biryani, pureveg, nonveg, arabian, coffeetea, dessert"),
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    radius_km: float = 50,
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get location cards filtered by food spot category.
+    Groups posts by location_name where post category matches the food spot type.
+    """
+    db = get_database()
+
+    # Get the category names for this food spot
+    categories = FOOD_SPOT_CATEGORIES.get(spot.lower())
+    if not categories:
+        return []
+
+    # Build regex patterns for category matching (case-insensitive)
+    category_patterns = [{"category": {"$regex": re.escape(cat), "$options": "i"}} for cat in categories]
+
+    # Query posts that have matching category AND a location_name
+    base_query = {
+        "$and": [
+            {"$or": category_patterns},
+            {"location_name": {"$exists": True, "$ne": None, "$ne": ""}},
+        ]
+    }
+
+    user_posts = await db.posts.find(base_query).sort("created_at", -1).to_list(None)
+    restaurant_posts = await db.restaurant_posts.find(base_query).sort("created_at", -1).to_list(None)
+    all_posts = user_posts + restaurant_posts
+
+    # Group posts by location_name
+    location_map = {}
+
+    for post in all_posts:
+        location_name = post.get("location_name")
+        if not location_name:
+            continue
+
+        # Calculate distance if coordinates provided
+        if lat is not None and lng is not None:
+            post_lat = post.get("latitude")
+            post_lng = post.get("longitude")
+            if post_lat and post_lng:
+                distance = haversine(lat, lng, post_lat, post_lng)
+            else:
+                distance = radius_km - 1
+            if distance > radius_km:
+                continue
+        else:
+            distance = 0
+
+        if location_name not in location_map:
+            location_map[location_name] = {
+                "location": location_name,
+                "location_name": location_name,
+                "uploads": 0,
+                "images": [],
+                "thumbnails": [],
+                "images_data": [],
+                "map_link": None,
+                "min_distance": distance,
+                "avg_rating": [],
+            }
+
+        loc_data = location_map[location_name]
+        loc_data["uploads"] += 1
+
+        if distance < loc_data["min_distance"]:
+            loc_data["min_distance"] = distance
+
+        if len(loc_data["images"]) < 20:
+            media_url = post.get("media_url") or post.get("image_url")
+            if media_url:
+                loc_data["images"].append(media_url)
+                loc_data["thumbnails"].append(post.get("thumbnail_url"))
+                loc_data["images_data"].append({
+                    "media_url": media_url,
+                    "thumbnail_url": post.get("thumbnail_url"),
+                    "media_type": post.get("media_type", "image"),
+                    "post_id": str(post["_id"]),
+                    "dish_name": post.get("dish_name"),
+                    "review_text": post.get("review_text"),
+                    "category": post.get("category"),
+                    "clicks_count": post.get("clicks_count", 0),
+                    "views_count": post.get("views_count", 0),
+                })
+
+        if not loc_data["map_link"] and post.get("map_link"):
+            loc_data["map_link"] = post.get("map_link")
+
+        if post.get("rating"):
+            loc_data["avg_rating"].append(post.get("rating"))
+
+    # Build result list
+    locations_list = []
+    for loc_name, loc_data in location_map.items():
+        ratings = loc_data["avg_rating"]
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0
+
+        locations_list.append({
+            "location": loc_data["location"],
+            "location_name": loc_data["location_name"],
+            "uploads": loc_data["uploads"],
+            "images": loc_data["images"],
+            "thumbnails": loc_data["thumbnails"],
+            "images_data": loc_data["images_data"],
+            "map_link": loc_data["map_link"],
+            "distance_km": round(loc_data["min_distance"], 2) if lat else None,
+            "average_rating": round(avg_rating, 1),
+        })
+
+    locations_list.sort(key=lambda x: x["uploads"], reverse=True)
     return locations_list[:limit]

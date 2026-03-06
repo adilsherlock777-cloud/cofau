@@ -971,7 +971,6 @@ postId={post.id}
                 <Text style={styles.locationText} numberOfLines={1}>
                   {post.location_name || post.location_address}
                 </Text>
-                <View style={{ flex: 1 }} />
                 <View style={styles.locationArrowButton}>
                   <Ionicons name="chevron-forward" size={14} color="#fff" />
                 </View>
@@ -1456,6 +1455,7 @@ heartAnimationContainer: {
 },
 
 locationText: {
+flex: 1,
 fontSize: 15,
 fontWeight: "500",
 color: "#000",

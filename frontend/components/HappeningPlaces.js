@@ -186,6 +186,11 @@ export default function HappeningPlaces({ embedded = false }) {
   const [recentSearches, setRecentSearches] = useState([]);
   const searchTimerRef = useRef(null);
 
+  // Food spot category filter
+  const [selectedFoodSpot, setSelectedFoodSpot] = useState(null); // null or spot id
+  const [foodSpotLocations, setFoodSpotLocations] = useState([]);
+  const [foodSpotLoading, setFoodSpotLoading] = useState(false);
+
   // Track if initial load has happened to prevent duplicate fetch
   const hasInitiallyLoaded = useRef(false);
 
@@ -533,6 +538,77 @@ export default function HappeningPlaces({ embedded = false }) {
       setRecentSearches([]);
     } catch (e) {
     }
+  };
+
+  // Food spot category definitions
+  const FOOD_SPOTS = [
+    { id: 'cafe', label: 'Cafe', emoji: '☕' },
+    { id: 'biryani', label: 'Biryani Spot', emoji: '🍛' },
+    { id: 'pureveg', label: 'Pure Veg', emoji: '__veg__' },
+    { id: 'nonveg', label: 'Non Veg', emoji: '__nonveg__' },
+    { id: 'arabian', label: 'Arabian', emoji: '🧆' },
+    { id: 'coffeetea', label: 'Coffee/Tea Spot', emoji: '🫖' },
+    { id: 'dessert', label: 'Dessert Spot', emoji: '🍰' },
+  ];
+
+  const fetchFoodSpotLocations = async (spotId) => {
+    if (!token) return;
+    try {
+      setFoodSpotLoading(true);
+      let endpoint = `${API_URL}/locations/by-food-spot?spot=${spotId}&limit=20`;
+      if (userLocation) {
+        endpoint += `&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=50`;
+      }
+      const response = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const locations = Array.isArray(response.data) ? response.data : [];
+      // Reverse images so latest posts appear first
+      const reversed = locations.map(loc => ({
+        ...loc,
+        images: loc.images ? [...loc.images].reverse() : [],
+        thumbnails: loc.thumbnails ? [...loc.thumbnails].reverse() : [],
+        images_data: loc.images_data ? [...loc.images_data].reverse() : [],
+      }));
+      setFoodSpotLocations(reversed);
+    } catch (error) {
+      console.error('❌ Error fetching food spot locations:', error.message);
+      setFoodSpotLocations([]);
+    } finally {
+      setFoodSpotLoading(false);
+    }
+  };
+
+  const handleFoodSpotPress = (spotId) => {
+    if (selectedFoodSpot === spotId) {
+      // Deselect
+      setSelectedFoodSpot(null);
+      setFoodSpotLocations([]);
+    } else {
+      setSelectedFoodSpot(spotId);
+      fetchFoodSpotLocations(spotId);
+    }
+  };
+
+  // Veg/NonVeg icon for food spot chips
+  const renderFoodSpotIcon = (emoji, size) => {
+    if (emoji === '__veg__') {
+      const color = '#22C55E';
+      return (
+        <View style={{ width: size, height: size, borderRadius: 3, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: size * 0.45, height: size * 0.45, borderRadius: size * 0.45, backgroundColor: color }} />
+        </View>
+      );
+    }
+    if (emoji === '__nonveg__') {
+      const color = '#E02D2D';
+      return (
+        <View style={{ width: size, height: size, borderRadius: 3, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: size * 0.45, height: size * 0.45, borderRadius: size * 0.45, backgroundColor: color }} />
+        </View>
+      );
+    }
+    return <Text style={{ fontSize: size }}>{emoji}</Text>;
   };
 
   const handleLocationPress = (location) => {
@@ -988,6 +1064,170 @@ export default function HappeningPlaces({ embedded = false }) {
               </View>
             )}
           </View>
+
+          {/* Food Spot Category Boxes */}
+          {selectedArea === 'All' && (
+            <View style={styles.foodSpotSection}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.foodSpotScroll}
+              >
+                {FOOD_SPOTS.map((spot) => {
+                  const isActive = selectedFoodSpot === spot.id;
+                  return (
+                    <TouchableOpacity
+                      key={spot.id}
+                      onPress={() => handleFoodSpotPress(spot.id)}
+                      activeOpacity={0.7}
+                      style={[styles.foodSpotBox, isActive && styles.foodSpotBoxActive]}
+                    >
+                      {isActive ? (
+                        <LinearGradient
+                          colors={['#FF2E2E', '#FF7A18']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.foodSpotBoxGradient}
+                        >
+                          {renderFoodSpotIcon(spot.emoji, 20)}
+                          <Text style={styles.foodSpotLabelActive}>{spot.label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.foodSpotBoxInner}>
+                          {renderFoodSpotIcon(spot.emoji, 20)}
+                          <Text style={styles.foodSpotLabel}>{spot.label}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Food Spot Filtered Location Cards */}
+          {selectedArea === 'All' && selectedFoodSpot && (
+            <View style={styles.areaPostsSection}>
+              <Text style={styles.areaPostsTitle}>
+                {FOOD_SPOTS.find(s => s.id === selectedFoodSpot)?.label || ''} Places
+              </Text>
+              {foodSpotLoading ? (
+                <ActivityIndicator size="large" color="#E94A37" style={{ marginVertical: 30 }} />
+              ) : foodSpotLocations.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="images-outline" size={48} color="#CCC" />
+                  <Text style={styles.emptyTitle}>No places found</Text>
+                  <Text style={styles.emptySubtext}>No posts with this category yet</Text>
+                </View>
+              ) : (
+                foodSpotLocations.map((location, index) => {
+                  const images = location.images || [];
+                  const thumbnails = location.thumbnails || [];
+                  const imagesData = location.images_data || [];
+                  const locationKey = `foodspot-${location.location}-${index}`;
+
+                  return (
+                    <TouchableOpacity
+                      key={locationKey}
+                      style={styles.cardOuter}
+                      onPress={() => handleLocationPress(location)}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={['rgba(255, 122, 24, 0.35)', 'rgba(255, 122, 24, 0.15)', 'rgba(255, 255, 255, 1)']}
+                        locations={[0, 0.3, 1]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={styles.card}
+                      >
+                        <View style={styles.cardHeader}>
+                          <View style={styles.rankNumber}>
+                            <LinearGradient
+                              colors={['#FF2E2E', '#FF7A18']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.rankGradient}
+                            >
+                              <Text style={styles.rankNumberText}>{index + 1}</Text>
+                            </LinearGradient>
+                          </View>
+                          <View style={styles.locationInfo}>
+                            <Text style={styles.locationName} numberOfLines={1}>
+                              {location.location || location.location_name}
+                            </Text>
+                            <Text style={styles.uploadCount}>
+                              ({formatUploadCount(location.uploads)} uploaded)
+                              {location.distance_km != null && location.distance_km !== 0 && ` • ${location.distance_km} km away`}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.imageGrid}>
+                          {images.length > 0 ? (
+                            <>
+                              <View style={styles.imageRow}>
+                                {images.slice(0, 3).map((imageUrl, imgIndex) =>
+                                  renderMediaItem(imageUrl, imgIndex, imagesData, thumbnails, locationKey)
+                                )}
+                              </View>
+                              <View style={styles.imageRow}>
+                                {images[3] && renderMediaItem(images[3], 3, imagesData, thumbnails, locationKey)}
+                                {images.length === 5 ? (
+                                  renderMediaItem(images[4], 4, imagesData, thumbnails, locationKey)
+                                ) : images.length > 5 ? (
+                                  <View style={styles.blurredImageWrapper}>
+                                    {(() => {
+                                      const imageData = imagesData[4] || {};
+                                      const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
+                                      let displayUrl = null;
+                                      if (isVideo) {
+                                        const thumbnailUrl = imageData.thumbnail_url
+                                          ? fixUrl(imageData.thumbnail_url)
+                                          : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
+                                        displayUrl = thumbnailUrl || fixUrl(images[4], { thumbnail: true });
+                                      } else {
+                                        displayUrl = fixUrl(images[4], { thumbnail: true });
+                                      }
+                                      if (!displayUrl) return null;
+                                      return (
+                                        <Image
+                                          source={{ uri: displayUrl }}
+                                          style={styles.gridImageSquare}
+                                          contentFit="cover"
+                                          blurRadius={8}
+                                          placeholder={{ blurhash: BLUR_HASH }}
+                                        />
+                                      );
+                                    })()}
+                                    <View style={styles.countButtonOverlay}>
+                                      <LinearGradient
+                                        colors={['#FF2E2E', '#FF7A18']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.countButtonGradientBorder}
+                                      >
+                                        <Text style={styles.countButtonText}>
+                                          +{location.uploads || images.length}
+                                        </Text>
+                                      </LinearGradient>
+                                    </View>
+                                  </View>
+                                ) : null}
+                              </View>
+                            </>
+                          ) : (
+                            <View style={styles.noImagePlaceholder}>
+                              <Ionicons name="image-outline" size={32} color="#CCC" />
+                            </View>
+                          )}
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </View>
+          )}
 
           {/* Area Vendor Cards - shown when a specific area is selected */}
           {selectedArea !== 'All' && (
@@ -1905,6 +2145,52 @@ skeletonImageLarge: {
     fontSize: 14,
     color: '#333',
     paddingVertical: 6,
+  },
+
+  // Food Spot Category Boxes
+  foodSpotSection: {
+    marginTop: 4,
+    marginBottom: 12,
+    paddingHorizontal: 0,
+  },
+  foodSpotScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  foodSpotBox: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
+    overflow: 'hidden',
+  },
+  foodSpotBoxActive: {
+    borderColor: 'transparent',
+    borderWidth: 0,
+  },
+  foodSpotBoxInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
+    backgroundColor: '#fff',
+  },
+  foodSpotBoxGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  foodSpotLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
+  foodSpotLabelActive: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
 
   // Area Posts Section styles

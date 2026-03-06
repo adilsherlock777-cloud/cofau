@@ -140,12 +140,12 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="happening"
           options={{
-            title: "Order",
+            title: "Saved",
             tabBarIcon: ({ focused }) =>
               focused ? (
-                <GradientIcon name="receipt" size={22} />
+                <GradientIcon name="location" size={22} />
               ) : (
-                <Ionicons name="receipt-outline" size={22} color="#000" />
+                <Ionicons name="location-outline" size={22} color="#000" />
               ),
           }}
         />
