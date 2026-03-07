@@ -2728,16 +2728,15 @@ async def search_posts(
 
     if smart_filters and (smart_filters.get("dish_name") or smart_filters.get("location") or is_nearby):
         # Build targeted MongoDB query from AI-parsed filters
-        conditions = []
+        and_parts = []
         if smart_filters.get("dish_name"):
             dish_regex = {"$regex": smart_filters["dish_name"], "$options": "i"}
-            conditions.append({"dish_name": dish_regex})
-            conditions.append({"review_text": dish_regex})
+            and_parts.append({"$or": [{"dish_name": dish_regex}, {"review_text": dish_regex}]})
         if smart_filters.get("location"):
             loc_regex = {"$regex": smart_filters["location"], "$options": "i"}
-            conditions.append({"location_name": loc_regex})
+            and_parts.append({"location_name": loc_regex})
 
-        search_query = {"$or": conditions} if len(conditions) > 1 else conditions[0]
+        search_query = {"$and": and_parts} if len(and_parts) > 1 else and_parts[0]
         if blocked_user_ids:
             search_query = {"$and": [search_query, {"user_id": {"$nin": blocked_user_ids}}]}
 
