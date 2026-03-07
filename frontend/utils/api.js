@@ -310,9 +310,9 @@ export const sendCompliment = async (recipientId, complimentType, customMessage 
 /**
  * Save a post
  */
-export const savePost = async (postId) => {
+export const savePost = async (postId, accountType) => {
   try {
-    const response = await axios.post(`${API_URL}/saved/add`, { postId });
+    const response = await axios.post(`${API_URL}/saved/add`, { postId, accountType });
     return response.data;
   } catch (error) {
     console.error('❌ Error saving post:', error.response?.data || error.message);

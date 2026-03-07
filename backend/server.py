@@ -1199,33 +1199,24 @@ async def create_post(
 # ======================================================
 def calculate_engagement_score(post, current_time):
     """
-    Calculate engagement score based on likes, comments, and recency.
-    Higher score = more likely to appear at top.
-    
-    Formula:
-    - Likes weight: 1.0 per like
-    - Comments weight: 2.0 per comment (comments are more valuable)
-    - Recency decay: exponential decay over time (posts from last 24h get full boost)
-    - Base score: 1.0 (so new posts with 0 engagement still have a chance)
+    Calculate engagement score based on likes, comments, recency, and randomness.
+    Uses logarithmic scaling + random factor to create a mixed feed where
+    high-engagement posts are favored but don't always dominate position 1.
     """
     import math
-    
+
     likes_count = post.get("likes_count", 0)
     comments_count = post.get("comments_count", 0)
     created_at = post.get("created_at")
-    
-    # Engagement from interactions
-    engagement_score = (likes_count * 1.0) + (comments_count * 2.0)
-    
+
+    # Use logarithmic scaling so 50 likes isn't 50x better than 1 like
+    # log(1+n) compresses the range: 0->0, 1->0.69, 5->1.79, 10->2.40, 50->3.93
+    engagement_score = math.log1p(likes_count) * 1.0 + math.log1p(comments_count) * 2.0
+
     # Recency factor (decay over time)
     if created_at and isinstance(created_at, datetime):
         time_diff = (current_time - created_at).total_seconds() / 3600  # Hours since creation
-        
-        # Exponential decay: 
-        # - Posts < 24h old: full weight (1.0)
-        # - Posts 1-7 days old: 0.7x weight
-        # - Posts 7-30 days old: 0.5x weight  
-        # - Posts > 30 days old: 0.3x weight
+
         if time_diff < 24:
             recency_factor = 1.0
         elif time_diff < 168:  # 7 days
@@ -1234,21 +1225,23 @@ def calculate_engagement_score(post, current_time):
             recency_factor = 0.5
         else:
             recency_factor = 0.3
-        
-        # Apply recency factor to engagement
+
         engagement_score *= recency_factor
-        
-        # Add small recency boost (newer posts get small advantage even with 0 engagement)
-        recency_boost = max(0, (24 - time_diff) / 24) * 0.5  # Max 0.5 boost for posts < 24h
+
+        # Recency boost for fresh posts
+        recency_boost = max(0, (24 - time_diff) / 24) * 0.5
         engagement_score += recency_boost
     else:
-        # If no created_at, use base score only
         recency_factor = 0.5
         engagement_score *= recency_factor
-    
-    # Add base score so posts with 0 engagement still have a chance
+
+    # Base score so posts with 0 engagement still appear
     final_score = engagement_score + 1.0
-    
+
+    # Add random factor (0.5x to 1.5x) to create variety on each refresh
+    random_factor = 0.5 + random.random()
+    final_score *= random_factor
+
     return final_score
 
 
@@ -1347,7 +1340,7 @@ async def get_feed(
             j = i + 1
             while j < len(posts_with_scores):
                 next_post, next_score = posts_with_scores[j]
-                if abs(next_score - current_score) / max(current_score, 1) <= 0.15:
+                if abs(next_score - current_score) / max(current_score, 1) <= 0.50:
                     similar_group.append((next_post, next_score))
                     j += 1
                 else:
@@ -1371,6 +1364,70 @@ async def get_feed(
         posts = spread_result[skip:]
         if limit:
             posts = posts[:limit]
+    elif sort == "mixed":
+        # Mixed feed: every 9 posts = 3 newest + 3 oldest + 3 most liked, shuffled
+        page_size = limit or 30
+        fetch_limit = 3000
+
+        user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
+        restaurant_posts_raw = await db.restaurant_posts.find(restaurant_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
+
+        for post in user_posts_raw:
+            post["_source"] = "user"
+        for post in restaurant_posts_raw:
+            post["_source"] = "restaurant"
+
+        all_posts = user_posts_raw + restaurant_posts_raw
+
+        # 3 sorted views of the same posts
+        by_newest = sorted(all_posts, key=lambda x: x.get("created_at", datetime.min), reverse=True)
+        by_oldest = sorted(all_posts, key=lambda x: x.get("created_at", datetime.min))
+        by_likes = sorted(all_posts, key=lambda x: x.get("likes_count", 0), reverse=True)
+
+        # Build mixed feed: pick 3 from each bucket per group of 9
+        mixed = []
+        used_ids = set()
+        newest_idx, oldest_idx, likes_idx = 0, 0, 0
+        total_needed = skip + page_size
+
+        while len(mixed) < total_needed and (newest_idx < len(by_newest) or oldest_idx < len(by_oldest) or likes_idx < len(by_likes)):
+            batch = []
+
+            # Pick 3 newest
+            count = 0
+            while count < 3 and newest_idx < len(by_newest):
+                post_id = str(by_newest[newest_idx]["_id"])
+                if post_id not in used_ids:
+                    batch.append(by_newest[newest_idx])
+                    used_ids.add(post_id)
+                    count += 1
+                newest_idx += 1
+
+            # Pick 3 oldest
+            count = 0
+            while count < 3 and oldest_idx < len(by_oldest):
+                post_id = str(by_oldest[oldest_idx]["_id"])
+                if post_id not in used_ids:
+                    batch.append(by_oldest[oldest_idx])
+                    used_ids.add(post_id)
+                    count += 1
+                oldest_idx += 1
+
+            # Pick 3 most liked
+            count = 0
+            while count < 3 and likes_idx < len(by_likes):
+                post_id = str(by_likes[likes_idx]["_id"])
+                if post_id not in used_ids:
+                    batch.append(by_likes[likes_idx])
+                    used_ids.add(post_id)
+                    count += 1
+                likes_idx += 1
+
+            random.shuffle(batch)
+            mixed.extend(batch)
+
+        posts = mixed[skip:skip + page_size] if limit else mixed[skip:]
+
     else:
         # Chronological sorting
         if limit is None:
@@ -1379,17 +1436,17 @@ async def get_feed(
         else:
             user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
             restaurant_posts_raw = await db.restaurant_posts.find(restaurant_query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-        
+
         # Add source identifier
         for post in user_posts_raw:
             post["_source"] = "user"
         for post in restaurant_posts_raw:
             post["_source"] = "restaurant"
-        
+
         # Combine and sort by created_at
         all_posts = user_posts_raw + restaurant_posts_raw
         all_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
-        
+
         # Apply limit after combining
         if limit:
             posts = all_posts[:limit]
@@ -1416,7 +1473,7 @@ async def get_feed(
             
             is_saved = await db.restaurant_saved_posts.find_one({
                 "post_id": post_id,
-                "restaurant_id": str(current_user["_id"])
+                "user_id": str(current_user["_id"])
             }) is not None
 
             is_clicked = await db.post_clicks.find_one({
@@ -1452,6 +1509,7 @@ async def get_feed(
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "shares_count": post.get("shares_count", 0),
+                "saves_count": post.get("saves_count", 0),
                 "clicks_count": post.get("clicks_count", 0),
                 "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
@@ -1532,6 +1590,7 @@ async def get_feed(
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "shares_count": post.get("shares_count", 0),
+                "saves_count": post.get("saves_count", 0),
                 "clicks_count": post.get("clicks_count", 0),
                 "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
@@ -1661,6 +1720,7 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "is_liked_by_user": liked_map.get(post_id, False),
             "is_saved_by_user": saved_map.get(post_id, False),
             "is_following": following_map.get(user_id, False),
@@ -1853,95 +1913,147 @@ async def share_post(post_id: str, current_user: dict = Depends(get_current_user
 
 @app.post("/api/posts/{post_id}/save")
 async def save_post(post_id: str, current_user: dict = Depends(get_current_user)):
-    """Save a post"""
+    """Save a post (works for both user and restaurant posts)"""
     db = get_database()
-    
-    # Check if post exists
+
+    # Check both collections
     post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    is_restaurant_post = False
+    if not post:
+        post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+        is_restaurant_post = True
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
-    # Check if already saved
-    existing_save = await db.saved_posts.find_one({
+
+    saved_collection = db.restaurant_saved_posts if is_restaurant_post else db.saved_posts
+    post_collection = db.restaurant_posts if is_restaurant_post else db.posts
+
+    existing_save = await saved_collection.find_one({
         "post_id": post_id,
         "user_id": str(current_user["_id"])
     })
-    
     if existing_save:
         raise HTTPException(status_code=400, detail="Post already saved")
-    
-    # Add save
-    await db.saved_posts.insert_one({
+
+    await saved_collection.insert_one({
         "post_id": post_id,
         "user_id": str(current_user["_id"]),
         "created_at": datetime.utcnow()
     })
-    
+    await post_collection.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"saves_count": 1}}
+    )
+
     return {"message": "Post saved"}
 
 @app.delete("/api/posts/{post_id}/save")
 async def unsave_post(post_id: str, current_user: dict = Depends(get_current_user)):
-    """Unsave a post"""
+    """Unsave a post (works for both user and restaurant posts)"""
     db = get_database()
-    
+
+    # Try user saved_posts first
     result = await db.saved_posts.delete_one({
         "post_id": post_id,
         "user_id": str(current_user["_id"])
     })
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=400, detail="Post not saved")
-    
-    return {"message": "Post unsaved"}
+    if result.deleted_count > 0:
+        await db.posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"saves_count": -1}}
+        )
+        return {"message": "Post unsaved"}
+
+    # Try restaurant_saved_posts
+    result = await db.restaurant_saved_posts.delete_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"])
+    })
+    if result.deleted_count > 0:
+        await db.restaurant_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"saves_count": -1}}
+        )
+        return {"message": "Post unsaved"}
+
+    raise HTTPException(status_code=400, detail="Post not saved")
 
 # ==================== SAVED POSTS ENDPOINTS (Alternative API) ====================
 
 @app.post("/api/saved/add")
 async def add_saved_post(request: dict, current_user: dict = Depends(get_current_user)):
-    """Save a post (alternative endpoint)"""
+    """Save a post (works for both user and restaurant posts)"""
     db = get_database()
-    
+
     post_id = request.get("postId")
+    account_type = request.get("accountType", "user")
     if not post_id:
         raise HTTPException(status_code=400, detail="postId is required")
-    
-    # Check if post exists
-    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+
+    # Check if post exists in correct collection
+    is_restaurant_post = account_type == "restaurant"
+    if is_restaurant_post:
+        post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+    else:
+        post = await db.posts.find_one({"_id": ObjectId(post_id)})
+        if not post:
+            post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+            is_restaurant_post = bool(post)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
-    # Check if already saved
-    existing_save = await db.saved_posts.find_one({
+
+    saved_collection = db.restaurant_saved_posts if is_restaurant_post else db.saved_posts
+    post_collection = db.restaurant_posts if is_restaurant_post else db.posts
+
+    existing_save = await saved_collection.find_one({
         "post_id": post_id,
         "user_id": str(current_user["_id"])
     })
-    
     if existing_save:
         return {"message": "Post already saved", "status": "success"}
-    
-    # Add save
-    await db.saved_posts.insert_one({
+
+    await saved_collection.insert_one({
         "post_id": post_id,
         "user_id": str(current_user["_id"]),
         "created_at": datetime.utcnow()
     })
-    
+    await post_collection.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$inc": {"saves_count": 1}}
+    )
+
     return {"message": "Post saved", "status": "success"}
 
 @app.delete("/api/saved/remove/{post_id}")
 async def remove_saved_post(post_id: str, current_user: dict = Depends(get_current_user)):
-    """Unsave a post (alternative endpoint)"""
+    """Unsave a post (works for both user and restaurant posts)"""
     db = get_database()
-    
+
+    # Try user saved_posts first
     result = await db.saved_posts.delete_one({
         "post_id": post_id,
         "user_id": str(current_user["_id"])
     })
-    
-    if result.deleted_count == 0:
-        return {"message": "Post not saved", "status": "success"}
-    
-    return {"message": "Post unsaved", "status": "success"}
+    if result.deleted_count > 0:
+        await db.posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"saves_count": -1}}
+        )
+        return {"message": "Post unsaved", "status": "success"}
+
+    # Try restaurant_saved_posts
+    result = await db.restaurant_saved_posts.delete_one({
+        "post_id": post_id,
+        "user_id": str(current_user["_id"])
+    })
+    if result.deleted_count > 0:
+        await db.restaurant_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$inc": {"saves_count": -1}}
+        )
+        return {"message": "Post unsaved", "status": "success"}
+
+    return {"message": "Post not saved", "status": "success"}
 
 @app.get("/api/saved/list")
 async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
@@ -1989,6 +2101,8 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
+            "category": post.get("category"),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": True,
             "created_at": post["created_at"],
@@ -2035,6 +2149,7 @@ async def list_liked_posts(skip: int = 0, limit: int = 100, current_user: dict =
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "created_at": post["created_at"],
             "liked_at": like.get("created_at"),
         })
@@ -2177,6 +2292,7 @@ async def get_saved_posts(user_id: str, skip: int = 0, limit: int = 50, current_
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": True,  # Always true for saved posts
             "created_at": post["created_at"],
@@ -2327,6 +2443,7 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2398,6 +2515,7 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2502,6 +2620,7 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2583,6 +2702,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
@@ -2667,7 +2787,7 @@ async def _parse_smart_query(query: str) -> dict:
                     "content": (
                         "You extract structured search filters from food search queries. "
                         "Return a JSON object with these optional fields:\n"
-                        '- "dish_name": the food/dish being searched (e.g. "shawarma", "biryani", "momos")\n'
+                        '- "dish_name": the food, dish, or food category being searched (e.g. "shawarma", "biryani", "momos", "ice cream", "pizza", "coffee", "desserts", "burger", "pasta", "cake", "juice", "dosa"). Always extract the food item even if it is a broad category.\n'
                         '- "location": the area/place/neighborhood mentioned (e.g. "JP Nagar", "Koramangala", "Indiranagar"). Do NOT include "near me" or "nearby" as a location.\n'
                         '- "nearby": set to true if the user says "near me", "nearby", "around me", "close to me", or similar phrases meaning the user\'s current location.\n'
                         '- "sort_by": one of "popularity" (for best/top/most liked/famous), "rating" (for highest rated/top rated), "recent" (for latest/newest). Default to "popularity" if the user says best/top/good.\n'
@@ -2729,7 +2849,7 @@ async def search_posts(
         and_parts = []
         if smart_filters.get("dish_name"):
             dish_regex = {"$regex": smart_filters["dish_name"], "$options": "i"}
-            and_parts.append({"$or": [{"dish_name": dish_regex}, {"review_text": dish_regex}]})
+            and_parts.append({"$or": [{"dish_name": dish_regex}, {"review_text": dish_regex}, {"category": dish_regex}]})
         if smart_filters.get("location"):
             loc_regex = {"$regex": smart_filters["location"], "$options": "i"}
             and_parts.append({"location_name": loc_regex})
@@ -2843,6 +2963,7 @@ async def search_posts(
         review_text = (post.get("review_text") or "").lower()
         location_name = (post.get("location_name") or "").lower()
         dish_name = (post.get("dish_name") or "").lower()
+        category = (post.get("category") or "").lower()
 
         if smart_filters:
             # --- Smart filter scoring: boost posts matching BOTH dish + location ---
@@ -2854,6 +2975,9 @@ async def search_posts(
             if sf_dish and sf_dish in dish_name:
                 dish_match = True
                 score += 100
+            elif sf_dish and sf_dish in category:
+                dish_match = True
+                score += 90
             elif sf_dish and sf_dish in review_text:
                 dish_match = True
                 score += 60
@@ -3014,6 +3138,7 @@ async def search_posts(
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "shares_count": post.get("shares_count", 0),
+                "saves_count": post.get("saves_count", 0),
                 "clicks_count": post.get("clicks_count", 0),
                 "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
@@ -3055,6 +3180,7 @@ async def search_posts(
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "shares_count": post.get("shares_count", 0),
+                "saves_count": post.get("saves_count", 0),
                 "clicks_count": post.get("clicks_count", 0),
                 "views_count": post.get("views_count", 0),
                 "is_liked_by_user": is_liked,
@@ -3487,6 +3613,7 @@ async def get_restaurant_reviews(
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "dish_name": post.get("dish_name"),
             "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
         })
@@ -4314,6 +4441,7 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
                 "likes_count": post.get("likes_count", 0),
                 "comments_count": post.get("comments_count", 0),
                 "shares_count": post.get("shares_count", 0),
+                "saves_count": post.get("saves_count", 0),
                 "is_liked_by_user": is_liked,
                 "is_saved_by_user": is_saved,
                 "is_following": is_following,
@@ -4367,6 +4495,7 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
+            "saves_count": post.get("saves_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": is_saved,
             "is_following": is_following,

@@ -134,6 +134,7 @@ const [showCommentsModal, setShowCommentsModal] = useState(false);
 const [commentCount, setCommentCount] = useState(post.comments || post.comments_count || 0);
 const [isBlocked, setIsBlocked] = useState(post.is_blocked || false);
 const [sharesCount, setSharesCount] = useState(post.shares_count || post.shares || 0);
+const [savesCount, setSavesCount] = useState(post.saves_count || 0);
 
 // Track restaurant post click for analytics
 const trackRestaurantPostClick = async () => {
@@ -292,10 +293,12 @@ const handleLike = async () => {
 const handleSave = async () => {
 const prev = isSaved;
 setIsSaved(!prev);
+setSavesCount(prev ? savesCount - 1 : savesCount + 1);
 try {
-prev ? await unsavePost(post.id) : await savePost(post.id);
+prev ? await unsavePost(post.id) : await savePost(post.id, post.account_type);
 } catch {
 setIsSaved(prev);
+setSavesCount(savesCount);
 }
 };
 
@@ -1023,6 +1026,7 @@ postId={post.id}
         <Ionicons name="bookmark-outline" size={18} color="#888" />
       )}
     </View>
+    <Text style={[styles.engagementCount, isSaved && { color: '#FF9500' }]}>{savesCount}</Text>
   </TouchableOpacity>
 </View>
 

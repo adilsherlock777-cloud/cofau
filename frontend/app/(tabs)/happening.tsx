@@ -9,13 +9,17 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
+  Alert,
+  Linking,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { getSavedPosts } from '../../utils/api';
+import { getSavedPosts, unsavePost } from '../../utils/api';
 import { normalizeMediaUrl } from '../../utils/imageUrlFix';
 import axios from 'axios';
 
@@ -23,7 +27,18 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.c
 const API_URL = `${API_BASE_URL}/api`;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const ITEM_SIZE = (SCREEN_WIDTH - 6) / 3; // 3 columns with 2px gaps
+const CARD_IMAGE_WIDTH = SCREEN_WIDTH * 0.38;
+const CARD_HEIGHT = 140;
+
+// Category tabs - similar to FOOD_SPOTS in explore
+const CATEGORY_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'restaurant', label: 'Restaurants' },
+  { id: 'cafe', label: 'Cafe' },
+  { id: 'biryani', label: 'Biryani' },
+  { id: 'pureveg', label: 'Veg' },
+  { id: 'nonveg', label: 'Non Veg' },
+];
 
 // ======================================================
 // DASHBOARD COMPONENTS (for restaurant users)
@@ -167,6 +182,116 @@ const DashboardContent = memo(({ analytics, loading, onRefresh }: { analytics: a
 });
 
 // ======================================================
+// SAVED POST CARD COMPONENT
+// ======================================================
+
+const SavedPostCard = memo(({ post, onUnsave, onPress }: { post: any; onUnsave: (id: string) => void; onPress: (id: string) => void }) => {
+  const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
+  const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
+  const isVideo =
+    post.media_type === 'video' ||
+    mediaUrl?.toLowerCase().endsWith('.mp4') ||
+    mediaUrl?.toLowerCase().endsWith('.mov') ||
+    mediaUrl?.toLowerCase().endsWith('.avi') ||
+    mediaUrl?.toLowerCase().endsWith('.webm');
+
+  const displayUrl = isVideo ? (thumbnailUrl || mediaUrl) : mediaUrl;
+
+  const handleDirection = () => {
+    if (post.map_link) {
+      Linking.openURL(post.map_link);
+    } else if (post.location_name) {
+      const query = encodeURIComponent(post.location_name);
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+    }
+  };
+
+  const handleUnsave = () => {
+    Alert.alert(
+      'Unsave Post',
+      'Do you want to unsave this post?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Unsave',
+          style: 'destructive',
+          onPress: () => onUnsave(post._id || post.id),
+        },
+      ]
+    );
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={() => onPress(post._id || post.id)}
+    >
+      {/* Image Section - 40% left */}
+      <View style={styles.cardImageContainer}>
+        {displayUrl ? (
+          <Image
+            source={{ uri: displayUrl }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.cardImagePlaceholder}>
+            <Ionicons name={isVideo ? 'videocam-outline' : 'image-outline'} size={32} color="#ccc" />
+          </View>
+        )}
+        {isVideo && displayUrl && (
+          <View style={styles.videoIcon}>
+            <Ionicons name="play-circle" size={24} color="#fff" />
+          </View>
+        )}
+        {post.dish_name && (
+          <View style={styles.dishTag}>
+            <Text style={styles.dishTagText} numberOfLines={1}>{post.dish_name}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Details Section - 60% right */}
+      <View style={styles.cardDetails}>
+        {/* Unsave button - top right */}
+        <TouchableOpacity style={styles.unsaveButton} onPress={handleUnsave} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="bookmark" size={20} color="#E94A37" />
+        </TouchableOpacity>
+
+        {/* Location info */}
+        <View style={styles.locationInfo}>
+          <Ionicons name="location-sharp" size={16} color="#E94A37" />
+          <Text style={styles.locationName} numberOfLines={2}>
+            {post.location_name || 'Unknown Location'}
+          </Text>
+        </View>
+
+        {/* Category tag */}
+        {post.category && (
+          <View style={styles.categoryTag}>
+            <Text style={styles.categoryTagText} numberOfLines={1}>{post.category}</Text>
+          </View>
+        )}
+
+        {/* Review snippet */}
+        {post.review_text ? (
+          <Text style={styles.reviewSnippet} numberOfLines={1}>
+            {post.review_text}
+          </Text>
+        ) : null}
+
+        {/* Direction button */}
+        <TouchableOpacity style={styles.directionButton} onPress={handleDirection} activeOpacity={0.7}>
+          <Ionicons name="navigate" size={14} color="#fff" />
+          <Text style={styles.directionButtonText}>Directions</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ======================================================
 // MAIN SCREEN
 // ======================================================
 
@@ -180,6 +305,8 @@ export default function SavedLocationsScreen() {
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
 
   // Dashboard state (for restaurant users)
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -262,80 +389,99 @@ export default function SavedLocationsScreen() {
     setRefreshing(false);
   };
 
-  // Group posts by location, sorted latest to oldest
-  const groupedByLocation = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-
-    for (const post of savedPosts) {
-      const location = post.location_name?.trim() || 'Other';
-      if (!groups[location]) {
-        groups[location] = [];
-      }
-      groups[location].push(post);
+  const handleUnsave = async (postId: string) => {
+    // Optimistic removal
+    const prevPosts = savedPosts;
+    setSavedPosts(posts => posts.filter(p => (p._id || p.id) !== postId));
+    try {
+      await unsavePost(postId);
+    } catch {
+      // Revert on error
+      setSavedPosts(prevPosts);
     }
+  };
 
-    const sortedEntries = Object.entries(groups).sort(([, postsA], [, postsB]) => {
-      const dateA = new Date(postsA[0]?.saved_at || postsA[0]?.created_at || 0).getTime();
-      const dateB = new Date(postsB[0]?.saved_at || postsB[0]?.created_at || 0).getTime();
+  const handlePostPress = (postId: string) => {
+    router.push(`/post-details/${postId}`);
+  };
+
+  // Filter posts by category and search query
+  const filteredPosts = useMemo(() => {
+    let posts = [...savedPosts];
+
+    // Sort latest to oldest
+    posts.sort((a, b) => {
+      const dateA = new Date(a.saved_at || a.created_at || 0).getTime();
+      const dateB = new Date(b.saved_at || b.created_at || 0).getTime();
       return dateB - dateA;
     });
 
-    return sortedEntries;
+    // Category filter
+    if (activeCategory !== 'all') {
+      posts = posts.filter(post => {
+        const cat = (post.category || '').toLowerCase().trim();
+        const locName = (post.location_name || '').toLowerCase().trim();
+        const combined = `${cat} ${locName}`;
+
+        switch (activeCategory) {
+          case 'restaurant':
+            return combined.includes('restaurant') || combined.includes('hotel') || combined.includes('dhaba');
+          case 'cafe':
+            return combined.includes('cafe') || combined.includes('café') || combined.includes('coffee');
+          case 'biryani':
+            return combined.includes('biryani');
+          case 'pureveg':
+            return combined.includes('veg') && !combined.includes('non') && !combined.includes('nonveg') && !combined.includes('non-veg');
+          case 'nonveg':
+            return combined.includes('nonveg') || combined.includes('non-veg') || combined.includes('non veg') || combined.includes('chicken') || combined.includes('mutton') || combined.includes('fish');
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      posts = posts.filter(post => {
+        const name = (post.location_name || '').toLowerCase();
+        const dish = (post.dish_name || '').toLowerCase();
+        const review = (post.review_text || '').toLowerCase();
+        const cat = (post.category || '').toLowerCase();
+        return name.includes(q) || dish.includes(q) || review.includes(q) || cat.includes(q);
+      });
+    }
+
+    return posts;
+  }, [savedPosts, activeCategory, searchQuery]);
+
+  // Count posts per category for tab badges
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: savedPosts.length };
+    CATEGORY_TABS.forEach(tab => {
+      if (tab.id === 'all') return;
+      counts[tab.id] = savedPosts.filter(post => {
+        const cat = (post.category || '').toLowerCase().trim();
+        const locName = (post.location_name || '').toLowerCase().trim();
+        const combined = `${cat} ${locName}`;
+        switch (tab.id) {
+          case 'restaurant':
+            return combined.includes('restaurant') || combined.includes('hotel') || combined.includes('dhaba');
+          case 'cafe':
+            return combined.includes('cafe') || combined.includes('café') || combined.includes('coffee');
+          case 'biryani':
+            return combined.includes('biryani');
+          case 'pureveg':
+            return combined.includes('veg') && !combined.includes('non') && !combined.includes('nonveg') && !combined.includes('non-veg');
+          case 'nonveg':
+            return combined.includes('nonveg') || combined.includes('non-veg') || combined.includes('non veg') || combined.includes('chicken') || combined.includes('mutton') || combined.includes('fish');
+          default:
+            return false;
+        }
+      }).length;
+    });
+    return counts;
   }, [savedPosts]);
-
-  const renderPost = (post: any) => {
-    const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
-    const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
-    const isVideo =
-      post.media_type === 'video' ||
-      mediaUrl?.toLowerCase().endsWith('.mp4') ||
-      mediaUrl?.toLowerCase().endsWith('.mov') ||
-      mediaUrl?.toLowerCase().endsWith('.avi') ||
-      mediaUrl?.toLowerCase().endsWith('.webm');
-
-    const displayUrl = isVideo ? thumbnailUrl : mediaUrl;
-    const hasValidThumbnail = isVideo ? !!thumbnailUrl : !!mediaUrl;
-
-    return (
-      <TouchableOpacity
-        key={post._id || post.id}
-        style={styles.gridItem}
-        onPress={() => router.push(`/post-details/${post._id || post.id}`)}
-        activeOpacity={0.8}
-      >
-        {hasValidThumbnail && displayUrl ? (
-          <View style={styles.thumbnailContainer}>
-            <Image
-              source={{ uri: displayUrl }}
-              style={styles.thumbnail}
-              resizeMode="cover"
-            />
-            {isVideo && (
-              <View style={styles.videoOverlay}>
-                <Ionicons name="play-circle" size={40} color="#fff" />
-              </View>
-            )}
-            {post.dish_name && (
-              <View style={styles.dishNameTag}>
-                <Text style={styles.dishNameText} numberOfLines={1}>{post.dish_name.toUpperCase()}</Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.thumbnailPlaceholder}>
-            <Ionicons
-              name={isVideo ? 'videocam-outline' : 'image-outline'}
-              size={40}
-              color="#ccc"
-            />
-            {isVideo && !thumbnailUrl && (
-              <Text style={styles.placeholderText}>Video</Text>
-            )}
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
 
   // ======================================================
   // RESTAURANT USER: DASHBOARD VIEW
@@ -374,41 +520,13 @@ export default function SavedLocationsScreen() {
   // ======================================================
   // REGULAR USER: SAVED POSTS VIEW
   // ======================================================
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <MaskedView
-            maskElement={
-              <Text style={styles.headerTitleLobster}>Saved Locations</Text>
-            }
-          >
-            <LinearGradient
-              colors={['#FF2E2E', '#FF7A18']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Saved Locations</Text>
-            </LinearGradient>
-          </MaskedView>
-          <View style={styles.subtitleRow}>
-            <Ionicons name="location" size={16} color="#E94A37" />
-            <Text style={styles.titleSub}>Places you've saved</Text>
-          </View>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#E94A37" />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <MaskedView
           maskElement={
-            <Text style={styles.headerTitleLobster}>Saved Locations</Text>
+            <Text style={styles.headerTitleLobster}>Saved</Text>
           }
         >
           <LinearGradient
@@ -416,66 +534,129 @@ export default function SavedLocationsScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Saved Locations</Text>
+            <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Saved</Text>
           </LinearGradient>
         </MaskedView>
         <View style={styles.subtitleRow}>
-          <Ionicons name="location" size={16} color="#E94A37" />
-          <Text style={styles.titleSub}>Places you've saved</Text>
+          <Ionicons name="bookmark" size={16} color="#E94A37" />
+          <Text style={styles.titleSub}>Your saved posts</Text>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {savedPosts.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="location-outline" size={80} color="#ccc" />
-            <Text style={styles.emptyTitle}>No Saved Locations</Text>
-            <Text style={styles.emptySubtitle}>
-              Save posts to see your favorite places here
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.locationList}>
-            {groupedByLocation.map(([location, posts]) => (
-              <View key={location} style={styles.locationSection}>
-                <View style={styles.locationHeader}>
-                  <Ionicons name="location-sharp" size={18} color="#E94A37" />
-                  <Text style={styles.locationTitle}>{location}</Text>
-                  <Text style={styles.locationCount}>
-                    {posts.length} {posts.length === 1 ? 'post' : 'posts'}
-                  </Text>
-                </View>
-                <View style={styles.gridContainer}>
-                  {posts.map(renderPost)}
-                </View>
-              </View>
-            ))}
-          </View>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search saved places, dishes..."
+          placeholderTextColor="#aaa"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+            <Ionicons name="close-circle" size={18} color="#999" />
+          </TouchableOpacity>
         )}
+      </View>
+
+      {/* Category Tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsContainer}
+        contentContainerStyle={styles.tabsContent}
+      >
+        {CATEGORY_TABS.map(tab => {
+          const isActive = activeCategory === tab.id;
+          const count = categoryCounts[tab.id] || 0;
+          // Only show tabs that have posts (except ALL which always shows)
+          if (tab.id !== 'all' && count === 0) return null;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tab, isActive && styles.tabActive]}
+              onPress={() => setActiveCategory(tab.id)}
+              activeOpacity={0.7}
+            >
+              {isActive ? (
+                <LinearGradient
+                  colors={['#FF2E2E', '#FF7A18']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabGradient}
+                >
+                  <Text style={styles.tabTextActive}>{tab.label}</Text>
+                  {count > 0 && <Text style={styles.tabCountActive}>{count}</Text>}
+                </LinearGradient>
+              ) : (
+                <View style={styles.tabInner}>
+                  <Text style={styles.tabText}>{tab.label}</Text>
+                  {count > 0 && <Text style={styles.tabCount}>{count}</Text>}
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
+
+      {/* Content */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E94A37" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredPosts}
+          keyExtractor={item => item._id || item.id}
+          renderItem={({ item }) => (
+            <SavedPostCard
+              post={item}
+              onUnsave={handleUnsave}
+              onPress={handlePostPress}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E94A37" />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="bookmark-outline" size={70} color="#ddd" />
+              <Text style={styles.emptyTitle}>
+                {searchQuery ? 'No results found' : activeCategory !== 'all' ? 'No saved posts in this category' : 'No Saved Posts'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {searchQuery
+                  ? 'Try a different search term'
+                  : activeCategory !== 'all'
+                    ? 'Save posts from this category to see them here'
+                    : 'Save posts to see your favorite places here'}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
 
+// ======================================================
+// SAVED VIEW STYLES
+// ======================================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5',
   },
   header: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 60,
-    paddingBottom: 16,
+    paddingBottom: 14,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
   },
   headerTitleLobster: {
     fontFamily: 'Lobster',
@@ -494,117 +675,245 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  scrollView: {
+
+  // Search bar
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
     flex: 1,
+    fontSize: 15,
+    color: '#333',
+    paddingVertical: 0,
   },
-  scrollContent: {
-    paddingBottom: 90,
+  clearButton: {
+    padding: 4,
   },
+
+  // Category tabs
+  tabsContainer: {
+    maxHeight: 50,
+    marginTop: 8,
+  },
+  tabsContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  tab: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  tabActive: {},
+  tabGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  tabInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 6,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tabTextActive: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  tabCount: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#999',
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  tabCountActive: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#E94A37',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+
+  // Post list
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 100,
+  },
+
+  // Card
+  card: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    marginBottom: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+    height: CARD_HEIGHT,
+  },
+  cardImageContainer: {
+    width: CARD_IMAGE_WIDTH,
+    height: '100%',
+    position: 'relative',
+    backgroundColor: '#f0f0f0',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+  },
+  videoIcon: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 12,
+    padding: 2,
+  },
+  dishTag: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(233, 74, 55, 0.88)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    maxWidth: '85%',
+  },
+  dishTagText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Card details (right side)
+  cardDetails: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: 'space-between',
+  },
+  unsaveButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 1,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+    paddingRight: 28,
+  },
+  locationName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#222',
+    flex: 1,
+    lineHeight: 18,
+  },
+  categoryTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 2,
+  },
+  categoryTagText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#888',
+  },
+  reviewSnippet: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 2,
+  },
+  directionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#E94A37',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+    gap: 5,
+    marginTop: 4,
+  },
+  directionButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // Loading & empty
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  locationList: {
-    paddingBottom: 20,
-  },
-  locationSection: {
-    marginBottom: 16,
-  },
-  locationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F8F8F8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECECEC',
-  },
-  locationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#222',
-    marginLeft: 8,
-    flex: 1,
-  },
-  locationCount: {
-    fontSize: 13,
-    color: '#888',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 2,
-  },
-  gridItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    position: 'relative',
-  },
-  thumbnailContainer: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f0f0f0',
-  },
-  thumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: '#999',
-  },
-  videoOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dishNameTag: {
-    position: 'absolute',
-    bottom: 6,
-    left: 6,
-    backgroundColor: 'rgba(233, 74, 55, 0.85)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 5,
-    maxWidth: '75%',
-  },
-  dishNameText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '600',
-  },
   emptyContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 100,
+    paddingVertical: 80,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '600',
-    color: '#333',
-    marginTop: 20,
+    color: '#444',
+    marginTop: 16,
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#999',
-    marginTop: 8,
+    marginTop: 6,
     textAlign: 'center',
+    paddingHorizontal: 40,
   },
 });
 

@@ -120,6 +120,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
+  const [savesCount, setSavesCount] = useState(post.saves_count || 0);
   const [comments, setComments] = useState([]);
   const [commentCount, setCommentCount] = useState(post.comments_count || 0);
   const [sharesCount, setSharesCount] = useState(post.shares_count || 0);
@@ -406,19 +407,22 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
 
   const handleSaveToggle = async () => {
     const prevSaved = isSaved;
+    const prevCount = savesCount;
     setIsSaved(!prevSaved);
+    setSavesCount(prevSaved ? savesCount - 1 : savesCount + 1);
     try {
       if (prevSaved) {
-        await axios.delete(`${API_URL}/posts/${post.id}/save`, {
+        await axios.delete(`${API_URL}/saved/remove/${post.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        await axios.post(`${API_URL}/posts/${post.id}/save`, {}, {
+        await axios.post(`${API_URL}/saved/add`, { postId: post.id, accountType: post.account_type }, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
     } catch (e) {
       setIsSaved(prevSaved);
+      setSavesCount(prevCount);
     }
   };
 
@@ -1269,7 +1273,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                   )}
                 </View>
                 <Text style={[styles.detailsSaveText, isSaved && { color: '#FF5722' }]}>
-                  {isSaved ? "Saved" : "Save"}
+                  {isSaved ? "Saved" : "Save"} {savesCount > 0 ? `(${savesCount})` : ''}
                 </Text>
               </TouchableOpacity>
 

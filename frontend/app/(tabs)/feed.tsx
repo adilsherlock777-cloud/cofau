@@ -219,6 +219,7 @@ export default function FeedScreen() {
   const [suggestionsShown, setSuggestionsShown] = useState(false);
   const [showNewPostsPill, setShowNewPostsPill] = useState(false);
   const newestPostTimestampRef = useRef<string | null>(null);
+  const lastNewPostsCheckRef = useRef<number>(0);
   const newPostsPillAnim = useRef(new Animated.Value(0)).current;
   const justUploadedRef = useRef<boolean>(false);
 
@@ -325,10 +326,14 @@ const fetchWalletUnreadCount = async () => {
 
 const checkForNewPosts = useCallback(async () => {
   if (!newestPostTimestampRef.current) return;
+  // Don't check if last check was less than 30 seconds ago
+  const now = Date.now();
+  if (now - lastNewPostsCheckRef.current < 30000) return;
+  lastNewPostsCheckRef.current = now;
   try {
     // Fetch latest post by recency (not engagement) to correctly detect new posts
     const res = await axios.get(
-      `${BACKEND}/api/feed?skip=0&limit=1&sort=latest&_t=${Date.now()}`
+      `${BACKEND}/api/feed?skip=0&limit=1&sort=latest&_t=${now}`
     );
     if (res.data && res.data.length > 0) {
       if (res.data[0].created_at > newestPostTimestampRef.current) {
@@ -567,6 +572,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
           likes: post.likes || post.likes_count || 0,
           comments: post.comments || post.comments_count || 0,
           shares_count: post.shares_count || post.shares || 0,
+          saves_count: post.saves_count || 0,
           is_liked: post.is_liked || false,
           is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
           is_following: post.is_following || false,
@@ -633,6 +639,7 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         likes: post.likes || post.likes_count || 0,
         comments: post.comments || post.comments_count || 0,
         shares_count: post.shares_count || post.shares || 0,
+        saves_count: post.saves_count || 0,
         is_liked: post.is_liked || false,
         is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
         is_following: post.is_following || false,

@@ -26,7 +26,7 @@ import { Image } from "expo-image";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
-import { likePost, unlikePost, followUser } from "../../utils/api";
+import { likePost, unlikePost, followUser, savePost, unsavePost } from "../../utils/api";
 import UserAvatar from "../../components/UserAvatar";
 import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
 import HappeningPlaces from "../../components/HappeningPlaces";
@@ -1031,6 +1031,29 @@ const RestaurantDetailModal = memo(({ visible, restaurant, onClose, onViewProfil
 // ======================================================
 
 const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
+  const [isSaved, setIsSaved] = useState(false);
+  const [localSavesCount, setLocalSavesCount] = useState(0);
+
+  useEffect(() => {
+    if (post) {
+      setIsSaved(post.is_saved_by_user || false);
+      setLocalSavesCount(post.saves_count || 0);
+    }
+  }, [post]);
+
+  const handleSave = async () => {
+    if (!post) return;
+    const prev = isSaved;
+    setIsSaved(!prev);
+    setLocalSavesCount(prev ? localSavesCount - 1 : localSavesCount + 1);
+    try {
+      prev ? await unsavePost(post.id) : await savePost(post.id, post.account_type);
+    } catch {
+      setIsSaved(prev);
+      setLocalSavesCount(localSavesCount);
+    }
+  };
+
   if (!post) return null;
 
   return (
@@ -1054,7 +1077,7 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
                 contentFit="cover"
               />
             )}
-            
+
             <View style={styles.postDetailInfo}>
               <View style={styles.postUserRow}>
                 {post.user_profile_picture ? (
@@ -1101,6 +1124,10 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
                   <Text style={styles.postStatText}>{post.likes_count}</Text>
                 </View>
                 <View style={styles.postStatItem}>
+                  <Ionicons name="bookmark" size={14} color={isSaved ? "#FF9500" : "#888"} />
+                  <Text style={styles.postStatText}>{localSavesCount}</Text>
+                </View>
+                <View style={styles.postStatItem}>
                   <Ionicons name="navigate" size={14} color="#1B7C82" />
                   <Text style={styles.postStatText}>{post.distance_km} km</Text>
                 </View>
@@ -1108,16 +1135,23 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.viewProfileBtn} onPress={() => onViewPost(post)}>
-            <LinearGradient
-              colors={["#FF2E2E", "#FF7A18"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.viewProfileBtnGradient}
-            >
-              <Text style={styles.viewProfileBtnText}>View Full Post</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={styles.postDetailActions}>
+            <TouchableOpacity style={styles.saveActionBtn} onPress={handleSave}>
+              <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={isSaved ? "#FF9500" : "#888"} />
+              <Text style={[styles.saveActionText, isSaved && { color: '#FF9500' }]}>{isSaved ? "Saved" : "Save"}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.viewProfileBtn, { flex: 1 }]} onPress={() => onViewPost(post)}>
+              <LinearGradient
+                colors={["#FF2E2E", "#FF7A18"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.viewProfileBtnGradient}
+              >
+                <Text style={styles.viewProfileBtnText}>View Full Post</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -1913,11 +1947,12 @@ useFocusEffect(
       const categoryParam = categoriesToUse.length > 0
         ? `&categories=${encodeURIComponent(categoriesToUse.join(","))}`
         : '';
+      const sortParam = '&sort=mixed';
 
       // Progressive loading: on refresh, fetch first 6 posts fast, then load the rest
       if (refresh) {
         const INITIAL_BATCH = 6;
-        const firstUrl = `${API_URL}/feed?skip=0&limit=${INITIAL_BATCH}${categoryParam}`;
+        const firstUrl = `${API_URL}/feed?skip=0&limit=${INITIAL_BATCH}${categoryParam}${sortParam}`;
         const firstRes = await axios.get(firstUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
@@ -1948,7 +1983,7 @@ useFocusEffect(
         }
 
         // Load remaining posts in background
-        const restUrl = `${API_URL}/feed?skip=${INITIAL_BATCH}&limit=${POSTS_PER_PAGE - INITIAL_BATCH}${categoryParam}`;
+        const restUrl = `${API_URL}/feed?skip=${INITIAL_BATCH}&limit=${POSTS_PER_PAGE - INITIAL_BATCH}${categoryParam}${sortParam}`;
         const restRes = await axios.get(restUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
@@ -1962,7 +1997,7 @@ useFocusEffect(
         setPage(2);
       } else {
         // Pagination: load next page normally
-        let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}`;
+        let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}${sortParam}`;
         const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
@@ -2193,19 +2228,31 @@ return (
         if (activeTab !== 'popular') {
           setActiveTab('popular');
           setPlayingVideos([]);
+          if (accountType === 'restaurant' && posts.length === 0) {
+            setLoading(true);
+            fetchPosts(true, [], 'users');
+          }
         }
       }}
       activeOpacity={0.7}
     >
       {activeTab === 'popular' ? (
         <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.toggleTabGradient}>
-          <Ionicons name="flame" size={14} color="#FFF" style={{ marginRight: 5 }} />
-          <Text style={styles.toggleTabTextWhite}>Popular</Text>
+          {accountType === 'restaurant' ? (
+            <Text style={{ fontSize: 13, marginRight: 4 }}>😋</Text>
+          ) : (
+            <Ionicons name="flame" size={14} color="#FFF" style={{ marginRight: 5 }} />
+          )}
+          <Text style={styles.toggleTabTextWhite}>{accountType === 'restaurant' ? 'Dishes' : 'Popular'}</Text>
         </LinearGradient>
       ) : (
         <View style={styles.toggleTabInner}>
-          <Ionicons name="flame-outline" size={14} color="#888" style={{ marginRight: 5 }} />
-          <Text style={styles.toggleTabText}>Popular</Text>
+          {accountType === 'restaurant' ? (
+            <Text style={{ fontSize: 13, marginRight: 4 }}>😋</Text>
+          ) : (
+            <Ionicons name="flame-outline" size={14} color="#888" style={{ marginRight: 5 }} />
+          )}
+          <Text style={styles.toggleTabText}>{accountType === 'restaurant' ? 'Dishes' : 'Popular'}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -2646,16 +2693,16 @@ return (
       onCenterLocation={centerOnUserLocation}
       selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
     />
-) : activeTab === 'popular' ? (
-        // POPULAR / HAPPENING PLACES VIEW
+) : activeTab === 'popular' && accountType !== 'restaurant' ? (
+        // POPULAR / HAPPENING PLACES VIEW (regular users only)
         <View style={{ flex: 1 }}>
           <HappeningPlaces embedded />
         </View>
-) : accountType === 'restaurant' ? (
+) : accountType === 'restaurant' && activeTab === 'users' ? (
         // ACTIVE USERS LIST for restaurant users
         <ActiveUsersList token={token || ""} />
 ) : (
-        // USERS GRID VIEW
+        // DISHES / POSTS GRID VIEW (regular users 'users' tab + restaurant users 'popular/Dishes' tab)
         <>
           {loading && posts.length === 0 ? (
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -4137,7 +4184,6 @@ toggleTabTextActive: {
     backgroundColor: '#e0e0e0',
   },
   viewProfileBtn: {
-    marginTop: 20,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -4150,6 +4196,27 @@ toggleTabTextActive: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+
+  postDetailActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 12,
+  },
+  saveActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+  },
+  saveActionText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#888',
   },
 
   // ======================================================
