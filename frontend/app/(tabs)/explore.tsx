@@ -30,7 +30,7 @@ import { likePost, unlikePost, followUser } from "../../utils/api";
 import UserAvatar from "../../components/UserAvatar";
 import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
 import HappeningPlaces from "../../components/HappeningPlaces";
-import { SalesDashboard } from "../../components/SalesDashboard";
+import { ActiveUsersList } from "../../components/ActiveUsersList";
 let MapView: any;
 let Marker: any;
 let Callout: any;
@@ -2176,13 +2176,13 @@ return (
     >
       {activeTab === 'users' ? (
         <LinearGradient colors={["#FF2E2E", "#FF7A18"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.toggleTabGradient}>
-          <Text style={{ fontSize: 13, marginRight: 4 }}>{accountType === 'restaurant' ? '💰' : '😋'}</Text>
-          <Text style={styles.toggleTabTextWhite}>{accountType === 'restaurant' ? 'Sales' : 'Dishes'}</Text>
+          <Text style={{ fontSize: 13, marginRight: 4 }}>{accountType === 'restaurant' ? '👥' : '😋'}</Text>
+          <Text style={styles.toggleTabTextWhite}>{accountType === 'restaurant' ? 'Users' : 'Dishes'}</Text>
         </LinearGradient>
       ) : (
         <View style={styles.toggleTabInner}>
-          <Text style={{ fontSize: 13, marginRight: 4 }}>{accountType === 'restaurant' ? '💰' : '😋'}</Text>
-          <Text style={styles.toggleTabText}>{accountType === 'restaurant' ? 'Sales' : 'Dishes'}</Text>
+          <Text style={{ fontSize: 13, marginRight: 4 }}>{accountType === 'restaurant' ? '👥' : '😋'}</Text>
+          <Text style={styles.toggleTabText}>{accountType === 'restaurant' ? 'Users' : 'Dishes'}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -2652,10 +2652,8 @@ return (
           <HappeningPlaces embedded />
         </View>
 ) : accountType === 'restaurant' ? (
-        // SALES DASHBOARD for restaurant users
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-          <SalesDashboard token={token || ""} />
-        </ScrollView>
+        // ACTIVE USERS LIST for restaurant users
+        <ActiveUsersList token={token || ""} />
 ) : (
         // USERS GRID VIEW
         <>

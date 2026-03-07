@@ -3493,6 +3493,66 @@ async def get_restaurant_reviews(
 
     return result
 
+# ==================== ACTIVE USERS FOR RESTAURANTS ====================
+
+@app.get("/api/restaurant/active-users")
+async def get_active_users_for_restaurant(
+    current_restaurant: dict = Depends(restaurant_auth.get_current_restaurant)
+):
+    """Get actively posting users in the last 2 days for restaurant discovery."""
+    db = get_database()
+
+    two_days_ago = datetime.utcnow() - timedelta(days=2)
+
+    pipeline = [
+        {"$match": {"created_at": {"$gte": two_days_ago}}},
+        {"$group": {
+            "_id": "$user_id",
+            "username": {"$first": "$username"},
+            "post_count": {"$sum": 1},
+            "total_likes": {"$sum": {"$ifNull": ["$likes_count", 0]}},
+            "total_comments": {"$sum": {"$ifNull": ["$comments_count", 0]}},
+        }},
+        {"$addFields": {
+            "engagement_score": {"$add": ["$total_likes", "$total_comments"]}
+        }},
+        {"$sort": {"engagement_score": -1}},
+        {"$limit": 50},
+    ]
+
+    active_user_stats = await db.posts.aggregate(pipeline).to_list(50)
+
+    result = []
+    for stat in active_user_stats:
+        user_id = stat.get("_id")
+        if not user_id:
+            continue
+
+        user = None
+        try:
+            user = await db.users.find_one({"_id": ObjectId(user_id)})
+        except Exception:
+            pass
+
+        if not user:
+            continue
+
+        result.append({
+            "user_id": str(user["_id"]),
+            "full_name": user.get("full_name", ""),
+            "username": user.get("username", stat.get("username", "")),
+            "profile_picture": user.get("profile_picture"),
+            "level": user.get("level", 1),
+            "badge": user.get("badge"),
+            "followers_count": user.get("followers_count", 0),
+            "post_count": stat["post_count"],
+            "total_likes": stat["total_likes"],
+            "total_comments": stat["total_comments"],
+            "engagement_score": stat["engagement_score"],
+        })
+
+    return {"active_users": result}
+
 # ==================== FOLLOW ENDPOINTS ====================
 
 @app.post("/api/users/{user_id}/follow")
