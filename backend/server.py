@@ -1328,49 +1328,47 @@ async def get_feed(
         
         # Combine all posts
         all_posts = user_posts_raw + restaurant_posts_raw
-        
-        # Bucket posts into: popular (high engagement), new (< 48h), and older
-        popular_posts = []
-        new_posts = []
-        older_posts = []
 
+        # Calculate engagement scores with time decay for each post
+        posts_with_scores = []
         for post in all_posts:
-            created_at = post.get("created_at")
-            likes = post.get("likes_count", 0)
-            comments = post.get("comments_count", 0)
-            engagement = likes + comments
-            hours_old = 0
-            if created_at and isinstance(created_at, datetime):
-                hours_old = (current_time - created_at).total_seconds() / 3600
+            score = calculate_engagement_score(post, current_time)
+            posts_with_scores.append((post, score))
 
-            if engagement >= 5:
-                popular_posts.append(post)
-            elif hours_old < 48:
-                new_posts.append(post)
-            else:
-                older_posts.append(post)
+        # Sort by engagement score (highest first)
+        posts_with_scores.sort(key=lambda x: x[1], reverse=True)
 
-        # Shuffle within each bucket for variety on every load
-        random.shuffle(popular_posts)
-        random.shuffle(new_posts)
-        random.shuffle(older_posts)
+        # Shuffle posts with similar scores for variety on each refresh
+        shuffled = []
+        i = 0
+        while i < len(posts_with_scores):
+            current_post, current_score = posts_with_scores[i]
+            similar_group = [(current_post, current_score)]
+            j = i + 1
+            while j < len(posts_with_scores):
+                next_post, next_score = posts_with_scores[j]
+                if abs(next_score - current_score) / max(current_score, 1) <= 0.15:
+                    similar_group.append((next_post, next_score))
+                    j += 1
+                else:
+                    break
+            random.shuffle(similar_group)
+            shuffled.extend(similar_group)
+            i = j
 
-        # Interleave: pattern of [popular, new, older, popular, new, older, ...]
-        # This ensures users see a mix of all types
-        mixed_posts = []
-        pi, ni, oi = 0, 0, 0
-        while pi < len(popular_posts) or ni < len(new_posts) or oi < len(older_posts):
-            if pi < len(popular_posts):
-                mixed_posts.append(popular_posts[pi])
-                pi += 1
-            if ni < len(new_posts):
-                mixed_posts.append(new_posts[ni])
-                ni += 1
-            if oi < len(older_posts):
-                mixed_posts.append(older_posts[oi])
-                oi += 1
+        scored_posts = [p[0] for p in shuffled]
 
-        posts = mixed_posts[skip:]
+        # Spread apart consecutive posts from the same user
+        spread_result = []
+        remaining = list(scored_posts)
+        last_user_id = None
+        while remaining:
+            idx = next((i for i, p in enumerate(remaining) if p.get("user_id") != last_user_id), 0)
+            post = remaining.pop(idx)
+            spread_result.append(post)
+            last_user_id = post.get("user_id")
+
+        posts = spread_result[skip:]
         if limit:
             posts = posts[:limit]
     else:

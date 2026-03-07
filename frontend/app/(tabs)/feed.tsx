@@ -326,8 +326,9 @@ const fetchWalletUnreadCount = async () => {
 const checkForNewPosts = useCallback(async () => {
   if (!newestPostTimestampRef.current) return;
   try {
+    // Fetch latest post by recency (not engagement) to correctly detect new posts
     const res = await axios.get(
-      `${BACKEND}/api/feed?skip=0&limit=1&sort=engagement&_t=${Date.now()}`
+      `${BACKEND}/api/feed?skip=0&limit=1&sort=latest&_t=${Date.now()}`
     );
     if (res.data && res.data.length > 0) {
       if (res.data[0].created_at > newestPostTimestampRef.current) {
@@ -643,7 +644,11 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
       if (forceRefresh) {
         setFeedPosts(mapped);
         if (mapped.length > 0) {
-          newestPostTimestampRef.current = mapped[0].created_at;
+          // Track the most recent created_at across all posts (not just first post,
+          // since feed is sorted by engagement, not recency)
+          const maxTimestamp = mapped.reduce((max: string, p: any) =>
+            p.created_at > max ? p.created_at : max, mapped[0].created_at);
+          newestPostTimestampRef.current = maxTimestamp;
         }
         setShowNewPostsPill(false);
       } else {

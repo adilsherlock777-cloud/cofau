@@ -162,7 +162,52 @@ export default function HappeningPlaces({ embedded = false }) {
   const router = useRouter();
   const { token, accountType } = useAuth();
   const isRestaurant = accountType === 'restaurant';
-  
+
+  // ============================================
+  // DASHBOARD STATE (for restaurant users)
+  // ============================================
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [analytics, setAnalytics] = useState({
+    total_posts: 0,
+    followers_count: 0,
+    customer_reviews: 0,
+    profile_views: 0,
+    profile_views_trend: '',
+    profile_visits: 0,
+    profile_visits_trend: '',
+    search_appearances: 0,
+    search_appearances_trend: '',
+    post_clicks: 0,
+    post_clicks_trend: '',
+  });
+
+  const fetchAnalytics = async () => {
+    if (accountType !== 'restaurant' || !token) return;
+    setDashboardLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/restaurant/analytics`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAnalytics({
+        total_posts: response.data.total_posts || 0,
+        followers_count: response.data.followers_count || 0,
+        customer_reviews: response.data.customer_reviews || 0,
+        profile_views: response.data.profile_views || 0,
+        profile_views_trend: response.data.profile_views_trend || '',
+        profile_visits: response.data.profile_visits || 0,
+        profile_visits_trend: response.data.profile_visits_trend || '',
+        search_appearances: response.data.search_appearances || 0,
+        search_appearances_trend: response.data.search_appearances_trend || '',
+        post_clicks: response.data.post_clicks || 0,
+        post_clicks_trend: response.data.post_clicks_trend || '',
+      });
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
   // ============================================
   // STATE DECLARATIONS
   // ============================================
@@ -369,14 +414,7 @@ export default function HappeningPlaces({ embedded = false }) {
     });
 
     const locations = Array.isArray(response.data) ? response.data : [];
-    // Reverse images so latest posts appear first in cards
-    const reversed = locations.map(loc => ({
-      ...loc,
-      images: loc.images ? [...loc.images].reverse() : [],
-      thumbnails: loc.thumbnails ? [...loc.thumbnails].reverse() : [],
-      images_data: loc.images_data ? [...loc.images_data].reverse() : [],
-    }));
-    setTopLocations(reversed);
+    setTopLocations(locations);
   } catch (error) {
     console.error('❌ Error fetching locations:', error.response?.data || error.message);
     setTopLocations([]);
@@ -563,14 +601,7 @@ export default function HappeningPlaces({ embedded = false }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const locations = Array.isArray(response.data) ? response.data : [];
-      // Reverse images so latest posts appear first
-      const reversed = locations.map(loc => ({
-        ...loc,
-        images: loc.images ? [...loc.images].reverse() : [],
-        thumbnails: loc.thumbnails ? [...loc.thumbnails].reverse() : [],
-        images_data: loc.images_data ? [...loc.images_data].reverse() : [],
-      }));
-      setFoodSpotLocations(reversed);
+      setFoodSpotLocations(locations);
     } catch (error) {
       console.error('❌ Error fetching food spot locations:', error.message);
       setFoodSpotLocations([]);
@@ -706,6 +737,9 @@ export default function HappeningPlaces({ embedded = false }) {
   useFocusEffect(
     React.useCallback(() => {
       if (token) {
+        if (isRestaurant) {
+          fetchAnalytics();
+        }
         if (!hasInitiallyLoaded.current) {
           // First load: get location then fetch + fetch nearby areas
           hasInitiallyLoaded.current = true;
@@ -802,6 +836,180 @@ export default function HappeningPlaces({ embedded = false }) {
   // ============================================
   // MAIN RENDER
   // ============================================
+
+  // Restaurant users see the Dashboard
+  if (isRestaurant) {
+    return (
+      <>
+        {!embedded && <Stack.Screen options={{ headerShown: false }} />}
+        <View style={styles.container}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16 }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={[styles.plainHeader, embedded && { paddingTop: 8 }]}>
+              {!embedded && (
+                <MaskedView
+                  maskElement={
+                    <Text style={styles.headerTitleLobster}>Sales Dashboard</Text>
+                  }
+                >
+                  <LinearGradient
+                    colors={['#FF2E2E', '#FF7A18']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={[styles.headerTitleLobster, { opacity: 0 }]}>Sales Dashboard</Text>
+                  </LinearGradient>
+                </MaskedView>
+              )}
+            </View>
+
+            {dashboardLoading ? (
+              <View style={dashboardStyles.loadingContainer}>
+                <ActivityIndicator size="large" color="#E94A37" />
+                <Text style={dashboardStyles.loadingText}>Loading analytics...</Text>
+              </View>
+            ) : (
+              <>
+                {/* Analytics Header */}
+                <View style={dashboardStyles.analyticsHeader}>
+                  <Ionicons name="analytics" size={28} color="#E94A37" />
+                  <Text style={dashboardStyles.analyticsTitle}>Analytics Overview</Text>
+                </View>
+                <Text style={dashboardStyles.analyticsSubtitle}>
+                  Track your restaurant's performance
+                </Text>
+
+                {/* Primary Stats - 3 Column Grid */}
+                <View style={dashboardStyles.sectionTitle}>
+                  <Ionicons name="stats-chart" size={20} color="#333" />
+                  <Text style={dashboardStyles.sectionTitleText}>Key Metrics</Text>
+                </View>
+
+                <View style={dashboardStyles.statsGrid}>
+                  <View style={dashboardStyles.statCard}>
+                    <View style={[dashboardStyles.statIconContainer, { backgroundColor: '#E94A3715' }]}>
+                      <Ionicons name="images" size={24} color="#E94A37" />
+                    </View>
+                    <Text style={dashboardStyles.statValue}>{(analytics.total_posts ?? 0).toLocaleString()}</Text>
+                    <Text style={dashboardStyles.statLabel}>Total Posts</Text>
+                  </View>
+                  <View style={dashboardStyles.statCard}>
+                    <View style={[dashboardStyles.statIconContainer, { backgroundColor: '#1B7C8215' }]}>
+                      <Ionicons name="people" size={24} color="#1B7C82" />
+                    </View>
+                    <Text style={dashboardStyles.statValue}>{(analytics.followers_count ?? 0).toLocaleString()}</Text>
+                    <Text style={dashboardStyles.statLabel}>Followers</Text>
+                  </View>
+                  <View style={dashboardStyles.statCard}>
+                    <View style={[dashboardStyles.statIconContainer, { backgroundColor: '#F2CF6815' }]}>
+                      <Ionicons name="star" size={24} color="#F2CF68" />
+                    </View>
+                    <Text style={dashboardStyles.statValue}>{(analytics.customer_reviews ?? 0).toLocaleString()}</Text>
+                    <Text style={dashboardStyles.statLabel}>Reviews</Text>
+                  </View>
+                </View>
+
+                {/* Engagement Stats - Large Cards */}
+                <View style={dashboardStyles.sectionTitle}>
+                  <Ionicons name="eye" size={20} color="#333" />
+                  <Text style={dashboardStyles.sectionTitleText}>Visibility & Engagement</Text>
+                </View>
+
+                <View style={dashboardStyles.largeStatCard}>
+                  <View style={dashboardStyles.largeStatLeft}>
+                    <View style={[dashboardStyles.largeStatIconContainer, { backgroundColor: '#9C27B015' }]}>
+                      <Ionicons name="eye" size={26} color="#9C27B0" />
+                    </View>
+                    <View style={dashboardStyles.largeStatInfo}>
+                      <Text style={dashboardStyles.largeStatLabel}>Profile Views</Text>
+                      {analytics.profile_views_trend ? (
+                        <View style={dashboardStyles.trendContainer}>
+                          <Ionicons name="trending-up" size={14} color="#4CAF50" />
+                          <Text style={dashboardStyles.trendText}>{analytics.profile_views_trend}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text style={[dashboardStyles.largeStatValue, { color: '#9C27B0' }]}>{(analytics.profile_views ?? 0).toLocaleString()}</Text>
+                </View>
+
+                <View style={dashboardStyles.largeStatCard}>
+                  <View style={dashboardStyles.largeStatLeft}>
+                    <View style={[dashboardStyles.largeStatIconContainer, { backgroundColor: '#2196F315' }]}>
+                      <Ionicons name="footsteps" size={26} color="#2196F3" />
+                    </View>
+                    <View style={dashboardStyles.largeStatInfo}>
+                      <Text style={dashboardStyles.largeStatLabel}>Profile Visits</Text>
+                      {analytics.profile_visits_trend ? (
+                        <View style={dashboardStyles.trendContainer}>
+                          <Ionicons name="trending-up" size={14} color="#4CAF50" />
+                          <Text style={dashboardStyles.trendText}>{analytics.profile_visits_trend}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text style={[dashboardStyles.largeStatValue, { color: '#2196F3' }]}>{(analytics.profile_visits ?? 0).toLocaleString()}</Text>
+                </View>
+
+                <View style={dashboardStyles.largeStatCard}>
+                  <View style={dashboardStyles.largeStatLeft}>
+                    <View style={[dashboardStyles.largeStatIconContainer, { backgroundColor: '#FF980015' }]}>
+                      <Ionicons name="search" size={26} color="#FF9800" />
+                    </View>
+                    <View style={dashboardStyles.largeStatInfo}>
+                      <Text style={dashboardStyles.largeStatLabel}>Search Appearances</Text>
+                      {analytics.search_appearances_trend ? (
+                        <View style={dashboardStyles.trendContainer}>
+                          <Ionicons name="trending-up" size={14} color="#4CAF50" />
+                          <Text style={dashboardStyles.trendText}>{analytics.search_appearances_trend}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text style={[dashboardStyles.largeStatValue, { color: '#FF9800' }]}>{(analytics.search_appearances ?? 0).toLocaleString()}</Text>
+                </View>
+
+                <View style={dashboardStyles.largeStatCard}>
+                  <View style={dashboardStyles.largeStatLeft}>
+                    <View style={[dashboardStyles.largeStatIconContainer, { backgroundColor: '#4CAF5015' }]}>
+                      <Ionicons name="hand-left" size={26} color="#4CAF50" />
+                    </View>
+                    <View style={dashboardStyles.largeStatInfo}>
+                      <Text style={dashboardStyles.largeStatLabel}>Post Clicks</Text>
+                      {analytics.post_clicks_trend ? (
+                        <View style={dashboardStyles.trendContainer}>
+                          <Ionicons name="trending-up" size={14} color="#4CAF50" />
+                          <Text style={dashboardStyles.trendText}>{analytics.post_clicks_trend}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text style={[dashboardStyles.largeStatValue, { color: '#4CAF50' }]}>{(analytics.post_clicks ?? 0).toLocaleString()}</Text>
+                </View>
+
+                {/* Info Card */}
+                <View style={dashboardStyles.infoCard}>
+                  <Ionicons name="information-circle" size={24} color="#1B7C82" />
+                  <View style={dashboardStyles.infoContent}>
+                    <Text style={dashboardStyles.infoTitle}>How to improve?</Text>
+                    <Text style={dashboardStyles.infoText}>
+                      Post regularly, respond to reviews, and keep your menu updated to increase visibility and engagement.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ height: 120 }} />
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </>
+    );
+  }
 
   // Regular users see the normal happening places content
   return (
@@ -1395,7 +1603,7 @@ export default function HappeningPlaces({ embedded = false }) {
           )}
 
           {/* Empty State */}
-          {topLocations.length === 0 && selectedArea === 'All' && (
+          {topLocations.length === 0 && selectedArea === 'All' && !selectedFoodSpot && (
             <View style={styles.emptyState}>
               <Ionicons
                 name="location-outline"
@@ -1412,8 +1620,8 @@ export default function HappeningPlaces({ embedded = false }) {
             </View>
           )}
 
-          {/* Location Cards - only show when "All" is selected */}
-          {selectedArea === 'All' && topLocations.slice(0, visibleCards).map((location, index) => {
+          {/* Location Cards - only show when "All" is selected and no food spot filter active */}
+          {selectedArea === 'All' && !selectedFoodSpot && topLocations.slice(0, visibleCards).map((location, index) => {
             const images = location.images || [];
             const thumbnails = location.thumbnails || [];
             const imagesData = location.images_data || [];
@@ -1534,7 +1742,7 @@ export default function HappeningPlaces({ embedded = false }) {
           })}
 
           {/* Load More Button */}
-          {selectedArea === 'All' && visibleCards < topLocations.length && (
+          {selectedArea === 'All' && !selectedFoodSpot && visibleCards < topLocations.length && (
             <TouchableOpacity
               style={styles.loadMoreButton}
               onPress={() => setVisibleCards(prev => Math.min(prev + 3, topLocations.length))}
@@ -2325,5 +2533,156 @@ skeletonImageLarge: {
     color: '#333',
     fontWeight: '500',
     maxWidth: 120,
+  },
+});
+
+const dashboardStyles = StyleSheet.create({
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  analyticsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 10,
+  },
+  analyticsTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+  },
+  analyticsSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 12,
+    gap: 8,
+  },
+  sectionTitleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  largeStatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  largeStatLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  largeStatIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  largeStatInfo: {
+    gap: 4,
+  },
+  largeStatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  largeStatValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+  },
+  trendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trendText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#E8F5F5',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 24,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#1B7C82',
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1B7C82',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
   },
 });

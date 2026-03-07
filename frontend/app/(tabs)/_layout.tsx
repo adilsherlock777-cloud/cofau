@@ -100,13 +100,13 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="explore"
           options={{
-            title: isRestaurant ? "Dashboard" : "Explore",
+            title: "Explore",
             tabBarIcon: ({ focused }) =>
               focused ? (
-                <GradientIcon name={isRestaurant ? "analytics" : "compass"} size={22} />
+                <GradientIcon name="compass" size={22} />
               ) : (
                 <Ionicons
-                  name={isRestaurant ? "analytics-outline" : "compass-outline"}
+                  name="compass-outline"
                   size={22}
                   color="#000"
                 />
@@ -140,12 +140,12 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="happening"
           options={{
-            title: "Saved",
+            title: isRestaurant ? "Dashboard" : "Saved",
             tabBarIcon: ({ focused }) =>
               focused ? (
-                <GradientIcon name="location" size={22} />
+                <GradientIcon name={isRestaurant ? "analytics" : "location"} size={22} />
               ) : (
-                <Ionicons name="location-outline" size={22} color="#000" />
+                <Ionicons name={isRestaurant ? "analytics-outline" : "location-outline"} size={22} color="#000" />
               ),
           }}
         />

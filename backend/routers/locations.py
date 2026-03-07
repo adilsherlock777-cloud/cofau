@@ -308,7 +308,9 @@ async def get_nearby_locations(
     user_posts = await db.posts.find(location_name_query).to_list(None)
     restaurant_posts = await db.restaurant_posts.find(location_name_query).to_list(None)
     all_posts = user_posts + restaurant_posts
-    
+    # Sort merged list by created_at descending so newest images appear first in cards
+    all_posts.sort(key=lambda p: p.get("created_at") or datetime.min, reverse=True)
+
     # Group posts by location_name and calculate distance
     location_map = {}
     
@@ -435,9 +437,11 @@ async def get_locations_by_food_spot(
         ]
     }
 
-    user_posts = await db.posts.find(base_query).sort("created_at", -1).to_list(None)
-    restaurant_posts = await db.restaurant_posts.find(base_query).sort("created_at", -1).to_list(None)
+    user_posts = await db.posts.find(base_query).to_list(None)
+    restaurant_posts = await db.restaurant_posts.find(base_query).to_list(None)
     all_posts = user_posts + restaurant_posts
+    # Sort merged list by created_at descending so newest images appear first in cards
+    all_posts.sort(key=lambda p: p.get("created_at") or datetime.min, reverse=True)
 
     # Group posts by location_name
     location_map = {}
