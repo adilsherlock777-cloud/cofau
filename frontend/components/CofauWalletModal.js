@@ -43,10 +43,6 @@ const CofauWalletModal = ({ visible, onClose }) => {
     amount_needed: 500,
     progress_percent: 0,
     can_claim_voucher: false,
-    delivery_discount: {
-      per_order: 25,
-      deliveries_worth: 0,
-    },
     recent_transactions: [],
   });
   const transactionsScrollRef = React.useRef(null);
@@ -307,26 +303,6 @@ const CofauWalletModal = ({ visible, onClose }) => {
               <View style={styles.claimInfoContainer}>
                 <Text style={styles.claimInfoTitle}>How to Use Your Rewards</Text>
 
-                {/* Delivery Discount */}
-                <View style={styles.deliveryCard}>
-                  <View style={styles.deliveryIconContainer}>
-                    <Ionicons name="bicycle" size={24} color="#4CAF50" />
-                  </View>
-                  <View style={styles.deliveryContent}>
-                    <Text style={styles.deliveryTitle}>DELIVERY DISCOUNT</Text>
-                    <Text style={styles.deliverySubtext}>
-                      <Text>Use </Text>
-                      <Text style={styles.highlightText}>₹{walletData.delivery_discount.per_order}</Text>
-                      <Text> per order</Text>
-                    </Text>
-                    <Text style={styles.deliverySubtext}>
-                      <Text>Your balance: </Text>
-                      <Text style={styles.highlightText}>{walletData.delivery_discount.deliveries_worth} deliveries</Text>
-                      <Text> worth!</Text>
-                    </Text>
-                  </View>
-                </View>
-
                 {/* Amazon Voucher */}
                 <View style={[
                   styles.voucherCard,
@@ -429,18 +405,18 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
 
                   <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>🍔</Text>
+                    <Text style={styles.pointEmoji}>📅</Text>
                     <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>Delivery Rewards</Text>
-                      <Text style={styles.pointDesc}>₹10/- for every delivery completed. Earn ₹50/- Bonus for completing 10 delivery orders!</Text>
+                      <Text style={styles.pointTitle}>3 Posts Per Week</Text>
+                      <Text style={styles.pointDesc}>Earn rewards on up to 3 posts per week. 4th post onwards won't earn wallet rewards</Text>
                     </View>
                   </View>
 
                   <View style={styles.pointItem}>
-                    <Text style={styles.pointEmoji}>📅</Text>
+                    <Text style={styles.pointEmoji}>🏆</Text>
                     <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>2 Posts Per Week</Text>
-                      <Text style={styles.pointDesc}>Earn rewards on up to 2 posts per week. 3rd post onwards won't earn wallet rewards</Text>
+                      <Text style={styles.pointTitle}>Rank #1 Bonus</Text>
+                      <Text style={styles.pointDesc}>Earn ₹25 if your post gets Rank #1 in Foodies on Explore. Once per week!</Text>
                     </View>
                   </View>
 
@@ -831,34 +807,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 15,
     letterSpacing: 0.5,
-  },
-  deliveryCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 15,
-  },
-  deliveryIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: "#E8F5E9",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  deliveryContent: {
-    flex: 1,
-  },
-  deliveryTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#222",
-    marginBottom: 4,
-  },
-  deliverySubtext: {
-    fontSize: 13,
-    color: "#555",
-    lineHeight: 20,
   },
   highlightText: {
     fontWeight: "700",

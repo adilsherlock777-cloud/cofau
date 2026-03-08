@@ -117,6 +117,7 @@ const CATEGORIES = [
   { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
   { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
   { id: 'chinese', name: 'Chinese', emoji: '🍜' },
@@ -150,7 +151,6 @@ const CATEGORIES = [
   { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
   { id: 'pizza', name: 'Pizza', emoji: '🍕' },
   { id: 'dosa', name: 'Dosa', emoji: '🫕' },
-  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
 ];
 
 export default function LeaderboardScreen() {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import BadgeRequests from './BadgeRequests';
 import VoucherClaims from './VoucherClaims';
+import NewUsers from './NewUsers';
 
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000/api'
@@ -63,12 +64,19 @@ export default function Dashboard({ admin, onLogout }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
           <StatCard
             label="Total Users"
             value={stats?.total_users}
             loading={loadingStats}
             icon="👥"
+          />
+          <StatCard
+            label="New Users (30d)"
+            value={stats?.new_users_30d}
+            loading={loadingStats}
+            icon="🆕"
+            highlight={stats?.new_users_30d > 0}
           />
           <StatCard
             label="Total Posts"
@@ -125,6 +133,12 @@ export default function Dashboard({ admin, onLogout }) {
             count={stats?.pending_vouchers}
           />
           <TabButton
+            active={activeTab === 'new-users'}
+            onClick={() => setActiveTab('new-users')}
+            label="New Users"
+            count={stats?.new_users_30d}
+          />
+          <TabButton
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
             label="Overview"
@@ -138,6 +152,10 @@ export default function Dashboard({ admin, onLogout }) {
 
         {activeTab === 'voucher-claims' && (
           <VoucherClaims token={admin.token} onStatsChange={fetchStats} />
+        )}
+
+        {activeTab === 'new-users' && (
+          <NewUsers token={admin.token} />
         )}
 
         {activeTab === 'overview' && (

@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
+    bottom: -1,
+    right: 2,
   },
 });

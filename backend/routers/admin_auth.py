@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordBearer
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import get_database
 from utils.hashing import hash_password, verify_password
 from utils.jwt import create_access_token, verify_token
@@ -88,6 +88,8 @@ async def admin_stats(current_admin: dict = Depends(get_current_admin)):
     """Get admin dashboard stats"""
     db = get_database()
 
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
     total_users = await db.users.count_documents({})
     total_posts = await db.posts.count_documents({})
     total_restaurants = await db.restaurants.count_documents({})
@@ -95,6 +97,7 @@ async def admin_stats(current_admin: dict = Depends(get_current_admin)):
     approved_badges = await db.badge_requests.count_documents({"status": "approved"})
     pending_vouchers = await db.voucher_claims.count_documents({"status": "pending"})
     total_vouchers = await db.voucher_claims.count_documents({})
+    new_users_30d = await db.users.count_documents({"created_at": {"$gte": thirty_days_ago}})
 
     return {
         "total_users": total_users,
@@ -104,6 +107,7 @@ async def admin_stats(current_admin: dict = Depends(get_current_admin)):
         "approved_badges": approved_badges,
         "pending_vouchers": pending_vouchers,
         "total_vouchers": total_vouchers,
+        "new_users_30d": new_users_30d,
     }
 
 
@@ -204,3 +208,40 @@ async def process_voucher_claim(
         pass
 
     return {"message": "Voucher claim marked as processed"}
+
+
+@router.get("/new-users")
+async def get_new_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_admin: dict = Depends(get_current_admin),
+):
+    """Get users who signed up in the last 30 days"""
+    db = get_database()
+
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    cursor = (
+        db.users.find({"created_at": {"$gte": thirty_days_ago}})
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+
+    users = []
+    async for user in cursor:
+        users.append({
+            "user_id": str(user["_id"]),
+            "full_name": user.get("full_name", ""),
+            "username": user.get("username", ""),
+            "email": user.get("email", ""),
+            "phone_number": user.get("phone_number", ""),
+            "profile_picture": user.get("profile_picture"),
+            "level": user.get("level", 1),
+            "total_points": user.get("total_points", 0),
+            "created_at": user["created_at"].isoformat() if user.get("created_at") else None,
+        })
+
+    total = await db.users.count_documents({"created_at": {"$gte": thirty_days_ago}})
+
+    return {"users": users, "total": total}

@@ -506,6 +506,73 @@ async def get_daily_analytics(
     return result
 
 
+@router.get("/analytics/best-post")
+async def get_best_post(
+    current_restaurant: dict = Depends(get_current_restaurant)
+):
+    """
+    Get the single best-performing post by combined likes, comments, and clicks.
+    """
+    db = get_database()
+    restaurant_id = str(current_restaurant["_id"])
+
+    # Get all restaurant posts
+    posts = await db.restaurant_posts.find(
+        {"restaurant_id": restaurant_id}
+    ).to_list(None)
+
+    if not posts:
+        return None
+
+    # Get click counts per post from analytics
+    click_pipeline = [
+        {
+            "$match": {
+                "restaurant_id": restaurant_id,
+                "event_type": "post_click",
+                "post_id": {"$exists": True, "$ne": None}
+            }
+        },
+        {
+            "$group": {
+                "_id": "$post_id",
+                "clicks": {"$sum": 1}
+            }
+        }
+    ]
+    click_data = await db.restaurant_analytics.aggregate(click_pipeline).to_list(None)
+    clicks_map = {item["_id"]: item["clicks"] for item in click_data}
+
+    # Find the post with the highest combined score
+    best_post = None
+    best_score = -1
+
+    for post in posts:
+        post_id = str(post["_id"])
+        likes = post.get("likes_count", 0)
+        comments = post.get("comments_count", 0)
+        clicks = clicks_map.get(post_id, 0)
+        score = likes + comments + clicks
+
+        if score > best_score:
+            best_score = score
+            best_post = {
+                "post_id": post_id,
+                "dish_name": post.get("dish_name", ""),
+                "about": post.get("about", ""),
+                "media_url": post.get("media_url", ""),
+                "media_type": post.get("media_type", "image"),
+                "thumbnail_url": post.get("thumbnail_url", ""),
+                "likes_count": likes,
+                "comments_count": comments,
+                "clicks_count": clicks,
+                "total_score": score,
+                "created_at": str(post.get("created_at", "")),
+            }
+
+    return best_post
+
+
 @router.get("/analytics/top-posts")
 async def get_top_posts(
     limit: int = 5,

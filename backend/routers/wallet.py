@@ -96,36 +96,6 @@ async def get_wallet_transactions(
     }
 
 
-@router.post("/redeem/delivery")
-async def redeem_for_delivery(current_user: dict = Depends(get_current_user)):
-    """
-    Mark wallet balance as used for delivery discount.
-    (Placeholder for future integration with delivery service)
-    """
-    
-    if current_user.get("account_type") == "restaurant":
-        raise HTTPException(status_code=400, detail="Wallet not available for restaurant accounts")
-    
-    db = get_database()
-    user_id = str(current_user["_id"])
-    
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    wallet_balance = user.get("wallet_balance", 0.0)
-    
-    if wallet_balance < 25:
-        raise HTTPException(status_code=400, detail="Insufficient balance. Minimum ₹25 required.")
-    
-    # For now, just return info. Actual redemption will be implemented later.
-    return {
-        "message": "Delivery discount feature coming soon!",
-        "current_balance": wallet_balance,
-        "discount_available": min(wallet_balance, 25)
-    }
-
-
 @router.get("/unread-count")
 async def get_unread_wallet_count(current_user: dict = Depends(get_current_user)):
     """

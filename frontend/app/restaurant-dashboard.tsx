@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ export default function RestaurantDashboard() {
   const router = useRouter();
   const { token, user } = useAuth() as any;
   const [loading, setLoading] = useState(true);
+  const [bestPost, setBestPost] = useState<any>(null);
   const [analytics, setAnalytics] = useState({
     total_posts: 0,
     followers_count: 0,
@@ -60,9 +62,20 @@ export default function RestaurantDashboard() {
       post_clicks_trend: response.data.post_clicks_trend || '',
     });
     
+    // Fetch best performing post
+    try {
+      const bestPostRes = await axios.get(`${API_URL}/restaurant/analytics/best-post`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBestPost(bestPostRes.data);
+    } catch (e) {
+      setBestPost(null);
+    }
+
   } catch (error) {
     console.error('Error fetching analytics:', error);
     // Set zeros on error
+    setBestPost(null);
     setAnalytics({
       total_posts: 0,
       followers_count: 0,
@@ -244,6 +257,52 @@ const LargeStatCard = ({
   color="#4CAF50"
   trend={analytics.post_clicks_trend}
 />
+
+        {/* Best Performing Post */}
+        {bestPost && bestPost.total_score > 0 && (
+          <>
+            <View style={styles.sectionTitle}>
+              <Ionicons name="trophy" size={20} color="#333" />
+              <Text style={styles.sectionTitleText}>Best Performing Post</Text>
+            </View>
+
+            <View style={styles.bestPostCard}>
+              {bestPost.media_url ? (
+                <Image
+                  source={{ uri: bestPost.media_type === 'video' && bestPost.thumbnail_url ? bestPost.thumbnail_url : bestPost.media_url }}
+                  style={styles.bestPostImage}
+                  resizeMode="cover"
+                />
+              ) : null}
+              <View style={styles.bestPostContent}>
+                {bestPost.dish_name ? (
+                  <Text style={styles.bestPostDishName} numberOfLines={1}>{bestPost.dish_name}</Text>
+                ) : null}
+                {bestPost.about ? (
+                  <Text style={styles.bestPostAbout} numberOfLines={2}>{bestPost.about}</Text>
+                ) : null}
+                <View style={styles.bestPostMetrics}>
+                  <View style={styles.bestPostMetricItem}>
+                    <Ionicons name="heart" size={16} color="#E94A37" />
+                    <Text style={styles.bestPostMetricValue}>{bestPost.likes_count}</Text>
+                  </View>
+                  <View style={styles.bestPostMetricItem}>
+                    <Ionicons name="chatbubble" size={16} color="#2196F3" />
+                    <Text style={styles.bestPostMetricValue}>{bestPost.comments_count}</Text>
+                  </View>
+                  <View style={styles.bestPostMetricItem}>
+                    <Ionicons name="hand-left" size={16} color="#4CAF50" />
+                    <Text style={styles.bestPostMetricValue}>{bestPost.clicks_count}</Text>
+                  </View>
+                </View>
+                <View style={styles.bestPostTotalRow}>
+                  <Text style={styles.bestPostTotalLabel}>Total Engagement</Text>
+                  <Text style={styles.bestPostTotalValue}>{bestPost.total_score}</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        )}
 
         {/* Info Card */}
         <View style={styles.infoCard}>
@@ -513,5 +572,68 @@ headerTitle: {
     marginTop: 2,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  bestPostCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 12,
+  },
+  bestPostImage: {
+    width: '100%',
+    height: 180,
+  },
+  bestPostContent: {
+    padding: 14,
+  },
+  bestPostDishName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  bestPostAbout: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  bestPostMetrics: {
+    flexDirection: 'row',
+    gap: 20,
+    marginBottom: 12,
+  },
+  bestPostMetricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  bestPostMetricValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  bestPostTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 10,
+  },
+  bestPostTotalLabel: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  bestPostTotalValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#E94A37',
   },
 });

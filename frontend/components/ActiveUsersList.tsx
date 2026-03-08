@@ -155,7 +155,7 @@ export const ActiveUsersList: React.FC<ActiveUsersListProps> = ({ token }) => {
           <Ionicons name="people-circle" size={36} color="#E94A37" />
           <Text style={styles.headerTitle}>Active Food Bloggers</Text>
           <Text style={styles.headerSubtitle}>
-            Users who posted in the last 2 days
+            Users who posted in the last 7 days
           </Text>
           <View style={styles.tipCard}>
             <Ionicons name="bulb" size={20} color="#FF9800" />

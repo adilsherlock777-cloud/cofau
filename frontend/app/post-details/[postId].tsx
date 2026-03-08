@@ -25,7 +25,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
-import SharePreviewModal from "../../components/SharePreviewModal";
+import SimpleShareModal from "../../components/SimpleShareModal";
 import ReportModal from "../../components/ReportModal";
 import { followUser, unfollowUser, getComments, addComment } from "../../utils/api";
 import axios from "axios";
@@ -1167,6 +1167,20 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                     </Text>
                   </TouchableOpacity>
                 )}
+
+                {/* Save Button */}
+                <TouchableOpacity style={styles.detailsSaveBtn} onPress={handleSaveToggle} activeOpacity={0.8}>
+                  <View style={styles.detailsSaveIconWrap}>
+                    {isSaved ? (
+                      <GradientBookmark size={16} />
+                    ) : (
+                      <Ionicons name="bookmark-outline" size={16} color="#888" />
+                    )}
+                  </View>
+                  <Text style={[styles.detailsSaveText, isSaved && { color: '#FF5722' }]}>
+                    {isSaved ? "Saved" : "Save"}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* ALL-IN-ONE DETAILS CARD */}
@@ -1263,21 +1277,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                 )}
               </View>
 
-              {/* SAVE BUTTON - FeedCard style */}
-              <TouchableOpacity style={styles.detailsSaveBtn} onPress={handleSaveToggle} activeOpacity={0.8}>
-                <View style={styles.detailsSaveIconWrap}>
-                  {isSaved ? (
-                    <GradientBookmark size={18} />
-                  ) : (
-                    <Ionicons name="bookmark-outline" size={18} color="#888" />
-                  )}
-                </View>
-                <Text style={[styles.detailsSaveText, isSaved && { color: '#FF5722' }]}>
-                  {isSaved ? "Saved" : "Save"} {savesCount > 0 ? `(${savesCount})` : ''}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={{ height: 100 }} />
+              <View style={{ height: 40 }} />
             </ScrollView>
 
           </Animated.View>
@@ -1378,11 +1378,10 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       />
 
       {/* Share Modal */}
-      <SharePreviewModal
+      <SimpleShareModal
         visible={showShareModal}
         onClose={() => setShowShareModal(false)}
         post={post}
-        onShareComplete={() => setSharesCount((prev: number) => prev + 1)}
       />
     </View>
   );
@@ -2162,33 +2161,26 @@ heartAnimationContainer: {
   detailsSaveBtn: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 12,
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: "#FFF",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#F5F5F5",
     borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-    gap: 8,
+    marginLeft: 8,
+    gap: 4,
   },
 
   detailsSaveIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#F3F3F3",
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#EBEBEB",
     justifyContent: "center",
     alignItems: "center",
   },
 
   detailsSaveText: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
     color: "#333",
   },
 

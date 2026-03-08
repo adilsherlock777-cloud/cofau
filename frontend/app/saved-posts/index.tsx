@@ -11,6 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { getSavedPosts } from '../../utils/api';
@@ -18,6 +19,8 @@ import { normalizeMediaUrl } from '../../utils/imageUrlFix';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = (SCREEN_WIDTH - 6) / 3; // 3 columns with 2px gaps
+
+type FilterTab = 'all' | 'users' | 'restaurants';
 
 export default function SavedPostsScreen() {
   const router = useRouter();
@@ -27,6 +30,7 @@ export default function SavedPostsScreen() {
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
   useEffect(() => {
     fetchSaved();
@@ -50,12 +54,22 @@ export default function SavedPostsScreen() {
     setRefreshing(false);
   };
 
+  // Filter posts by tab
+  const filteredPosts = useMemo(() => {
+    if (activeFilter === 'all') return savedPosts;
+    if (activeFilter === 'restaurants') return savedPosts.filter(p => p.account_type === 'restaurant');
+    return savedPosts.filter(p => p.account_type !== 'restaurant');
+  }, [savedPosts, activeFilter]);
+
+  // Counts for tab badges
+  const userCount = useMemo(() => savedPosts.filter(p => p.account_type !== 'restaurant').length, [savedPosts]);
+  const restaurantCount = useMemo(() => savedPosts.filter(p => p.account_type === 'restaurant').length, [savedPosts]);
+
   // Group posts by location, sorted latest to oldest
   const groupedByLocation = useMemo(() => {
     const groups: Record<string, any[]> = {};
 
-    // Posts are already sorted latest-first from API (by saved_at / created_at desc)
-    for (const post of savedPosts) {
+    for (const post of filteredPosts) {
       const location = post.location_name?.trim() || 'Other';
       if (!groups[location]) {
         groups[location] = [];
@@ -63,7 +77,6 @@ export default function SavedPostsScreen() {
       groups[location].push(post);
     }
 
-    // Sort groups: the group whose first (most recent) post was saved most recently comes first
     const sortedEntries = Object.entries(groups).sort(([, postsA], [, postsB]) => {
       const dateA = new Date(postsA[0]?.saved_at || postsA[0]?.created_at || 0).getTime();
       const dateB = new Date(postsB[0]?.saved_at || postsB[0]?.created_at || 0).getTime();
@@ -71,7 +84,7 @@ export default function SavedPostsScreen() {
     });
 
     return sortedEntries;
-  }, [savedPosts]);
+  }, [filteredPosts]);
 
   const renderPost = (post: any) => {
     const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
@@ -113,6 +126,11 @@ export default function SavedPostsScreen() {
                 <Text style={styles.dishNameText} numberOfLines={1}>{post.dish_name.toUpperCase()}</Text>
               </View>
             )}
+            {post.account_type === 'restaurant' && (
+              <View style={styles.restaurantBadge}>
+                <Ionicons name="restaurant" size={10} color="#fff" />
+              </View>
+            )}
           </View>
         ) : (
           <View style={styles.thumbnailPlaceholder}>
@@ -125,6 +143,30 @@ export default function SavedPostsScreen() {
               <Text style={styles.placeholderText}>Video</Text>
             )}
           </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFilterTab = (tab: FilterTab, label: string, count: number) => {
+    const isActive = activeFilter === tab;
+    return (
+      <TouchableOpacity
+        key={tab}
+        style={styles.filterTab}
+        onPress={() => setActiveFilter(tab)}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+          {label}{count > 0 ? ` (${count})` : ''}
+        </Text>
+        {isActive && (
+          <LinearGradient
+            colors={['#FF2E2E', '#FF7A18']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.filterTabIndicator}
+          />
         )}
       </TouchableOpacity>
     );
@@ -157,18 +199,35 @@ export default function SavedPostsScreen() {
         <View style={styles.backButton} />
       </View>
 
+      {/* Filter Tabs */}
+      <View style={styles.filterBar}>
+        {renderFilterTab('all', 'All', savedPosts.length)}
+        {renderFilterTab('users', 'Users', userCount)}
+        {renderFilterTab('restaurants', 'Restaurants', restaurantCount)}
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {savedPosts.length === 0 ? (
+        {filteredPosts.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="bookmark-outline" size={80} color="#ccc" />
-            <Text style={styles.emptyTitle}>No Saved Posts</Text>
+            <Ionicons
+              name={activeFilter === 'restaurants' ? 'restaurant-outline' : 'bookmark-outline'}
+              size={80}
+              color="#ccc"
+            />
+            <Text style={styles.emptyTitle}>
+              {activeFilter === 'all' ? 'No Saved Posts' :
+               activeFilter === 'restaurants' ? 'No Saved Restaurant Posts' :
+               'No Saved User Posts'}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              Save posts you want to see again
+              {activeFilter === 'all'
+                ? 'Save posts you want to see again'
+                : `No ${activeFilter === 'restaurants' ? 'restaurant' : 'user'} posts saved yet`}
             </Text>
           </View>
         ) : (
@@ -218,6 +277,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000',
+  },
+  filterBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECECEC',
+  },
+  filterTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  filterTabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#999',
+  },
+  filterTabTextActive: {
+    color: '#222',
+    fontWeight: '600',
+  },
+  filterTabIndicator: {
+    height: 2.5,
+    width: '60%',
+    borderRadius: 2,
+    marginTop: 6,
   },
   scrollView: {
     flex: 1,
@@ -309,6 +394,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 9,
     fontWeight: '600',
+  },
+  restaurantBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(255, 122, 24, 0.85)',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,

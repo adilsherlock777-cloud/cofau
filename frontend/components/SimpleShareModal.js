@@ -18,7 +18,10 @@ import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Linking from 'expo-linking';
-import { normalizeMediaUrl, BACKEND_URL } from '../utils/imageUrlFix';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../utils/imageUrlFix';
+import UserAvatar from './UserAvatar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -68,6 +71,21 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
                         </View>
                     )}
 
+                    {/* User Avatar + Username - Top Left */}
+                    {post?.username && (
+                        <View style={storyCardStyles.usernameContainer}>
+                            <UserAvatar
+                                profilePicture={normalizeProfilePicture(post?.user_profile_picture)}
+                                username={post.username}
+                                size={28}
+                                showLevelBadge={false}
+                            />
+                            <Text style={storyCardStyles.usernameText} numberOfLines={1}>
+                                @{post.username}
+                            </Text>
+                        </View>
+                    )}
+
                     {/* Dish Name Label - Bottom Left */}
                     {post?.dish_name && (
                         <View style={storyCardStyles.dishNameContainer}>
@@ -80,7 +98,11 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
 
                     {/* Cofau Watermark on Image */}
                     <View style={storyCardStyles.watermarkContainer}>
-                        <Text style={storyCardStyles.watermarkText}>Cofau</Text>
+                        <MaskedView maskElement={<Text style={storyCardStyles.watermarkText}>Cofau</Text>}>
+                            <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                                <Text style={[storyCardStyles.watermarkText, { opacity: 0 }]}>Cofau</Text>
+                            </LinearGradient>
+                        </MaskedView>
                     </View>
                 </View>
 
@@ -181,15 +203,15 @@ const storyCardStyles = StyleSheet.create({
         position: 'absolute',
         bottom: 16,
         right: 16,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
     },
     watermarkText: {
-        fontSize: 12,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: '#000',
         fontFamily: 'Lobster',
         letterSpacing: 1,
     },
@@ -227,6 +249,24 @@ const storyCardStyles = StyleSheet.create({
         width: 1,
         backgroundColor: '#E8E8E8',
         marginVertical: 8,
+    },
+    usernameContainer: {
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        maxWidth: '70%',
+        gap: 4,
+    },
+    usernameText: {
+        color: '#FFF',
+        fontSize: 13,
+        fontWeight: '700',
     },
     dishNameContainer: {
         position: 'absolute',
@@ -269,22 +309,22 @@ export default function SimpleShareModal({ visible, onClose, post }) {
             setLoading(true);
             setSharingPlatform('whatsapp');
 
-            let message = `📷 ${post.username || 'User'} shared a post on Cofau!\n\n`;
-            if (post.review_text) {
-                message += `${post.review_text}\n\n`;
-            }
-            if (post.rating) {
-                message += `⭐ Rating: ${post.rating}/10\n`;
-            }
-            if (post.location_name) {
-                message += `📍 Location: ${post.location_name}\n`;
-            }
-            message += `\nView on Cofau: ${shareUrl}`;
+            const dishLine = post.dish_name ? `🍽 *${post.dish_name}*\n` : '';
+            const ratingLine = post.rating ? `⭐ ${post.rating}/10\n` : '';
+            const locationLine = post.location_name ? `📍 ${post.location_name}\n` : '';
+            const reviewLine = post.review_text ? `\n"${post.review_text}"\n` : '';
+
+            let message = `Hey, Check out this dish on *Cofau*!\n\n`;
+            message += dishLine;
+            message += ratingLine;
+            message += locationLine;
+            message += reviewLine;
+            message += `\n👉 ${shareUrl}`;
 
             const shareContent = {
                 message: message,
                 url: shareUrl,
-                title: `${post.username} shared a post on Cofau`,
+                title: post.dish_name || `${post.username} shared a dish on Cofau`,
             };
 
             await RNShare.share(shareContent);
@@ -343,22 +383,22 @@ export default function SimpleShareModal({ visible, onClose, post }) {
             setLoading(true);
             setSharingPlatform('instagram');
 
-            let message = `📷 ${post.username || 'User'} shared a post on Cofau!\n\n`;
-            if (post.review_text) {
-                message += `${post.review_text}\n\n`;
-            }
-            if (post.rating) {
-                message += `⭐ Rating: ${post.rating}/10\n`;
-            }
-            if (post.location_name) {
-                message += `📍 Location: ${post.location_name}\n`;
-            }
-            message += `\nView on Cofau: ${shareUrl}`;
+            const dishLine = post.dish_name ? `🍽 ${post.dish_name}\n` : '';
+            const ratingLine = post.rating ? `⭐ ${post.rating}/10\n` : '';
+            const locationLine = post.location_name ? `📍 ${post.location_name}\n` : '';
+            const reviewLine = post.review_text ? `\n"${post.review_text}"\n` : '';
+
+            let message = `Hey, Check out this dish on Cofau!\n\n`;
+            message += dishLine;
+            message += ratingLine;
+            message += locationLine;
+            message += reviewLine;
+            message += `\n👉 ${shareUrl}`;
 
             const shareContent = {
                 message: message,
                 url: shareUrl,
-                title: `${post.username} shared a post on Cofau`,
+                title: post.dish_name || `${post.username} shared a dish on Cofau`,
             };
 
             await RNShare.share(shareContent);

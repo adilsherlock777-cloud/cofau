@@ -60,6 +60,20 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
               <Ionicons name="image-outline" size={60} color="#ccc" />
             </View>
           )}
+          {/* User Avatar + Username - Top Left */}
+          {post?.username && (
+            <View style={storyCardStyles.usernameContainer}>
+              <UserAvatar
+                profilePicture={normalizeProfilePicture(post?.user_profile_picture)}
+                username={post.username}
+                size={28}
+                showLevelBadge={false}
+              />
+              <Text style={storyCardStyles.usernameText} numberOfLines={1}>
+                @{post.username}
+              </Text>
+            </View>
+          )}
           {post?.dish_name && (
             <View style={storyCardStyles.dishNameContainer}>
               <Ionicons name="fast-food" size={14} color="#FFF" />
@@ -122,6 +136,8 @@ const storyCardStyles = StyleSheet.create({
   infoBoxLabel: { fontSize: 11, fontWeight: '700', color: '#999', marginTop: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
   infoBoxValue: { fontSize: 13, fontWeight: '600', color: '#333', marginTop: 4, textAlign: 'center', lineHeight: 18 },
   divider: { width: 1, backgroundColor: '#E8E8E8', marginVertical: 8 },
+  usernameContainer: { position: 'absolute', top: 16, left: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, maxWidth: '70%', gap: 4 },
+  usernameText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   dishNameContainer: { position: 'absolute', bottom: 16, left: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, maxWidth: '60%', gap: 4 },
   dishNameText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
 });

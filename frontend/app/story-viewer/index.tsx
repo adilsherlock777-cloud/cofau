@@ -28,7 +28,9 @@ import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../../components/UserAvatar';
 import CofauVerifiedBadge from '../../components/CofauVerifiedBadge';
 import { normalizeStoryUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
-import { markStoryViewed, getStoryViews } from '../../utils/api';
+import { markStoryViewed, getStoryViews, sharePostToUsers } from '../../utils/api';
+import ShareToUsersModal from '../../components/ShareToUsersModal';
+import SimpleShareModal from '../../components/SimpleShareModal';
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 
@@ -98,6 +100,7 @@ export default function StoryViewerScreen() {
     }))
   ).current;
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showShareToUsersModal, setShowShareToUsersModal] = useState(false);
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
@@ -307,8 +310,42 @@ const handleSendStoryReply = async () => {
   /* ----------------------------------------------------------
      HANDLE SHARE STORY OPTIONS
   -----------------------------------------------------------*/
+  const [showSimpleShareModal, setShowSimpleShareModal] = useState(false);
+
+  // Build a post-like object from current story for SimpleShareModal
+  const getStoryAsPost = () => {
+    const currentStory = stories[currentIndex];
+    if (!currentStory) return null;
+    return {
+      id: currentStory.id,
+      media_url: currentStory.media_url,
+      media_type: currentStory.media_type,
+      username: storyUser?.username || '',
+      user_profile_picture: storyUser?.profile_picture || '',
+      rating: currentStory.from_post?.rating || null,
+      review_text: currentStory.from_post?.review || '',
+      location_name: currentStory.from_post?.location || currentStory.location_name || '',
+      dish_name: currentStory.from_post?.dish_name || '',
+    };
+  };
+
+  const pauseStory = () => {
+    setPaused(true);
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
+    progressAnims.current[currentIndex]?.stopAnimation();
+  };
+
   const handleShareStory = () => {
+    pauseStory();
     setShowShareModal(true);
+  };
+
+  const closeShareAndResume = () => {
+    setShowShareModal(false);
+    setPaused(false);
   };
 
   const handleAddToMyStory = async () => {
@@ -321,7 +358,7 @@ const handleSendStoryReply = async () => {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setShowShareModal(false);
+      closeShareAndResume();
       Alert.alert('Shared!', 'Story added to your stories');
     } catch (error: any) {
       console.error('❌ Error sharing story:', error);
@@ -331,34 +368,16 @@ const handleSendStoryReply = async () => {
 
   const handleShareToCofauUsers = () => {
     setShowShareModal(false);
-    const currentStory = stories[currentIndex];
-    router.push({
-      pathname: '/share-to-users',
-      params: {
-        mediaUrl: currentStory.media_url,
-        mediaType: currentStory.media_type,
-        storyId: currentStory.id,
-        fromUser: storyUser?.username || 'Someone',
-      }
-    });
+    setTimeout(() => {
+      setShowShareToUsersModal(true);
+    }, 300);
   };
 
-  const handleShareToWhatsAppInstagram = async () => {
-    const currentStory = stories[currentIndex];
-    if (!currentStory) return;
-
+  const handleShareToWhatsAppInstagram = () => {
     setShowShareModal(false);
-    
-    try {
-      const shareUrl = `https://api.cofau.com/share/story/${currentStory.id}`;
-      
-      await Share.share({
-        message: `Check out this story on Cofau! ${shareUrl}`,
-        url: shareUrl,
-      });
-    } catch (error) {
-      console.error('❌ Error sharing:', error);
-    }
+    setTimeout(() => {
+      setShowSimpleShareModal(true);
+    }, 300);
   };
 
   const handleOpenLocation = () => {
@@ -1220,14 +1239,25 @@ const handlePrevious = () => {
 
       {/* Bottom Section - OUTSIDE contentContainer */}
       {currentIsOwner ? (
-        <TouchableOpacity
-          style={styles.eyeIconContainer}
-          onPress={() => setShowViewersModal(true)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="eye" size={20} color="#FFF" />
-          <Text style={styles.eyeIconText}>{viewCount}</Text>
-        </TouchableOpacity>
+        <View style={styles.ownerBottomBar}>
+          <TouchableOpacity
+            style={styles.eyeIconContainer}
+            onPress={() => setShowViewersModal(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="eye" size={20} color="#FFF" />
+            <Text style={styles.eyeIconText}>{viewCount}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.ownerShareButton}
+            onPress={handleShareStory}
+            activeOpacity={0.7}
+          >
+            <View style={styles.ownerShareIconCircle}>
+              <Ionicons name="arrow-redo-outline" size={18} color="#FFF" />
+            </View>
+          </TouchableOpacity>
+        </View>
       ) : (
         <View style={[
           styles.interactionBar,
@@ -1275,12 +1305,6 @@ const handlePrevious = () => {
             )}
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.interactionButton}
-            onPress={handleShareStory}
-          >
-            <Ionicons name="share-outline" size={26} color="#FFF" />
-          </TouchableOpacity>
         </View>
       )}
 
@@ -1369,12 +1393,12 @@ const handlePrevious = () => {
         visible={showShareModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowShareModal(false)}
+        onRequestClose={closeShareAndResume}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.shareModalOverlay}
           activeOpacity={1}
-          onPress={() => setShowShareModal(false)}
+          onPress={closeShareAndResume}
         >
           <TouchableOpacity 
             activeOpacity={1} 
@@ -1383,16 +1407,8 @@ const handlePrevious = () => {
             <View style={styles.shareModalContent}>
               <Text style={styles.shareModalTitle}>Share Story</Text>
               <Text style={styles.shareModalSubtitle}>Choose how you want to share</Text>
-              
-              <TouchableOpacity 
-                style={styles.shareOptionButton}
-                onPress={handleAddToMyStory}
-              >
-                <Ionicons name="add-circle-outline" size={22} color="#FFF" style={styles.shareOptionIconStyle} />
-                <Text style={styles.shareOptionText}>Add to Story</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.shareOptionButton}
                 onPress={handleShareToCofauUsers}
               >
@@ -1408,9 +1424,9 @@ const handlePrevious = () => {
                 <Text style={styles.shareOptionText}>Share to WhatsApp/Instagram</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.shareOptionButton, styles.cancelButton]}
-                onPress={() => setShowShareModal(false)}
+                onPress={closeShareAndResume}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -1418,6 +1434,35 @@ const handlePrevious = () => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Share to Cofau Users Modal */}
+      <ShareToUsersModal
+        visible={showShareToUsersModal}
+        onClose={() => {
+          setShowShareToUsersModal(false);
+          setPaused(false);
+        }}
+        post={{ id: stories[currentIndex]?.id }}
+        onShare={async (userIds: string[]) => {
+          try {
+            await sharePostToUsers(stories[currentIndex]?.id, userIds);
+            setPaused(false);
+            Alert.alert('Shared!', `Story shared with ${userIds.length} user(s)`);
+          } catch (error) {
+            Alert.alert('Error', 'Failed to share story. Please try again.');
+          }
+        }}
+      />
+
+      {/* SimpleShareModal (WhatsApp/Instagram - same as FeedCard) */}
+      <SimpleShareModal
+        visible={showSimpleShareModal}
+        onClose={() => {
+          setShowSimpleShareModal(false);
+          setPaused(false);
+        }}
+        post={getStoryAsPost()}
+      />
     </SafeAreaView>
   );
 }
@@ -1746,10 +1791,16 @@ postCardArrow: {
     fontSize: 16,
     color: '#999',
   },
-  eyeIconContainer: {
+  ownerBottomBar: {
     position: 'absolute',
     bottom: 40,
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 100,
+  },
+  eyeIconContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -1757,12 +1808,22 @@ postCardArrow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    zIndex: 100,
   },
   eyeIconText: {
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  ownerShareButton: {
+    padding: 4,
+  },
+  ownerShareIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   interactionBar: {
     position: 'absolute',
@@ -1867,25 +1928,6 @@ postCardArrow: {
   cancelButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginTop: 5,
-  },
-  locationButton: {
-    position: 'absolute',
-    bottom: 100,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
-    maxWidth: SCREEN_WIDTH * 0.7,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-    zIndex: 10,
   },
   locationButtonText: {
     fontSize: 14,

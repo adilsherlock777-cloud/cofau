@@ -20,7 +20,7 @@ def get_create_notification():
 WALLET_REWARD_PER_POST = 25.0  # ₹25 per post (max 2 per week)
 WALLET_FIRST_POST_BONUS = 50.0  # First post bonus for new users
 POINTS_PER_POST = 25
-MAX_REWARDED_POSTS_PER_WEEK = 2  # Only first 2 posts per week earn rewards
+MAX_REWARDED_POSTS_PER_WEEK = 3  # Only first 3 posts per week earn rewards
 AMAZON_VOUCHER_THRESHOLD = 500.0  # Threshold to claim Amazon voucher
 
 
@@ -146,7 +146,7 @@ async def calculate_wallet_reward(
         "user_id": user_id,
         "type": "earned",
         "created_at": {"$gte": week_start},
-        "description": {"$not": {"$regex": "first post|First Post|delivery|Delivery", "$options": "i"}}
+        "description": {"$not": {"$regex": "first post|First Post|Rank #1", "$options": "i"}}
     })
 
     print(f"📊 User {user_id} has {rewarded_posts_this_week} rewarded posts this week (max {MAX_REWARDED_POSTS_PER_WEEK})")
@@ -270,21 +270,15 @@ async def get_wallet_info(db, user_id: str) -> dict:
     - Current balance
     - Amount needed for Amazon voucher
     - Recent transactions
-    - Delivery discount info
     """
-    
+
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user:
         return None
-    
+
     wallet_balance = user.get("wallet_balance", 0.0)
-    completed_deliveries = user.get("completed_deliveries_count", 0)
 
     amount_needed = max(0, AMAZON_VOUCHER_THRESHOLD - wallet_balance)
-
-    # Delivery discount info
-    DELIVERY_DISCOUNT_PER_ORDER = 25.0
-    deliveries_worth = int(wallet_balance / DELIVERY_DISCOUNT_PER_ORDER)
     
     # Get recent transactions (last 10)
     transactions = await db.wallet_transactions.find(
@@ -321,15 +315,9 @@ async def get_wallet_info(db, user_id: str) -> dict:
     
     return {
         "balance": wallet_balance,
-        "completed_deliveries": completed_deliveries,
-        "deliveries_to_next_reward": 10 - completed_deliveries,
         "target_amount": AMAZON_VOUCHER_THRESHOLD,
         "amount_needed": amount_needed,
         "progress_percent": min((wallet_balance / AMAZON_VOUCHER_THRESHOLD) * 100, 100),
         "can_claim_voucher": wallet_balance >= AMAZON_VOUCHER_THRESHOLD,
-        "delivery_discount": {
-            "per_order": DELIVERY_DISCOUNT_PER_ORDER,
-            "deliveries_worth": deliveries_worth
-        },
         "recent_transactions": formatted_transactions
     }

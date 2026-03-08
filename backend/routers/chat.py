@@ -148,7 +148,7 @@ async def chat_ws(websocket: WebSocket, other_user_id: str):
                 msg_doc = {
                     "from_user": current_user_id,
                     "to_user": other_user_id,
-                    "message": text or (f"📷 Shared a post" if post_id else (f"📷 Replied to story" if story_id else "")),
+                    "message": text or (f"Hey, Look out this Dish 🍽" if post_id else (f"📷 Replied to story" if story_id else "")),
                     "created_at": now,
                     "is_read": False,
                 }
@@ -323,7 +323,7 @@ async def share_post_to_users(
         msg_doc = {
             "from_user": current_user_id,
             "to_user": user_id,
-            "message": f"📷 {post_username} shared a post",
+            "message": "Hey, Look out this Dish 🍽",
             "post_id": request.post_id,
             "created_at": now,
             "is_read": False,

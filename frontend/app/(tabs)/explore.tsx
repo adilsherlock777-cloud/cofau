@@ -691,6 +691,233 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
   );
 });
 
+// Following Mode Marker (shows user DPs instead of post thumbnails)
+const FollowingMarker = memo(({ location, onPress }: any) => {
+  const [tracksChanges, setTracksChanges] = useState(true);
+  const { users, latitude, longitude, totalUserCount } = location;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setTracksChanges(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const displayUsers = users.slice(0, 3);
+  const remainingUsers = totalUserCount - 3;
+  const singleUser = users.length === 1;
+  const singlePost = singleUser && users[0].postCount === 1;
+
+  const renderDP = (user: any, size: number, onLoad?: () => void) => {
+    const dpUrl = fixUrl(user.user_profile_picture);
+    if (dpUrl) {
+      return (
+        <Image
+          source={{ uri: dpUrl }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          onLoad={() => {
+            onLoad?.();
+          }}
+        />
+      );
+    }
+    const initial = user.username?.[0]?.toUpperCase() || '?';
+    return (
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: size * 0.4 }}>{initial}</Text>
+      </View>
+    );
+  };
+
+  // Scenario 1: Single user, single post — post image with DP overlay
+  if (singlePost) {
+    const post = users[0].latestPost;
+    const imageUrl = post.full_thumbnail_url || post.full_image_url;
+
+    if (Platform.OS === 'android') {
+      return (
+        <Marker
+          coordinate={{ latitude, longitude }}
+          onPress={() => onPress(location)}
+          tracksViewChanges={tracksChanges}
+        >
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ position: 'relative' }}>
+              <View style={{ backgroundColor: '#fff', padding: 2, elevation: 5, borderRadius: 8 }}>
+                {imageUrl ? (
+                  <Image
+                    source={{ uri: imageUrl }}
+                    style={{ width: 56, height: 56, borderRadius: 6 }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    onLoad={() => setTracksChanges(false)}
+                  />
+                ) : (
+                  <View style={{ width: 56, height: 56, borderRadius: 6, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="image" size={20} color="#fff" />
+                  </View>
+                )}
+              </View>
+              <View style={{ position: 'absolute', top: -6, left: -6, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#fff', overflow: 'hidden', elevation: 10 }}>
+                {renderDP(users[0], 20)}
+              </View>
+            </View>
+          </View>
+        </Marker>
+      );
+    }
+
+    // iOS
+    return (
+      <Marker
+        coordinate={{ latitude, longitude }}
+        onPress={(e: any) => { e?.stopPropagation?.(); onPress(location); }}
+        tracksViewChanges={tracksChanges}
+        stopPropagation={true}
+      >
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ position: 'relative' }}>
+            <View style={styles.followingPostBubble}>
+              {imageUrl ? (
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={{ width: 56, height: 56, borderRadius: 6 }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  onLoad={() => setTracksChanges(false)}
+                />
+              ) : (
+                <View style={{ width: 56, height: 56, borderRadius: 6, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="image" size={20} color="#fff" />
+                </View>
+              )}
+            </View>
+            <View style={styles.followingDPOverlay}>
+              {renderDP(users[0], 20)}
+            </View>
+          </View>
+          <View style={styles.followingMarkerArrow} />
+        </View>
+      </Marker>
+    );
+  }
+
+  // Scenario 2: Single user, multiple posts — circular DP with count badge
+  if (singleUser) {
+    const user = users[0];
+
+    if (Platform.OS === 'android') {
+      return (
+        <Marker
+          coordinate={{ latitude, longitude }}
+          onPress={() => onPress(location)}
+          tracksViewChanges={tracksChanges}
+        >
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ position: 'relative' }}>
+              <View style={{ width: 50, height: 50, borderRadius: 25, borderWidth: 3, borderColor: '#fff', overflow: 'hidden', elevation: 5 }}>
+                {renderDP(user, 44, () => setTracksChanges(false))}
+              </View>
+              <View style={{ position: 'absolute', top: -6, right: -6, backgroundColor: '#E94A37', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 1.5, borderColor: '#fff', elevation: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{user.postCount}</Text>
+              </View>
+            </View>
+          </View>
+        </Marker>
+      );
+    }
+
+    // iOS
+    return (
+      <Marker
+        coordinate={{ latitude, longitude }}
+        onPress={(e: any) => { e?.stopPropagation?.(); onPress(location); }}
+        tracksViewChanges={tracksChanges}
+        stopPropagation={true}
+      >
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ position: 'relative' }}>
+            <View style={styles.followingUserBubble}>
+              {renderDP(user, 44, () => setTracksChanges(false))}
+            </View>
+            <View style={styles.followingCountBadge}>
+              <Text style={styles.followingCountBadgeText}>{user.postCount}</Text>
+            </View>
+          </View>
+          <View style={styles.followingMarkerArrow} />
+        </View>
+      </Marker>
+    );
+  }
+
+  // Scenario 3 & 4: Multiple users — side-by-side DPs
+  if (Platform.OS === 'android') {
+    return (
+      <Marker
+        coordinate={{ latitude, longitude }}
+        onPress={() => onPress(location)}
+        tracksViewChanges={tracksChanges}
+      >
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {displayUsers.map((user: any, index: number) => (
+              <View key={user.user_id} style={{ position: 'relative', marginLeft: index === 0 ? 0 : -10 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 2.5, borderColor: '#fff', overflow: 'hidden', elevation: 5 + (displayUsers.length - index) }}>
+                  {renderDP(user, 34, index === 0 ? () => setTracksChanges(false) : undefined)}
+                </View>
+                {user.postCount > 1 && (
+                  <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#E94A37', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3, borderWidth: 1, borderColor: '#fff', elevation: 8 }}>
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>{user.postCount}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+            {remainingUsers > 0 && (
+              <View style={{ backgroundColor: '#1a1a2e', borderRadius: 14, minWidth: 28, height: 28, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginLeft: -8, borderWidth: 2, borderColor: '#fff', elevation: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>+{remainingUsers}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Marker>
+    );
+  }
+
+  // iOS — Multiple users
+  return (
+    <Marker
+      coordinate={{ latitude, longitude }}
+      onPress={(e: any) => { e?.stopPropagation?.(); onPress(location); }}
+      tracksViewChanges={tracksChanges}
+      stopPropagation={true}
+      zIndex={1000 + totalUserCount}
+    >
+      <View style={{ alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {displayUsers.map((user: any, index: number) => (
+            <View key={user.user_id} style={{ position: 'relative', marginLeft: index === 0 ? 0 : -10, zIndex: displayUsers.length - index }}>
+              <View style={[styles.followingMultiUserDP]}>
+                {renderDP(user, 34, index === 0 ? () => setTracksChanges(false) : undefined)}
+              </View>
+              {user.postCount > 1 && (
+                <View style={styles.followingSmallCountBadge}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>{user.postCount}</Text>
+                </View>
+              )}
+            </View>
+          ))}
+          {remainingUsers > 0 && (
+            <View style={styles.followingPlusNBadge}>
+              <Text style={styles.followingPlusNText}>+{remainingUsers}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.followingMarkerArrow} />
+      </View>
+    </Marker>
+  );
+});
+
 const LocationButton = memo(({ onPress }: { onPress: () => void }) => (
   <TouchableOpacity style={styles.locationButton} onPress={onPress} activeOpacity={0.8}>
     <View style={styles.locationButtonInner}>
@@ -732,6 +959,7 @@ const MapViewComponent = memo(({
   onRestaurantPress,
   onPostPress,
   onClusterPress,
+  onFollowingLocationPress,
   isLoading,
   mapRef,
   filterType,
@@ -750,7 +978,7 @@ const MapViewComponent = memo(({
 
   // Group posts by location — use toFixed(3) (~111m) so nearby posts cluster
   // instead of overlapping as separate markers (which blocks taps on iOS)
-  const { singlePosts, clusters } = React.useMemo(() => {
+  const { singlePosts, clusters, followingLocations } = React.useMemo(() => {
     const groups = new Map<string, any[]>();
 
     posts.forEach((post: any) => {
@@ -765,31 +993,80 @@ const MapViewComponent = memo(({
 
     const singlePosts: any[] = [];
     const clusters: any[] = [];
+    const followingLocations: any[] = [];
 
-    groups.forEach((groupPosts, key) => {
-      const [lat, lng] = key.split(',').map(Number);
+    if (filterType === 'following') {
+      // Following mode: group by location, then sub-group by user
+      groups.forEach((locationPosts, key) => {
+        const [lat, lng] = key.split(',').map(Number);
 
-      // Sort posts within each group by latest uploaded first
-      groupPosts.sort((a: any, b: any) =>
-        (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
-      );
+        const userMap = new Map<string, any[]>();
+        locationPosts.forEach((post: any) => {
+          const uid = post.user_id || 'unknown';
+          if (!userMap.has(uid)) userMap.set(uid, []);
+          userMap.get(uid)!.push(post);
+        });
 
-      if (groupPosts.length === 1) {
-        singlePosts.push(groupPosts[0]);
-      } else {
-        clusters.push({
+        const users: any[] = [];
+        userMap.forEach((userPosts, userId) => {
+          userPosts.sort((a: any, b: any) =>
+            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+          );
+          const rep = userPosts[0];
+          users.push({
+            user_id: userId,
+            username: rep.username || 'Unknown',
+            user_profile_picture: rep.user_profile_picture || null,
+            user_level: rep.user_level || 1,
+            account_type: rep.account_type || 'user',
+            postCount: userPosts.length,
+            latestPost: rep,
+            posts: userPosts,
+          });
+        });
+
+        // Sort users by latest post date (newest first)
+        users.sort((a: any, b: any) =>
+          new Date(b.latestPost.created_at || 0).getTime() -
+          new Date(a.latestPost.created_at || 0).getTime()
+        );
+
+        followingLocations.push({
           id: key,
           latitude: lat,
           longitude: lng,
-          count: groupPosts.length,
-          posts: groupPosts,
-          locationName: groupPosts[0].location_name || 'This location',
+          locationName: locationPosts[0].location_name || 'This location',
+          users,
+          totalPostCount: locationPosts.length,
+          totalUserCount: users.length,
         });
-      }
-    });
+      });
+    } else {
+      // Near me / Restaurants mode: existing logic
+      groups.forEach((groupPosts, key) => {
+        const [lat, lng] = key.split(',').map(Number);
 
-    return { singlePosts, clusters };
-  }, [posts]);
+        groupPosts.sort((a: any, b: any) =>
+          (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
+        );
+
+        if (groupPosts.length === 1) {
+          singlePosts.push(groupPosts[0]);
+        } else {
+          clusters.push({
+            id: key,
+            latitude: lat,
+            longitude: lng,
+            count: groupPosts.length,
+            posts: groupPosts,
+            locationName: groupPosts[0].location_name || 'This location',
+          });
+        }
+      });
+    }
+
+    return { singlePosts, clusters, followingLocations };
+  }, [posts, filterType]);
 
  // Get category emoji
 const getCategoryEmoji = (categoryName: string | null) => {
@@ -869,24 +1146,31 @@ const getCategoryEmoji = (categoryName: string | null) => {
             />
           ))}
 
-          {/* Single Post Markers */}
-          {(filterType === 'posts' || filterType === 'followers') && (() => {
-            return singlePosts.map((post: any) => (
-              <PostMarker
-                key={`post-${post.id}`}
-                post={post}
-                onPress={onPostPress}
-              />
-            ));
-          })()}
+          {/* Near Me: Single Post Markers */}
+          {filterType === 'posts' && singlePosts.map((post: any) => (
+            <PostMarker
+              key={`post-${post.id}`}
+              post={post}
+              onPress={onPostPress}
+            />
+          ))}
 
-          {/* Cluster Markers */}
-          {(filterType === 'posts' || filterType === 'followers') && clusters.map((cluster: any) => (
+          {/* Near Me: Cluster Markers */}
+          {filterType === 'posts' && clusters.map((cluster: any) => (
             <ClusterMarker
               key={`cluster-${cluster.id}`}
               cluster={cluster}
               onPress={onClusterPress}
               categoryEmoji={categoryEmoji}
+            />
+          ))}
+
+          {/* Following: User DP Markers */}
+          {filterType === 'following' && followingLocations.map((loc: any) => (
+            <FollowingMarker
+              key={`following-${loc.id}`}
+              location={loc}
+              onPress={onFollowingLocationPress}
             />
           ))}
         </MapView>
@@ -915,10 +1199,10 @@ const getCategoryEmoji = (categoryName: string | null) => {
         </TouchableOpacity>
         <View style={styles.mapToggleDivider} />
         <TouchableOpacity
-          style={[styles.mapToggleOption, filterType === 'followers' && styles.mapToggleOptionActive]}
-          onPress={() => onFilterChange('followers')}
+          style={[styles.mapToggleOption, filterType === 'following' && styles.mapToggleOptionActive]}
+          onPress={() => onFilterChange('following')}
         >
-          <Text style={[styles.mapToggleText, filterType === 'followers' && styles.mapToggleTextActive]}>Followers</Text>
+          <Text style={[styles.mapToggleText, filterType === 'following' && styles.mapToggleTextActive]}>Following</Text>
         </TouchableOpacity>
       </View>
 
@@ -936,7 +1220,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
             ? `${posts.length} posts at ${singlePosts.length + clusters.length} locations`
             : filterType === 'restaurants'
             ? `${restaurants.length} restaurants nearby`
-            : `${posts.length} posts from followers at ${singlePosts.length + clusters.length} locations`
+            : `${posts.length} posts from following at ${followingLocations.length} locations`
           }
         </Text>
       </View>
@@ -1124,7 +1408,7 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
                   <Text style={styles.postStatText}>{post.likes_count}</Text>
                 </View>
                 <View style={styles.postStatItem}>
-                  <Ionicons name="bookmark" size={14} color={isSaved ? "#FF9500" : "#888"} />
+                  <Ionicons name="bookmark" size={14} color={isSaved ? "#FF2E2E" : "#888"} />
                   <Text style={styles.postStatText}>{localSavesCount}</Text>
                 </View>
                 <View style={styles.postStatItem}>
@@ -1137,7 +1421,7 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
 
           <View style={styles.postDetailActions}>
             <TouchableOpacity style={styles.saveActionBtn} onPress={handleSave}>
-              <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={isSaved ? "#FF9500" : "#888"} />
+              <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={isSaved ? "#FF2E2E" : "#888"} />
               <Text style={[styles.saveActionText, isSaved && { color: '#FF9500' }]}>{isSaved ? "Saved" : "Save"}</Text>
             </TouchableOpacity>
 
@@ -1154,6 +1438,78 @@ const PostDetailModal = memo(({ visible, post, onClose, onViewPost }: any) => {
           </View>
         </View>
       </View>
+    </Modal>
+  );
+});
+
+// ======================================================
+// FOLLOWING USERS AT LOCATION MODAL
+// ======================================================
+
+const FollowingUsersModal = memo(({ visible, data, onClose, onSelectUser }: any) => {
+  if (!data) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={styles.followingUsersModal}>
+          {/* Header */}
+          <View style={styles.followingUsersModalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.followingUsersModalTitle}>Users at this location</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                <Ionicons name="location" size={14} color="#E94A37" />
+                <Text style={styles.followingUsersModalLocation} numberOfLines={1}>
+                  {data.locationName}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          {/* User List */}
+          <FlatList
+            data={data.users}
+            keyExtractor={(item: any) => item.user_id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ padding: 16 }}
+            renderItem={({ item }: any) => (
+              <TouchableOpacity
+                style={styles.followingUserRow}
+                onPress={() => onSelectUser(item, data.locationName)}
+                activeOpacity={0.7}
+              >
+                {fixUrl(item.user_profile_picture) ? (
+                  <Image
+                    source={{ uri: fixUrl(item.user_profile_picture)! }}
+                    style={styles.followingUserAvatar}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={styles.followingUserAvatarPlaceholder}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                      {item.username?.[0]?.toUpperCase() || '?'}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.followingUserName} numberOfLines={1}>
+                    {item.username}
+                  </Text>
+                  <Text style={styles.followingUserPostCount}>
+                    {item.postCount} {item.postCount === 1 ? 'post' : 'posts'} here
+                  </Text>
+                </View>
+
+                <Ionicons name="chevron-forward" size={20} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          />
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 });
@@ -1347,6 +1703,8 @@ export default function ExploreScreen() {
   const [showTopPostsInfo, setShowTopPostsInfo] = useState(false);
   const [topPosts, setTopPosts] = useState<any[]>([]);
   const [topPostsLoading, setTopPostsLoading] = useState(false);
+  const [showFollowingUsersModal, setShowFollowingUsersModal] = useState(false);
+  const [followingUsersModalData, setFollowingUsersModalData] = useState<any>(null);
 
   // Hero card border glow animation
   const heroBorderAnim = useRef(new Animated.Value(0)).current;
@@ -1377,7 +1735,7 @@ export default function ExploreScreen() {
   const [showRestaurantModal, setShowRestaurantModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedQuickCategory, setSelectedQuickCategory] = useState<string | null>(null);
-  const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'followers'>('posts');
+  const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'following'>('posts');
 
   const POSTS_PER_PAGE = 20;
   const CATEGORIES = [
@@ -1385,6 +1743,7 @@ export default function ExploreScreen() {
   { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '__veg__' },
   { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '__nonveg__' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
   { id: 'chinese', name: 'Chinese', emoji: '🍜' },
@@ -1419,7 +1778,6 @@ export default function ExploreScreen() {
   { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
   { id: 'pizza', name: 'Pizza', emoji: '🍕' },
   { id: 'dosa', name: 'Dosa', emoji: '🫕' },
-  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
 ];
 
 // Show only popular categories in quick chips (names must match CATEGORIES exactly)
@@ -1669,7 +2027,7 @@ const handleQuickCategoryPress = (category: any) => {
     setSelectedQuickCategory(null);
     if (activeTab === 'map') {
       // Use appropriate cache based on filter type
-      const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
       setMapPosts(cacheToUse);
     } else {
       setAppliedCategories([]);
@@ -1681,7 +2039,7 @@ const handleQuickCategoryPress = (category: any) => {
     setSelectedQuickCategory(category.id);
     if (activeTab === 'map') {
       // Filter from appropriate cache based on filter type
-      const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
       const filteredPosts = cacheToUse.filter((post: any) => {
   const postCategory = post.category?.toLowerCase().trim();
   const selectedCategoryName = category.name.toLowerCase().trim();
@@ -1698,13 +2056,13 @@ const handleQuickCategoryPress = (category: any) => {
 };
 
   // Handle map filter type changes
-  const handleMapFilterChange = async (newFilterType: 'posts' | 'restaurants' | 'followers') => {
+  const handleMapFilterChange = async (newFilterType: 'posts' | 'restaurants' | 'following') => {
     setMapFilterType(newFilterType);
 
     // Clear quick category selection when changing filter type
     setSelectedQuickCategory(null);
 
-    if (newFilterType === 'followers') {
+    if (newFilterType === 'following') {
       // Fetch followers posts (will use cache if available)
       await fetchFollowersPosts();
     } else if (newFilterType === 'posts') {
@@ -1756,6 +2114,32 @@ const handleQuickCategoryPress = (category: any) => {
     },
   });
 };
+
+  // Following mode: handle marker press
+  const handleFollowingLocationPress = (location: any) => {
+    const { users, locationName } = location;
+    if (users.length === 1) {
+      // Single user → go directly to location-details
+      router.push({
+        pathname: "/location-details",
+        params: { locationName: encodeURIComponent(locationName) },
+      });
+    } else {
+      // Multiple users → show intermediate modal
+      setFollowingUsersModalData({ locationName, users });
+      setShowFollowingUsersModal(true);
+    }
+  };
+
+  // Following mode: handle user selection from modal
+  const handleFollowingUserSelect = (user: any, locationName: string) => {
+    setShowFollowingUsersModal(false);
+    setFollowingUsersModalData(null);
+    router.push({
+      pathname: "/location-details",
+      params: { locationName: encodeURIComponent(locationName) },
+    });
+  };
 
   const handleViewRestaurantProfile = async (restaurant: any) => {
   setShowRestaurantModal(false);
@@ -1837,7 +2221,7 @@ useFocusEffect(
     // When returning to this screen and map tab is active
     if (activeTab === 'map' && userLocation) {
       // Determine which cache to use based on filter type
-      const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
 
       if (mapPosts.length === 0 && cacheToUse.length > 0) {
         // Cache exists but mapPosts is empty (returned from navigation)
@@ -1859,7 +2243,7 @@ useFocusEffect(
         }
       } else if (cacheToUse.length === 0) {
         // No cache exists, need to fetch
-        if (mapFilterType === 'followers') {
+        if (mapFilterType === 'following') {
           fetchFollowersPosts(true);
         } else {
           fetchMapPins(undefined, true);
@@ -2259,8 +2643,8 @@ return (
   </View>
 </View>
 
-      {/* Search Box and Categories - Shown for MAP and USERS tabs, hidden for TOP and restaurant users */}
-      {accountType !== 'restaurant' && activeTab !== 'topPosts' && activeTab !== 'popular' && (
+      {/* Search Box and Categories - Shown for MAP and USERS/DISHES tabs, hidden for TOP POSTS and restaurant Users tab */}
+      {activeTab !== 'topPosts' && !(accountType === 'restaurant' && activeTab === 'users') && !(accountType !== 'restaurant' && activeTab === 'popular') && (
         <>
           {/* Search Box */}
           <View style={styles.searchBoxWrapper}>
@@ -2336,8 +2720,8 @@ return (
       )}
 </View>
 
-      {/* USERS TAB: Category Tags - Hidden for restaurant users */}
-      {accountType !== 'restaurant' && activeTab === 'users' && appliedCategories.length > 0 && (
+      {/* Category Tags - shown when filters are applied on relevant tabs */}
+      {((accountType !== 'restaurant' && activeTab === 'users') || (accountType === 'restaurant' && (activeTab === 'popular' || activeTab === 'map'))) && appliedCategories.length > 0 && (
         <View style={styles.selectedTagsWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectedTagsContainer}>
             {appliedCategories.map((cat) => (
@@ -2353,7 +2737,7 @@ return (
   setSelectedQuickCategory(null);
   if (activeTab === 'map') {
     // Use appropriate cache based on filter type
-    const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+    const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
     setMapPosts(cacheToUse);
   } else {
     fetchPostsWithCategories([]);
@@ -2686,6 +3070,7 @@ return (
       onRestaurantPress={handleRestaurantPress}
       onPostPress={handlePostPress}
       onClusterPress={handleClusterPress}
+      onFollowingLocationPress={handleFollowingLocationPress}
       isLoading={mapLoading}
       mapRef={mapRef}
       filterType={mapFilterType}
@@ -2783,7 +3168,7 @@ return (
             setSelectedQuickCategory(null);
             if (activeTab === 'map') {
               // Use appropriate cache based on filter type
-              const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+              const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
               setMapPosts(cacheToUse);
             } else {
               fetchPostsWithCategories([]);
@@ -2817,7 +3202,7 @@ return (
 
     if (activeTab === 'map') {
   // For map tab - filter from appropriate cache based on filter type
-  const cacheToUse = mapFilterType === 'followers' ? cachedFollowersPosts.current : cachedMapPosts.current;
+  const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
   if (selectedCategories.length > 0) {
     const filteredPosts = cacheToUse.filter((post: any) => {
       const postCategory = post.category?.toLowerCase().trim();
@@ -2874,6 +3259,15 @@ return (
           setShowTopPostsModal(false);
           router.push(`/post-details/${post.id}`);
         }}
+      />
+      <FollowingUsersModal
+        visible={showFollowingUsersModal}
+        data={followingUsersModalData}
+        onClose={() => {
+          setShowFollowingUsersModal(false);
+          setFollowingUsersModalData(null);
+        }}
+        onSelectUser={handleFollowingUserSelect}
       />
     </View>
   );
@@ -4303,5 +4697,188 @@ toggleTabTextActive: {
     fontSize: 13,
     color: '#666',
     fontWeight: '500',
+  },
+
+  // ======================================================
+  // FOLLOWING MODE MARKER STYLES
+  // ======================================================
+  followingPostBubble: {
+    backgroundColor: '#fff',
+    padding: 2,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  followingDPOverlay: {
+    position: 'absolute' as const,
+    top: -6,
+    left: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#fff',
+    overflow: 'hidden' as const,
+    zIndex: 10,
+    elevation: 10,
+  },
+  followingUserBubble: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 3,
+    borderColor: '#fff',
+    overflow: 'hidden' as const,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  followingCountBadge: {
+    position: 'absolute' as const,
+    top: -6,
+    right: -6,
+    backgroundColor: '#E94A37',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    zIndex: 10,
+    elevation: 8,
+  },
+  followingCountBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold' as const,
+  },
+  followingMultiUserDP: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2.5,
+    borderColor: '#fff',
+    overflow: 'hidden' as const,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  followingSmallCountBadge: {
+    position: 'absolute' as const,
+    top: -4,
+    right: -4,
+    backgroundColor: '#E94A37',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#fff',
+    zIndex: 10,
+    elevation: 8,
+  },
+  followingPlusNBadge: {
+    backgroundColor: '#1a1a2e',
+    borderRadius: 14,
+    minWidth: 28,
+    height: 28,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 6,
+    marginLeft: -8,
+    borderWidth: 2,
+    borderColor: '#fff',
+    zIndex: 10,
+    elevation: 8,
+  },
+  followingPlusNText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold' as const,
+  },
+  followingMarkerArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#fff',
+    marginTop: -2,
+  },
+
+  // ======================================================
+  // FOLLOWING USERS MODAL STYLES
+  // ======================================================
+  followingUsersModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: Dimensions.get('window').height * 0.6,
+    minHeight: 200,
+  },
+  followingUsersModalHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  followingUsersModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold' as const,
+    color: '#1a1a2e',
+  },
+  followingUsersModalLocation: {
+    fontSize: 13,
+    color: '#666',
+    marginLeft: 4,
+    flex: 1,
+  },
+  followingUserRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  followingUserAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f0f0f0',
+  },
+  followingUserAvatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E94A37',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  followingUserName: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#1a1a2e',
+  },
+  followingUserPostCount: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
   },
 });

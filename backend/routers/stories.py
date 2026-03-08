@@ -244,6 +244,13 @@ async def get_stories_feed(
         result = []
         for user_id, user_stories in user_stories_map.items():
             user = await db.users.find_one({"_id": ObjectId(user_id)})
+            if not user:
+                # Try restaurants collection for restaurant accounts
+                user = await db.restaurants.find_one({"_id": ObjectId(user_id)})
+                if user:
+                    user["full_name"] = user.get("restaurant_name", "Restaurant")
+                    user["username"] = user.get("restaurant_name", "Restaurant")
+                    user["level"] = None
             if user:
                 # Get view counts for each story
                 formatted_stories = []
@@ -339,6 +346,26 @@ async def create_story_from_post(
         result = await db.stories.insert_one(story_doc)
         story_id = str(result.inserted_id)
 
+        # Notify original post owner that their post was shared in a story
+        try:
+            post = await db.posts.find_one({"_id": ObjectId(post_id)})
+            if post:
+                post_owner_id = post.get("user_id") or post.get("restaurant_id")
+                current_user_id = str(current_user["_id"])
+                if post_owner_id and post_owner_id != current_user_id:
+                    from routers.notifications import create_notification
+                    username = current_user.get("username") or current_user.get("full_name", "Someone")
+                    await create_notification(
+                        db=db,
+                        notification_type="story_mention",
+                        from_user_id=current_user_id,
+                        to_user_id=post_owner_id,
+                        post_id=post_id,
+                        message=f'Your post has been mentioned in "{username}" story'
+                    )
+        except Exception as notify_err:
+            print(f"⚠️ Failed to send story mention notification: {notify_err}")
+
         return {
             "message": "Story created from post",
             "story": {
@@ -373,8 +400,14 @@ async def get_user_stories(
             "expires_at": {"$gt": now}
         }).sort("created_at", 1).to_list(None)
         
-        # Get user details
+        # Get user details (check both users and restaurants collections)
         user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            user = await db.restaurants.find_one({"_id": ObjectId(user_id)})
+            if user:
+                user["full_name"] = user.get("restaurant_name", "Restaurant")
+                user["username"] = user.get("restaurant_name", "Restaurant")
+                user["level"] = None
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -610,6 +643,11 @@ async def get_story_views(
             viewer_details = []
             for view in views:
                 viewer = await db.users.find_one({"_id": ObjectId(view["viewer_id"])})
+                if not viewer:
+                    viewer = await db.restaurants.find_one({"_id": ObjectId(view["viewer_id"])})
+                    if viewer:
+                        viewer["full_name"] = viewer.get("restaurant_name", "Restaurant")
+                        viewer["username"] = viewer.get("restaurant_name", "Restaurant")
                 if viewer:
                     has_liked = await db.story_likes.find_one({
                         "story_id": story_id,
@@ -674,8 +712,13 @@ async def share_story(
         if original_story["user_id"] == current_user_id:
             raise HTTPException(status_code=400, detail="Cannot share your own story")
         
-        # Get original story owner details
+        # Get original story owner details (check both collections)
         original_user = await db.users.find_one({"_id": ObjectId(original_story["user_id"])})
+        if not original_user:
+            original_user = await db.restaurants.find_one({"_id": ObjectId(original_story["user_id"])})
+            if original_user:
+                original_user["full_name"] = original_user.get("restaurant_name", "Restaurant")
+                original_user["username"] = original_user.get("restaurant_name", "Restaurant")
         if not original_user:
             raise HTTPException(status_code=404, detail="Original story owner not found")
         

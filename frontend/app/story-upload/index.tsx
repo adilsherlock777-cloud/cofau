@@ -90,7 +90,7 @@ export default function StoryUploadScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: true,
       quality: 0.8,
-      videoMaxDuration: 30,
+      videoMaxDuration: 60,
     });
 
     if (!result.canceled && result.assets[0]) {

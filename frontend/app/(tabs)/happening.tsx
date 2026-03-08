@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { getSavedPosts, unsavePost } from '../../utils/api';
 import { normalizeMediaUrl } from '../../utils/imageUrlFix';
+import { Video, ResizeMode } from 'expo-av';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
@@ -30,15 +31,69 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_IMAGE_WIDTH = SCREEN_WIDTH * 0.38;
 const CARD_HEIGHT = 140;
 
-// Category tabs - similar to FOOD_SPOTS in explore
+// Category tabs - matching FOOD_SPOTS from Popular in explore
 const CATEGORY_TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'restaurant', label: 'Restaurants' },
-  { id: 'cafe', label: 'Cafe' },
-  { id: 'biryani', label: 'Biryani' },
-  { id: 'pureveg', label: 'Veg' },
-  { id: 'nonveg', label: 'Non Veg' },
+  { id: 'all', label: 'All', emoji: '', emptyMsg: 'Save posts from Explore to see them here' },
+  { id: 'restaurant', label: 'Restaurants', emoji: '🍽️', emptyMsg: 'Explore restaurants and save your favourites' },
+  { id: 'cafe', label: 'Cafe', emoji: '☕', emptyMsg: 'Discover cafes, fast food spots & save them' },
+  { id: 'biryani', label: 'Biryani Spot', emoji: '🍛', emptyMsg: 'Find the best biryani spots and save them' },
+  { id: 'pureveg', label: 'Pure Veg', emoji: '__veg__', emptyMsg: 'Explore pure veg places and save your picks' },
+  { id: 'nonveg', label: 'Non Veg', emoji: '__nonveg__', emptyMsg: 'Discover non-veg spots and save your favourites' },
+  { id: 'arabian', label: 'Arabian', emoji: '🧆', emptyMsg: 'Find Arabian food spots and save them' },
+  { id: 'coffeetea', label: 'Coffee/Tea', emoji: '🫖', emptyMsg: 'Explore coffee & tea spots and save them' },
+  { id: 'dessert', label: 'Desserts', emoji: '🍰', emptyMsg: 'Discover dessert spots and save your favourites' },
 ];
+
+// Match a post to a category tab
+const matchesCategory = (post: any, categoryId: string): boolean => {
+  const cat = (post.category || '').toLowerCase().trim();
+  const locName = (post.location_name || '').toLowerCase().trim();
+  const dish = (post.dish_name || '').toLowerCase().trim();
+  const combined = `${cat} ${locName} ${dish}`;
+
+  switch (categoryId) {
+    case 'all':
+      return true;
+    case 'restaurant':
+      return (post.account_type === 'restaurant');
+    case 'cafe':
+      return combined.includes('cafe') || combined.includes('café') || combined.includes('fast food') || combined.includes('fast-food') || combined.includes('drinks') || combined.includes('soda') || combined.includes('burger') || combined.includes('pizza');
+    case 'biryani':
+      return combined.includes('biryani');
+    case 'pureveg':
+      return cat.includes('veg') && !cat.includes('non') || cat.includes('vegetarian') && !cat.includes('non');
+    case 'nonveg':
+      return cat.includes('non-vegetarian') || cat.includes('nonveg') || cat.includes('non veg') || combined.includes('chicken') || combined.includes('mutton') || combined.includes('fish') || combined.includes('seafood') || combined.includes('bbq') || combined.includes('tandoor');
+    case 'arabian':
+      return combined.includes('arab') || combined.includes('shawarma') || combined.includes('falafel') || combined.includes('persian');
+    case 'coffeetea':
+      return combined.includes('coffee') || combined.includes('tea') || combined.includes('tea/coffee') || combined.includes('tea-coffee');
+    case 'dessert':
+      return combined.includes('dessert') || combined.includes('sweet') || combined.includes('cake') || combined.includes('ice cream') || combined.includes('icecream');
+    default:
+      return false;
+  }
+};
+
+// Veg/NonVeg icon helper
+const renderCategoryIcon = (emoji: string, size: number) => {
+  if (emoji === '__veg__') {
+    return (
+      <View style={{ width: size, height: size, borderRadius: 3, borderWidth: 1.5, borderColor: '#22C55E', justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ width: size * 0.45, height: size * 0.45, borderRadius: size * 0.45, backgroundColor: '#22C55E' }} />
+      </View>
+    );
+  }
+  if (emoji === '__nonveg__') {
+    return (
+      <View style={{ width: size, height: size, borderRadius: 3, borderWidth: 1.5, borderColor: '#E02D2D', justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ width: size * 0.45, height: size * 0.45, borderRadius: size * 0.45, backgroundColor: '#E02D2D' }} />
+      </View>
+    );
+  }
+  if (!emoji) return null;
+  return <Text style={{ fontSize: size }}>{emoji}</Text>;
+};
 
 // ======================================================
 // DASHBOARD COMPONENTS (for restaurant users)
@@ -185,6 +240,32 @@ const DashboardContent = memo(({ analytics, loading, onRefresh }: { analytics: a
 // SAVED POST CARD COMPONENT
 // ======================================================
 
+const VideoPreview = memo(({ uri, style }: { uri: string; style: any }) => {
+  const videoRef = useRef<Video>(null);
+  const isSeeking = useRef(false);
+
+  const onPlaybackStatusUpdate = useCallback((status: any) => {
+    if (status.isLoaded && status.positionMillis >= 3000 && !isSeeking.current) {
+      isSeeking.current = true;
+      videoRef.current?.setPositionAsync(0)
+        .then(() => { isSeeking.current = false; })
+        .catch(() => { isSeeking.current = false; });
+    }
+  }, []);
+
+  return (
+    <Video
+      ref={videoRef}
+      source={{ uri }}
+      style={style}
+      resizeMode={ResizeMode.COVER}
+      shouldPlay
+      isMuted
+      onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+    />
+  );
+});
+
 const SavedPostCard = memo(({ post, onUnsave, onPress }: { post: any; onUnsave: (id: string) => void; onPress: (id: string) => void }) => {
   const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
   const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
@@ -194,8 +275,6 @@ const SavedPostCard = memo(({ post, onUnsave, onPress }: { post: any; onUnsave: 
     mediaUrl?.toLowerCase().endsWith('.mov') ||
     mediaUrl?.toLowerCase().endsWith('.avi') ||
     mediaUrl?.toLowerCase().endsWith('.webm');
-
-  const displayUrl = isVideo ? (thumbnailUrl || mediaUrl) : mediaUrl;
 
   const handleDirection = () => {
     if (post.map_link) {
@@ -227,11 +306,13 @@ const SavedPostCard = memo(({ post, onUnsave, onPress }: { post: any; onUnsave: 
       activeOpacity={0.85}
       onPress={() => onPress(post._id || post.id)}
     >
-      {/* Image Section - 40% left */}
+      {/* Image/Video Section - 40% left */}
       <View style={styles.cardImageContainer}>
-        {displayUrl ? (
+        {isVideo && mediaUrl ? (
+          <VideoPreview uri={mediaUrl} style={styles.cardImage} />
+        ) : mediaUrl ? (
           <Image
-            source={{ uri: displayUrl }}
+            source={{ uri: mediaUrl }}
             style={styles.cardImage}
             resizeMode="cover"
           />
@@ -240,9 +321,9 @@ const SavedPostCard = memo(({ post, onUnsave, onPress }: { post: any; onUnsave: 
             <Ionicons name={isVideo ? 'videocam-outline' : 'image-outline'} size={32} color="#ccc" />
           </View>
         )}
-        {isVideo && displayUrl && (
+        {isVideo && mediaUrl && (
           <View style={styles.videoIcon}>
-            <Ionicons name="play-circle" size={24} color="#fff" />
+            <Ionicons name="videocam" size={16} color="#fff" />
           </View>
         )}
         {post.dish_name && (
@@ -325,22 +406,22 @@ export default function SavedLocationsScreen() {
   });
 
   useEffect(() => {
-    if (isRestaurant) {
+    if (isRestaurant && token) {
       fetchAnalytics();
-    } else {
+    } else if (!isRestaurant) {
       fetchSaved();
     }
-  }, []);
+  }, [isRestaurant, token]);
 
   // Refresh when tab is focused
   useFocusEffect(
     useCallback(() => {
-      if (isRestaurant) {
+      if (isRestaurant && token) {
         fetchAnalytics();
-      } else if (!loading) {
+      } else if (!isRestaurant && !loading) {
         fetchSaved();
       }
-    }, [isRestaurant])
+    }, [isRestaurant, token])
   );
 
   const fetchAnalytics = async () => {
@@ -418,26 +499,7 @@ export default function SavedLocationsScreen() {
 
     // Category filter
     if (activeCategory !== 'all') {
-      posts = posts.filter(post => {
-        const cat = (post.category || '').toLowerCase().trim();
-        const locName = (post.location_name || '').toLowerCase().trim();
-        const combined = `${cat} ${locName}`;
-
-        switch (activeCategory) {
-          case 'restaurant':
-            return combined.includes('restaurant') || combined.includes('hotel') || combined.includes('dhaba');
-          case 'cafe':
-            return combined.includes('cafe') || combined.includes('café') || combined.includes('coffee');
-          case 'biryani':
-            return combined.includes('biryani');
-          case 'pureveg':
-            return combined.includes('veg') && !combined.includes('non') && !combined.includes('nonveg') && !combined.includes('non-veg');
-          case 'nonveg':
-            return combined.includes('nonveg') || combined.includes('non-veg') || combined.includes('non veg') || combined.includes('chicken') || combined.includes('mutton') || combined.includes('fish');
-          default:
-            return true;
-        }
-      });
+      posts = posts.filter(post => matchesCategory(post, activeCategory));
     }
 
     // Search filter
@@ -457,28 +519,11 @@ export default function SavedLocationsScreen() {
 
   // Count posts per category for tab badges
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: savedPosts.length };
+    const counts: Record<string, number> = {};
     CATEGORY_TABS.forEach(tab => {
-      if (tab.id === 'all') return;
-      counts[tab.id] = savedPosts.filter(post => {
-        const cat = (post.category || '').toLowerCase().trim();
-        const locName = (post.location_name || '').toLowerCase().trim();
-        const combined = `${cat} ${locName}`;
-        switch (tab.id) {
-          case 'restaurant':
-            return combined.includes('restaurant') || combined.includes('hotel') || combined.includes('dhaba');
-          case 'cafe':
-            return combined.includes('cafe') || combined.includes('café') || combined.includes('coffee');
-          case 'biryani':
-            return combined.includes('biryani');
-          case 'pureveg':
-            return combined.includes('veg') && !combined.includes('non') && !combined.includes('nonveg') && !combined.includes('non-veg');
-          case 'nonveg':
-            return combined.includes('nonveg') || combined.includes('non-veg') || combined.includes('non veg') || combined.includes('chicken') || combined.includes('mutton') || combined.includes('fish');
-          default:
-            return false;
-        }
-      }).length;
+      counts[tab.id] = tab.id === 'all'
+        ? savedPosts.length
+        : savedPosts.filter(post => matchesCategory(post, tab.id)).length;
     });
     return counts;
   }, [savedPosts]);
@@ -562,17 +607,15 @@ export default function SavedLocationsScreen() {
       </View>
 
       {/* Category Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabsContainer}
-        contentContainerStyle={styles.tabsContent}
-      >
+      <View style={styles.tabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsContent}
+        >
         {CATEGORY_TABS.map(tab => {
           const isActive = activeCategory === tab.id;
           const count = categoryCounts[tab.id] || 0;
-          // Only show tabs that have posts (except ALL which always shows)
-          if (tab.id !== 'all' && count === 0) return null;
           return (
             <TouchableOpacity
               key={tab.id}
@@ -587,11 +630,13 @@ export default function SavedLocationsScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.tabGradient}
                 >
+                  {tab.emoji ? renderCategoryIcon(tab.emoji, 14) : null}
                   <Text style={styles.tabTextActive}>{tab.label}</Text>
                   {count > 0 && <Text style={styles.tabCountActive}>{count}</Text>}
                 </LinearGradient>
               ) : (
                 <View style={styles.tabInner}>
+                  {tab.emoji ? renderCategoryIcon(tab.emoji, 14) : null}
                   <Text style={styles.tabText}>{tab.label}</Text>
                   {count > 0 && <Text style={styles.tabCount}>{count}</Text>}
                 </View>
@@ -599,7 +644,8 @@ export default function SavedLocationsScreen() {
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* Content */}
       {loading ? (
@@ -626,15 +672,23 @@ export default function SavedLocationsScreen() {
             <View style={styles.emptyContainer}>
               <Ionicons name="bookmark-outline" size={70} color="#ddd" />
               <Text style={styles.emptyTitle}>
-                {searchQuery ? 'No results found' : activeCategory !== 'all' ? 'No saved posts in this category' : 'No Saved Posts'}
+                {searchQuery ? 'No results found' : 'No Saved Posts'}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {searchQuery
                   ? 'Try a different search term'
-                  : activeCategory !== 'all'
-                    ? 'Save posts from this category to see them here'
-                    : 'Save posts to see your favorite places here'}
+                  : CATEGORY_TABS.find(t => t.id === activeCategory)?.emptyMsg || 'Save posts to see your favorite places here'}
               </Text>
+              {!searchQuery && (
+                <TouchableOpacity
+                  style={styles.exploreButton}
+                  onPress={() => router.push('/(tabs)/explore')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="compass-outline" size={16} color="#fff" />
+                  <Text style={styles.exploreButtonText}>Explore & Save</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
@@ -704,37 +758,42 @@ const styles = StyleSheet.create({
   },
 
   // Category tabs
-  tabsContainer: {
-    maxHeight: 50,
-    marginTop: 8,
+  tabsWrapper: {
+    height: 52,
+    marginTop: 10,
+    marginBottom: 4,
   },
   tabsContent: {
     paddingHorizontal: 16,
     gap: 8,
     alignItems: 'center',
+    height: 52,
   },
   tab: {
-    borderRadius: 20,
+    borderRadius: 25,
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
     overflow: 'hidden',
   },
-  tabActive: {},
+  tabActive: {
+    borderColor: 'transparent',
+    borderWidth: 0,
+  },
   tabGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
     gap: 6,
   },
   tabInner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderRadius: 25,
     gap: 6,
   },
   tabText: {
@@ -914,6 +973,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  exploreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E94A37',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    marginTop: 18,
+    gap: 6,
+  },
+  exploreButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

@@ -241,6 +241,7 @@ const CATEGORIES = [
   { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '__veg__' },
   { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '__nonveg__' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
   { id: 'chinese', name: 'Chinese', emoji: '🍜' },
@@ -274,7 +275,6 @@ const CATEGORIES = [
   { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
   { id: 'pizza', name: 'Pizza', emoji: '🍕' },
   { id: 'dosa', name: 'Dosa', emoji: '🫕' },
-  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
 ];
 
   // ------------------------------ MEDIA PICKERS ------------------------------
@@ -336,7 +336,7 @@ const getAverageRating = () => {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: true,
       quality: 0.8,
-      videoMaxDuration: 90,
+      videoMaxDuration: 300,
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -365,7 +365,7 @@ const getAverageRating = () => {
       allowsEditing: true,
       ...(Platform.OS === 'android' ? { aspect: [4, 5] } : {}),
       quality: 0.8,
-      videoMaxDuration: 90,
+      videoMaxDuration: 300,
     });
 
       if (!result.canceled && result.assets[0]) {
@@ -790,7 +790,7 @@ return (
               <View style={styles.uploadPrompt}>
                 <Ionicons name="camera" size={50} color="#CCC" />
                 <Text style={styles.uploadText}>Tap to add photo or video</Text>
-                <Text style={styles.uploadSubText}>Videos max 90 seconds</Text>
+                <Text style={styles.uploadSubText}>Videos max 5 minutes</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -845,6 +845,18 @@ return (
   </View>
 )}
 
+        {/* Dish Name - Mandatory for all posts */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Dish Name *</Text>
+          <TextInput
+            style={styles.linkInput}
+            placeholder="e.g., Butter Chicken, Margherita Pizza"
+            placeholderTextColor="#999"
+            value={dishName}
+            onChangeText={setDishName}
+          />
+        </View>
+
 {/* Price - Only for Restaurants */}
 {accountType === 'restaurant' && (
   <View style={styles.section}>
@@ -875,18 +887,6 @@ return (
             value={review}
             onChangeText={setReview}
             multiline
-          />
-        </View>
-
-        {/* Dish Name - Mandatory for all posts */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Dish Name *</Text>
-          <TextInput
-            style={styles.linkInput}
-            placeholder="e.g., Butter Chicken, Margherita Pizza"
-            placeholderTextColor="#999"
-            value={dishName}
-            onChangeText={setDishName}
           />
         </View>
 

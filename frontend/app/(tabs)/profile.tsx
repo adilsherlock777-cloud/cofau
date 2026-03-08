@@ -75,6 +75,7 @@ const CATEGORIES = [
   { id: 'vegetarian-vegan', name: 'Vegetarian/Vegan', emoji: '🥬' },
   { id: 'non-vegetarian', name: 'Non vegetarian', emoji: '🍖' },
   { id: 'biryani', name: 'Biryani', emoji: '🍛' },
+  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
   { id: 'desserts', name: 'Desserts', emoji: '🍰' },
   { id: 'seafood', name: 'SeaFood', emoji: '🦐' },
   { id: 'chinese', name: 'Chinese', emoji: '🍜' },
@@ -108,7 +109,6 @@ const CATEGORIES = [
   { id: 'drinks', name: 'Drinks / sodas', emoji: '🥤' },
   { id: 'pizza', name: 'Pizza', emoji: '🍕' },
   { id: 'dosa', name: 'Dosa', emoji: '🫕' },
-  { id: 'cafe', name: 'Cafe', emoji: '🧁' },
 ];
 
 /**
@@ -4757,7 +4757,7 @@ if (isRestaurantProfile) {
 
           <View style={styles.profileCardWrapper}>
   {Platform.OS === 'ios' ? (
-    <BlurView intensity={60} tint="light" style={styles.profileCard}>
+    <View style={[styles.profileCard, { backgroundColor: '#FFFFFF' }]}>
       {/* Profile Picture */}
       <View style={styles.profilePictureContainer}>
            <ProfileBadge
@@ -4786,7 +4786,7 @@ if (isRestaurantProfile) {
           {uploadingImage ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Ionicons name="camera" size={12} color="#fff" />
+            <Ionicons name="camera" size={14} color="#fff" />
           )}
         </LinearGradient>
       </TouchableOpacity>
@@ -4831,7 +4831,102 @@ if (isRestaurantProfile) {
         </TouchableOpacity>
       </View>
 
-    </BlurView>
+      {/* Action Buttons inside card */}
+      <View style={styles.cardDivider} />
+      <View style={styles.actionButtonsInsideCard}>
+        {isOwnProfile ? (
+          <>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => setEditModalVisible(true)}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="create" size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Edit Profile</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => router.push('/chat')}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="chatbubble" size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Messages</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+            >
+              <LinearGradient
+                colors={isFollowing ? ['#1B7C82', '#1B7C82'] : ['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={[styles.actionButtonInside, isFollowing && { opacity: 0.7 }]}
+              >
+                {followLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name={isFollowing ? "checkmark-circle" : "person-add"} size={14} color="#fff" />
+                    <Text style={styles.actionButtonText}>{isFollowing ? 'Following' : 'Follow'}</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => router.push(`/chat/${userData?.id}`)}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="chatbubble" size={14} color="#fff" />
+                <Text style={styles.actionButtonText}>Message</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => setComplimentModalVisible(true)}
+              disabled={hasComplimented}
+            >
+              <LinearGradient
+                colors={hasComplimented ? ['#1B7C82', '#1B7C82', '#1B7C82'] : ['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={[styles.actionButtonInside, hasComplimented && { opacity: 0.7 }]}
+              >
+                <Ionicons name="heart" size={14} color="#fff" />
+                <Text style={styles.actionButtonText}>{hasComplimented ? 'Complimented' : 'Compliment'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+    </View>
   ) : (
     <View style={[styles.profileCard, styles.profileCardAndroid]}>
       {/* Profile Picture */}
@@ -4862,7 +4957,7 @@ if (isRestaurantProfile) {
           {uploadingImage ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Ionicons name="camera" size={12} color="#fff" />
+            <Ionicons name="camera" size={14} color="#fff" />
           )}
         </LinearGradient>
       </TouchableOpacity>
@@ -4907,13 +5002,108 @@ if (isRestaurantProfile) {
         </TouchableOpacity>
       </View>
 
+      {/* Action Buttons inside card */}
+      <View style={styles.cardDivider} />
+      <View style={styles.actionButtonsInsideCard}>
+        {isOwnProfile ? (
+          <>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => setEditModalVisible(true)}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="create" size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Edit Profile</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => router.push('/chat')}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="chatbubble" size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Messages</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+            >
+              <LinearGradient
+                colors={isFollowing ? ['#1B7C82', '#1B7C82'] : ['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={[styles.actionButtonInside, isFollowing && { opacity: 0.7 }]}
+              >
+                {followLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name={isFollowing ? "checkmark-circle" : "person-add"} size={14} color="#fff" />
+                    <Text style={styles.actionButtonText}>{isFollowing ? 'Following' : 'Follow'}</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => router.push(`/chat/${userData?.id}`)}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="chatbubble" size={14} color="#fff" />
+                <Text style={styles.actionButtonText}>Message</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={() => setComplimentModalVisible(true)}
+              disabled={hasComplimented}
+            >
+              <LinearGradient
+                colors={hasComplimented ? ['#1B7C82', '#1B7C82', '#1B7C82'] : ['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={[styles.actionButtonInside, hasComplimented && { opacity: 0.7 }]}
+              >
+                <Ionicons name="heart" size={14} color="#fff" />
+                <Text style={styles.actionButtonText}>{hasComplimented ? 'Complimented' : 'Compliment'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
     </View>
   )}
 </View>
         </View>
 
-        {/* Action Buttons with Gradient */}
-        <View style={styles.actionButtonsContainer}>
+        {/* Old Action Buttons - hidden, now inside card */}
+        <View style={[styles.actionButtonsContainer, { display: 'none' }]}>
         {isOwnProfile ? (
   <>
     {/* Edit Profile Button */}
@@ -5199,7 +5389,7 @@ if (isRestaurantProfile) {
             activeOpacity={1}
             onPress={() => setSettingsModalVisible(false)}
           />
-          
+
           <Animated.View
             style={[
               styles.sidebarContainer,
@@ -5226,21 +5416,6 @@ if (isRestaurantProfile) {
             </View>
 
             <ScrollView style={styles.sidebarContent}>
-              <TouchableOpacity
-                style={styles.sidebarMenuItem}
-                onPress={() => {
-                  setSettingsModalVisible(false);
-                  router.push('/saved-posts');
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.sidebarMenuIconContainer}>
-                  <Ionicons name="bookmark-outline" size={24} color="#333" />
-                </View>
-                <Text style={styles.sidebarMenuText}>Saved Posts</Text>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={styles.sidebarMenuItem}
                 onPress={() => {
@@ -7861,8 +8036,8 @@ header: {
     paddingTop: 65,
     paddingBottom: 55,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -7913,54 +8088,61 @@ header: {
   },
 
  profileCardWrapper: {
-  marginHorizontal: 16,
+  marginHorizontal: 20,
   marginTop: -40,
-  marginBottom: 8,
-  borderRadius: 20,
+  marginBottom: 10,
+  borderRadius: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 12,
+  elevation: 5,
+  backgroundColor: '#FFFFFF',
 },
  profileCard: {
-  borderRadius: 20,
-  paddingVertical: 6,
-  paddingHorizontal: 20,
+  borderRadius: 16,
+  paddingVertical: 12,
+  paddingHorizontal: 22,
   justifyContent: 'center',
   alignItems: 'center',
   position: 'relative',
   backgroundColor: '#FFFFFF',
   overflow: 'hidden',
-  borderWidth: 1,
-  borderColor: '#E0E0E0',
-  borderBottomWidth: 3.5,
-  borderBottomColor: '#C8C8C8',
+  borderWidth: 0,
+  borderColor: 'transparent',
+  borderBottomWidth: 0,
+  borderBottomColor: 'transparent',
 },
 
 profileCardAndroid: {
   backgroundColor: '#FFFFFF',
-  borderWidth: 1,
-  borderColor: '#E0E0E0',
-  borderBottomWidth: 3.5,
-  borderBottomColor: '#C8C8C8',
+  borderWidth: 0,
+  borderColor: 'transparent',
+  borderBottomWidth: 0,
+  borderBottomColor: 'transparent',
+  elevation: 4,
 },
 bioInsideCard: {
-  paddingHorizontal: 0,
-  paddingTop: 14,
-  paddingBottom: 2,
+  paddingHorizontal: 4,
+  paddingTop: 10,
+  paddingBottom: 6,
   alignSelf: 'stretch',
   width: '100%',
-  alignItems: 'flex-start',
+  alignItems: 'center',
 },
 cardDivider: {
-  height: 1.5,
-  backgroundColor: '#CCCCCC',
+  height: 1,
+  backgroundColor: '#EBEBEB',
   marginHorizontal: 0,
-  marginTop: 4,
-  marginBottom: 2,
+  marginTop: 6,
+  marginBottom: 4,
   alignSelf: 'stretch',
 },
 statsInsideCard: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'space-evenly',
-  paddingVertical: 4,
+  paddingVertical: 8,
   paddingHorizontal: 6,
 },
 profilePictureContainer: {
@@ -7970,11 +8152,11 @@ profilePictureContainer: {
 },
   cameraIcon: {
     position: 'absolute',
-    right: 4,
-    bottom: 0,
-    borderRadius: 8,
-    width: 18,
-    height: 18,
+    right: 6,
+    bottom: 2,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
@@ -8016,15 +8198,15 @@ statBox: {
 },
 statDivider: {
   width: 1,
-  height: 30,
-  backgroundColor: '#D0D0D0',
+  height: 28,
+  backgroundColor: '#EBEBEB',
   alignSelf: 'center',
 },
   statValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 3,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#222',
+    marginBottom: 2,
   },
   statLabel: {
     fontSize: 10,
@@ -8070,6 +8252,32 @@ statDivider: {
     }),
   },
 
+  actionButtonsInsideCard: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingTop: 10,
+    paddingBottom: 4,
+    gap: 10,
+    alignSelf: 'stretch',
+  },
+  actionButtonInsideWrapper: {
+    flex: 1,
+    borderRadius: 14,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  actionButtonInside: {
+    paddingVertical: 8,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
   bioSection: {
     paddingHorizontal: 20,
     paddingVertical: 4,
@@ -8082,11 +8290,12 @@ statDivider: {
     marginBottom: 4,
   },
   bioText: {
-    fontSize: 11,
-    color: '#666',
-    lineHeight: 16,
-    fontStyle: 'italic',
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#484848',
+    lineHeight: 19,
+    fontWeight: '400',
+    letterSpacing: 0.1,
+    textAlign: 'center',
     flexShrink: 1,
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,

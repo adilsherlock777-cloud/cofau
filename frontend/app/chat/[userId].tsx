@@ -21,6 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
 import axios from "axios";
 import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
+import { likePost, unlikePost } from "../../utils/api";
 
 const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE}/api`;
@@ -426,49 +427,148 @@ const markMessagesAsRead = async () => {
             isMe ? styles.bubbleRight : styles.bubbleLeft,
           ]}
         >
-          <Text style={[styles.msg, isMe && styles.msgRight]}>{item.message}</Text>
-          
+          <Text style={[styles.msg, isMe && styles.msgRight]}>
+            {item.post_id ? "Hey, Look out this Dish 🍽" : item.message}
+          </Text>
+
           {/* Post Preview */}
           {item.post_id && (
             <TouchableOpacity
               style={styles.postPreview}
               onPress={() => router.push(`/post-details/${item.post_id}`)}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
               {isLoadingPost ? (
                 <View style={styles.postLoadingContainer}>
-                  <ActivityIndicator size="small" color={isMe ? "#fff" : "#666"} />
+                  <ActivityIndicator size="small" color="#E94A37" />
                 </View>
               ) : post ? (
-                <>
-                  <Image
-                    source={{ uri: normalizeMediaUrl(post.thumbnail_url || post.media_url || post.image_url) }}
-                    style={styles.postImage}
-                    resizeMode="cover"
-                  />
+                <View style={styles.postCard}>
+                  {/* Post Image with gradient overlay */}
+                  <View style={styles.postImageWrapper}>
+                    <Image
+                      source={{ uri: normalizeMediaUrl(post.thumbnail_url || post.media_url || post.image_url) }}
+                      style={styles.postImage}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.6)"]}
+                      style={styles.postImageOverlay}
+                    />
+                    {/* Rating badge on image */}
+                    {post.rating > 0 && (
+                      <View style={styles.postRatingBadge}>
+                        <Text style={styles.postRatingBadgeText}>⭐ {post.rating}/10</Text>
+                      </View>
+                    )}
+                    {/* Category badge */}
+                    {post.category && (
+                      <View style={styles.postCategoryBadge}>
+                        <Text style={styles.postCategoryText}>{post.category}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {/* Post Info */}
                   <View style={styles.postInfo}>
-                    <Text style={[styles.postUsername, isMe && styles.postUsernameRight]}>
-                      {post.username || "User"}
-                    </Text>
+                    <View style={styles.postInfoHeader}>
+                      {post.user_profile_picture || post.restaurant_profile_picture ? (
+                        <Image
+                          source={{ uri: normalizeMediaUrl(post.user_profile_picture || post.restaurant_profile_picture) }}
+                          style={styles.postAuthorAvatar}
+                        />
+                      ) : (
+                        <View style={styles.postAuthorAvatarPlaceholder}>
+                          <Text style={styles.postAuthorAvatarText}>
+                            {(post.username || "U")[0].toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.postAuthorInfo}>
+                        <Text style={styles.postUsername} numberOfLines={1}>
+                          {post.username || "User"}
+                        </Text>
+                        {(post.dish_name || post.location_name) && (
+                          <Text style={styles.postLocation} numberOfLines={1}>
+                            {post.dish_name ? `🍽 ${post.dish_name}` : ""}
+                            {post.dish_name && post.location_name ? " · " : ""}
+                            {post.location_name ? `📍 ${post.location_name}` : ""}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
                     {post.review_text && (
-                      <Text
-                        style={[styles.postText, isMe && styles.postTextRight]}
-                        numberOfLines={2}
-                      >
+                      <Text style={styles.postText} numberOfLines={2}>
                         {post.review_text}
                       </Text>
                     )}
-                    {post.rating && (
-                      <Text style={[styles.postRating, isMe && styles.postRatingRight]}>
-                        ⭐ {post.rating}/10
-                      </Text>
-                    )}
+                    {/* Action buttons */}
+                    <View style={styles.postActions}>
+                      <TouchableOpacity
+                        style={styles.postActionBtn}
+                        activeOpacity={0.7}
+                        onPress={async (e) => {
+                          e.stopPropagation?.();
+                          const postId = item.post_id!;
+                          const currentPost = postData[postId];
+                          if (!currentPost) return;
+                          const wasLiked = currentPost.is_liked_by_user;
+                          // Optimistic update
+                          setPostData((prev) => ({
+                            ...prev,
+                            [postId]: {
+                              ...prev[postId],
+                              is_liked_by_user: !wasLiked,
+                              likes_count: (prev[postId].likes_count || 0) + (wasLiked ? -1 : 1),
+                            },
+                          }));
+                          try {
+                            wasLiked
+                              ? await unlikePost(postId, currentPost.account_type)
+                              : await likePost(postId, currentPost.account_type);
+                          } catch {
+                            // Revert on error
+                            setPostData((prev) => ({
+                              ...prev,
+                              [postId]: {
+                                ...prev[postId],
+                                is_liked_by_user: wasLiked,
+                                likes_count: (prev[postId].likes_count || 0) + (wasLiked ? 1 : -1),
+                              },
+                            }));
+                          }
+                        }}
+                      >
+                        <Ionicons
+                          name={post.is_liked_by_user ? "heart" : "heart-outline"}
+                          size={18}
+                          color={post.is_liked_by_user ? "#E94A37" : "#666"}
+                        />
+                        <Text style={[styles.postActionText, post.is_liked_by_user && { color: "#E94A37" }]}>
+                          {post.likes_count || 0}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.postActionBtn}
+                        activeOpacity={0.7}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          router.push(`/post-details/${item.post_id}`);
+                        }}
+                      >
+                        <Ionicons name="chatbubble-outline" size={16} color="#666" />
+                        <Text style={styles.postActionText}>{post.comments_count || 0}</Text>
+                      </TouchableOpacity>
+                      <View style={styles.postViewLink}>
+                        <Text style={styles.postViewLinkText}>View Post</Text>
+                        <Ionicons name="chevron-forward" size={12} color="#E94A37" />
+                      </View>
+                    </View>
                   </View>
-                </>
+                </View>
               ) : (
                 <View style={styles.postErrorContainer}>
-                  <Ionicons name="image-outline" size={24} color={isMe ? "#fff" : "#666"} />
-                  <Text style={[styles.postErrorText, isMe && styles.postErrorTextRight]}>
+                  <Ionicons name="image-outline" size={24} color="#999" />
+                  <Text style={styles.postErrorText}>
                     Post unavailable
                   </Text>
                 </View>
@@ -853,8 +953,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomLeftRadius: 4,
   },
-  bubbleRight: { 
-    backgroundColor: "#2A9D9D",
+  bubbleRight: {
+    backgroundColor: "#FFE0D6",
     borderBottomRightRadius: 4,
   },
   msg: { 
@@ -863,7 +963,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   msgRight: {
-    color: "#fff",
+    color: "#333",
   },
   storyReplyPreview: {
     marginTop: 8,
@@ -893,73 +993,171 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   storyReplyLabelRight: {
-    color: 'rgba(255,255,255,0.9)',
+    color: '#fff',
   },
   time: { 
     fontSize: 11, 
     marginTop: 4, 
     color: "#999",
   },
-  timeRight: { 
-    color: "rgba(255,255,255,0.7)" 
+  timeRight: {
+    color: "#999"
   },
   postPreview: {
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "rgba(0,0,0,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  postCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  postImageWrapper: {
+    position: "relative",
   },
   postImage: {
     width: "100%",
-    height: 180,
+    height: 160,
     backgroundColor: "#f0f0f0",
+  },
+  postImageOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+  },
+  postRatingBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  postRatingBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  postCategoryBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(233,74,55,0.85)",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  postCategoryText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+    textTransform: "capitalize",
   },
   postInfo: {
     padding: 10,
   },
-  postUsername: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#000",
-    marginBottom: 4,
+  postInfoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
   },
-  postUsernameRight: {
+  postAuthorAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  postAuthorAvatarPlaceholder: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+    backgroundColor: "#E94A37",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  postAuthorAvatarText: {
     color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  postAuthorInfo: {
+    flex: 1,
+  },
+  postUsername: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#222",
+  },
+  postLocation: {
+    fontSize: 11,
+    color: "#888",
+    marginTop: 1,
   },
   postText: {
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 4,
+    fontSize: 12,
+    color: "#555",
+    lineHeight: 17,
+    marginBottom: 8,
   },
-  postTextRight: {
-    color: "rgba(255,255,255,0.9)",
+  postActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    paddingTop: 8,
   },
-  postRating: {
+  postActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 16,
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  postActionText: {
     fontSize: 12,
     color: "#666",
+    fontWeight: "600",
   },
-  postRatingRight: {
-    color: "rgba(255,255,255,0.8)",
+  postViewLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: "auto",
+    gap: 2,
+  },
+  postViewLinkText: {
+    fontSize: 11,
+    color: "#E94A37",
+    fontWeight: "600",
   },
   postLoadingContainer: {
-    padding: 20,
+    padding: 30,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#fafafa",
   },
   postErrorContainer: {
-    padding: 20,
+    padding: 24,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#fafafa",
   },
   postErrorText: {
     marginTop: 8,
     fontSize: 12,
-    color: "#666",
-  },
-  postErrorTextRight: {
-    color: "rgba(255,255,255,0.8)",
+    color: "#999",
   },
   inputContainer: {
     backgroundColor: "#fff",
@@ -987,10 +1185,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#2A9D9D",
+    backgroundColor: "#E94A37",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#2A9D9D",
+    shadowColor: "#E94A37",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,

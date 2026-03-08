@@ -2057,43 +2057,138 @@ async def remove_saved_post(post_id: str, current_user: dict = Depends(get_curre
 
 @app.get("/api/saved/list")
 async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
-    """Get current user's saved posts (alternative endpoint)"""
+    """Get current user's saved posts (includes both regular and restaurant posts)"""
     db = get_database()
-    
+
     user_id = str(current_user["_id"])
-    
-    # Get saved posts
+
+    # Get saved regular posts
     saved_posts = await db.saved_posts.find({"user_id": user_id}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    
+
     result = []
     for saved in saved_posts:
         post = await db.posts.find_one({"_id": ObjectId(saved["post_id"])})
+        is_restaurant_post = False
         if not post:
-            continue  # Skip if post was deleted
-        
-        user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-        
-        is_liked = await db.likes.find_one({
+            # Fallback: check restaurant_posts (in case a restaurant post was saved here)
+            post = await db.restaurant_posts.find_one({"_id": ObjectId(saved["post_id"])})
+            if not post:
+                continue  # Skip if post was deleted
+            is_restaurant_post = True
+
+        media_type = post.get("media_type", "image")
+
+        if is_restaurant_post:
+            restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+            is_liked = await db.restaurant_likes.find_one({
+                "post_id": saved["post_id"],
+                "user_id": str(current_user["_id"])
+            }) is not None
+            result.append({
+                "_id": str(post["_id"]),
+                "id": str(post["_id"]),
+                "user_id": post.get("restaurant_id", ""),
+                "username": restaurant.get("restaurant_name", "Restaurant") if restaurant else "Restaurant",
+                "full_name": restaurant.get("restaurant_name", "Restaurant") if restaurant else "Restaurant",
+                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+                "user_badge": None,
+                "media_url": post.get("media_url", ""),
+                "mediaUrl": post.get("media_url", ""),
+                "image_url": post.get("media_url") if media_type == "image" else None,
+                "media_type": media_type,
+                "rating": 0,
+                "review_text": post.get("about", ""),
+                "map_link": post.get("map_link"),
+                "location_name": post.get("location_name"),
+                "dish_name": post.get("dish_name"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "shares_count": post.get("shares_count", 0),
+                "saves_count": post.get("saves_count", 0),
+                "category": post.get("category"),
+                "price": post.get("price"),
+                "is_liked_by_user": is_liked,
+                "is_saved_by_user": True,
+                "account_type": "restaurant",
+                "created_at": post.get("created_at"),
+                "saved_at": saved["created_at"]
+            })
+        else:
+            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+            is_liked = await db.likes.find_one({
+                "post_id": saved["post_id"],
+                "user_id": str(current_user["_id"])
+            }) is not None
+            result.append({
+                "_id": str(post["_id"]),
+                "id": str(post["_id"]),
+                "user_id": post["user_id"],
+                "username": user.get("username", "Unknown") if user else "Unknown",
+                "full_name": user.get("full_name", user.get("username", "Unknown")) if user else "Unknown",
+                "user_profile_picture": user.get("profile_picture") if user else None,
+                "user_badge": user.get("badge") if user else None,
+                "media_url": post.get("media_url", ""),
+                "mediaUrl": post.get("media_url", ""),
+                "image_url": post.get("media_url") if media_type == "image" else None,
+                "media_type": media_type,
+                "rating": post.get("rating", 0),
+                "review_text": post.get("review_text", ""),
+                "map_link": post.get("map_link"),
+                "location_name": post.get("location_name"),
+                "dish_name": post.get("dish_name"),
+                "thumbnail_url": post.get("thumbnail_url"),
+                "likes_count": post.get("likes_count", 0),
+                "comments_count": post.get("comments_count", 0),
+                "shares_count": post.get("shares_count", 0),
+                "saves_count": post.get("saves_count", 0),
+                "category": post.get("category"),
+                "is_liked_by_user": is_liked,
+                "is_saved_by_user": True,
+                "account_type": "user",
+                "created_at": post["created_at"],
+                "saved_at": saved["created_at"]
+            })
+
+    # Get saved restaurant posts (check both user_id and restaurant_id fields)
+    saved_restaurant_posts = await db.restaurant_saved_posts.find({
+        "$or": [{"user_id": user_id}, {"restaurant_id": user_id}]
+    }).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    # Track already-added post IDs to avoid duplicates
+    added_post_ids = {r["id"] for r in result}
+
+    for saved in saved_restaurant_posts:
+        if saved["post_id"] in added_post_ids:
+            continue  # Already added from saved_posts fallback
+
+        post = await db.restaurant_posts.find_one({"_id": ObjectId(saved["post_id"])})
+        if not post:
+            continue
+
+        restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
+
+        is_liked = await db.restaurant_likes.find_one({
             "post_id": saved["post_id"],
             "user_id": str(current_user["_id"])
         }) is not None
-        
+
         media_type = post.get("media_type", "image")
-        
+
         result.append({
             "_id": str(post["_id"]),
             "id": str(post["_id"]),
-            "user_id": post["user_id"],
-            "username": user.get("username", "Unknown") if user else "Unknown",
-            "full_name": user.get("full_name", user.get("username", "Unknown")) if user else "Unknown",
-            "user_profile_picture": user.get("profile_picture") if user else None,
-            "user_badge": user.get("badge") if user else None,
+            "user_id": post.get("restaurant_id", ""),
+            "username": restaurant.get("restaurant_name", "Restaurant") if restaurant else "Restaurant",
+            "full_name": restaurant.get("restaurant_name", "Restaurant") if restaurant else "Restaurant",
+            "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+            "user_badge": None,
             "media_url": post.get("media_url", ""),
-            "mediaUrl": post.get("media_url", ""),  # For compatibility
+            "mediaUrl": post.get("media_url", ""),
             "image_url": post.get("media_url") if media_type == "image" else None,
             "media_type": media_type,
-            "rating": post.get("rating", 0),
-            "review_text": post.get("review_text", ""),
+            "rating": 0,
+            "review_text": post.get("about", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
             "dish_name": post.get("dish_name"),
@@ -2103,12 +2198,17 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "shares_count": post.get("shares_count", 0),
             "saves_count": post.get("saves_count", 0),
             "category": post.get("category"),
+            "price": post.get("price"),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": True,
-            "created_at": post["created_at"],
+            "account_type": "restaurant",
+            "created_at": post.get("created_at"),
             "saved_at": saved["created_at"]
         })
-    
+
+    # Sort combined results by saved_at descending
+    result.sort(key=lambda x: x.get("saved_at") or x.get("created_at") or "", reverse=True)
+
     return result
 
 
@@ -3626,13 +3726,13 @@ async def get_restaurant_reviews(
 async def get_active_users_for_restaurant(
     current_restaurant: dict = Depends(restaurant_auth.get_current_restaurant)
 ):
-    """Get actively posting users in the last 2 days for restaurant discovery."""
+    """Get actively posting users in the last 7 days for restaurant discovery."""
     db = get_database()
 
-    two_days_ago = datetime.utcnow() - timedelta(days=2)
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
     pipeline = [
-        {"$match": {"created_at": {"$gte": two_days_ago}}},
+        {"$match": {"created_at": {"$gte": seven_days_ago}}},
         {"$group": {
             "_id": "$user_id",
             "username": {"$first": "$username"},
@@ -4549,6 +4649,12 @@ async def report_post(
 async def share_preview(request: Request, post_id: str):
     db = get_database()
     post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    is_restaurant_post = False
+
+    if not post:
+        post = await db.restaurant_posts.find_one({"_id": ObjectId(post_id)})
+        if post:
+            is_restaurant_post = True
 
     if not post:
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
@@ -4558,10 +4664,42 @@ async def share_preview(request: Request, post_id: str):
     APP_STORE_URL = "https://apps.apple.com/app/cofau/id6758019920"
     PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.cofau.app"
 
-    title = post.get("review_text", "Cofau Post")
+    # Build rich title & description
+    dish_name = post.get("dish_name", "")
     rating = post.get("rating", 0)
     location = post.get("location_name", "")
-    description = f"Rated {rating}/10 {('- ' + location) if location else ''} on Cofau!"
+    category = post.get("category", "")
+    review_text = post.get("review_text", "")
+
+    # Get poster username
+    if is_restaurant_post:
+        rid = post.get("restaurant_id")
+        owner = await db.restaurants.find_one({"_id": ObjectId(rid)}) if rid else None
+        username = owner.get("restaurant_name", "A Restaurant") if owner else "A Restaurant"
+    else:
+        uid = post.get("user_id")
+        owner = await db.users.find_one({"_id": ObjectId(uid)}) if uid else None
+        username = owner.get("full_name", owner.get("username", "A Cofau User")) if owner else "A Cofau User"
+
+    # Title: dish name or review text or fallback
+    if dish_name:
+        title = f"{dish_name} — {username} on Cofau"
+    elif review_text:
+        title = review_text[:80] + ("..." if len(review_text) > 80 else "")
+    else:
+        title = f"{username} shared a dish on Cofau"
+
+    # Description: rating + location + category
+    desc_parts = []
+    if rating:
+        desc_parts.append(f"Rated {rating}/10")
+    if category:
+        desc_parts.append(category)
+    if location:
+        desc_parts.append(location)
+    if review_text and dish_name:
+        desc_parts.append(review_text[:100])
+    description = " · ".join(desc_parts) if desc_parts else "Discover amazing food on Cofau!"
 
     media_type = post.get("media_type", "image")
     if media_type == "video":
@@ -4631,14 +4769,14 @@ async def share_preview(request: Request, post_id: str):
         <meta name="twitter:image" content="{image_url}" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
-    <body style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f8f9fa; display:flex; justify-content:center; align-items:center; min-height:100vh;">
+    <body style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#FFF5F2; display:flex; justify-content:center; align-items:center; min-height:100vh;">
         <div style="text-align:center; padding:40px 20px;">
-            <div style="width:80px; height:80px; background:#4dd0e1; border-radius:20px; margin:0 auto 20px; display:flex; align-items:center; justify-content:center;">
+            <div style="width:80px; height:80px; background:linear-gradient(135deg,#FF2E2E,#FF7A18); border-radius:20px; margin:0 auto 20px; display:flex; align-items:center; justify-content:center;">
                 <span style="font-size:40px; color:white; font-weight:bold; font-style:italic;">C</span>
             </div>
             <h2 style="color:#333; margin:0 0 8px;">Opening in Cofau...</h2>
             <p style="color:#888; font-size:14px; margin:0 0 24px;">If the app doesn't open automatically:</p>
-            <a id="store-link" href="#" style="display:inline-block; background:#4dd0e1; color:white; text-decoration:none; padding:14px 32px; border-radius:12px; font-weight:600; font-size:16px;">
+            <a id="store-link" href="#" style="display:inline-block; background:linear-gradient(90deg,#FF2E2E,#FF7A18); color:white; text-decoration:none; padding:14px 32px; border-radius:12px; font-weight:600; font-size:16px;">
                 Download Cofau
             </a>
         </div>

@@ -215,22 +215,25 @@ const MAX_CUSTOM_LENGTH = 250;
                         {remainingChars} characters remaining
                       </Text>
                       <TouchableOpacity
-                        style={[
-                          styles.sendCustomButton,
-                          (!customMessage.trim() || loading) && styles.sendCustomButtonDisabled,
-                        ]}
                         onPress={handleSendCustomCompliment}
                         disabled={!customMessage.trim() || loading}
                         activeOpacity={0.7}
                       >
-                        {selectedType === 'custom' && loading ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <>
-                            <Ionicons name="send" size={16} color="#fff" />
-                            <Text style={styles.sendCustomButtonText}>Send</Text>
-                          </>
-                        )}
+                        <LinearGradient
+                          colors={(!customMessage.trim() || loading) ? ['#CCC', '#CCC'] : ['#FF2E2E', '#FF7A18']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.sendCustomButton}
+                        >
+                          {selectedType === 'custom' && loading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <>
+                              <Ionicons name="send" size={16} color="#fff" />
+                              <Text style={styles.sendCustomButtonText}>Send</Text>
+                            </>
+                          )}
+                        </LinearGradient>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -244,7 +247,7 @@ const MAX_CUSTOM_LENGTH = 250;
             {/* Footer */}
             <View style={styles.footer}>
               <LinearGradient
-                colors={['#E94A37', '#F2CF68', '#1B7C82']}
+                colors={['#FF2E2E', '#FF7A18']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.footerGradient}
@@ -423,14 +426,10 @@ const styles = StyleSheet.create({
   sendCustomButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1B7C82',
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 18,
     gap: 6,
-  },
-  sendCustomButtonDisabled: {
-    backgroundColor: '#CCC',
   },
   sendCustomButtonText: {
     color: '#FFF',

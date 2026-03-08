@@ -33,7 +33,7 @@ const SPACING = 2;
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS);
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 
-type TabType = "nearby" | "posts" | "places" | "restaurants";
+type TabType = "nearby" | "posts" | "places" | "restaurants" | "users";
 
 const fixUrl = (url: string | null) => {
   if (!url) return null;
@@ -351,11 +351,12 @@ export default function SearchResultsScreen() {
             username={item.full_name || item.username}
             size={60}
             level={item.level}
-            showLevelBadge={false}
+            showLevelBadge={true}
             style={{}}
           />
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{item.full_name || item.username}</Text>
+            <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>@{item.username}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
@@ -761,6 +762,33 @@ export default function SearchResultsScreen() {
           />
         );
 
+      case "users":
+        return (
+          <FlatList
+            data={users}
+            renderItem={renderUserItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            ListEmptyComponent={
+              searchQuery.trim() ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyText}>No users found</Text>
+                  <Text style={styles.emptySubtext}>
+                    Try searching for a different name
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="search-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyText}>Search for users by name</Text>
+                </View>
+              )
+            }
+          />
+        );
+
       default:
         return null;
     }
@@ -771,6 +799,7 @@ export default function SearchResultsScreen() {
     { key: "nearby", label: "Nearby", icon: "location-outline", count: nearbyPosts.length },
     { key: "restaurants", label: "Restaurants", icon: "storefront-outline", count: restaurants.length },
     { key: "places", label: "Places", icon: "map-outline", count: locations.length },
+    { key: "users", label: "Users", icon: "people-outline", count: users.length },
   ];
 
   return (

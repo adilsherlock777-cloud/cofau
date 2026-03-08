@@ -1026,7 +1026,7 @@ postId={post.id}
         <Ionicons name="bookmark-outline" size={18} color="#888" />
       )}
     </View>
-    <Text style={[styles.engagementCount, isSaved && { color: '#FF9500' }]}>{savesCount}</Text>
+    <Text style={[styles.engagementCount, isSaved && { color: '#FF2E2E' }]}>{savesCount}</Text>
   </TouchableOpacity>
 </View>
 

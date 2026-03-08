@@ -1177,6 +1177,84 @@ async def send_leaderboard_rank_notifications():
             notified_entries.append({"post_id": post_id, "user_id": user_id, "rank": rank})
             continue
 
+        # =========================================
+        # RANK 1 WALLET REWARD: ₹25 once per week
+        # =========================================
+        if rank == 1 and user_id:
+            try:
+                now = datetime.utcnow()
+                days_since_monday = now.weekday()
+                week_start = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+                # Check if user already received rank 1 reward this week
+                already_rewarded = await db.wallet_transactions.count_documents({
+                    "user_id": user_id,
+                    "type": "earned",
+                    "description": {"$regex": "Rank #1", "$options": "i"},
+                    "created_at": {"$gte": week_start}
+                })
+
+                if already_rewarded == 0:
+                    RANK1_REWARD = 25.0
+
+                    # Credit ₹25 to wallet
+                    await db.users.update_one(
+                        {"_id": ObjectId(user_id)},
+                        {
+                            "$inc": {"wallet_balance": RANK1_REWARD},
+                            "$set": {"last_wallet_earn_date": now}
+                        }
+                    )
+
+                    # Create wallet transaction
+                    await db.wallet_transactions.insert_one({
+                        "user_id": user_id,
+                        "amount": RANK1_REWARD,
+                        "type": "earned",
+                        "description": "Rank #1 in Foodies",
+                        "post_id": post_id,
+                        "created_at": now
+                    })
+
+                    # Send wallet reward notification
+                    try:
+                        wallet_notif_doc = {
+                            "type": "wallet_reward",
+                            "fromUserId": user_id,
+                            "fromUserName": "Cofau",
+                            "fromUserProfilePicture": None,
+                            "toUserId": user_id,
+                            "postId": post_id,
+                            "message": "Congratulations! ₹25 added to your wallet for Rank #1 in Foodies",
+                            "isRead": False,
+                            "createdAt": now,
+                        }
+                        await db.notifications.insert_one(wallet_notif_doc)
+
+                        from utils.push_notifications import send_push_notification, get_user_device_tokens
+                        device_tokens = await get_user_device_tokens(user_id)
+                        if device_tokens:
+                            await send_push_notification(
+                                device_tokens=device_tokens,
+                                title="💰 ₹25 Wallet Reward!",
+                                body="Congratulations! ₹25 added to your wallet for Rank #1 in Foodies",
+                                data={
+                                    "type": "wallet_reward",
+                                    "postId": post_id,
+                                    "screen": "feed",
+                                    "openWallet": "true",
+                                },
+                                user_id=user_id,
+                            )
+                    except Exception as notif_err:
+                        logger.error(f"⚠️ Failed to send rank 1 wallet notification: {notif_err}")
+
+                    logger.info(f"💰 Rank #1 wallet reward: ₹{RANK1_REWARD} credited to user {user_id}")
+                else:
+                    logger.info(f"⏭️ Skipping rank 1 wallet reward for user {user_id} - already rewarded this week")
+            except Exception as e:
+                logger.error(f"❌ Error processing rank 1 wallet reward for user {user_id}: {e}")
+
         message = RANK_APPRECIATION_MESSAGES.get(rank, f"Your post is ranked #{rank} on Cofau's Top Posts!")
         push_title = f"🏆 You're Ranked #{rank}!"
 
