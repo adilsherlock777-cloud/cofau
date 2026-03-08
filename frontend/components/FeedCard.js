@@ -904,6 +904,7 @@ postId={post.id}
         <Text style={styles.dishNameOverlayText} numberOfLines={1}>
           {post.dish_name.toUpperCase()}
         </Text>
+        <View style={styles.dishNameArrow}><Ionicons name="chevron-forward" size={10} color="#fff" /></View>
       </TouchableOpacity>
     ) : null}
   </Pressable>
@@ -1273,11 +1274,25 @@ dishNameOverlay: {
   borderRadius: 6,
   maxWidth: '55%',
   zIndex: 20,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  overflow: 'hidden',
 },
 dishNameOverlayText: {
   color: '#FFF',
   fontSize: 10,
   fontWeight: '600',
+  flexShrink: 1,
+},
+dishNameArrow: {
+  width: 16,
+  height: 16,
+  borderRadius: 8,
+  backgroundColor: '#FF2E2E',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
 },
 
 // Mute button styles

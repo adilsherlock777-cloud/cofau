@@ -270,6 +270,7 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
       {item.dish_name && (
         <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
           <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name.toUpperCase()}</Text>
+          <View style={styles.dishNameArrow}><Ionicons name="chevron-forward" size={8} color="#fff" /></View>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -293,6 +294,7 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => {
       {item.dish_name && (
         <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
           <Text style={styles.dishNameText} numberOfLines={1}>{item.dish_name.toUpperCase()}</Text>
+          <View style={styles.dishNameArrow}><Ionicons name="chevron-forward" size={8} color="#fff" /></View>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -966,6 +968,8 @@ const MapViewComponent = memo(({
   onFilterChange,
   onCenterLocation,
   selectedCategory,
+  selectedFollowingUser,
+  onBackToFollowingGrid,
 }: any) => {
   // Delay map mount on Android to let Google Play Services initialize
   const [mapReady, setMapReady] = React.useState(Platform.OS !== 'android');
@@ -995,8 +999,29 @@ const MapViewComponent = memo(({
     const clusters: any[] = [];
     const followingLocations: any[] = [];
 
-    if (filterType === 'following') {
-      // Following mode: group by location, then sub-group by user
+    if (filterType === 'following' && selectedFollowingUser) {
+      // Following with user selected: use same single/cluster logic as Near Me
+      // (mapPosts is already filtered to this user's posts)
+      groups.forEach((groupPosts, key) => {
+        const [lat, lng] = key.split(',').map(Number);
+        groupPosts.sort((a: any, b: any) =>
+          (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
+        );
+        if (groupPosts.length === 1) {
+          singlePosts.push(groupPosts[0]);
+        } else {
+          clusters.push({
+            id: key,
+            latitude: lat,
+            longitude: lng,
+            count: groupPosts.length,
+            posts: groupPosts,
+            locationName: groupPosts[0].location_name || 'This location',
+          });
+        }
+      });
+    } else if (filterType === 'following') {
+      // Following mode without user selected: group by location, then sub-group by user
       groups.forEach((locationPosts, key) => {
         const [lat, lng] = key.split(',').map(Number);
 
@@ -1066,7 +1091,7 @@ const MapViewComponent = memo(({
     }
 
     return { singlePosts, clusters, followingLocations };
-  }, [posts, filterType]);
+  }, [posts, filterType, selectedFollowingUser]);
 
  // Get category emoji
 const getCategoryEmoji = (categoryName: string | null) => {
@@ -1165,8 +1190,25 @@ const getCategoryEmoji = (categoryName: string | null) => {
             />
           ))}
 
-          {/* Following: User DP Markers */}
-          {filterType === 'following' && followingLocations.map((loc: any) => (
+          {/* Following with user selected: show food posts like Near Me */}
+          {filterType === 'following' && selectedFollowingUser && singlePosts.map((post: any) => (
+            <PostMarker
+              key={`following-post-${post.id}`}
+              post={post}
+              onPress={onPostPress}
+            />
+          ))}
+          {filterType === 'following' && selectedFollowingUser && clusters.map((cluster: any) => (
+            <ClusterMarker
+              key={`following-cluster-${cluster.id}`}
+              cluster={cluster}
+              onPress={onClusterPress}
+              categoryEmoji={categoryEmoji}
+            />
+          ))}
+
+          {/* Following without user selected: show DP markers as fallback */}
+          {filterType === 'following' && !selectedFollowingUser && followingLocations.map((loc: any) => (
             <FollowingMarker
               key={`following-${loc.id}`}
               location={loc}
@@ -1220,13 +1262,30 @@ const getCategoryEmoji = (categoryName: string | null) => {
             ? `${posts.length} posts at ${singlePosts.length + clusters.length} locations`
             : filterType === 'restaurants'
             ? `${restaurants.length} restaurants nearby`
-            : `${posts.length} posts from following at ${followingLocations.length} locations`
+            : selectedFollowingUser
+            ? `${posts.length} posts by ${selectedFollowingUser.username}`
+            : `Tap Following to select a friend`
           }
         </Text>
       </View>
 
       {/* Location Button */}
       <LocationButton onPress={onCenterLocation} />
+
+      {/* Back to Following Grid button */}
+      {filterType === 'following' && selectedFollowingUser && (
+        <TouchableOpacity
+          style={styles.followingBackButton}
+          onPress={onBackToFollowingGrid}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="arrow-back" size={16} color="#fff" />
+          <Text style={styles.followingBackButtonText} numberOfLines={1}>
+            {selectedFollowingUser.username}
+          </Text>
+          <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 });
@@ -1515,6 +1574,81 @@ const FollowingUsersModal = memo(({ visible, data, onClose, onSelectUser }: any)
 });
 
 // ======================================================
+// FOLLOWING USERS GRID OVERLAY
+// ======================================================
+
+const GRID_COLUMNS = 4;
+
+const FollowingUsersGrid = memo(({ visible, users, onSelectUser, onClose }: any) => {
+  if (!visible) return null;
+
+  const formatCount = (count: number) => count > 100 ? '99+' : String(count);
+
+  const renderUser = ({ item }: any) => (
+    <TouchableOpacity
+      style={styles.followingGridCell}
+      onPress={() => onSelectUser(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.followingGridAvatarContainer}>
+        <UserAvatar
+          profilePicture={item.user_profile_picture}
+          username={item.username}
+          size={56}
+          showLevelBadge={false}
+          level={item.user_level}
+          style={undefined}
+        />
+        <View style={styles.followingGridCountBadge}>
+          <Text style={styles.followingGridCountText}>{formatCount(item.postCount)}</Text>
+        </View>
+      </View>
+      <Text style={styles.followingGridUsername} numberOfLines={1}>
+        {item.username}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.followingGridOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={styles.followingGridContainer}>
+          {/* Header */}
+          <View style={styles.followingGridHeader}>
+            <View>
+              <Text style={styles.followingGridTitle}>Following</Text>
+              <Text style={styles.followingGridSubtitle}>
+                {users.length} {users.length === 1 ? 'person' : 'people'} with posts
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          {users.length === 0 ? (
+            <View style={styles.followingGridEmptyState}>
+              <Ionicons name="people-outline" size={48} color="#ccc" />
+              <Text style={styles.followingGridEmptyText}>Follow users to see their food posts here!</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={users}
+              keyExtractor={(item: any) => item.user_id}
+              numColumns={GRID_COLUMNS}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ padding: 16 }}
+              columnWrapperStyle={{ gap: 8 }}
+              renderItem={renderUser}
+            />
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+});
+
+// ======================================================
 // TOP POSTS MODAL
 // ======================================================
 
@@ -1736,6 +1870,30 @@ export default function ExploreScreen() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedQuickCategory, setSelectedQuickCategory] = useState<string | null>(null);
   const [mapFilterType, setMapFilterType] = useState<'posts' | 'restaurants' | 'following'>('posts');
+  const [selectedFollowingUser, setSelectedFollowingUser] = useState<any>(null);
+  const [showFollowingGrid, setShowFollowingGrid] = useState(false);
+
+  // Derive followed users with post counts for the Following grid
+  const followingUsersForGrid = React.useMemo(() => {
+    if (mapFilterType !== 'following') return [];
+    const userMap = new Map<string, any>();
+    const source = cachedFollowersPosts.current;
+    source.forEach((post: any) => {
+      const uid = post.user_id || 'unknown';
+      if (userMap.has(uid)) {
+        userMap.get(uid)!.postCount += 1;
+      } else {
+        userMap.set(uid, {
+          user_id: uid,
+          username: post.username || 'Unknown',
+          user_profile_picture: post.user_profile_picture || null,
+          user_level: post.user_level || 1,
+          postCount: 1,
+        });
+      }
+    });
+    return Array.from(userMap.values()).sort((a: any, b: any) => b.postCount - a.postCount);
+  }, [mapFilterType, mapPosts]);
 
   const POSTS_PER_PAGE = 20;
   const CATEGORIES = [
@@ -2026,8 +2184,12 @@ const handleQuickCategoryPress = (category: any) => {
     // Deselect - show all cached posts (NO API CALL)
     setSelectedQuickCategory(null);
     if (activeTab === 'map') {
-      // Use appropriate cache based on filter type
-      const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      // Use appropriate cache based on filter type, filtered to selected user if applicable
+      const cacheToUse = mapFilterType === 'following'
+        ? (selectedFollowingUser
+            ? cachedFollowersPosts.current.filter((p: any) => p.user_id === selectedFollowingUser.user_id)
+            : cachedFollowersPosts.current)
+        : cachedMapPosts.current;
       setMapPosts(cacheToUse);
     } else {
       setAppliedCategories([]);
@@ -2038,8 +2200,12 @@ const handleQuickCategoryPress = (category: any) => {
     // Select - filter from cached posts (NO API CALL)
     setSelectedQuickCategory(category.id);
     if (activeTab === 'map') {
-      // Filter from appropriate cache based on filter type
-      const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      // Filter from appropriate cache based on filter type, filtered to selected user if applicable
+      const cacheToUse = mapFilterType === 'following'
+        ? (selectedFollowingUser
+            ? cachedFollowersPosts.current.filter((p: any) => p.user_id === selectedFollowingUser.user_id)
+            : cachedFollowersPosts.current)
+        : cachedMapPosts.current;
       const filteredPosts = cacheToUse.filter((post: any) => {
   const postCategory = post.category?.toLowerCase().trim();
   const selectedCategoryName = category.name.toLowerCase().trim();
@@ -2062,9 +2228,18 @@ const handleQuickCategoryPress = (category: any) => {
     // Clear quick category selection when changing filter type
     setSelectedQuickCategory(null);
 
+    // Reset following-specific state when switching away
+    if (newFilterType !== 'following') {
+      setSelectedFollowingUser(null);
+      setShowFollowingGrid(false);
+    }
+
     if (newFilterType === 'following') {
       // Fetch followers posts (will use cache if available)
       await fetchFollowersPosts();
+      // Show user grid overlay after data is loaded
+      setShowFollowingGrid(true);
+      setSelectedFollowingUser(null);
     } else if (newFilterType === 'posts') {
       // Restore cached regular posts
       if (cachedMapPosts.current.length > 0) {
@@ -2139,6 +2314,43 @@ const handleQuickCategoryPress = (category: any) => {
       pathname: "/location-details",
       params: { locationName: encodeURIComponent(locationName) },
     });
+  };
+
+  // Following grid: user tapped from grid → show their posts on map
+  const handleFollowingGridUserSelect = (user: any) => {
+    setSelectedFollowingUser(user);
+    setShowFollowingGrid(false);
+
+    // Filter mapPosts to only this user's posts
+    const userPosts = cachedFollowersPosts.current.filter(
+      (post: any) => post.user_id === user.user_id
+    );
+    setMapPosts(userPosts);
+
+    // Zoom map to fit user's posts
+    if (userPosts.length > 0 && mapRef.current) {
+      const coords = userPosts
+        .filter((p: any) => p.latitude && p.longitude)
+        .map((p: any) => ({ latitude: p.latitude, longitude: p.longitude }));
+      if (coords.length > 0) {
+        mapRef.current.fitToCoordinates(coords, {
+          edgePadding: { top: 100, right: 50, bottom: 50, left: 50 },
+          animated: true,
+        });
+      }
+    }
+  };
+
+  // Following grid: back button → return to grid
+  const handleBackToFollowingGrid = () => {
+    setSelectedFollowingUser(null);
+    setShowFollowingGrid(true);
+    setMapPosts(cachedFollowersPosts.current);
+  };
+
+  // Following grid: close/dismiss grid overlay
+  const handleFollowingGridClose = () => {
+    setShowFollowingGrid(false);
   };
 
   const handleViewRestaurantProfile = async (restaurant: any) => {
@@ -2220,8 +2432,12 @@ useFocusEffect(
     
     // When returning to this screen and map tab is active
     if (activeTab === 'map' && userLocation) {
-      // Determine which cache to use based on filter type
-      const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
+      // Determine which cache to use based on filter type, filtered to selected user if applicable
+      const cacheToUse = mapFilterType === 'following'
+        ? (selectedFollowingUser
+            ? cachedFollowersPosts.current.filter((p: any) => p.user_id === selectedFollowingUser.user_id)
+            : cachedFollowersPosts.current)
+        : cachedMapPosts.current;
 
       if (mapPosts.length === 0 && cacheToUse.length > 0) {
         // Cache exists but mapPosts is empty (returned from navigation)
@@ -2736,8 +2952,12 @@ return (
   setAppliedCategories([]);
   setSelectedQuickCategory(null);
   if (activeTab === 'map') {
-    // Use appropriate cache based on filter type
-    const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
+    // Use appropriate cache based on filter type, filtered to selected user if applicable
+    const cacheToUse = mapFilterType === 'following'
+      ? (selectedFollowingUser
+          ? cachedFollowersPosts.current.filter((p: any) => p.user_id === selectedFollowingUser.user_id)
+          : cachedFollowersPosts.current)
+      : cachedMapPosts.current;
     setMapPosts(cacheToUse);
   } else {
     fetchPostsWithCategories([]);
@@ -3077,6 +3297,8 @@ return (
       onFilterChange={handleMapFilterChange}
       onCenterLocation={centerOnUserLocation}
       selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
+      selectedFollowingUser={selectedFollowingUser}
+      onBackToFollowingGrid={handleBackToFollowingGrid}
     />
 ) : activeTab === 'popular' && accountType !== 'restaurant' ? (
         // POPULAR / HAPPENING PLACES VIEW (regular users only)
@@ -3167,8 +3389,12 @@ return (
             setAppliedCategories([]);
             setSelectedQuickCategory(null);
             if (activeTab === 'map') {
-              // Use appropriate cache based on filter type
-              const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
+              // Use appropriate cache based on filter type, filtered to selected user if applicable
+              const cacheToUse = mapFilterType === 'following'
+                ? (selectedFollowingUser
+                    ? cachedFollowersPosts.current.filter((p: any) => p.user_id === selectedFollowingUser.user_id)
+                    : cachedFollowersPosts.current)
+                : cachedMapPosts.current;
               setMapPosts(cacheToUse);
             } else {
               fetchPostsWithCategories([]);
@@ -3201,8 +3427,12 @@ return (
     setShowCategoryModal(false);
 
     if (activeTab === 'map') {
-  // For map tab - filter from appropriate cache based on filter type
-  const cacheToUse = mapFilterType === 'following' ? cachedFollowersPosts.current : cachedMapPosts.current;
+  // For map tab - filter from appropriate cache based on filter type, filtered to selected user if applicable
+  const cacheToUse = mapFilterType === 'following'
+    ? (selectedFollowingUser
+        ? cachedFollowersPosts.current.filter((p: any) => p.user_id === selectedFollowingUser.user_id)
+        : cachedFollowersPosts.current)
+    : cachedMapPosts.current;
   if (selectedCategories.length > 0) {
     const filteredPosts = cacheToUse.filter((post: any) => {
       const postCategory = post.category?.toLowerCase().trim();
@@ -3268,6 +3498,12 @@ return (
           setFollowingUsersModalData(null);
         }}
         onSelectUser={handleFollowingUserSelect}
+      />
+      <FollowingUsersGrid
+        visible={showFollowingGrid}
+        users={followingUsersForGrid}
+        onSelectUser={handleFollowingGridUserSelect}
+        onClose={handleFollowingGridClose}
       />
     </View>
   );
@@ -3706,8 +3942,9 @@ const styles = StyleSheet.create({
 
   viewsContainer: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
   viewsText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  dishNameTag: { position: "absolute", bottom: 4, left: 4, backgroundColor: "rgba(233, 74, 55, 0.85)", paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, maxWidth: "65%", borderBottomWidth: 1.5, borderBottomColor: "rgba(180, 40, 30, 0.9)", borderRightWidth: 1, borderRightColor: "rgba(200, 50, 35, 0.6)", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1, elevation: 2 },
-  dishNameText: { color: "#fff", fontSize: 8, fontWeight: "600" },
+  dishNameTag: { position: "absolute", bottom: 4, left: 4, backgroundColor: "rgba(233, 74, 55, 0.85)", paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, maxWidth: "65%", borderBottomWidth: 1.5, borderBottomColor: "rgba(180, 40, 30, 0.9)", borderRightWidth: 1, borderRightColor: "rgba(200, 50, 35, 0.6)", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1, elevation: 2, flexDirection: "row" as const, alignItems: "center" as const, gap: 3, overflow: "hidden" as const },
+  dishNameText: { color: "#fff", fontSize: 8, fontWeight: "600", flexShrink: 1 },
+  dishNameArrow: { width: 12, height: 12, borderRadius: 6, backgroundColor: "#FF2E2E", alignItems: "center" as const, justifyContent: "center" as const, flexShrink: 0 },
   loadingMore: { padding: 20, alignItems: "center" },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 },
   emptyStateText: { fontSize: 18, fontWeight: "600", color: "#333", marginTop: 16 },
@@ -4880,5 +5117,112 @@ toggleTabTextActive: {
     fontSize: 12,
     color: '#888',
     marginTop: 2,
+  },
+
+  // ======================================================
+  // FOLLOWING USERS GRID STYLES
+  // ======================================================
+  followingGridOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end' as const,
+  },
+  followingGridContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: SCREEN_HEIGHT * 0.65,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  followingGridHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  followingGridTitle: {
+    fontSize: 18,
+    fontWeight: 'bold' as const,
+    color: '#1a1a2e',
+  },
+  followingGridSubtitle: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 2,
+  },
+  followingGridCell: {
+    alignItems: 'center' as const,
+    paddingVertical: 12,
+    width: (SCREEN_WIDTH - 40 - 24) / 4,
+  },
+  followingGridAvatarContainer: {
+    position: 'relative' as const,
+  },
+  followingGridCountBadge: {
+    position: 'absolute' as const,
+    top: -4,
+    right: -4,
+    backgroundColor: '#E94A37',
+    borderRadius: 11,
+    minWidth: 22,
+    height: 22,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#fff',
+    zIndex: 10,
+  },
+  followingGridCountText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold' as const,
+  },
+  followingGridUsername: {
+    fontSize: 11,
+    color: '#333',
+    marginTop: 6,
+    textAlign: 'center' as const,
+    maxWidth: 72,
+  },
+  followingGridEmptyState: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 60,
+  },
+  followingGridEmptyText: {
+    color: '#888',
+    fontSize: 15,
+    marginTop: 12,
+    textAlign: 'center' as const,
+    paddingHorizontal: 20,
+  },
+  followingBackButton: {
+    position: 'absolute' as const,
+    top: Platform.OS === 'ios' ? 100 : 80,
+    left: 16,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 6,
+    maxWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  followingBackButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600' as const,
+    flexShrink: 1,
   },
 });
