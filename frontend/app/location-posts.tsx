@@ -74,25 +74,15 @@ export default function LocationPostsScreen() {
         )}
 
         {/* Clicks/Views badge */}
-        {(clicksCount > 0 || viewsCount > 0) && (
-          <View style={styles.clicksBadge}>
-            <Ionicons name="eye-outline" size={10} color="#fff" />
-            <Text style={styles.clicksText}>{formatCount(viewsCount || clicksCount)}</Text>
-          </View>
-        )}
+        <View style={styles.clicksBadge}>
+          <Ionicons name="eye-outline" size={10} color="#fff" />
+          <Text style={styles.clicksText}>{formatCount(viewsCount || clicksCount)}</Text>
+        </View>
 
         {/* Dish name tag */}
         {dishName && (
           <View style={styles.dishTag}>
             <Text style={styles.dishText} numberOfLines={1}>{dishName}</Text>
-          </View>
-        )}
-
-        {/* Rating badge */}
-        {item.rating && (
-          <View style={styles.ratingBadgeGrid}>
-            <Ionicons name="star" size={10} color="#FFD700" />
-            <Text style={styles.ratingTextGrid}>{item.rating}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -199,23 +189,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     borderRadius: 12,
     padding: 4,
-  },
-  ratingBadgeGrid: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(233, 74, 55, 0.9)",
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 10,
-    gap: 2,
-  },
-  ratingTextGrid: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
   },
   clicksBadge: {
     position: "absolute",

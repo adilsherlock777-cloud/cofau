@@ -1174,7 +1174,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
           {/* Near Me: Single Post Markers */}
           {filterType === 'posts' && singlePosts.map((post: any) => (
             <PostMarker
-              key={`post-${post.id}`}
+              key={`post-${post.id}-${post.clicks_count || 0}`}
               post={post}
               onPress={onPostPress}
             />
@@ -1193,7 +1193,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
           {/* Following with user selected: show food posts like Near Me */}
           {filterType === 'following' && selectedFollowingUser && singlePosts.map((post: any) => (
             <PostMarker
-              key={`following-post-${post.id}`}
+              key={`following-post-${post.id}-${post.clicks_count || 0}`}
               post={post}
               onPress={onPostPress}
             />
@@ -1207,14 +1207,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
             />
           ))}
 
-          {/* Following without user selected: show DP markers as fallback */}
-          {filterType === 'following' && !selectedFollowingUser && followingLocations.map((loc: any) => (
-            <FollowingMarker
-              key={`following-${loc.id}`}
-              location={loc}
-              onPress={onFollowingLocationPress}
-            />
-          ))}
+          {/* Following without user selected: map is empty, grid overlay is shown */}
         </MapView>
         </MapErrorBoundary>
       ) : (
@@ -1264,7 +1257,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
             ? `${restaurants.length} restaurants nearby`
             : selectedFollowingUser
             ? `${posts.length} posts by ${selectedFollowingUser.username}`
-            : `Tap Following to select a friend`
+            : `Select a user to view posts`
           }
         </Text>
       </View>
@@ -1610,20 +1603,17 @@ const FollowingUsersGrid = memo(({ visible, users, onSelectUser, onClose }: any)
   );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.followingGridOverlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.followingGridContainer}>
-          {/* Header */}
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => {}}>
+      <View style={styles.followingGridOverlay}>
+        <View style={styles.followingGridContainer}>
+          {/* Header — no close button, user must select someone */}
           <View style={styles.followingGridHeader}>
             <View>
               <Text style={styles.followingGridTitle}>Following</Text>
               <Text style={styles.followingGridSubtitle}>
-                {users.length} {users.length === 1 ? 'person' : 'people'} with posts
+                {users.length} {users.length === 1 ? 'person' : 'people'} with posts — select to view on map
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
           </View>
 
           {users.length === 0 ? (
@@ -1642,8 +1632,8 @@ const FollowingUsersGrid = memo(({ visible, users, onSelectUser, onClose }: any)
               renderItem={renderUser}
             />
           )}
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 });
@@ -1751,6 +1741,7 @@ export default function ExploreScreen() {
   const mapRef = useRef<typeof MapView>(null);
   const videoPositions = useRef<Map<string, { top: number; height: number }>>(new Map());
   const cachedMapPosts = useRef<any[]>([]);
+  const cachedMapRestaurants = useRef<any[]>([]);
   const cachedFollowersPosts = useRef<any[]>([]);
   const cachedUserLocation = useRef<{ latitude: number; longitude: number } | null>(null);
   const feedPostsLoadedRef = useRef(false);
@@ -2120,6 +2111,7 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
 
       setMapPosts(processedPosts);
       setMapRestaurants(restaurants);
+      cachedMapRestaurants.current = restaurants;
     }
   } catch (error) {
     if (!mountedRef.current) return;
@@ -2250,8 +2242,10 @@ const handleQuickCategoryPress = (category: any) => {
         await fetchMapPins(undefined, true);
       }
     } else if (newFilterType === 'restaurants') {
-      // Just show restaurants (already loaded from initial fetch)
-      // No need to fetch again
+      // Restore cached restaurants (may have been cleared by Following tab)
+      if (mapRestaurants.length === 0 && cachedMapRestaurants.current.length > 0) {
+        setMapRestaurants(cachedMapRestaurants.current);
+      }
     }
   };
 
@@ -2266,7 +2260,19 @@ const handleQuickCategoryPress = (category: any) => {
 
     // Track click (same logic as grid tiles)
     if (post && !post.is_clicked) {
-      setMapPosts((prev) => prev.map((p: any) => p.id === post.id ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true } : p));
+      const updateClick = (p: any) =>
+        p.id === post.id ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true } : p;
+
+      // Update displayed posts
+      setMapPosts((prev) => prev.map(updateClick));
+
+      // Also update caches so count persists on back navigation
+      if (mapFilterType === 'following') {
+        cachedFollowersPosts.current = cachedFollowersPosts.current.map(updateClick);
+      } else {
+        cachedMapPosts.current = cachedMapPosts.current.map(updateClick);
+      }
+
       try {
         const tkn = await AsyncStorage.getItem('token');
         axios.post(`${API_URL}/posts/${post.id}/click`, {}, {
@@ -2439,8 +2445,8 @@ useFocusEffect(
             : cachedFollowersPosts.current)
         : cachedMapPosts.current;
 
-      if (mapPosts.length === 0 && cacheToUse.length > 0) {
-        // Cache exists but mapPosts is empty (returned from navigation)
+      if (cacheToUse.length > 0) {
+        // Always re-apply correct posts on focus (handles returning from navigation)
         if (selectedQuickCategory) {
           // Re-apply category filter from cache
           const category = QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory);
@@ -2465,16 +2471,15 @@ useFocusEffect(
           fetchMapPins(undefined, true);
         }
       }
-      // If mapPosts.length > 0, do nothing - data already there
     }
-    
+
     // Users tab logic - use ref to avoid stale closure triggering unnecessary refetches
     if (user && token && activeTab === 'users' && !feedPostsLoadedRef.current) {
       fetchPosts(true);
     }
-    
+
     return () => setPlayingVideos([]);
-  }, [activeTab, userLocation, selectedQuickCategory, user, token])
+  }, [activeTab, userLocation, selectedQuickCategory, selectedFollowingUser, user, token])
 );
 
   // ======================================================
