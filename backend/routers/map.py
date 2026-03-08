@@ -258,7 +258,12 @@ async def get_map_pins(
             review_count = await db.posts.count_documents({
                 "tagged_restaurant_id": str(restaurant["_id"])
             })
-            
+
+            # Count posts uploaded by the restaurant itself
+            own_posts_count = await db.restaurant_posts.count_documents({
+                "restaurant_id": str(restaurant["_id"])
+            })
+
             restaurants_pins.append({
                 "id": str(restaurant["_id"]),
                 "type": "restaurant",
@@ -268,12 +273,13 @@ async def get_map_pins(
                 "latitude": restaurant["latitude"],
                 "longitude": restaurant["longitude"],
                 "review_count": review_count,
+                "posts_count": own_posts_count,
                 "distance_km": round(distance, 2),
                 "map_link": restaurant.get("map_link"),
                 "bio": restaurant.get("bio", ""),
                 "is_verified": restaurant.get("is_verified", False)
             })
-    
+
     # ==================== USER POSTS ====================
     posts = await db.posts.find({
         "latitude": {"$exists": True, "$ne": None},
@@ -581,22 +587,27 @@ async def get_nearby_restaurants(
             )
             
             if distance <= radius_km:
-                # Get review count
+                # Get review count (posts tagged with this restaurant)
                 review_count = await db.posts.count_documents({
                     "tagged_restaurant_id": str(restaurant["_id"])
                 })
-                
+
+                # Count posts uploaded by the restaurant itself
+                own_posts_count = await db.restaurant_posts.count_documents({
+                    "restaurant_id": str(restaurant["_id"])
+                })
+
                 # Get average rating from reviews
                 reviews = await db.posts.find({
                     "tagged_restaurant_id": str(restaurant["_id"]),
                     "rating": {"$exists": True, "$ne": None}
                 }).to_list(None)
-                
+
                 avg_rating = 0
                 if reviews:
                     ratings = [r.get("rating", 0) for r in reviews if r.get("rating")]
                     avg_rating = sum(ratings) / len(ratings) if ratings else 0
-                
+
                 restaurants_pins.append({
                     "id": str(restaurant["_id"]),
                     "type": "restaurant",
@@ -607,6 +618,7 @@ async def get_nearby_restaurants(
                     "latitude": coords["latitude"],
                     "longitude": coords["longitude"],
                     "review_count": review_count,
+                    "posts_count": own_posts_count,
                     "average_rating": round(avg_rating, 1),
                     "distance_km": round(distance, 2),
                     "map_link": restaurant.get("map_link"),

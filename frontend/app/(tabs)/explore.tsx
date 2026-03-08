@@ -1331,13 +1331,13 @@ const RestaurantDetailModal = memo(({ visible, restaurant, onClose, onViewProfil
 
           <View style={styles.restaurantStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{restaurant.review_count}</Text>
+              <Text style={styles.statNumber}>{restaurant.review_count || 0}</Text>
               <Text style={styles.statLabel}>Reviews</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{restaurant.review_count || 0}</Text>
-              <Text style={styles.statLabel}>Total Posts</Text>
+              <Text style={styles.statNumber}>{restaurant.posts_count || 0}</Text>
+              <Text style={styles.statLabel}>Posts</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
@@ -1348,9 +1348,9 @@ const RestaurantDetailModal = memo(({ visible, restaurant, onClose, onViewProfil
 
           <TouchableOpacity style={styles.viewProfileBtn} onPress={() => onViewProfile(restaurant)}>
             <LinearGradient
-              colors={["#E94A37", "#F2CF68", "#1B7C82"]}
+              colors={["#FF2E2E", "#FF7A18"]}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.viewProfileBtnGradient}
             >
               <Text style={styles.viewProfileBtnText}>View Restaurant Profile</Text>

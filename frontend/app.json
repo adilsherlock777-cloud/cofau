@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cofau",
     "slug": "cofau-app",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "scheme": "cofau",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "5",
+      "buildNumber": "6",
       "bundleIdentifier": "com.cofau.app",
       "googleServicesFile": "./GoogleService-Info.plist", 
       "associatedDomains": ["applinks:api.cofau.com"],
@@ -33,7 +33,7 @@
     },
     "android": {
       "package": "com.cofau.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "googleServicesFile": "./google-services.json",
       "useNextNotificationsApi": true,
       "intentFilters": [
