@@ -439,6 +439,7 @@ export default function ProfileScreen() {
   const [phoneUpdateStep, setPhoneUpdateStep] = useState<'verify_old' | 'enter_new' | 'verify_new'>('verify_old');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [sortMode, setSortMode] = useState<'latest' | 'mostViewed' | 'mostLiked'>('latest');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -503,6 +504,12 @@ export default function ProfileScreen() {
       if (token && userData && userPosts.length === 0) {
         fetchUserPosts();
       }
+      return () => {
+        // Clear image memory cache on Android when leaving screen to prevent OOM
+        if (Platform.OS === 'android') {
+          ExpoImage.clearMemoryCache();
+        }
+      };
     }, [token, userData])
   );
 
@@ -669,23 +676,32 @@ const getFilteredReviews = () => {
 const getFilteredPostsByCategory = (posts: any[], isVideo: boolean) => {
   // First filter by media type (photo or video)
   const mediaFiltered = posts.filter((post: any) => isVideo ? post.isVideo : !post.isVideo);
-  
-  // Then filter by category if not 'all'
-  if (selectedCategory === 'all') {
-    return mediaFiltered;
-  }
-  
-  // Find the selected category's name from CATEGORIES array
-  const selectedCategoryData = CATEGORIES.find(c => c.id === selectedCategory);
-  const categoryName = selectedCategoryData?.name;
 
-  // DEBUG LOG
-  
-  return mediaFiltered.filter((post: any) => {
-    if (!post.category || !categoryName) return false;
-    // Case-insensitive comparison
-    return post.category.toLowerCase() === categoryName.toLowerCase();
-  });
+  // Then filter by category if not 'all'
+  let result;
+  if (selectedCategory === 'all') {
+    result = mediaFiltered;
+  } else {
+    const selectedCategoryData = CATEGORIES.find(c => c.id === selectedCategory);
+    const categoryName = selectedCategoryData?.name;
+    result = mediaFiltered.filter((post: any) => {
+      if (!post.category || !categoryName) return false;
+      return post.category.toLowerCase() === categoryName.toLowerCase();
+    });
+  }
+
+  // Apply sort
+  if (sortMode === 'mostViewed') {
+    return [...result].sort((a: any, b: any) => {
+      const aCount = isVideo ? (a.views_count || 0) : (a.clicks_count || 0);
+      const bCount = isVideo ? (b.views_count || 0) : (b.clicks_count || 0);
+      return bCount - aCount;
+    });
+  } else if (sortMode === 'mostLiked') {
+    return [...result].sort((a: any, b: any) => (b.likes_count || 0) - (a.likes_count || 0));
+  }
+
+  return result;
 };
 
   const GradientHeart = ({ size = 24 }) => (
@@ -2182,11 +2198,11 @@ const renderGridWithLikes = useCallback(({ item }: { item: any }) => {
         </View>
       )}
 
-      {/* Likes Badge - Top Right */}
+      {/* Views Badge - Top Right */}
       <View style={styles.gridLikesBadge}>
-        <GradientHeart size={14} />
+        <Ionicons name="eye-outline" size={14} color="#fff" />
         <Text style={styles.gridLikesText}>
-          {item.likes_count || item.likes || 0}
+          {(() => { const c = isVideo ? (item.views_count || 0) : (item.clicks_count || 0); return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
         </Text>
       </View>
     </TouchableOpacity>
@@ -2822,6 +2838,10 @@ const renderRestaurantProfile = () => {
     numColumns={3}
     scrollEnabled={false}
     columnWrapperStyle={{ gap: 1 }}
+    initialNumToRender={9}
+    maxToRenderPerBatch={9}
+    windowSize={5}
+    removeClippedSubviews={Platform.OS === 'android'}
             ListEmptyComponent={() => (
               <View style={styles.emptyContainer}>
                 <Ionicons name="images-outline" size={64} color="#ccc" />
@@ -2918,15 +2938,11 @@ const renderRestaurantProfile = () => {
           </View>
         )}
 
-        {/* Likes Badge */}
+        {/* Views Badge */}
         <View style={restaurantStyles.reviewLikesBadge}>
-          {(item.likes_count || 0) > 0 ? (
-            <GradientHeart size={14} />
-          ) : (
-            <Ionicons name="heart-outline" size={14} color="#fff" />
-          )}
+          <Ionicons name="eye-outline" size={14} color="#fff" />
           <Text style={restaurantStyles.reviewLikesText}>
-            {item.likes_count || 0}
+            {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
           </Text>
         </View>
       </View>
@@ -2999,6 +3015,10 @@ const renderRestaurantProfile = () => {
   )}
   keyExtractor={(item) => item.id}
   scrollEnabled={false}
+  initialNumToRender={6}
+  maxToRenderPerBatch={6}
+  windowSize={5}
+  removeClippedSubviews={Platform.OS === 'android'}
 />
     ) : (
       <View style={styles.emptyContainer}>
@@ -4449,11 +4469,11 @@ const renderRestaurantProfile = () => {
 
       {/* Right Side - Details */}
       <View style={styles.listDetails}>
-        {/* Likes - Gradient Heart */}
+        {/* Views - Eye Icon */}
         <View style={styles.listDetailRow}>
-          <GradientHeart size={20} />
+          <Ionicons name="eye-outline" size={20} color="#E94A37" />
           <Text style={styles.listDetailText}>
-            {item.likes_count || item.likes || 0}
+            {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
           </Text>
         </View>
 
@@ -4557,11 +4577,11 @@ const renderRestaurantProfile = () => {
 
         {/* Right Side - Details */}
         <View style={styles.listDetails}>
-          {/* Likes - Gradient Heart */}
+          {/* Views - Eye Icon */}
           <View style={styles.listDetailRow}>
-            <GradientHeart size={20} />
+            <Ionicons name="eye-outline" size={20} color="#E94A37" />
             <Text style={styles.listDetailText}>
-              {item.likes_count || item.likes || 0}
+              {(() => { const c = item.views_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
             </Text>
           </View>
 
@@ -4625,36 +4645,66 @@ const renderCategoryFilter = () => {
     : currentTabPosts.filter((post: any) => post.category === selectedCategory).length;
 
   return (
-    <View style={styles.categoryFilterContainer}>
-      <TouchableOpacity
-        style={styles.categoryDropdownButton}
-        onPress={() => {
-          setCategoryModalVisible(true);
-        }}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.categoryDropdownEmoji}>
-          {selectedCategoryData?.emoji || '🍽️'}
-        </Text>
-        <Text style={styles.categoryDropdownText}>
-          {selectedCategoryData?.name || 'All'}
-        </Text>
-        <View style={styles.categoryDropdownCount}>
-          <Text style={styles.categoryDropdownCountText}>{filteredCount}</Text>
-        </View>
-        <Ionicons name="chevron-down" size={18} color="#666" />
-      </TouchableOpacity>
-      
-      {/* Clear filter button - show only when a category is selected */}
-      {selectedCategory !== 'all' && (
+    <View style={styles.categoryFilterWrapper}>
+      <View style={styles.categoryFilterContainer}>
         <TouchableOpacity
-          style={styles.clearCategoryButton}
-          onPress={() => setSelectedCategory('all')}
+          style={styles.categoryDropdownButton}
+          onPress={() => {
+            setCategoryModalVisible(true);
+          }}
           activeOpacity={0.7}
         >
-          <Ionicons name="close-circle" size={20} color="#E94A37" />
+          <Text style={styles.categoryDropdownEmoji}>
+            {selectedCategoryData?.emoji || '🍽️'}
+          </Text>
+          <Text style={styles.categoryDropdownText}>
+            {selectedCategoryData?.name || 'All'}
+          </Text>
+          <View style={styles.categoryDropdownCount}>
+            <Text style={styles.categoryDropdownCountText}>{filteredCount}</Text>
+          </View>
+          <Ionicons name="chevron-down" size={18} color="#666" />
         </TouchableOpacity>
-      )}
+
+        {/* Clear filter button - show only when a category is selected */}
+        {selectedCategory !== 'all' && (
+          <TouchableOpacity
+            style={styles.clearCategoryButton}
+            onPress={() => setSelectedCategory('all')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close-circle" size={20} color="#E94A37" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Sort Options */}
+      <View style={styles.sortOptionsRow}>
+        <TouchableOpacity
+          style={[styles.sortChip, sortMode === 'latest' && styles.sortChipActive]}
+          onPress={() => setSortMode('latest')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="time-outline" size={14} color={sortMode === 'latest' ? '#fff' : '#666'} />
+          <Text style={[styles.sortChipText, sortMode === 'latest' && styles.sortChipTextActive]}>Latest</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sortChip, sortMode === 'mostViewed' && styles.sortChipActive]}
+          onPress={() => setSortMode('mostViewed')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="eye-outline" size={14} color={sortMode === 'mostViewed' ? '#fff' : '#666'} />
+          <Text style={[styles.sortChipText, sortMode === 'mostViewed' && styles.sortChipTextActive]}>Most Viewed</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sortChip, sortMode === 'mostLiked' && styles.sortChipActive]}
+          onPress={() => setSortMode('mostLiked')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="heart-outline" size={14} color={sortMode === 'mostLiked' ? '#fff' : '#666'} />
+          <Text style={[styles.sortChipText, sortMode === 'mostLiked' && styles.sortChipTextActive]}>Most Liked</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -5298,7 +5348,7 @@ if (isRestaurantProfile) {
       <GridSkeleton />
     ) : (
       <FlatList
-        key={`videos-grid-3col-${selectedCategory}`}
+        key={`videos-grid-3col-${selectedCategory}-${sortMode}`}
         data={getFilteredPostsByCategory(userPosts, true)}
         renderItem={renderGridWithLikes}
         keyExtractor={(item: any) => item.id}
@@ -5339,7 +5389,7 @@ if (isRestaurantProfile) {
       <GridSkeleton />
     ) : (
       <FlatList
-        key={`photos-grid-3col-${selectedCategory}`}
+        key={`photos-grid-3col-${selectedCategory}-${sortMode}`}
         data={getFilteredPostsByCategory(userPosts, false)}
         renderItem={renderGridWithLikes}
         keyExtractor={(item: any) => item.id}
@@ -7820,15 +7870,44 @@ favouriteGridImage: {
   zIndex: 10,
 },
 // Category Filter Styles
+categoryFilterWrapper: {
+  backgroundColor: '#fff',
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
 categoryFilterContainer: {
   flexDirection: 'row',
   alignItems: 'center',
   paddingVertical: 8,
   paddingHorizontal: 16,
-  borderBottomWidth: 1,
-  borderBottomColor: '#f0f0f0',
   backgroundColor: '#fff',
   gap: 10,
+},
+sortOptionsRow: {
+  flexDirection: 'row',
+  paddingHorizontal: 16,
+  paddingBottom: 10,
+  gap: 8,
+},
+sortChip: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 16,
+  backgroundColor: '#f5f5f5',
+  gap: 4,
+},
+sortChipActive: {
+  backgroundColor: '#E94A37',
+},
+sortChipText: {
+  fontSize: 11,
+  color: '#666',
+  fontWeight: '600',
+},
+sortChipTextActive: {
+  color: '#fff',
 },
 categoryDropdownButton: {
   flexDirection: 'row',

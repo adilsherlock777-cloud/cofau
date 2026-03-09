@@ -17,6 +17,7 @@ import {
   Animated,
   Easing,
   Keyboard,
+  InteractionManager,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -62,7 +63,7 @@ const SQUARE_HEIGHT = COLUMN_WIDTH;
 const VERTICAL_HEIGHT = COLUMN_WIDTH * 1.5;
 const SMALL_HEIGHT = COLUMN_WIDTH * 0.75;
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
-const MAX_CONCURRENT_VIDEOS = 2;
+const MAX_CONCURRENT_VIDEOS = Platform.OS === 'android' ? 1 : 2;
 
 // Veg / Non-veg FSSAI-style dot icon (green square+dot for veg, red for non-veg)
 const FoodTypeIcon = ({ type, size = 20 }: { type: 'veg' | 'nonveg'; size?: number }) => {
@@ -226,12 +227,21 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
           onView(item.id);
         }
       } else {
-        await videoRef.current.pauseAsync();
+        // Unload video to free memory on Android
+        if (Platform.OS === 'android') {
+          await videoRef.current.unloadAsync();
+        } else {
+          await videoRef.current.pauseAsync();
+        }
       }
     } catch (e) {
     }
   };
   controlVideo();
+  return () => {
+    // Cleanup: unload video when component unmounts
+    videoRef.current?.unloadAsync().catch(() => {});
+  };
 }, [shouldPlay, item.full_image_url]);
 
   const displayThumbnail = item.full_thumbnail_url || item.full_image_url;
@@ -319,7 +329,7 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
-    }, 5000); // Increased to 5s for Android image loading
+    }, Platform.OS === 'android' ? 2000 : 5000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -432,7 +442,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
-    }, 5000); // Increased to 5s for Android image loading
+    }, Platform.OS === 'android' ? 2000 : 5000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -538,7 +548,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setTracksChanges(false);
-    }, 5000); // Increased to 5s for Android image loading
+    }, Platform.OS === 'android' ? 2000 : 5000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -623,6 +633,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
   }
 
   // iOS layout with overlapping images
+  const clusterWidth = 60 + (latestPosts.length - 1) * 45;
   return (
     <Marker
       coordinate={{ latitude, longitude }}
@@ -633,10 +644,11 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
       tracksViewChanges={tracksChanges}
       zIndex={1000 + count}
       stopPropagation={true}
+      anchor={{ x: 0.5, y: 1 }}
     >
-      <View style={styles.clusterMarkerContainer}>
+      <View style={[styles.clusterMarkerContainer, { width: clusterWidth }]}>
         {/* Preview Images */}
-        <View style={[styles.clusterPreviewContainer, { width: 60 + (latestPosts.length - 1) * 45 }]}>
+        <View style={[styles.clusterPreviewContainer, { width: clusterWidth }]}>
           {latestPosts.map((post: any, index: number) => (
             <View
               key={post.id}
@@ -1572,7 +1584,7 @@ const FollowingUsersModal = memo(({ visible, data, onClose, onSelectUser }: any)
 
 const GRID_COLUMNS = 4;
 
-const FollowingUsersGrid = memo(({ visible, users, onSelectUser, onClose }: any) => {
+const FollowingUsersGrid = memo(({ visible, users, onSelectUser, onClose, suggestedUsers, onFollowSuggestion, onViewProfile }: any) => {
   if (!visible) return null;
 
   const formatCount = (count: number) => count > 100 ? '99+' : String(count);
@@ -1602,25 +1614,75 @@ const FollowingUsersGrid = memo(({ visible, users, onSelectUser, onClose }: any)
     </TouchableOpacity>
   );
 
+  const renderSuggestion = ({ item }: any) => (
+    <View style={styles.followingGridCell}>
+      <TouchableOpacity onPress={() => onViewProfile(item)} activeOpacity={0.7}>
+        <View style={styles.followingGridAvatarContainer}>
+          <UserAvatar
+            profilePicture={item.user_profile_picture}
+            username={item.username}
+            size={56}
+            showLevelBadge={false}
+            level={item.user_level}
+            style={undefined}
+          />
+        </View>
+        <Text style={styles.followingGridUsername} numberOfLines={1}>
+          {item.username}
+        </Text>
+      </TouchableOpacity>
+      {!item.is_following ? (
+        <TouchableOpacity
+          style={styles.suggestionFollowButton}
+          onPress={() => onFollowSuggestion(item)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.suggestionFollowButtonText}>Follow</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.suggestionFollowingBadge}>
+          <Ionicons name="checkmark" size={12} color="#4ECDC4" />
+          <Text style={styles.suggestionFollowingText}>Following</Text>
+        </View>
+      )}
+    </View>
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => {}}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.followingGridOverlay}>
         <View style={styles.followingGridContainer}>
-          {/* Header — no close button, user must select someone */}
           <View style={styles.followingGridHeader}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.followingGridTitle}>Following</Text>
               <Text style={styles.followingGridSubtitle}>
-                {users.length} {users.length === 1 ? 'person' : 'people'} with posts — select to view on map
+                {users.length > 0
+                  ? `${users.length} ${users.length === 1 ? 'person' : 'people'} with posts — select to view on map`
+                  : 'Suggested people to follow'}
               </Text>
             </View>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
           </View>
 
           {users.length === 0 ? (
-            <View style={styles.followingGridEmptyState}>
-              <Ionicons name="people-outline" size={48} color="#ccc" />
-              <Text style={styles.followingGridEmptyText}>Follow users to see their food posts here!</Text>
-            </View>
+            suggestedUsers && suggestedUsers.length > 0 ? (
+              <FlatList
+                data={suggestedUsers}
+                keyExtractor={(item: any) => item.user_id}
+                numColumns={GRID_COLUMNS}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ padding: 16 }}
+                columnWrapperStyle={{ gap: 8 }}
+                renderItem={renderSuggestion}
+              />
+            ) : (
+              <View style={styles.followingGridEmptyState}>
+                <Ionicons name="people-outline" size={48} color="#ccc" />
+                <Text style={styles.followingGridEmptyText}>Follow users to see their food posts here!</Text>
+              </View>
+            )
           ) : (
             <FlatList
               data={users}
@@ -2357,6 +2419,65 @@ const handleQuickCategoryPress = (category: any) => {
   // Following grid: close/dismiss grid overlay
   const handleFollowingGridClose = () => {
     setShowFollowingGrid(false);
+    // If no following users, switch back to posts so user isn't stuck on empty map
+    if (followingUsersForGrid.length === 0) {
+      setMapFilterType('posts');
+      if (cachedMapPosts.current.length > 0) {
+        setMapPosts(cachedMapPosts.current);
+      }
+    }
+  };
+
+  // Derive top 8 unique user suggestions from topPosts for empty Following state
+  const suggestedUsersForGrid = React.useMemo(() => {
+    if (followingUsersForGrid.length > 0) return [];
+    const seen = new Set<string>();
+    const suggestions: any[] = [];
+    for (const post of topPosts) {
+      if (!post.user_id || post.user_id === user?.id || seen.has(post.user_id)) continue;
+      seen.add(post.user_id);
+      suggestions.push({
+        user_id: post.user_id,
+        username: post.username || 'Unknown',
+        user_profile_picture: post.user_profile_picture || null,
+        user_level: post.user_level || 1,
+        account_type: post.account_type,
+        is_following: post.is_following || false,
+      });
+      if (suggestions.length >= 8) break;
+    }
+    return suggestions;
+  }, [topPosts, followingUsersForGrid, user?.id]);
+
+  // Fetch top posts when Following tab opens with empty state (for suggestions)
+  useEffect(() => {
+    if (showFollowingGrid && followingUsersForGrid.length === 0 && topPosts.length === 0) {
+      fetchTopPosts();
+    }
+  }, [showFollowingGrid, followingUsersForGrid.length]);
+
+  // Handle follow from suggestion in Following grid
+  const handleFollowSuggestion = async (suggestedUser: any) => {
+    if (!suggestedUser.user_id) return;
+    try {
+      await followUser(suggestedUser.user_id, suggestedUser.account_type);
+      // Update the suggestion's is_following state via topPosts
+      setTopPosts((prev: any[]) => prev.map((p: any) =>
+        p.user_id === suggestedUser.user_id ? { ...p, is_following: true } : p
+      ));
+    } catch {
+      Alert.alert("Error", "Failed to follow user. Please try again.");
+    }
+  };
+
+  // Handle view profile from suggestion in Following grid
+  const handleViewSuggestedProfile = (suggestedUser: any) => {
+    setShowFollowingGrid(false);
+    setMapFilterType('posts');
+    if (cachedMapPosts.current.length > 0) {
+      setMapPosts(cachedMapPosts.current);
+    }
+    router.push(`/profile?userId=${suggestedUser.user_id}`);
   };
 
   const handleViewRestaurantProfile = async (restaurant: any) => {
@@ -2478,7 +2599,13 @@ useFocusEffect(
       fetchPosts(true);
     }
 
-    return () => setPlayingVideos([]);
+    return () => {
+      setPlayingVideos([]);
+      // Clear image memory cache on Android when leaving screen to prevent OOM
+      if (Platform.OS === 'android') {
+        Image.clearMemoryCache();
+      }
+    };
   }, [activeTab, userLocation, selectedQuickCategory, selectedFollowingUser, user, token])
 );
 
@@ -2573,12 +2700,14 @@ useFocusEffect(
         feedPostsLoadedRef.current = true;
         setLoading(false); // Show first cards immediately
 
-        // Pre-fetch thumbnails for visible cards
-        firstPosts.forEach((post: any) => {
-          const urlToPreFetch = post.full_thumbnail_url || post.full_image_url;
-          if (urlToPreFetch && !post._isVideo) {
-            Image.prefetch(urlToPreFetch);
-          }
+        // Pre-fetch thumbnails after UI settles (non-blocking)
+        InteractionManager.runAfterInteractions(() => {
+          firstPosts.forEach((post: any) => {
+            const urlToPreFetch = post.full_thumbnail_url || post.full_image_url;
+            if (urlToPreFetch && !post._isVideo) {
+              Image.prefetch(urlToPreFetch);
+            }
+          });
         });
 
         if (firstRes.data.length < INITIAL_BATCH) {
@@ -2594,7 +2723,10 @@ useFocusEffect(
 
         if (restRes.data.length > 0) {
           const restPosts = restRes.data.map(mapPostData);
-          setPosts(prev => [...prev, ...restPosts.filter((np: any) => !prev.some((ep) => ep.id === np.id))]);
+          setPosts(prev => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            return [...prev, ...restPosts.filter((np: any) => !existingIds.has(np.id))];
+          });
         }
 
         const totalFetched = firstRes.data.length + (restRes.data?.length || 0);
@@ -2698,7 +2830,10 @@ useFocusEffect(
   const handleView = async (postId: string) => {
     setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, views_count: (p.views_count || 0) + 1, is_viewed: true } : p));
     try {
-      await AsyncStorage.getItem('token');
+      const tkn = await AsyncStorage.getItem('token');
+      axios.post(`${API_URL}/posts/${postId}/view`, {}, {
+        headers: { Authorization: `Bearer ${tkn}` }
+      }).catch(() => {});
     } catch {}
   };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
@@ -3329,7 +3464,7 @@ return (
               </View>
             </ScrollView>
           ) : (
-            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4dd0e1" />}>
+            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={Platform.OS === 'android' ? 64 : 16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4dd0e1" />}>
               <View style={styles.masonryContainer}>
                 {columns.map((column, columnIndex) => (
                   <View key={columnIndex} style={styles.column}>
@@ -3509,6 +3644,9 @@ return (
         users={followingUsersForGrid}
         onSelectUser={handleFollowingGridUserSelect}
         onClose={handleFollowingGridClose}
+        suggestedUsers={suggestedUsersForGrid}
+        onFollowSuggestion={handleFollowSuggestion}
+        onViewProfile={handleViewSuggestedProfile}
       />
     </View>
   );
@@ -3579,7 +3717,10 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#333"
+    color: "#333",
+    paddingVertical: Platform.OS === 'android' ? 4 : 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   animatedPlaceholder: {
     position: 'absolute' as const,
@@ -5205,6 +5346,29 @@ toggleTabTextActive: {
     marginTop: 12,
     textAlign: 'center' as const,
     paddingHorizontal: 20,
+  },
+  suggestionFollowButton: {
+    backgroundColor: '#E94A37',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 6,
+  },
+  suggestionFollowButtonText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold' as const,
+  },
+  suggestionFollowingBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginTop: 6,
+    gap: 2,
+  },
+  suggestionFollowingText: {
+    color: '#4ECDC4',
+    fontSize: 10,
+    fontWeight: '600' as const,
   },
   followingBackButton: {
     position: 'absolute' as const,

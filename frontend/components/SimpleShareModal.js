@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Video } from 'expo-av';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Linking from 'expo-linking';
@@ -35,6 +36,10 @@ const CARD_WIDTH = STORY_WIDTH * 0.88;
 // =====================================================
 const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
     const mediaUrl = normalizeMediaUrl(post?.media_url || post?.image_url);
+    const thumbnailUrl = post?.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
+    const isVideoPost = post?.media_type === 'video' || mediaUrl?.toLowerCase().endsWith('.mp4');
+    // For videos, use thumbnail; for images, use the media URL directly
+    const displayImageUrl = isVideoPost ? (thumbnailUrl || null) : mediaUrl;
 
     return (
         <View
@@ -43,9 +48,9 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
             collapsable={false}
         >
             {/* Blurred Background Image */}
-            {mediaUrl && (
+            {displayImageUrl && (
                 <Image
-                    source={{ uri: mediaUrl }}
+                    source={{ uri: displayImageUrl }}
                     style={storyCardStyles.blurredBackground}
                     contentFit="cover"
                     blurRadius={30}
@@ -59,9 +64,9 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
             <View style={storyCardStyles.card}>
                 {/* Food Image with Cofau Watermark */}
                 <View style={storyCardStyles.imageWrapper}>
-                    {mediaUrl ? (
+                    {displayImageUrl ? (
                         <Image
-                            source={{ uri: mediaUrl }}
+                            source={{ uri: displayImageUrl }}
                             style={storyCardStyles.foodImage}
                             contentFit="cover"
                         />
@@ -344,33 +349,74 @@ export default function SimpleShareModal({ visible, onClose, post }) {
             setLoading(true);
             setSharingPlatform('instagram-story');
 
-            // Step 1: Capture the story card as an image
-            const uri = await captureRef(storyCardRef, {
-                format: 'png',
-                quality: 1,
-                result: 'tmpfile',
-            });
-
-            // Step 2: Save to camera roll
             const { status } = await MediaLibrary.requestPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Please allow access to save images.');
+                Alert.alert('Permission Required', 'Please allow access to save media.');
                 return;
             }
 
-            await MediaLibrary.createAssetAsync(uri);
+            if (isVideo && mediaUrl) {
+                // For videos: download the actual video file and share it
+                const fileExt = mediaUrl.toLowerCase().includes('.mov') ? 'mov' : 'mp4';
+                const localUri = `${FileSystem.cacheDirectory}cofau_share_${Date.now()}.${fileExt}`;
 
-            // Step 3: Open share sheet
-            await Sharing.shareAsync(uri, {
-                mimeType: 'image/png',
-                dialogTitle: 'Share to Instagram Story',
-                UTI: 'public.png',
-            });
+                const downloadResumable = FileSystem.createDownloadResumable(
+                    mediaUrl,
+                    localUri,
+                    {}
+                );
+                const result = await downloadResumable.downloadAsync();
+
+                if (!result || !result.uri) {
+                    throw new Error('Video download failed');
+                }
+
+                await MediaLibrary.createAssetAsync(result.uri);
+
+                await Sharing.shareAsync(result.uri, {
+                    mimeType: fileExt === 'mov' ? 'video/quicktime' : 'video/mp4',
+                    dialogTitle: 'Share to Instagram Story',
+                    UTI: fileExt === 'mov' ? 'com.apple.quicktime-movie' : 'public.mpeg-4',
+                });
+            } else {
+                // For images: capture the story card as a styled image
+                const uri = await captureRef(storyCardRef, {
+                    format: 'png',
+                    quality: 1,
+                    result: 'tmpfile',
+                });
+
+                await MediaLibrary.createAssetAsync(uri);
+
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'image/png',
+                    dialogTitle: 'Share to Instagram Story',
+                    UTI: 'public.png',
+                });
+            }
 
             onClose();
         } catch (error) {
             console.error('Instagram Story share error:', error);
-            Alert.alert('Error', 'Failed to create story image. Please try again.');
+            // Fallback: share as image if video download fails
+            if (isVideo) {
+                try {
+                    const uri = await captureRef(storyCardRef, {
+                        format: 'png',
+                        quality: 1,
+                        result: 'tmpfile',
+                    });
+                    await MediaLibrary.createAssetAsync(uri);
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: 'Share to Instagram Story',
+                        UTI: 'public.png',
+                    });
+                    onClose();
+                    return;
+                } catch {}
+            }
+            Alert.alert('Error', 'Failed to share. Please try again.');
         } finally {
             setLoading(false);
             setSharingPlatform(null);

@@ -4471,9 +4471,11 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
             "category": post.get("category"), 
             "likes_count": post["likes_count"],
             "comments_count": post["comments_count"],
+            "clicks_count": post.get("clicks_count", 0),
+            "views_count": post.get("views_count", 0),
             "created_at": post["created_at"]
         })
-    
+
     return result
 
 @app.get("/api/posts/{post_id}")
