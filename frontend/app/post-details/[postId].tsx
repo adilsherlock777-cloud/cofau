@@ -117,7 +117,7 @@ const GradientBookmark = ({ size = 18 }) => (
 function PostItem({ post, currentPostId, token, bottomInset, accountType }: any) {
   const router = useRouter();
   const { user } = useAuth() as any;
-  const [isLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [savesCount, setSavesCount] = useState(post.saves_count || 0);
@@ -385,13 +385,22 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   };
 
   const handleLikeToggle = async () => {
+    const prevLiked = isLiked;
     const prevCount = likesCount;
-    setLikesCount(prevCount + 1);
+    setIsLiked(!prevLiked);
+    setLikesCount(prevLiked ? prevCount - 1 : prevCount + 1);
     try {
-      await axios.post(`${API_URL}/posts/${post.id}/like`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (prevLiked) {
+        await axios.delete(`${API_URL}/posts/${post.id}/like`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(`${API_URL}/posts/${post.id}/like`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
     } catch (e) {
+      setIsLiked(prevLiked);
       setLikesCount(prevCount);
     }
   };
@@ -499,7 +508,9 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
 
   if (now - lastTap < DOUBLE_TAP_DELAY) {
     // Double tap detected - like the post
-    handleLikeToggle();
+    if (!isLiked) {
+      handleLikeToggle();
+    }
     // Reset all animation values
     leftHalfX.setValue(-200);
     rightHalfX.setValue(200);
@@ -1053,14 +1064,18 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
     onPress={() => setShowDetails(true)}
   >
     <View style={styles.bottomOverlayIconWrap}>
-      <Ionicons name="create-outline" size={16} color="#FF5722" />
+      <Ionicons name="fast-food" size={16} color="#FF5722" />
     </View>
     <View style={{ flex: 1, marginRight: 10 }}>
-      <Text style={styles.bottomOverlayText} numberOfLines={2} ellipsizeMode="tail">
-        {(post.account_type === 'restaurant' || post.is_restaurant_post)
-          ? (post.dish_details || post.description || post.review_text || post.dish_name || "Tap for details")
-          : (post.review_text || post.dish_name || "Tap for details")}
+      <Text style={styles.bottomOverlayDishName} numberOfLines={1} ellipsizeMode="tail">
+        {post.dish_name || "Tap for details"}
       </Text>
+      {post.rating && (
+        <View style={styles.bottomOverlayRatingRow}>
+          <Ionicons name="star" size={12} color="#FFD700" />
+          <Text style={styles.bottomOverlayRating}>{post.rating}/10</Text>
+        </View>
+      )}
     </View>
     <View style={styles.bottomOverlayArrow}>
       <Ionicons name="chevron-up" size={16} color="#333" />
@@ -1172,71 +1187,53 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                 </TouchableOpacity>
               </View>
 
-              {/* ALL-IN-ONE DETAILS CARD */}
+              {/* DISH NAME - Prominent at top */}
+              {post.dish_name && (
+                <View style={styles.detailsDishNameBox}>
+                  <Ionicons name="fast-food" size={20} color="#FF5722" />
+                  <Text style={styles.detailsDishNameText} numberOfLines={2}>{post.dish_name}</Text>
+                </View>
+              )}
+
+              {/* UNIFIED DETAILS CARD - Rating + Review + Location */}
               <View style={styles.detailsSingleCard}>
-                {/* RATING or PRICE */}
+                {/* Rating/Price + Review in one row */}
+                <View style={styles.detailsRatingReviewRow}>
 {post.account_type === 'restaurant' || post.is_restaurant_post ? (
   (post.price != null && post.price !== '') ? (
-    <View style={styles.detailsSection}>
-      <Text style={styles.detailsSectionLabel}>PRICE</Text>
-      <View style={styles.detailsSectionRow}>
-        <Ionicons name="pricetag" size={19} color="#FFD700" />
-        <Text style={styles.detailsSectionValue}>₹{post.price}</Text>
-      </View>
+    <View style={styles.detailsRatingChip3D}>
+      <Ionicons name="pricetag" size={14} color="#B8860B" />
+      <Text style={styles.detailsRatingChipValue}>₹{post.price}</Text>
     </View>
   ) : null
 ) : (
   post.rating ? (
-    <View style={styles.detailsSection}>
-      <Text style={styles.detailsSectionLabel}>RATING</Text>
-      <View style={styles.detailsSectionRow}>
-        <Ionicons name="star" size={19} color="#FFD700" />
-        <Text style={styles.detailsSectionValue}>{post.rating}/10</Text>
-      </View>
+    <View style={styles.detailsRatingChip3D}>
+      <Ionicons name="star" size={14} color="#B8860B" />
+      <Text style={styles.detailsRatingChipValue}>{post.rating}/10</Text>
     </View>
   ) : null
 )}
 
-                {/* DISH NAME */}
-                {post.dish_name && (
-                  <View style={styles.detailsSection}>
-                    <Text style={styles.detailsSectionLabel}>DISH NAME</Text>
-                    <View style={styles.detailsSectionRow}>
-                      <Ionicons name="fast-food" size={19} color="#FFD700" />
-                      <Text style={styles.detailsSectionValue}>{post.dish_name}</Text>
-                    </View>
-                  </View>
-                )}
+{(() => {
+  const reviewContent = post.account_type === 'restaurant' || post.is_restaurant_post
+    ? (post.about || post.dish_details || post.description || post.review_text)
+    : post.review_text;
+  return reviewContent ? (
+    <>
+      <Text style={styles.detailsRatingReviewDash}>—</Text>
+      <Text style={styles.detailsReviewText} numberOfLines={2}>
+        "{reviewContent}"
+      </Text>
+    </>
+  ) : null;
+})()}
+                </View>
 
-                {/* REVIEW / ABOUT */}
-{post.account_type === 'restaurant' || post.is_restaurant_post ? (
-  (post.about || post.dish_details || post.description || post.review_text) ? (
-    <View style={styles.detailsSection}>
-      <Text style={styles.detailsSectionLabel}>ABOUT</Text>
-      <View style={styles.detailsSectionRow}>
-        <Ionicons name="information-circle" size={19} color="#FFD700" />
-        <Text style={styles.detailsSectionText}>
-          {post.about || post.dish_details || post.description || post.review_text}
-        </Text>
-      </View>
-    </View>
-  ) : null
-) : (
-  post.review_text ? (
-    <View style={styles.detailsSection}>
-      <Text style={styles.detailsSectionLabel}>REVIEW</Text>
-      <View style={styles.detailsSectionRow}>
-        <Ionicons name="create" size={19} color="#FFD700" />
-        <Text style={styles.detailsSectionText}>{post.review_text}</Text>
-      </View>
-    </View>
-  ) : null
-)}
-
-                {/* LOCATION */}
+                {/* Divider + Location */}
                 {post.location_name && (
-                  <View style={[styles.detailsSection, { borderBottomWidth: 0 }]}>
-                    <Text style={styles.detailsSectionLabel}>LOCATION</Text>
+                  <>
+                    <View style={styles.detailsGlassDivider} />
                     <Pressable
                       onPress={() => {
                         if (post.map_link) {
@@ -1262,7 +1259,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                         </View>
                       </LinearGradient>
                     </Pressable>
-                  </View>
+                  </>
                 )}
               </View>
 
@@ -1920,11 +1917,24 @@ heartAnimationContainer: {
     marginRight: 8,
   },
 
-  bottomOverlayText: {
+  bottomOverlayDishName: {
     color: "#222",
-    fontSize: 12.5,
-    fontWeight: "500",
-    lineHeight: 17,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
+  bottomOverlayRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 2,
+  },
+
+  bottomOverlayRating: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#888",
   },
 
   bottomOverlayArrow: {
@@ -2074,39 +2084,6 @@ heartAnimationContainer: {
     elevation: 6,
   },
 
-  detailsSection: {
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(0, 0, 0, 0.06)",
-  },
-
-  detailsSectionLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 4,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-
-  detailsSectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  detailsSectionValue: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#000",
-  },
-
-  detailsSectionText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#000",
-    flex: 1,
-  },
 
   detailsLocationGradient: {
     flexDirection: "row",
@@ -2145,6 +2122,91 @@ heartAnimationContainer: {
     backgroundColor: "#FF2E2E",
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  /* Dish Name Box - Prominent at top */
+  detailsDishNameBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 4,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  detailsDishNameText: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111",
+    letterSpacing: -0.3,
+  },
+
+  /* Unified Rating + Review Row */
+  detailsRatingReviewRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+
+  detailsRatingChip3D: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FFF9E6",
+    borderRadius: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(184, 134, 11, 0.2)",
+    borderBottomWidth: 2.5,
+    borderBottomColor: "rgba(184, 134, 11, 0.25)",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#B8860B",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+
+  detailsRatingChipValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#8B6914",
+  },
+
+  detailsRatingReviewDash: {
+    fontSize: 14,
+    color: "rgba(0, 0, 0, 0.25)",
+    marginHorizontal: 8,
+    marginTop: 4,
+  },
+
+  detailsReviewText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#555",
+    lineHeight: 18,
+    fontStyle: "italic",
+    marginTop: 4,
+  },
+
+  detailsGlassDivider: {
+    height: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.06)",
+    marginVertical: 10,
   },
 
   detailsSaveBtn: {

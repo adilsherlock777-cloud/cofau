@@ -251,12 +251,13 @@ export default function LocationDetailsScreen() {
   const handlePostPress = async (postId: string) => {
     const post = posts.find((p: any) => p.id === postId);
 
-    // Increment clicks_count every time a user taps the post
-    if (post) {
+    // Only count click if this user hasn't clicked this post before
+    if (post && !post.is_clicked) {
+      // Optimistically increment clicks_count and mark as clicked
       setPosts((prev: any[]) =>
         prev.map((p: any) =>
           p.id === postId
-            ? { ...p, clicks_count: (p.clicks_count || 0) + 1 }
+            ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true }
             : p
         )
       );

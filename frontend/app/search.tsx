@@ -39,7 +39,7 @@ export default function PostBottomSheet({ visible, postId, onClose }: PostBottom
   
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [isLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
@@ -87,6 +87,7 @@ export default function PostBottomSheet({ visible, postId, onClose }: PostBottom
       }
 
       setPost(postData);
+      setIsLiked(postData.is_liked_by_user || false);
       setLikesCount(postData.likes_count || 0);
       setIsSaved(postData.is_saved_by_user || false);
     } catch (error) {
@@ -101,16 +102,26 @@ export default function PostBottomSheet({ visible, postId, onClose }: PostBottom
   const handleLikeToggle = async () => {
     if (!post || !token) return;
 
+    const prevLiked = isLiked;
     const prevCount = likesCount;
-    setLikesCount(prevCount + 1);
+
+    setIsLiked(!prevLiked);
+    setLikesCount(prevLiked ? prevCount - 1 : prevCount + 1);
 
     try {
-      await axios.post(
-        `${API_URL}/posts/${post.id}/like`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      if (prevLiked) {
+        await axios.delete(`${API_URL}/posts/${post.id}/like`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(
+          `${API_URL}/posts/${post.id}/like`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
     } catch (e) {
+      setIsLiked(prevLiked);
       setLikesCount(prevCount);
     }
   };

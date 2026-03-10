@@ -1476,8 +1476,15 @@ async def get_feed(
                 "user_id": str(current_user["_id"])
             }) is not None
 
-            is_clicked = False
-            is_viewed = False
+            is_clicked = await db.post_clicks.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
+            is_viewed = await db.post_views.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
 
             result.append({
                 "id": post_id,
@@ -1547,8 +1554,15 @@ async def get_feed(
                 "followingId": user_id
             }) is not None
 
-            is_clicked = False
-            is_viewed = False
+            is_clicked = await db.post_clicks.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
+
+            is_viewed = await db.post_views.find_one({
+                "post_id": post_id,
+                "user_id": str(current_user["_id"])
+            }) is not None
 
             media_url = post.get("media_url", "")
             media_type = post.get("media_type", "image")

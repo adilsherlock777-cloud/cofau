@@ -33,6 +33,7 @@ import CofauVerifiedBadge from "./CofauVerifiedBadge";
 import { useAuth } from "../context/AuthContext";
 import {
 likePost,
+unlikePost,
 savePost,
 unsavePost,
 reportPost,
@@ -98,7 +99,7 @@ function FeedCard({
   const { user } = useAuth();
   const videoRef = useRef(null);
 
-const [isLiked] = useState(false);
+const [isLiked, setIsLiked] = useState(post.is_liked || false);
 const [likesCount, setLikes] = useState(post.likes || 0);
 const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
 const [showReportModal, setShowReportModal] = useState(false);
@@ -274,12 +275,18 @@ useEffect(() => {
 }, [isMuted, shouldPlay, isVideo]);
 
 const handleLike = async () => {
-  const prevCount = likesCount;
-  setLikes(prevCount + 1);
+  const prev = isLiked;
+  setIsLiked(!prev);
+  setLikes(prev ? likesCount - 1 : likesCount + 1);
   try {
-    await likePost(post.id, post.account_type);
+    if (prev) {
+      await unlikePost(post.id, post.account_type);
+    } else {
+      await likePost(post.id, post.account_type);
+    }
   } catch {
-    setLikes(prevCount);
+    setIsLiked(prev);
+    setLikes(likesCount);
   }
 };
 
@@ -399,7 +406,9 @@ const handleDoubleTap = () => {
   const DOUBLE_TAP_DELAY = 300;
 
   if (now - lastTap < DOUBLE_TAP_DELAY) {
-    handleLike();
+    if (!isLiked) {
+      handleLike();
+    }
     // Reset all animation values
     leftHalfX.setValue(-200);
     rightHalfX.setValue(200);
@@ -908,70 +917,57 @@ postId={post.id}
     <BlurView intensity={100} tint="default" style={styles.glassCard}>
       <View style={styles.glassCardInner}>
 
-        {/* RATING */}
-        {post.rating != null && !post.price && (
+        {/* RATING + REVIEW (unified row) */}
+        {(post.rating != null || post.price || post.description || post.about) && (
           <View style={styles.glassSection}>
-            <Text style={styles.detailLabel}>RATING</Text>
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={19} color="#FFD700" />
-              <Text style={styles.ratingText}>
-                <Text style={styles.ratingNumber}>{post.rating}</Text>/10
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* PRICE */}
-        {post.price && (
-          <View style={styles.glassSection}>
-            <Text style={styles.detailLabel}>PRICE</Text>
-            <View style={styles.ratingRow}>
-              <Ionicons name="pricetag" size={19} color="#FFD700" />
-              <Text style={styles.ratingText}>{post.price}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* REVIEW / ABOUT */}
-        {(post.description || post.about) && (
-          <View style={styles.glassSection}>
-            <Text style={styles.detailLabel}>
-              {post.price ? 'ABOUT' : 'REVIEW'}
-            </Text>
-            <View style={styles.reviewRow}>
-              <Ionicons
-                name={post.price ? "information-circle" : "create"}
-                size={19}
-                color="#FFD700"
-              />
-              <Text style={styles.reviewText}>
-                {post.about || post.description}
-              </Text>
+            <View style={styles.ratingReviewRow}>
+              {/* Rating or Price chip */}
+              {(post.rating != null || post.price) && (
+                <View style={styles.ratingChip3D}>
+                  <Ionicons name={post.price ? "pricetag" : "star"} size={16} color="#FFD700" />
+                  <Text style={styles.ratingChipValue}>
+                    {post.price ? post.price : `${post.rating}/10`}
+                  </Text>
+                </View>
+              )}
+              {/* Review / About text */}
+              {(post.description || post.about) && (
+                <>
+                  {(post.rating != null || post.price) && (
+                    <Text style={styles.ratingReviewDash}>—</Text>
+                  )}
+                  <Text style={styles.reviewText} numberOfLines={2}>
+                    {post.about || post.description}
+                  </Text>
+                </>
+              )}
             </View>
           </View>
         )}
 
         {/* LOCATION */}
         {(post.location_name || post.location_address) && (
-          <View style={[styles.glassSection, { borderBottomWidth: 0 }]}>
-              <Text style={styles.detailLabel}>LOCATION</Text>
+          <>
+            <View style={styles.glassDivider} />
+            <View style={[styles.glassSection, { borderBottomWidth: 0 }]}>
               <Pressable onPress={handleOpenMap} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-              <LinearGradient
-                colors={['rgba(255,46,46,0.10)', 'rgba(255,122,24,0.08)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.locationGradientWrap}
-              >
-                <Ionicons name="location" size={18} color="#FF2E2E" />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {post.location_name || post.location_address}
-                </Text>
-                <View style={styles.locationArrowButton}>
-                  <Ionicons name="chevron-forward" size={14} color="#fff" />
-                </View>
-              </LinearGradient>
+                <LinearGradient
+                  colors={['rgba(255,46,46,0.08)', 'rgba(255,122,24,0.05)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.locationTapBox}
+                >
+                  <Ionicons name="location" size={16} color="#FF2E2E" />
+                  <Text style={styles.locationText} numberOfLines={1}>
+                    {post.location_name || post.location_address}
+                  </Text>
+                  <View style={styles.locationArrowButton}>
+                    <Ionicons name="chevron-forward" size={12} color="#fff" />
+                  </View>
+                </LinearGradient>
               </Pressable>
             </View>
+          </>
         )}
 
       </View>
@@ -1344,43 +1340,58 @@ elevation: 2,
 borderWidth: 0,
 },
 
-detailLabel: {
-fontSize: 11,
-fontWeight: "600",
-color: "#666",
-marginBottom: 4,
-letterSpacing: 0.5,
-textTransform: "uppercase",
+ratingReviewRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
 },
 
-ratingRow: {
-flexDirection: "row",
-alignItems: "center",
-gap: 6,
+ratingChip3D: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  backgroundColor: '#FFF3D0',
+  borderRadius: 50,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderWidth: 1.5,
+  borderColor: 'rgba(184, 134, 11, 0.35)',
+  borderBottomWidth: 3,
+  borderBottomColor: 'rgba(184, 134, 11, 0.45)',
+  borderRightWidth: 2,
+  borderRightColor: 'rgba(184, 134, 11, 0.25)',
+  shadowColor: '#B8860B',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.35,
+  shadowRadius: 5,
+  elevation: 4,
 },
 
-ratingText: {
-fontSize: 15,
-fontWeight: "500",
-color: "#000",
+ratingChipValue: {
+  fontSize: 14,
+  fontWeight: '800',
+  color: '#333',
 },
 
-ratingNumber: {
-fontWeight: "500",
-fontSize: 15,
-color: "#000",
-},
-
-reviewRow: {
-flexDirection: "row",
-gap: 8,
+ratingReviewDash: {
+  fontSize: 14,
+  color: '#BBB',
+  marginHorizontal: 10,
+  marginTop: 4,
 },
 
 reviewText: {
-fontSize: 16,
-fontWeight: "500",
-color: "#000",
-flex: 1,
+  flex: 1,
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#444',
+  lineHeight: 20,
+  marginTop: 4,
+},
+
+glassDivider: {
+  height: StyleSheet.hairlineWidth,
+  backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  marginHorizontal: 0,
 },
 
 locationBox: {
@@ -1404,9 +1415,9 @@ locationButton: {
 },
 
 locationArrowButton: {
-  width: 24,
-  height: 24,
-  borderRadius: 12,
+  width: 22,
+  height: 22,
+  borderRadius: 11,
   backgroundColor: '#FF2E2E',
   justifyContent: 'center',
   alignItems: 'center',
@@ -1445,10 +1456,15 @@ locationBoxPressed: {
   opacity: 0.9,
 },
 
-locationRow: {
-flexDirection: "row",
-alignItems: "center",
-gap: 7,
+locationTapBox: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 46, 46, 0.12)',
 },
 
 heartAnimationContainer: {
@@ -1465,10 +1481,10 @@ heartAnimationContainer: {
 },
 
 locationText: {
-flex: 1,
-fontSize: 15,
-fontWeight: "500",
-color: "#000",
+  flex: 1,
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#444',
 },
 
 actions: {
@@ -1624,6 +1640,7 @@ export default React.memo(FeedCard, (prevProps, nextProps) => {
     prevProps.post.id === nextProps.post.id &&
     prevProps.shouldPlay === nextProps.shouldPlay &&
     prevProps.isMuted === nextProps.isMuted &&
+    prevProps.post.is_liked === nextProps.post.is_liked &&
     prevProps.post.is_saved_by_user === nextProps.post.is_saved_by_user
   );
 });

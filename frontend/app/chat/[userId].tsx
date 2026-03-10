@@ -21,7 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
 import axios from "axios";
 import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
-import { likePost } from "../../utils/api";
+import { likePost, unlikePost } from "../../utils/api";
 
 const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE}/api`;
@@ -511,24 +511,28 @@ const markMessagesAsRead = async () => {
                           const postId = item.post_id!;
                           const currentPost = postData[postId];
                           if (!currentPost) return;
-                          const prevCount = currentPost.likes_count || 0;
+                          const wasLiked = currentPost.is_liked_by_user;
                           // Optimistic update
                           setPostData((prev) => ({
                             ...prev,
                             [postId]: {
                               ...prev[postId],
-                              likes_count: prevCount + 1,
+                              is_liked_by_user: !wasLiked,
+                              likes_count: (prev[postId].likes_count || 0) + (wasLiked ? -1 : 1),
                             },
                           }));
                           try {
-                            await likePost(postId, currentPost.account_type);
+                            wasLiked
+                              ? await unlikePost(postId, currentPost.account_type)
+                              : await likePost(postId, currentPost.account_type);
                           } catch {
                             // Revert on error
                             setPostData((prev) => ({
                               ...prev,
                               [postId]: {
                                 ...prev[postId],
-                                likes_count: prevCount,
+                                is_liked_by_user: wasLiked,
+                                likes_count: (prev[postId].likes_count || 0) + (wasLiked ? 1 : -1),
                               },
                             }));
                           }
