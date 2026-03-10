@@ -275,7 +275,7 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
       )}
       <View style={styles.clicksBadge}>
         <Ionicons name="eye-outline" size={13} color="#fff" />
-        <Text style={styles.clicksText}>{(item.views_count || 0) > 1000 ? `${((item.views_count || 0) / 1000).toFixed(1)}K` : (item.views_count || 0)}</Text>
+        <Text style={styles.clicksText}>{(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}</Text>
       </View>
       {item.dish_name && (
         <TouchableOpacity style={styles.dishNameTag} activeOpacity={0.7} onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}>
@@ -446,7 +446,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
     return () => clearTimeout(timer);
   }, []);
 
-  const viewCount = post.views_count || post.clicks_count || 0;
+  const viewCount = post.clicks_count || 0;
   const viewCountDisplay = viewCount > 1000 ? `${(viewCount / 1000).toFixed(1)}K` : viewCount;
 
   // Android - Use expo-image for reliable rendering inside map markers

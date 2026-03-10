@@ -452,15 +452,6 @@ async def like_restaurant_post(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
-    # Check if already liked
-    existing_like = await db.restaurant_likes.find_one({
-        "post_id": post_id,
-        "restaurant_id": str(current_restaurant["_id"])
-    })
-    
-    if existing_like:
-        raise HTTPException(status_code=400, detail="Already liked this post")
-    
     # Add like
     await db.restaurant_likes.insert_one({
         "post_id": post_id,
@@ -1367,16 +1358,6 @@ async def like_restaurant_post_as_user(
         raise HTTPException(status_code=404, detail="Post not found")
     
     user_id = str(current_user.get("_id") or current_user.get("id"))
-    
-    # Check if already liked
-    existing_like = await db.restaurant_likes.find_one({
-        "post_id": post_id,
-        "user_id": user_id,
-        "user_type": "user"
-    })
-    
-    if existing_like:
-        raise HTTPException(status_code=400, detail="Already liked this post")
     
     # Add like
     await db.restaurant_likes.insert_one({

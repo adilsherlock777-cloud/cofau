@@ -33,91 +33,95 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Story card dimensions (9:16 for Instagram Stories)
 const STORY_WIDTH = SCREEN_WIDTH;
 const STORY_HEIGHT = STORY_WIDTH * (16 / 9);
-const CARD_WIDTH = STORY_WIDTH * 0.88;
+const IMAGE_MARGIN = 16;
+const IMAGE_WIDTH = STORY_WIDTH - IMAGE_MARGIN * 2;
+const IMAGE_HEIGHT = IMAGE_WIDTH * (5 / 4); // 4:5 aspect ratio
 
 // =====================================================
-// INSTAGRAM STORY CARD (hidden, for capture)
+// INSTAGRAM STORY CARD - Premium design with blur bg,
+// big food image, and floating glassmorphism UI (hidden, for capture)
 // =====================================================
 const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
   const mediaUrl = normalizeMediaUrl(post?.media_url || post?.image_url);
   const thumbnailUrl = post?.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
   const isVideoPost = post?.media_type === 'video' || mediaUrl?.toLowerCase().endsWith('.mp4');
-  // For videos, use thumbnail; for images, use the media URL directly
   const displayImageUrl = isVideoPost ? (thumbnailUrl || null) : mediaUrl;
+
+  const reviewText = post?.review_text || post?.description || '';
+  const truncatedReview = reviewText.length > 90 ? reviewText.substring(0, 87) + '...' : reviewText;
 
   return (
     <View ref={ref} style={storyCardStyles.container} collapsable={false}>
+      {/* Blurred Background */}
       {displayImageUrl && (
-        <Image
-          source={{ uri: displayImageUrl }}
-          style={storyCardStyles.blurredBackground}
-          contentFit="cover"
-          blurRadius={30}
-        />
+        <Image source={{ uri: displayImageUrl }} style={storyCardStyles.blurredBackground} contentFit="cover" blurRadius={35} />
       )}
       <View style={storyCardStyles.darkOverlay} />
-      <View style={storyCardStyles.card}>
-        <View style={storyCardStyles.imageWrapper}>
-          {displayImageUrl ? (
-            <Image source={{ uri: displayImageUrl }} style={storyCardStyles.foodImage} contentFit="cover" />
-          ) : (
-            <View style={storyCardStyles.placeholderImage}>
-              <Ionicons name="image-outline" size={60} color="#ccc" />
+
+      {/* Main Food Image - big, proper ratio, rounded */}
+      <View style={storyCardStyles.foodImageWrapper}>
+        {displayImageUrl ? (
+          <Image source={{ uri: displayImageUrl }} style={storyCardStyles.foodImage} contentFit="cover" />
+        ) : (
+          <View style={storyCardStyles.placeholderImage}>
+            <Ionicons name="image-outline" size={80} color="rgba(255,255,255,0.3)" />
+          </View>
+        )}
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)']} locations={[0.4, 0.75, 1]} style={storyCardStyles.imageBottomGradient} />
+
+        {/* Username pill - top left */}
+        {post?.username && (
+          <View style={storyCardStyles.usernamePill}>
+            <UserAvatar profilePicture={normalizeProfilePicture(post?.user_profile_picture)} username={post.username} size={34} showLevelBadge={false} />
+            <Text style={storyCardStyles.usernameText} numberOfLines={1}>@{post.username}</Text>
+          </View>
+        )}
+
+        {/* Dish name + Restaurant - bottom of image */}
+        <View style={storyCardStyles.imageBottomInfo}>
+          {post?.dish_name && <Text style={storyCardStyles.dishName} numberOfLines={2}>{post.dish_name}</Text>}
+          {post?.tagged_restaurant?.restaurant_name && (
+            <View style={storyCardStyles.restaurantRow}>
+              <Ionicons name="restaurant-outline" size={13} color="rgba(255,255,255,0.7)" />
+              <Text style={storyCardStyles.restaurantName} numberOfLines={1}>{post.tagged_restaurant.restaurant_name}</Text>
             </View>
           )}
-          {/* User Avatar + Username - Top Left */}
-          {post?.username && (
-            <View style={storyCardStyles.usernameContainer}>
-              <UserAvatar
-                profilePicture={normalizeProfilePicture(post?.user_profile_picture)}
-                username={post.username}
-                size={28}
-                showLevelBadge={false}
-              />
-              <Text style={storyCardStyles.usernameText} numberOfLines={1}>
-                @{post.username}
-              </Text>
+        </View>
+      </View>
+
+      {/* Floating glass info box below the image */}
+      <View style={storyCardStyles.glassSection}>
+        <View style={storyCardStyles.glassInfoBox}>
+          <View style={storyCardStyles.ratingReviewRow}>
+            <View style={storyCardStyles.ratingChip}>
+              <Ionicons name="star" size={14} color="#FFD700" />
+              <Text style={storyCardStyles.ratingValue}>{post?.rating ? `${post.rating}/10` : '-'}</Text>
             </View>
+            {truncatedReview ? (
+              <>
+                <Text style={storyCardStyles.ratingReviewDash}>—</Text>
+                <Text style={storyCardStyles.reviewText} numberOfLines={2}>"{truncatedReview}"</Text>
+              </>
+            ) : null}
+          </View>
+          {post?.location_name && (
+            <>
+              <View style={storyCardStyles.glassDivider} />
+              <View style={storyCardStyles.locationRow}>
+                <Ionicons name="location" size={14} color="#FF6B6B" />
+                <Text style={storyCardStyles.locationText} numberOfLines={1}>{post.location_name}</Text>
+              </View>
+            </>
           )}
-          {post?.dish_name && (
-            <View style={storyCardStyles.dishNameContainer}>
-              <Ionicons name="fast-food" size={14} color="#FFF" />
-              <Text style={storyCardStyles.dishNameText} numberOfLines={1}>
-                {post.dish_name.toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View style={storyCardStyles.watermarkContainer}>
-            <MaskedView maskElement={<Text style={storyCardStyles.watermarkText}>Cofau</Text>}>
+        </View>
+        <View style={storyCardStyles.foundOnRow}>
+          <Text style={storyCardStyles.foundOnText}>Found it on</Text>
+          <View style={storyCardStyles.cofauBadge}>
+            <MaskedView maskElement={<Text style={storyCardStyles.cofauBadgeText}>Cofau</Text>}>
               <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                <Text style={[storyCardStyles.watermarkText, { opacity: 0 }]}>Cofau</Text>
+                <Text style={[storyCardStyles.cofauBadgeText, { opacity: 0 }]}>Cofau</Text>
               </LinearGradient>
             </MaskedView>
-          </View>
-        </View>
-        <View style={storyCardStyles.infoBoxesContainer}>
-          <View style={storyCardStyles.infoBox}>
-            <Ionicons name="star" size={22} color="#FFD700" />
-            <Text style={storyCardStyles.infoBoxLabel}>Rating</Text>
-            <Text style={storyCardStyles.infoBoxValue}>
-              {post?.rating ? `${post.rating}/10` : '-'}
-            </Text>
-          </View>
-          <View style={storyCardStyles.divider} />
-          <View style={[storyCardStyles.infoBox, storyCardStyles.reviewBox]}>
-            <Ionicons name="create" size={22} color="#FFD700" />
-            <Text style={storyCardStyles.infoBoxLabel}>Review</Text>
-            <Text style={storyCardStyles.infoBoxValue}>
-              {post?.review_text || post?.description || '-'}
-            </Text>
-          </View>
-          <View style={storyCardStyles.divider} />
-          <View style={storyCardStyles.infoBox}>
-            <Ionicons name="location" size={22} color="#E53935" />
-            <Text style={storyCardStyles.infoBoxLabel}>Location</Text>
-            <Text style={storyCardStyles.infoBoxValue}>
-              {post?.location_name || '-'}
-            </Text>
           </View>
         </View>
       </View>
@@ -126,25 +130,33 @@ const InstagramStoryCard = React.forwardRef(({ post }, ref) => {
 });
 
 const storyCardStyles = StyleSheet.create({
-  container: { width: STORY_WIDTH, height: STORY_HEIGHT, position: 'absolute', left: -9999, top: 0, backgroundColor: '#000' },
+  container: { width: STORY_WIDTH, height: STORY_HEIGHT, position: 'absolute', left: -9999, top: 0, backgroundColor: '#0a0a0a' },
   blurredBackground: { position: 'absolute', width: '100%', height: '100%' },
-  darkOverlay: { position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.35)' },
-  card: { position: 'absolute', top: '10%', left: (STORY_WIDTH - CARD_WIDTH) / 2, width: CARD_WIDTH, backgroundColor: '#FFFFFF', borderRadius: 24, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 15 },
-  imageWrapper: { width: '100%', aspectRatio: 1, position: 'relative' },
+  darkOverlay: { position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.4)' },
+  foodImageWrapper: { position: 'absolute', top: STORY_HEIGHT * 0.04, left: IMAGE_MARGIN, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, borderRadius: 20, overflow: 'hidden' },
   foodImage: { width: '100%', height: '100%' },
-  placeholderImage: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#E0E0E0' },
-  watermarkContainer: { position: 'absolute', bottom: 16, right: 16, backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  watermarkText: { fontSize: 18, fontWeight: '700', color: '#000', fontFamily: 'Lobster', letterSpacing: 1 },
-  infoBoxesContainer: { flexDirection: 'row', paddingVertical: 20, paddingHorizontal: 12, backgroundColor: '#FFFFFF' },
-  infoBox: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
-  reviewBox: { flex: 1.4 },
-  infoBoxLabel: { fontSize: 11, fontWeight: '700', color: '#999', marginTop: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
-  infoBoxValue: { fontSize: 13, fontWeight: '600', color: '#333', marginTop: 4, textAlign: 'center', lineHeight: 18 },
-  divider: { width: 1, backgroundColor: '#E8E8E8', marginVertical: 8 },
-  usernameContainer: { position: 'absolute', top: 16, left: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, maxWidth: '70%', gap: 4 },
-  usernameText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
-  dishNameContainer: { position: 'absolute', bottom: 16, left: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, maxWidth: '60%', gap: 4 },
-  dishNameText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
+  placeholderImage: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' },
+  imageBottomGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%' },
+  usernamePill: { position: 'absolute', top: 14, left: 14, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 50, gap: 6, maxWidth: '60%' },
+  usernameText: { color: '#FFF', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  imageBottomInfo: { position: 'absolute', bottom: 16, left: 16, right: 16 },
+  dishName: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  restaurantRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  restaurantName: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.2 },
+  glassSection: { position: 'absolute', top: STORY_HEIGHT * 0.04 + IMAGE_HEIGHT + 14, left: IMAGE_MARGIN, right: IMAGE_MARGIN },
+  glassInfoBox: { backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
+  ratingReviewRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  ratingChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5 },
+  ratingValue: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
+  ratingReviewDash: { fontSize: 14, color: 'rgba(255,255,255,0.4)', marginHorizontal: 8, marginTop: 3 },
+  reviewText: { flex: 1, fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.85)', lineHeight: 18, fontStyle: 'italic', marginTop: 3 },
+  glassDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 10 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  locationText: { flex: 1, fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+  foundOnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  foundOnText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.5 },
+  cofauBadge: { backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 50 },
+  cofauBadgeText: { fontSize: 14, fontWeight: '700', fontFamily: 'Lobster', letterSpacing: 0.5, color: '#000' },
 });
 
 // =====================================================

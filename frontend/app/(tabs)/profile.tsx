@@ -693,8 +693,8 @@ const getFilteredPostsByCategory = (posts: any[], isVideo: boolean) => {
   // Apply sort
   if (sortMode === 'mostViewed') {
     return [...result].sort((a: any, b: any) => {
-      const aCount = isVideo ? (a.views_count || 0) : (a.clicks_count || 0);
-      const bCount = isVideo ? (b.views_count || 0) : (b.clicks_count || 0);
+      const aCount = a.clicks_count || 0;
+      const bCount = b.clicks_count || 0;
       return bCount - aCount;
     });
   } else if (sortMode === 'mostLiked') {
@@ -2202,7 +2202,7 @@ const renderGridWithLikes = useCallback(({ item }: { item: any }) => {
       <View style={styles.gridLikesBadge}>
         <Ionicons name="eye-outline" size={14} color="#fff" />
         <Text style={styles.gridLikesText}>
-          {(() => { const c = isVideo ? (item.views_count || 0) : (item.clicks_count || 0); return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
+          {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
         </Text>
       </View>
     </TouchableOpacity>
@@ -4581,7 +4581,7 @@ const renderRestaurantProfile = () => {
           <View style={styles.listDetailRow}>
             <Ionicons name="eye-outline" size={20} color="#E94A37" />
             <Text style={styles.listDetailText}>
-              {(() => { const c = item.views_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
+              {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
             </Text>
           </View>
 

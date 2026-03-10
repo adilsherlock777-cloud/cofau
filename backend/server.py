@@ -1737,25 +1737,8 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/posts/{post_id}/click")
 async def track_post_click(post_id: str, current_user: dict = Depends(get_current_user)):
-    """Increment clicks_count on a post when a user taps it. One click per user per post."""
+    """Increment clicks_count on a post when a user taps it."""
     db = get_database()
-    user_id = str(current_user["_id"])
-
-    # Check if this user already clicked this post
-    existing_click = await db.post_clicks.find_one({
-        "post_id": post_id,
-        "user_id": user_id
-    })
-
-    if existing_click:
-        return {"status": "already_clicked"}
-
-    # Record the click
-    await db.post_clicks.insert_one({
-        "post_id": post_id,
-        "user_id": user_id,
-        "created_at": datetime.utcnow()
-    })
 
     # Increment clicks_count — try user posts first, then restaurant posts
     result = await db.posts.update_one(
@@ -1774,25 +1757,8 @@ async def track_post_click(post_id: str, current_user: dict = Depends(get_curren
 
 @app.post("/api/posts/{post_id}/view")
 async def track_post_view(post_id: str, current_user: dict = Depends(get_current_user)):
-    """Increment views_count on a video post when a user watches it. One view per user per post."""
+    """Increment views_count on a video post when a user watches it."""
     db = get_database()
-    user_id = str(current_user["_id"])
-
-    # Check if this user already viewed this post
-    existing_view = await db.post_views.find_one({
-        "post_id": post_id,
-        "user_id": user_id
-    })
-
-    if existing_view:
-        return {"status": "already_viewed"}
-
-    # Record the view
-    await db.post_views.insert_one({
-        "post_id": post_id,
-        "user_id": user_id,
-        "created_at": datetime.utcnow()
-    })
 
     # Increment views_count — try user posts first, then restaurant posts
     result = await db.posts.update_one(
@@ -1813,16 +1779,7 @@ async def track_post_view(post_id: str, current_user: dict = Depends(get_current
 async def like_post(post_id: str, current_user: dict = Depends(get_current_user)):
     """Like a post"""
     db = get_database()
-    
-    # Check if already liked
-    existing_like = await db.likes.find_one({
-        "post_id": post_id,
-        "user_id": str(current_user["_id"])
-    })
-    
-    if existing_like:
-        raise HTTPException(status_code=400, detail="Already liked this post")
-    
+
     # Get post to find owner - check both user posts and restaurant posts
     post = await db.posts.find_one({"_id": ObjectId(post_id)})
     is_restaurant_post = False
