@@ -117,7 +117,7 @@ const GradientBookmark = ({ size = 18 }) => (
 function PostItem({ post, currentPostId, token, bottomInset, accountType }: any) {
   const router = useRouter();
   const { user } = useAuth() as any;
-  const [isLiked, setIsLiked] = useState(post.is_liked_by_user || false);
+  const [isLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
   const [savesCount, setSavesCount] = useState(post.saves_count || 0);
@@ -385,22 +385,13 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   };
 
   const handleLikeToggle = async () => {
-    const prevLiked = isLiked;
     const prevCount = likesCount;
-    setIsLiked(!prevLiked);
-    setLikesCount(prevLiked ? prevCount - 1 : prevCount + 1);
+    setLikesCount(prevCount + 1);
     try {
-      if (prevLiked) {
-        await axios.delete(`${API_URL}/posts/${post.id}/like`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        await axios.post(`${API_URL}/posts/${post.id}/like`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      }
+      await axios.post(`${API_URL}/posts/${post.id}/like`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
     } catch (e) {
-      setIsLiked(prevLiked);
       setLikesCount(prevCount);
     }
   };
@@ -508,9 +499,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
 
   if (now - lastTap < DOUBLE_TAP_DELAY) {
     // Double tap detected - like the post
-    if (!isLiked) {
-      handleLikeToggle();
-    }
+    handleLikeToggle();
     // Reset all animation values
     leftHalfX.setValue(-200);
     rightHalfX.setValue(200);

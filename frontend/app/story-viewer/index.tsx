@@ -218,23 +218,15 @@ export default function StoryViewerScreen() {
     const currentStory = stories[currentIndex];
     if (!currentStory) return;
 
+    const prevCount = likeCount;
+    setLikeCount(prevCount + 1);
+    triggerHeartAnimation();
     try {
-      if (isLiked) {
-        await axios.delete(`${API_URL}/stories/${currentStory.id}/like`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setIsLiked(false);
-        setLikeCount(prev => Math.max(0, prev - 1));
-      } else {
-        await axios.post(`${API_URL}/stories/${currentStory.id}/like`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setIsLiked(true);
-        setLikeCount(prev => prev + 1);
-        triggerHeartAnimation();
-      }
+      await axios.post(`${API_URL}/stories/${currentStory.id}/like`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
     } catch (error) {
-      console.error('❌ Error liking/unliking story:', error);
+      setLikeCount(prevCount);
     }
   };
 

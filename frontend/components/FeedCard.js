@@ -33,7 +33,6 @@ import CofauVerifiedBadge from "./CofauVerifiedBadge";
 import { useAuth } from "../context/AuthContext";
 import {
 likePost,
-unlikePost,
 savePost,
 unsavePost,
 reportPost,
@@ -99,7 +98,7 @@ function FeedCard({
   const { user } = useAuth();
   const videoRef = useRef(null);
 
-const [isLiked, setIsLiked] = useState(post.is_liked || false);
+const [isLiked] = useState(false);
 const [likesCount, setLikes] = useState(post.likes || 0);
 const [isSaved, setIsSaved] = useState(post.is_saved_by_user || false);
 const [showReportModal, setShowReportModal] = useState(false);
@@ -275,18 +274,12 @@ useEffect(() => {
 }, [isMuted, shouldPlay, isVideo]);
 
 const handleLike = async () => {
-  const prev = isLiked;
-  setIsLiked(!prev);
-  setLikes(prev ? likesCount - 1 : likesCount + 1);
+  const prevCount = likesCount;
+  setLikes(prevCount + 1);
   try {
-    if (prev) {
-      await unlikePost(post.id, post.account_type);  // ← Pass account_type
-    } else {
-      await likePost(post.id, post.account_type);    // ← Pass account_type
-    }
+    await likePost(post.id, post.account_type);
   } catch {
-    setIsLiked(prev);
-    setLikes(likesCount);
+    setLikes(prevCount);
   }
 };
 
@@ -406,9 +399,7 @@ const handleDoubleTap = () => {
   const DOUBLE_TAP_DELAY = 300;
 
   if (now - lastTap < DOUBLE_TAP_DELAY) {
-    if (!isLiked) {
-      handleLike();
-    }
+    handleLike();
     // Reset all animation values
     leftHalfX.setValue(-200);
     rightHalfX.setValue(200);
@@ -1633,7 +1624,6 @@ export default React.memo(FeedCard, (prevProps, nextProps) => {
     prevProps.post.id === nextProps.post.id &&
     prevProps.shouldPlay === nextProps.shouldPlay &&
     prevProps.isMuted === nextProps.isMuted &&
-    prevProps.post.is_liked === nextProps.post.is_liked &&
     prevProps.post.is_saved_by_user === nextProps.post.is_saved_by_user
   );
 });

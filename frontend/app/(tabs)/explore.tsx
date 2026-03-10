@@ -27,7 +27,7 @@ import { Image } from "expo-image";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
-import { likePost, unlikePost, followUser, savePost, unsavePost } from "../../utils/api";
+import { likePost, followUser, savePost, unsavePost } from "../../utils/api";
 import UserAvatar from "../../components/UserAvatar";
 import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
 import HappeningPlaces from "../../components/HappeningPlaces";
@@ -2320,10 +2320,10 @@ const handleQuickCategoryPress = (category: any) => {
     setSelectedPost(post);
     setShowPostModal(true);
 
-    // Track click (same logic as grid tiles)
-    if (post && !post.is_clicked) {
+    // Track click every time user taps the post
+    if (post) {
       const updateClick = (p: any) =>
-        p.id === post.id ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true } : p;
+        p.id === post.id ? { ...p, clicks_count: (p.clicks_count || 0) + 1 } : p;
 
       // Update displayed posts
       setMapPosts((prev) => prev.map(updateClick));
@@ -2799,7 +2799,7 @@ useFocusEffect(
       : [...prev, itemName]
   ); 
 };
-  const handleLike = async (id: string, liked: boolean) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_liked: !liked, likes_count: p.likes_count + (liked ? -1 : 1) } : p)); try { liked ? await unlikePost(id) : await likePost(id); } catch {} };
+  const handleLike = async (id: string) => { setPosts((prev) => prev.map((p) => p.id === id ? { ...p, likes_count: (p.likes_count || 0) + 1 } : p)); try { await likePost(id); } catch {} };
   const [topPostFollowLoading, setTopPostFollowLoading] = useState<string | null>(null);
   const handleTopPostFollow = (postItem: any) => {
     if (!postItem.user_id || topPostFollowLoading) return;
@@ -2842,10 +2842,9 @@ useFocusEffect(
 
   const post = posts.find(p => p.id === postId);
 
-  // Only count click if this user hasn't clicked this post before
-  if (post && !post.is_clicked) {
-    // Optimistically increment clicks_count and mark as clicked
-    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, clicks_count: (p.clicks_count || 0) + 1, is_clicked: true } : p));
+  // Increment clicks_count every time a user taps the post
+  if (post) {
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, clicks_count: (p.clicks_count || 0) + 1 } : p));
 
     // Track click on backend
     try {
