@@ -560,6 +560,7 @@ export default function SavedLocationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [mapFilter, setMapFilter] = useState<'users' | 'restaurants'>('users');
   const mapRef = useRef<any>(null);
 
   // Dashboard state (for restaurant users)
@@ -701,9 +702,23 @@ export default function SavedLocationsScreen() {
     return counts;
   }, [savedPosts]);
 
-  // Posts with valid coordinates for map
+  // Posts with valid coordinates for map, filtered by mapFilter
   const postsWithCoords = useMemo(() =>
-    savedPosts.filter(p => p.latitude && p.longitude),
+    savedPosts.filter(p => {
+      if (!p.latitude || !p.longitude) return false;
+      if (mapFilter === 'restaurants') return p.account_type === 'restaurant';
+      return p.account_type !== 'restaurant';
+    }),
+    [savedPosts, mapFilter]
+  );
+
+  // Counts for map sub-tabs
+  const mapUserCount = useMemo(() =>
+    savedPosts.filter(p => p.latitude && p.longitude && p.account_type !== 'restaurant').length,
+    [savedPosts]
+  );
+  const mapRestaurantCount = useMemo(() =>
+    savedPosts.filter(p => p.latitude && p.longitude && p.account_type === 'restaurant').length,
     [savedPosts]
   );
 
@@ -925,6 +940,30 @@ export default function SavedLocationsScreen() {
                 ))}
               </MapView>
             </MapErrorBoundary>
+
+            {/* Users / Restaurants sub-tabs */}
+            <View style={mapStyles.mapSubTabsContainer}>
+              <TouchableOpacity
+                style={[mapStyles.mapSubTab, mapFilter === 'users' && mapStyles.mapSubTabActive]}
+                onPress={() => setMapFilter('users')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="person" size={14} color={mapFilter === 'users' ? '#fff' : '#666'} />
+                <Text style={[mapStyles.mapSubTabText, mapFilter === 'users' && mapStyles.mapSubTabTextActive]}>
+                  Users {mapUserCount > 0 ? `(${mapUserCount})` : ''}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[mapStyles.mapSubTab, mapFilter === 'restaurants' && mapStyles.mapSubTabActive]}
+                onPress={() => setMapFilter('restaurants')}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 14 }}>🍽️</Text>
+                <Text style={[mapStyles.mapSubTabText, mapFilter === 'restaurants' && mapStyles.mapSubTabTextActive]}>
+                  Restaurants {mapRestaurantCount > 0 ? `(${mapRestaurantCount})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={mapStyles.resultsCountContainer}>
               <Text style={mapStyles.resultsCountText}>
@@ -1443,6 +1482,25 @@ const dashboardStyles = StyleSheet.create({
 const mapStyles = StyleSheet.create({
   mapContainer: { flex: 1, position: 'relative' },
   map: { flex: 1, width: '100%', height: '100%' },
+  mapSubTabsContainer: {
+    position: 'absolute', top: 12, left: 16, right: 16,
+    flexDirection: 'row', gap: 8, justifyContent: 'center',
+  },
+  mapSubTab: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 25, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 4, elevation: 3,
+  },
+  mapSubTabActive: {
+    backgroundColor: '#E94A37',
+  },
+  mapSubTabText: {
+    fontSize: 13, fontWeight: '600', color: '#666',
+  },
+  mapSubTabTextActive: {
+    color: '#fff',
+  },
   resultsCountContainer: {
     position: 'absolute', bottom: 20, left: 16, right: 16,
     backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 20,

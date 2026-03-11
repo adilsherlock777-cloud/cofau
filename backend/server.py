@@ -2149,6 +2149,7 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
         # Resolve coordinates from map_link if not stored
         post_lat = post.get("latitude")
         post_lng = post.get("longitude")
+        print(f"📍 Saved post {saved['post_id']}: lat={post_lat}, lng={post_lng}, map_link={post.get('map_link')}, location={post.get('location_name')}")
         if not post_lat or not post_lng:
             map_link = post.get("map_link")
             if map_link:
@@ -3778,6 +3779,10 @@ async def search_restaurants_for_tagging(
             "profile_picture": restaurant.get("profile_picture"),
             "bio": restaurant.get("bio", ""),
             "is_verified": restaurant.get("is_verified", False),
+            "map_link": restaurant.get("map_link"),
+            "latitude": restaurant.get("latitude"),
+            "longitude": restaurant.get("longitude"),
+            "address": restaurant.get("address"),
         })
     
     # ✅ Track search appearances - INSIDE the function, BEFORE return

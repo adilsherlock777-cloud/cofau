@@ -727,6 +727,16 @@ const selectRestaurant = (restaurant: any) => {
   setRestaurantSearchQuery('');
   setShowRestaurantSuggestions(false);
   setRestaurantSuggestions([]);
+
+  // Auto-fill location from restaurant's registered location
+  if (restaurant.map_link) {
+    setMapsLink(restaurant.map_link);
+    setLocationName(restaurant.address || restaurant.restaurant_name);
+  } else if (restaurant.latitude && restaurant.longitude) {
+    const generatedLink = `https://www.google.com/maps/search/?api=1&query=${restaurant.latitude},${restaurant.longitude}`;
+    setMapsLink(generatedLink);
+    setLocationName(restaurant.address || restaurant.restaurant_name);
+  }
 };
 
 const removeTaggedRestaurant = () => {
