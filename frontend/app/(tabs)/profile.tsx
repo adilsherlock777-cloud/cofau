@@ -4861,7 +4861,6 @@ if (isRestaurantProfile) {
           <Text style={styles.statValue}>{userStats?.total_posts || 0}</Text>
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Posts</Text>
         </View>
-        <View style={styles.statDivider} />
         <TouchableOpacity
           style={styles.statBox}
           onPress={() => { if (userData?.id) { setFollowersModalVisible(true); fetchFollowers(); } }}
@@ -4870,7 +4869,6 @@ if (isRestaurantProfile) {
           <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Followers</Text>
         </TouchableOpacity>
-        <View style={styles.statDivider} />
         <TouchableOpacity
           style={styles.statBox}
           onPress={() => { if (isOwnProfile) { setComplimentsListModalVisible(true); fetchReceivedCompliments(); } }}
@@ -4882,7 +4880,6 @@ if (isRestaurantProfile) {
       </View>
 
       {/* Action Buttons inside card */}
-      <View style={styles.cardDivider} />
       <View style={styles.actionButtonsInsideCard}>
         {isOwnProfile ? (
           <>
@@ -5032,7 +5029,6 @@ if (isRestaurantProfile) {
           <Text style={styles.statValue}>{userStats?.total_posts || 0}</Text>
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Posts</Text>
         </View>
-        <View style={styles.statDivider} />
         <TouchableOpacity
           style={styles.statBox}
           onPress={() => { if (userData?.id) { setFollowersModalVisible(true); fetchFollowers(); } }}
@@ -5041,7 +5037,6 @@ if (isRestaurantProfile) {
           <Text style={styles.statValue}>{userStats?.followers_count || 0}</Text>
           <Text style={styles.statLabel} allowFontScaling={false} maxFontSizeMultiplier={1}>Followers</Text>
         </TouchableOpacity>
-        <View style={styles.statDivider} />
         <TouchableOpacity
           style={styles.statBox}
           onPress={() => { if (isOwnProfile) { setComplimentsListModalVisible(true); fetchReceivedCompliments(); } }}
@@ -5053,7 +5048,6 @@ if (isRestaurantProfile) {
       </View>
 
       {/* Action Buttons inside card */}
-      <View style={styles.cardDivider} />
       <View style={styles.actionButtonsInsideCard}>
         {isOwnProfile ? (
           <>

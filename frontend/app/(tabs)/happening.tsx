@@ -22,7 +22,23 @@ import { useAuth } from '../../context/AuthContext';
 import { getSavedPosts, unsavePost } from '../../utils/api';
 import { normalizeMediaUrl } from '../../utils/imageUrlFix';
 import { Video, ResizeMode } from 'expo-av';
+import { Image as ExpoImage } from 'expo-image';
 import axios from 'axios';
+
+let MapView: any;
+let Marker: any;
+try {
+  const maps = require('react-native-maps');
+  MapView = maps.default;
+  Marker = maps.Marker;
+} catch {
+  MapView = ({ children, style, ...props }: any) => (
+    <View style={[style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
+      <Text>Maps not available in Expo Go</Text>
+    </View>
+  );
+  Marker = View;
+}
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE_URL}/api`;
@@ -33,6 +49,7 @@ const CARD_HEIGHT = 140;
 
 // Category tabs - matching FOOD_SPOTS from Popular in explore
 const CATEGORY_TABS = [
+  { id: 'map', label: 'Map', emoji: '__map__', emptyMsg: 'Saved posts with location data will appear here' },
   { id: 'all', label: 'All', emoji: '', emptyMsg: 'Save posts from Explore to see them here' },
   { id: 'restaurant', label: 'Restaurants', emoji: '🍽️', emptyMsg: 'Explore restaurants and save your favourites' },
   { id: 'cafe', label: 'Cafe', emoji: '☕', emptyMsg: 'Discover cafes, fast food spots & save them' },
@@ -76,7 +93,10 @@ const matchesCategory = (post: any, categoryId: string): boolean => {
 };
 
 // Veg/NonVeg icon helper
-const renderCategoryIcon = (emoji: string, size: number) => {
+const renderCategoryIcon = (emoji: string, size: number, isActive?: boolean) => {
+  if (emoji === '__map__') {
+    return <Ionicons name="map" size={size} color={isActive ? '#fff' : '#666'} />;
+  }
   if (emoji === '__veg__') {
     return (
       <View style={{ width: size, height: size, borderRadius: 3, borderWidth: 1.5, borderColor: '#22C55E', justifyContent: 'center', alignItems: 'center' }}>
@@ -266,6 +286,158 @@ const VideoPreview = memo(({ uri, style }: { uri: string; style: any }) => {
   );
 });
 
+// ======================================================
+// MAP MARKER COMPONENTS (same logic as explore.tsx)
+// ======================================================
+
+const fixUrl = (url: string | null) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  let cleaned = url.trim().replace(/([^:]\/)\/+/g, '$1');
+  if (!cleaned.startsWith('/')) cleaned = '/' + cleaned;
+  return `${API_BASE_URL}${cleaned}`;
+};
+
+const PostMarker = memo(({ post, onPress }: any) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [tracksChanges, setTracksChanges] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setTracksChanges(false), Platform.OS === 'android' ? 2000 : 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!post.latitude || !post.longitude) return null;
+  const imageUrl = fixUrl(post.thumbnail_url) || fixUrl(post.media_url || post.mediaUrl);
+  const viewCount = post.clicks_count || 0;
+  const viewCountDisplay = viewCount > 1000 ? `${(viewCount / 1000).toFixed(1)}K` : viewCount;
+
+  return (
+    <Marker
+      coordinate={{ latitude: post.latitude, longitude: post.longitude }}
+      onPress={(e: any) => { e?.stopPropagation?.(); onPress(post); }}
+      tracksViewChanges={tracksChanges && !imageLoaded}
+      stopPropagation={true}
+    >
+      <View style={mapStyles.postMarkerContainer}>
+        <View style={mapStyles.postMarkerBubble}>
+          {imageUrl ? (
+            <ExpoImage
+              source={{ uri: imageUrl }}
+              style={mapStyles.postMarkerImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              onLoad={() => setImageLoaded(true)}
+            />
+          ) : (
+            <View style={mapStyles.postMarkerPlaceholder}>
+              <Ionicons name="image" size={24} color="#fff" />
+            </View>
+          )}
+          <View style={mapStyles.markerViewsBadge}>
+            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Text style={mapStyles.markerViewsText}>{viewCountDisplay}</Text>
+          </View>
+        </View>
+        <View style={mapStyles.postMarkerArrow} />
+      </View>
+    </Marker>
+  );
+});
+
+const ClusterMarker = memo(({ cluster, onPress }: any) => {
+  const [tracksChanges, setTracksChanges] = useState(true);
+  const { posts, latitude, longitude, count } = cluster;
+  const latestPosts = [...posts]
+    .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, 3);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setTracksChanges(false), Platform.OS === 'android' ? 2000 : 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const clusterWidth = 60 + (latestPosts.length - 1) * 45;
+  return (
+    <Marker
+      coordinate={{ latitude, longitude }}
+      onPress={(e: any) => { e?.stopPropagation?.(); onPress(cluster); }}
+      tracksViewChanges={tracksChanges}
+      zIndex={1000 + count}
+      stopPropagation={true}
+      anchor={{ x: 0.5, y: 1 }}
+    >
+      <View style={[mapStyles.clusterMarkerContainer, { width: clusterWidth }]}>
+        <View style={[mapStyles.clusterPreviewContainer, { width: clusterWidth }]}>
+          {latestPosts.map((post: any, index: number) => (
+            <View
+              key={post._id || post.id}
+              style={[
+                mapStyles.clusterPreviewImage,
+                { position: 'absolute', left: index * 45, zIndex: 3 - index, elevation: 4 + (3 - index) }
+              ]}
+            >
+              {fixUrl(post.thumbnail_url) || fixUrl(post.media_url) ? (
+                <ExpoImage
+                  source={{ uri: (fixUrl(post.thumbnail_url) || fixUrl(post.media_url))! }}
+                  style={mapStyles.clusterImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              ) : (
+                <View style={mapStyles.clusterImagePlaceholder}>
+                  <Ionicons name="image" size={16} color="#fff" />
+                </View>
+              )}
+              <View style={mapStyles.markerViewsBadge}>
+                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Text style={mapStyles.markerViewsText}>
+                  {(post.clicks_count || 0) > 1000
+                    ? `${((post.clicks_count || 0) / 1000).toFixed(1)}K`
+                    : (post.clicks_count || 0)}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+        <View style={mapStyles.clusterPinContainer}>
+          <View style={mapStyles.clusterPin}>
+            <Ionicons name="location" size={18} color="#fff" />
+          </View>
+          <View style={mapStyles.clusterCountBadge}>
+            <Text style={mapStyles.clusterCountText}>{count}</Text>
+          </View>
+          <View style={mapStyles.clusterPinArrow} />
+        </View>
+      </View>
+    </Marker>
+  );
+});
+
+class MapErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch() {}
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Ionicons name="map-outline" size={48} color="#999" />
+          <Text style={{ color: '#666', fontSize: 16, marginTop: 12, textAlign: 'center' }}>
+            Map couldn't load. Please restart the app.
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ======================================================
+
 const SavedPostCard = memo(({ post, onUnsave, onPress }: { post: any; onUnsave: (id: string) => void; onPress: (id: string) => void }) => {
   const mediaUrl = normalizeMediaUrl(post.media_url || post.mediaUrl);
   const thumbnailUrl = post.thumbnail_url ? normalizeMediaUrl(post.thumbnail_url) : null;
@@ -388,6 +560,7 @@ export default function SavedLocationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const mapRef = useRef<any>(null);
 
   // Dashboard state (for restaurant users)
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -528,6 +701,72 @@ export default function SavedLocationsScreen() {
     return counts;
   }, [savedPosts]);
 
+  // Posts with valid coordinates for map
+  const postsWithCoords = useMemo(() =>
+    savedPosts.filter(p => p.latitude && p.longitude),
+    [savedPosts]
+  );
+
+  // Group posts by location for map markers (same toFixed(3) logic as explore.tsx)
+  const { singlePosts, clusters } = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    postsWithCoords.forEach((post: any) => {
+      const key = `${post.latitude.toFixed(3)},${post.longitude.toFixed(3)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(post);
+    });
+
+    const singlePosts: any[] = [];
+    const clusters: any[] = [];
+    groups.forEach((groupPosts, key) => {
+      const [lat, lng] = key.split(',').map(Number);
+      groupPosts.sort((a: any, b: any) =>
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      if (groupPosts.length === 1) {
+        singlePosts.push(groupPosts[0]);
+      } else {
+        clusters.push({
+          id: key,
+          latitude: lat,
+          longitude: lng,
+          count: groupPosts.length,
+          posts: groupPosts,
+          locationName: groupPosts[0].location_name || 'This location',
+        });
+      }
+    });
+    return { singlePosts, clusters };
+  }, [postsWithCoords]);
+
+  // Calculate map initial region from saved posts
+  const mapRegion = useMemo(() => {
+    if (postsWithCoords.length === 0) return null;
+    const lats = postsWithCoords.map(p => p.latitude);
+    const lngs = postsWithCoords.map(p => p.longitude);
+    return {
+      latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
+      longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+      latitudeDelta: Math.max((Math.max(...lats) - Math.min(...lats)) * 1.3, 0.02),
+      longitudeDelta: Math.max((Math.max(...lngs) - Math.min(...lngs)) * 1.3, 0.02),
+    };
+  }, [postsWithCoords]);
+
+  const handlePostMarkerPress = (post: any) => {
+    router.push(`/post-details/${post._id || post.id}`);
+  };
+
+  const handleClusterPress = (cluster: any) => {
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: cluster.latitude,
+        longitude: cluster.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 500);
+    }
+  };
+
   // ======================================================
   // RESTAURANT USER: DASHBOARD VIEW
   // ======================================================
@@ -630,15 +869,15 @@ export default function SavedLocationsScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.tabGradient}
                 >
-                  {tab.emoji ? renderCategoryIcon(tab.emoji, 14) : null}
+                  {tab.emoji ? renderCategoryIcon(tab.emoji, 14, true) : null}
                   <Text style={styles.tabTextActive}>{tab.label}</Text>
-                  {count > 0 && <Text style={styles.tabCountActive}>{count}</Text>}
+                  {count > 0 && tab.id !== 'map' && <Text style={styles.tabCountActive}>{count}</Text>}
                 </LinearGradient>
               ) : (
                 <View style={styles.tabInner}>
-                  {tab.emoji ? renderCategoryIcon(tab.emoji, 14) : null}
+                  {tab.emoji ? renderCategoryIcon(tab.emoji, 14, false) : null}
                   <Text style={styles.tabText}>{tab.label}</Text>
-                  {count > 0 && <Text style={styles.tabCount}>{count}</Text>}
+                  {count > 0 && tab.id !== 'map' && <Text style={styles.tabCount}>{count}</Text>}
                 </View>
               )}
             </TouchableOpacity>
@@ -651,6 +890,48 @@ export default function SavedLocationsScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#E94A37" />
+        </View>
+      ) : activeCategory === 'map' ? (
+        /* Map View - always show map like explore.tsx */
+        <View style={{ flex: 1 }}>
+          <View style={mapStyles.mapContainer}>
+            <MapErrorBoundary>
+              <MapView
+                ref={mapRef}
+                style={mapStyles.map}
+                initialRegion={mapRegion || {
+                  latitude: 17.385,
+                  longitude: 78.4867,
+                  latitudeDelta: 0.5,
+                  longitudeDelta: 0.5,
+                }}
+                showsUserLocation={true}
+                showsMyLocationButton={false}
+                showsCompass={true}
+              >
+                {singlePosts.map((post: any) => (
+                  <PostMarker
+                    key={`saved-post-${post._id || post.id}`}
+                    post={post}
+                    onPress={handlePostMarkerPress}
+                  />
+                ))}
+                {clusters.map((cluster: any) => (
+                  <ClusterMarker
+                    key={`saved-cluster-${cluster.id}`}
+                    cluster={cluster}
+                    onPress={handleClusterPress}
+                  />
+                ))}
+              </MapView>
+            </MapErrorBoundary>
+
+            <View style={mapStyles.resultsCountContainer}>
+              <Text style={mapStyles.resultsCountText}>
+                {postsWithCoords.length} saved {postsWithCoords.length === 1 ? 'place' : 'places'}{postsWithCoords.length > 0 ? ` at ${singlePosts.length + clusters.length} ${singlePosts.length + clusters.length === 1 ? 'location' : 'locations'}` : ''}
+              </Text>
+            </View>
+          </View>
         </View>
       ) : (
         <FlatList
@@ -1153,5 +1434,59 @@ const dashboardStyles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 18,
+  },
+});
+
+// ======================================================
+// MAP STYLES (matching explore.tsx)
+// ======================================================
+const mapStyles = StyleSheet.create({
+  mapContainer: { flex: 1, position: 'relative' },
+  map: { flex: 1, width: '100%', height: '100%' },
+  resultsCountContainer: {
+    position: 'absolute', bottom: 20, left: 16, right: 16,
+    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 20,
+    paddingVertical: 8, paddingHorizontal: 16, alignItems: 'center',
+  },
+  resultsCountText: { color: '#fff', fontSize: 12, fontWeight: '500' },
+  postMarkerContainer: { alignItems: 'center' },
+  postMarkerBubble: {
+    width: 56, height: 56, borderRadius: 8, backgroundColor: '#F2CF68',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5,
+  },
+  postMarkerImage: { width: 50, height: 50, borderRadius: 6 },
+  postMarkerPlaceholder: { width: 50, height: 50, borderRadius: 6, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2CF68' },
+  postMarkerArrow: {
+    width: 0, height: 0, borderLeftWidth: 8, borderRightWidth: 8, borderTopWidth: 10,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fff', marginTop: -2,
+  },
+  markerViewsBadge: {
+    position: 'absolute', bottom: 2, alignSelf: 'center', flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 6, gap: 2,
+  },
+  markerViewsText: { color: '#fff', fontSize: 7, fontWeight: '600' },
+  clusterMarkerContainer: { alignItems: 'center' },
+  clusterPreviewContainer: { position: 'relative', height: 60, marginBottom: -10 },
+  clusterPreviewImage: {
+    width: 60, height: 60, borderRadius: 10, borderWidth: 3, borderColor: '#fff', backgroundColor: '#f0f0f0',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4,
+  },
+  clusterImage: { width: 54, height: 54, borderRadius: 7 },
+  clusterImagePlaceholder: { width: 54, height: 54, borderRadius: 7, backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
+  clusterPinContainer: { alignItems: 'center' },
+  clusterPin: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#E94A37',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5,
+  },
+  clusterCountBadge: {
+    position: 'absolute', top: -5, right: -10, backgroundColor: '#fff', borderRadius: 12,
+    minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E94A37', paddingHorizontal: 6,
+  },
+  clusterCountText: { color: '#E94A37', fontSize: 12, fontWeight: 'bold' },
+  clusterPinArrow: {
+    width: 0, height: 0, borderLeftWidth: 8, borderRightWidth: 8, borderTopWidth: 10,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fff', marginTop: -3,
   },
 });

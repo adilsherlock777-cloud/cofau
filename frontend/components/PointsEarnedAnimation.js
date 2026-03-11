@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, Modal, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -38,27 +39,27 @@ export default function PointsEarnedAnimation({
   onClose,
   levelData,
 }) {
-  const slideAnim = useRef(new Animated.Value(-120)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const pointsScaleAnim = useRef(new Animated.Value(0)).current;
+  const checkAnim = useRef(new Animated.Value(0)).current;
   const [show, setShow] = useState(false);
 
   const level = levelData?.level || 1;
   const currentPoints = levelData?.currentPoints || 0;
   const totalPoints = levelData?.total_points || 0;
 
-  // Calculate progress
   const currentLevelData = LEVEL_TABLE.find((l) => l.level === level);
   const prevLevelData = LEVEL_TABLE.find((l) => l.level === level - 1);
   const currentThreshold = currentLevelData?.required_points || 1250;
   const prevThreshold = prevLevelData?.required_points || 0;
   const pointsNeededForLevel = currentThreshold - prevThreshold;
-  const progressBefore = pointsNeededForLevel > 0
-    ? Math.min(Math.max((currentPoints - pointsEarned) / pointsNeededForLevel, 0), 1)
-    : 0;
   const progressAfter = pointsNeededForLevel > 0
     ? Math.min(currentPoints / pointsNeededForLevel, 1)
+    : 0;
+  const progressBefore = pointsNeededForLevel > 0
+    ? Math.min(Math.max((currentPoints - pointsEarned) / pointsNeededForLevel, 0), 1)
     : 0;
 
   useEffect(() => {
@@ -66,48 +67,57 @@ export default function PointsEarnedAnimation({
       setShow(true);
       progressAnim.setValue(progressBefore);
       pointsScaleAnim.setValue(0);
+      checkAnim.setValue(0);
 
-      // Slide in from top
+      // Fade in white screen + scale up card
       Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 60,
-          useNativeDriver: true,
-          tension: 50,
-          friction: 8,
-        }),
-        Animated.timing(opacityAnim, {
+        Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 300,
+          duration: 400,
           useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 60,
+          friction: 7,
         }),
       ]).start(() => {
-        // Animate progress bar filling
-        Animated.timing(progressAnim, {
-          toValue: progressAfter,
-          duration: 800,
-          useNativeDriver: false,
-        }).start();
-
-        // Pop in the +points text
-        Animated.spring(pointsScaleAnim, {
+        // Checkmark pop
+        Animated.spring(checkAnim, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 100,
-          friction: 6,
-          delay: 200,
+          tension: 120,
+          friction: 5,
         }).start();
+
+        // Animate progress bar after a beat
+        setTimeout(() => {
+          Animated.timing(progressAnim, {
+            toValue: progressAfter,
+            duration: 800,
+            useNativeDriver: false,
+          }).start();
+
+          Animated.spring(pointsScaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 6,
+          }).start();
+        }, 400);
       });
 
       // Auto dismiss after 3 seconds
       const timer = setTimeout(() => {
         Animated.parallel([
-          Animated.timing(slideAnim, {
-            toValue: -120,
+          Animated.timing(fadeAnim, {
+            toValue: 0,
             duration: 300,
             useNativeDriver: true,
           }),
-          Animated.timing(opacityAnim, {
-            toValue: 0,
+          Animated.timing(scaleAnim, {
+            toValue: 0.8,
             duration: 300,
             useNativeDriver: true,
           }),
@@ -119,8 +129,8 @@ export default function PointsEarnedAnimation({
 
       return () => clearTimeout(timer);
     } else {
-      slideAnim.setValue(-120);
-      opacityAnim.setValue(0);
+      fadeAnim.setValue(0);
+      scaleAnim.setValue(0.8);
       setShow(false);
     }
   }, [visible]);
@@ -136,133 +146,153 @@ export default function PointsEarnedAnimation({
   });
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ translateY: slideAnim }],
-          opacity: opacityAnim,
-        },
-      ]}
-      pointerEvents="none"
-    >
-      <View style={styles.card}>
-        {/* Level Badge */}
-        <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-          <Text style={styles.badgeText}>{level}</Text>
-        </View>
+    <Modal visible={visible && show} transparent animationType="none">
+      <StatusBar barStyle="dark-content" />
+      <Animated.View style={[styles.fullScreen, { opacity: fadeAnim }]}>
+        <Animated.View
+          style={[
+            styles.card,
+            { transform: [{ scale: scaleAnim }] },
+          ]}
+        >
+          {/* Success checkmark */}
+          <Animated.View style={[styles.checkCircle, { transform: [{ scale: checkAnim }] }]}>
+            <MaterialCommunityIcons name="check" size={32} color="#fff" />
+          </Animated.View>
 
-        {/* Content */}
-        <View style={styles.content}>
-          {/* Top row: title + points earned */}
-          <View style={styles.topRow}>
-            <Text style={styles.levelTitle}>{levelTitle}</Text>
-            <Animated.Text
-              style={[
-                styles.pointsText,
-                { transform: [{ scale: pointsScaleAnim }] },
-              ]}
-            >
-              +{pointsEarned} pts
-            </Animated.Text>
+          <Text style={styles.successTitle}>Post Uploaded!</Text>
+
+          {/* Level info card */}
+          <View style={styles.levelCard}>
+            {/* Badge + title row */}
+            <View style={styles.levelRow}>
+              <View style={[styles.badge, { backgroundColor: badgeColor }]}>
+                <Text style={styles.badgeText}>{level}</Text>
+              </View>
+              <View style={styles.levelInfo}>
+                <Text style={styles.levelTitle}>{levelTitle}</Text>
+                <Text style={styles.levelSubtitle}>Level {level}</Text>
+              </View>
+              <Animated.Text
+                style={[
+                  styles.pointsText,
+                  { transform: [{ scale: pointsScaleAnim }] },
+                ]}
+              >
+                +{pointsEarned} pts
+              </Animated.Text>
+            </View>
+
+            {/* Progress bar */}
+            <View style={styles.progressBarBg}>
+              <Animated.View style={[styles.progressBarFill, { width: progressWidth }]}>
+                <LinearGradient
+                  colors={['#FF9A4D', '#FF5C5C']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.progressGradient}
+                />
+              </Animated.View>
+            </View>
+
+            <Text style={styles.progressText}>
+              {totalPoints} / {currentThreshold} pts
+            </Text>
           </View>
-
-          {/* Progress bar */}
-          <View style={styles.progressBarBg}>
-            <Animated.View style={[styles.progressBarFill, { width: progressWidth }]}>
-              <LinearGradient
-                colors={['#FF9A4D', '#FF5C5C']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.progressGradient}
-              />
-            </Animated.View>
-          </View>
-
-          {/* Points text */}
-          <Text style={styles.progressText}>
-            {totalPoints}/{currentThreshold} pts
-          </Text>
-        </View>
-      </View>
-    </Animated.View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 9999,
+  fullScreen: {
+    flex: 1,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   card: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    width: SCREEN_WIDTH - 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    width: SCREEN_WIDTH - 60,
   },
-  badge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  checkCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 28,
+  },
+  levelCard: {
+    width: '100%',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 16,
+    padding: 18,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  badge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   badgeText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  content: {
+  levelInfo: {
     flex: 1,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+    marginLeft: 12,
   },
   levelTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
   },
+  levelSubtitle: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
+    marginTop: 1,
+  },
   pointsText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FF5C5C',
   },
   progressBarBg: {
-    height: 8,
-    backgroundColor: '#E8E8E8',
-    borderRadius: 4,
+    height: 10,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 5,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   progressGradient: {
     flex: 1,
   },
   progressText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#888',
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 6,
     textAlign: 'right',
   },
 });

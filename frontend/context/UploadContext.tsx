@@ -23,6 +23,7 @@ interface UploadContextType {
   uploadState: UploadState;
   lastUploadTimestamp: number;
   lastUploadResult: any | null;
+  lastUploadPostData: any | null;
   startUpload: (postData: any, accountType: string) => Promise<UploadResult>;
   retryUpload: () => Promise<void>;
   clearUploadState: () => void;
@@ -41,6 +42,7 @@ const UploadContext = createContext<UploadContextType>({
   uploadState: initialState,
   lastUploadTimestamp: 0,
   lastUploadResult: null,
+  lastUploadPostData: null,
   startUpload: async () => ({ success: false }),
   retryUpload: async () => {},
   clearUploadState: () => {},
@@ -53,6 +55,7 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [uploadState, setUploadState] = useState<UploadState>(initialState);
   const [lastUploadTimestamp, setLastUploadTimestamp] = useState(0);
   const [lastUploadResult, setLastUploadResult] = useState<any | null>(null);
+  const [lastUploadPostData, setLastUploadPostData] = useState<any | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   const buildFormData = useCallback((postData: any, accountType: string): FormData => {
@@ -191,6 +194,9 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return { success: false, error: 'Upload already in progress' };
     }
 
+    // Save postData so feed can build optimistic post after upload completes
+    setLastUploadPostData({ ...postData, accountType });
+
     setUploadState({
       isUploading: true,
       progress: 0,
@@ -232,6 +238,7 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     uploadState,
     lastUploadTimestamp,
     lastUploadResult,
+    lastUploadPostData,
     startUpload,
     retryUpload,
     clearUploadState,

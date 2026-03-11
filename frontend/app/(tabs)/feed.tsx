@@ -42,7 +42,6 @@ import { useNotifications } from "../../context/NotificationContext";
 import { useUpload } from "../../context/UploadContext";
 import { useLevelAnimation } from "../../context/LevelContext";
 import PointsEarnedAnimation from "../../components/PointsEarnedAnimation";
-import PostRewardModal from "../../components/PostRewardModal";
 import SuggestedUsersBar from "../../components/SuggestedUsersBar";
 import {
   normalizeMediaUrl,
@@ -178,7 +177,7 @@ export default function FeedScreen() {
   const router = useRouter();
   const { openWallet } = useLocalSearchParams<{ openWallet?: string }>();
   const { user, token, refreshUser, accountType } = useAuth() as any;
-  const { lastUploadTimestamp, lastUploadResult } = useUpload();
+  const { lastUploadTimestamp, lastUploadResult, clearUploadState } = useUpload();
   const { showLevelUpAnimation } = useLevelAnimation();
   const lastKnownUploadRef = useRef(lastUploadTimestamp);
   const previousLevelRef = useRef(user?.level || 1);
@@ -187,11 +186,6 @@ export default function FeedScreen() {
   const [showPointsAnimation, setShowPointsAnimation] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
   const [levelData, setLevelData] = useState<any>(null);
-  const [showRewardModal, setShowRewardModal] = useState(false);
-  const [rewardData, setRewardData] = useState<any>(null);
-  const pendingPointsRef = useRef<number | null>(null);
-  const pendingLevelDataRef = useRef<any>(null);
-  const pendingLevelUpRef = useRef<number | null>(null);
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -236,21 +230,6 @@ export default function FeedScreen() {
   // Build display data: deduplicate + insert "caught up" divider + suggested posts
   const displayData = useMemo(() => {
     let spread = spreadPosts(feedPosts);
-
-    // Pin user's own post to top right after they upload
-    if (justUploadedRef.current && user?.id && spread.length > 0) {
-      const ownIdx = spread.findIndex(
-        (p: any) =>
-          p.user_id === user.id &&
-          Date.now() - new Date(p.created_at).getTime() < 5 * 60 * 1000 // within 5 min
-      );
-      if (ownIdx > 0) {
-        const [ownPost] = spread.splice(ownIdx, 1);
-        spread.unshift(ownPost);
-      }
-      justUploadedRef.current = false;
-    }
-
     let result = [...spread];
 
     // Append suggested posts when the regular feed has no more pages
@@ -422,46 +401,37 @@ useEffect(() => {
   if (lastUploadTimestamp > lastKnownUploadRef.current) {
     const prevLevel = previousLevelRef.current;
     lastKnownUploadRef.current = lastUploadTimestamp;
-    justUploadedRef.current = true;
-    fetchFeed(true);
+    setShowNewPostsPill(false);
+    lastNewPostsCheckRef.current = Date.now();
 
-    // Show animations based on upload result
-    if (lastUploadResult) {
+    // Immediately hide the "Post uploaded successfully!" banner
+    clearUploadState();
+
+    // STEP 1: Show full-screen points animation immediately
+    if (lastUploadResult?.level_update) {
       const data = lastUploadResult;
-      const hasWalletReward = data.wallet_reward && data.wallet_reward.wallet_earned > 0;
+      previousLevelRef.current = data.level_update.level || prevLevel;
+      const earnedPoints = data.level_update.pointsEarned || 10;
 
-      // Wallet reward takes priority - show it first
-      if (hasWalletReward) {
-        setRewardData(data.wallet_reward);
-        setShowRewardModal(true);
-      }
+      setPointsEarned(earnedPoints);
+      setLevelData(data.level_update);
+      setShowPointsAnimation(true);
 
-      // Check for level-up
-      if (data.level_update) {
-        const newLevel = data.level_update.level || 1;
-        if (newLevel > prevLevel) {
-          if (!hasWalletReward) {
-            showLevelUpAnimation(newLevel);
-          } else {
-            pendingLevelUpRef.current = newLevel;
-          }
-        }
-        // Update the stored level
-        previousLevelRef.current = data.level_update.level || prevLevel;
-
-        const earnedPoints = data.level_update.pointsEarned || 10;
-
-        if (!hasWalletReward) {
-          setPointsEarned(earnedPoints);
-          setLevelData(data.level_update);
-          setShowPointsAnimation(true);
-        } else {
-          // Store pending points to show after reward modal closes
-          pendingPointsRef.current = earnedPoints;
-          pendingLevelDataRef.current = data.level_update;
-        }
+      // STEP 2: After animation ends (3s), show level-up if applicable
+      const newLevel = data.level_update.level || 1;
+      if (newLevel > prevLevel) {
+        setTimeout(() => {
+          showLevelUpAnimation(newLevel);
+        }, 3500);
       }
     }
+
+    // STEP 3: Refresh feed with own post pinned to top after animation
+    justUploadedRef.current = true;
+    setTimeout(() => {
+      fetchFeed(true, true);
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 3200);
   }
 }, [lastUploadTimestamp, lastUploadResult]);
 
@@ -592,10 +562,10 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
     }
   };
 
-  const fetchFeed = async (forceRefresh = false) => {
+  const fetchFeed = async (forceRefresh = false, silent = false) => {
     try {
       if (forceRefresh) {
-        setLoading(true);
+        if (!silent) setLoading(true);
         setPage(1);
         setHasMore(true);
         setSuggestedPosts([]);
@@ -650,7 +620,71 @@ const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: a
         tagged_restaurant: post.tagged_restaurant || null,
         dish_name: post.dish_name || null,
         user_badge: post.user_badge || null,
+        is_first_discovery: post.is_first_discovery || false,
       }));
+
+      // Pin own post to top if user just uploaded
+      if (forceRefresh && justUploadedRef.current && user?.id) {
+        const ownIdx = mapped.findIndex(
+          (p: any) =>
+            p.user_id === user.id &&
+            Date.now() - new Date(p.created_at).getTime() < 5 * 60 * 1000
+        );
+        if (ownIdx > 0) {
+          const [ownPost] = mapped.splice(ownIdx, 1);
+          mapped.unshift(ownPost);
+        } else if (ownIdx === -1) {
+          // Post not in engagement-sorted results — fetch latest to find it
+          try {
+            const latestRes = await axios.get(
+              `${BACKEND}/api/feed?skip=0&limit=5&sort=latest&_t=${Date.now()}`
+            );
+            const ownPost = latestRes.data?.find(
+              (p: any) =>
+                (p.user_id === user.id) &&
+                Date.now() - new Date(p.created_at).getTime() < 5 * 60 * 1000
+            );
+            if (ownPost) {
+              const mappedOwn = {
+                id: ownPost.id,
+                user_id: ownPost.user_id,
+                username: ownPost.username,
+                user_profile_picture: getPostDP(ownPost),
+                description: ownPost.review_text || ownPost.description || ownPost.about,
+                rating: ownPost.rating,
+                price: ownPost.price,
+                about: ownPost.about,
+                account_type: ownPost.account_type,
+                media_url: normalizeMediaUrl(ownPost.image_url || ownPost.media_url),
+                thumbnail_url: ownPost.thumbnail_url
+                  ? normalizeMediaUrl(ownPost.thumbnail_url)
+                  : null,
+                media_type: ownPost.media_type,
+                created_at: ownPost.created_at,
+                user_level: ownPost.user_level || ownPost.level || ownPost.userLevel,
+                location_name: ownPost.location_name || ownPost.location || ownPost.place_name,
+                location_address: ownPost.location_address || ownPost.address,
+                map_link: ownPost.map_link || ownPost.google_maps_link,
+                likes: ownPost.likes || ownPost.likes_count || 0,
+                comments: ownPost.comments || ownPost.comments_count || 0,
+                shares_count: ownPost.shares_count || ownPost.shares || 0,
+                saves_count: ownPost.saves_count || 0,
+                is_liked: ownPost.is_liked || false,
+                is_saved_by_user: ownPost.is_saved_by_user || ownPost.is_saved || false,
+                is_following: ownPost.is_following || false,
+                tagged_restaurant: ownPost.tagged_restaurant || null,
+                dish_name: ownPost.dish_name || null,
+                user_badge: ownPost.user_badge || null,
+                is_first_discovery: ownPost.is_first_discovery || false,
+              };
+              mapped.unshift(mappedOwn);
+            }
+          } catch (err) {
+            // silenced — feed still works, just without pinned post
+          }
+        }
+        justUploadedRef.current = false;
+      }
 
       if (forceRefresh) {
         setFeedPosts(mapped);
@@ -1178,8 +1212,8 @@ const renderPost = useCallback(
       {/* Fixed Line */}
       {showFixedLine && <View style={styles.fixedLine} />}
 
-      {/* "New Posts" Floating Pill */}
-      {showNewPostsPill && (
+      {/* "New Posts" Floating Pill - hide during animations */}
+      {showNewPostsPill && !showPointsAnimation && (
         <Animated.View
           style={[
             styles.newPostsPillWrapper,
@@ -1293,29 +1327,6 @@ const renderPost = useCallback(
       <CofauWalletModal
         visible={showWalletModal}
         onClose={() => setShowWalletModal(false)}
-      />
-
-      {/* Post Reward Modal (wallet earned) */}
-      <PostRewardModal
-        visible={showRewardModal}
-        onClose={() => {
-          setShowRewardModal(false);
-          setRewardData(null);
-          // Show pending level-up animation
-          if (pendingLevelUpRef.current !== null) {
-            showLevelUpAnimation(pendingLevelUpRef.current);
-            pendingLevelUpRef.current = null;
-          }
-          // Show pending points animation
-          if (pendingPointsRef.current !== null) {
-            setPointsEarned(pendingPointsRef.current);
-            setLevelData(pendingLevelDataRef.current);
-            setShowPointsAnimation(true);
-            pendingPointsRef.current = null;
-            pendingLevelDataRef.current = null;
-          }
-        }}
-        rewardData={rewardData}
       />
 
       {/* Points Earned Animation */}

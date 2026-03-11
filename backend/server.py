@@ -1373,6 +1373,44 @@ async def get_feed(
             spread_result.append(post)
             last_user_id = post.get("user_id")
 
+        # Get list of user IDs that the current user follows
+        current_uid = str(current_user["_id"])
+        following_docs = await db.follows.find({"followerId": current_uid}).to_list(None)
+        following_ids = {doc["followingId"] for doc in following_docs}
+
+        # 1) Extract own recent posts (uploaded within last 2 hours) -> show first
+        recent_cutoff = current_time - timedelta(hours=2)
+        recent_own = [p for p in spread_result
+                      if p.get("user_id") == current_uid
+                      and p.get("created_at", datetime.min) >= recent_cutoff]
+
+        # 2) Extract following users' posts (sorted newest first)
+        following_posts = [p for p in spread_result
+                          if p.get("user_id") in following_ids
+                          and p not in recent_own]
+        following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+
+        # 3) Remaining engagement-ranked posts
+        boosted_ids = set(id(p) for p in recent_own) | set(id(p) for p in following_posts)
+        other_posts = [p for p in spread_result if id(p) not in boosted_ids]
+
+        # 4) Build final feed: own recent first, then interleave following every 5 posts
+        final_feed = list(recent_own)
+        following_idx = 0
+        for i, post in enumerate(other_posts):
+            final_feed.append(post)
+            # After every 5 engagement posts, insert a following post
+            if (i + 1) % 5 == 0 and following_idx < len(following_posts):
+                final_feed.append(following_posts[following_idx])
+                following_idx += 1
+
+        # Append any remaining following posts at the end
+        while following_idx < len(following_posts):
+            final_feed.append(following_posts[following_idx])
+            following_idx += 1
+
+        spread_result = final_feed
+
         posts = spread_result[skip:]
         if limit:
             posts = posts[:limit]
@@ -1438,6 +1476,34 @@ async def get_feed(
             random.shuffle(batch)
             mixed.extend(batch)
 
+        # Get following IDs
+        current_uid = str(current_user["_id"])
+        following_docs_m = await db.follows.find({"followerId": current_uid}).to_list(None)
+        following_ids_m = {doc["followingId"] for doc in following_docs_m}
+
+        recent_cutoff = current_time - timedelta(hours=2)
+        recent_own = [p for p in mixed
+                      if p.get("user_id") == current_uid
+                      and p.get("created_at", datetime.min) >= recent_cutoff]
+        following_posts = [p for p in mixed
+                          if p.get("user_id") in following_ids_m
+                          and p not in recent_own]
+        following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+        boosted_ids = set(id(p) for p in recent_own) | set(id(p) for p in following_posts)
+        other_posts = [p for p in mixed if id(p) not in boosted_ids]
+
+        final_feed = list(recent_own)
+        f_idx = 0
+        for i, post in enumerate(other_posts):
+            final_feed.append(post)
+            if (i + 1) % 5 == 0 and f_idx < len(following_posts):
+                final_feed.append(following_posts[f_idx])
+                f_idx += 1
+        while f_idx < len(following_posts):
+            final_feed.append(following_posts[f_idx])
+            f_idx += 1
+        mixed = final_feed
+
         posts = mixed[skip:skip + page_size] if limit else mixed[skip:]
 
     else:
@@ -1458,6 +1524,34 @@ async def get_feed(
         # Combine and sort by created_at
         all_posts = user_posts_raw + restaurant_posts_raw
         all_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+
+        # Get following IDs and boost own + following posts
+        current_uid = str(current_user["_id"])
+        following_docs_c = await db.follows.find({"followerId": current_uid}).to_list(None)
+        following_ids_c = {doc["followingId"] for doc in following_docs_c}
+
+        recent_cutoff = current_time - timedelta(hours=2)
+        recent_own = [p for p in all_posts
+                      if p.get("user_id") == current_uid
+                      and p.get("created_at", datetime.min) >= recent_cutoff]
+        following_posts = [p for p in all_posts
+                          if p.get("user_id") in following_ids_c
+                          and p not in recent_own]
+        following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+        boosted_ids = set(id(p) for p in recent_own) | set(id(p) for p in following_posts)
+        other_posts = [p for p in all_posts if id(p) not in boosted_ids]
+
+        final_feed = list(recent_own)
+        f_idx = 0
+        for i, post in enumerate(other_posts):
+            final_feed.append(post)
+            if (i + 1) % 5 == 0 and f_idx < len(following_posts):
+                final_feed.append(following_posts[f_idx])
+                f_idx += 1
+        while f_idx < len(following_posts):
+            final_feed.append(following_posts[f_idx])
+            f_idx += 1
+        all_posts = final_feed
 
         # Apply limit after combining
         if limit:
@@ -2030,6 +2124,8 @@ async def remove_saved_post(post_id: str, current_user: dict = Depends(get_curre
 @app.get("/api/saved/list")
 async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
     """Get current user's saved posts (includes both regular and restaurant posts)"""
+    from routers.map import get_coordinates_for_map_link
+
     db = get_database()
 
     user_id = str(current_user["_id"])
@@ -2049,6 +2145,27 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             is_restaurant_post = True
 
         media_type = post.get("media_type", "image")
+
+        # Resolve coordinates from map_link if not stored
+        post_lat = post.get("latitude")
+        post_lng = post.get("longitude")
+        if not post_lat or not post_lng:
+            map_link = post.get("map_link")
+            if map_link:
+                try:
+                    coords = await get_coordinates_for_map_link(map_link)
+                    if coords:
+                        post_lat = coords.get("latitude")
+                        post_lng = coords.get("longitude")
+                        # Cache coordinates in the DB for future use
+                        if post_lat and post_lng:
+                            collection = db.restaurant_posts if is_restaurant_post else db.posts
+                            await collection.update_one(
+                                {"_id": post["_id"]},
+                                {"$set": {"latitude": post_lat, "longitude": post_lng}}
+                            )
+                except Exception as e:
+                    print(f"⚠️ Error resolving coords for saved post: {e}")
 
         if is_restaurant_post:
             restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
@@ -2081,6 +2198,9 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
                 "saves_count": post.get("saves_count", 0),
                 "category": post.get("category"),
                 "price": post.get("price"),
+                "latitude": post_lat,
+                "longitude": post_lng,
+                "clicks_count": post.get("clicks_count", 0),
                 "is_liked_by_user": is_liked,
                 "is_saved_by_user": True,
                 "account_type": "restaurant",
@@ -2117,6 +2237,9 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
                 "shares_count": post.get("shares_count", 0),
                 "saves_count": post.get("saves_count", 0),
                 "category": post.get("category"),
+                "latitude": post_lat,
+                "longitude": post_lng,
+                "clicks_count": post.get("clicks_count", 0),
                 "is_liked_by_user": is_liked,
                 "is_saved_by_user": True,
                 "account_type": "user",
@@ -2149,6 +2272,25 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
 
         media_type = post.get("media_type", "image")
 
+        # Resolve coordinates from map_link if not stored
+        rp_lat = post.get("latitude")
+        rp_lng = post.get("longitude")
+        if not rp_lat or not rp_lng:
+            rp_map_link = post.get("map_link")
+            if rp_map_link:
+                try:
+                    coords = await get_coordinates_for_map_link(rp_map_link)
+                    if coords:
+                        rp_lat = coords.get("latitude")
+                        rp_lng = coords.get("longitude")
+                        if rp_lat and rp_lng:
+                            await db.restaurant_posts.update_one(
+                                {"_id": post["_id"]},
+                                {"$set": {"latitude": rp_lat, "longitude": rp_lng}}
+                            )
+                except Exception as e:
+                    print(f"⚠️ Error resolving coords for saved restaurant post: {e}")
+
         result.append({
             "_id": str(post["_id"]),
             "id": str(post["_id"]),
@@ -2165,7 +2307,7 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "review_text": post.get("about", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
-                "is_first_discovery": post.get("is_first_discovery", False),
+            "is_first_discovery": post.get("is_first_discovery", False),
             "dish_name": post.get("dish_name"),
             "thumbnail_url": post.get("thumbnail_url"),
             "likes_count": post.get("likes_count", 0),
@@ -2174,6 +2316,9 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "saves_count": post.get("saves_count", 0),
             "category": post.get("category"),
             "price": post.get("price"),
+            "latitude": rp_lat,
+            "longitude": rp_lng,
+            "clicks_count": post.get("clicks_count", 0),
             "is_liked_by_user": is_liked,
             "is_saved_by_user": True,
             "account_type": "restaurant",
