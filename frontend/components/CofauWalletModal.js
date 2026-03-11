@@ -399,8 +399,8 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   <View style={styles.pointItem}>
                     <Text style={styles.pointEmoji}>💰</Text>
                     <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>₹25 Per Post</Text>
-                      <Text style={styles.pointDesc}>Earn ₹25 for every post you upload</Text>
+                      <Text style={styles.pointTitle}>₹10 Per Post</Text>
+                      <Text style={styles.pointDesc}>Earn ₹10 for every post you upload</Text>
                     </View>
                   </View>
 
@@ -416,7 +416,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     <Text style={styles.pointEmoji}>🏆</Text>
                     <View style={styles.pointContent}>
                       <Text style={styles.pointTitle}>Rank #1 Bonus</Text>
-                      <Text style={styles.pointDesc}>Earn ₹25 if your post gets Rank #1 in Foodies on Explore. Once per week!</Text>
+                      <Text style={styles.pointDesc}>Earn ₹10 if your post gets Rank #1 in Foodies on Explore. Once per week!</Text>
                     </View>
                   </View>
 
@@ -434,7 +434,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     <Text style={styles.pointEmoji}>⭐</Text>
                     <View style={styles.pointContent}>
                       <Text style={styles.pointTitle}>Points Per Post</Text>
-                      <Text style={styles.pointDesc}>Earn 25 points with every post you share</Text>
+                      <Text style={styles.pointDesc}>Earn 10-20 points with every post based on your level</Text>
                     </View>
                   </View>
                 </ScrollView>

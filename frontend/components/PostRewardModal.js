@@ -16,7 +16,7 @@ const PostRewardModal = ({ visible, onClose, rewardData }) => {
   // Default values if rewardData is null
   const data = rewardData || {
     wallet_earned: 0,
-    points_earned: 25,
+    points_earned: 10,
     message: "Post Uploaded!",
     tip: "",
     new_balance: 0,

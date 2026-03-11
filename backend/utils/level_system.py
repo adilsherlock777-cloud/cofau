@@ -73,17 +73,17 @@ def get_level_data(level: int) -> dict:
 def get_points_for_level(level: int) -> int:
     """
     Get points awarded for uploading a post based on current level.
-    - Levels 1-4 (Reviewer): 25 points
+    - Levels 1-4 (Reviewer): 10 points
     - Levels 5-8 (Top Reviewer): 15 points
-    - Levels 9-12 (Influencer): 5 points
+    - Levels 9-12 (Influencer): 20 points
     """
     if level >= 1 and level <= 4:
-        return 25
+        return 10
     elif level >= 5 and level <= 8:
         return 15
     elif level >= 9 and level <= 12:
-        return 5
-    return 25  # Default to 25 if level is out of range
+        return 20
+    return 10  # Default to 10 if level is out of range
 
 def calculateUserLevelAfterPost(user: dict) -> dict:
     """
@@ -153,16 +153,16 @@ def add_post_points(current_points: int) -> int:
     DEPRECATED: Use calculateUserLevelAfterPost instead.
     This function is kept for backward compatibility.
     """
-    return current_points + 25
+    return current_points + 10
 
 def recalculate_points_from_post_count(post_count: int) -> dict:
     """
     Recalculate user points and level based on post count.
-    Formula: total_points = post_count × 25
-    
+    Formula: total_points = post_count × 10
+
     Args:
         post_count: Number of posts the user has
-        
+
     Returns:
         dict with:
         - level: New level
@@ -171,8 +171,8 @@ def recalculate_points_from_post_count(post_count: int) -> dict:
         - title: New title
         - total_points: Total accumulated points
     """
-    # Calculate total points: each post = 25 points
-    new_total_points = post_count * 25
+    # Calculate total points: each post = 10 points
+    new_total_points = post_count * 10
     
     # Calculate level from total points
     level_info = get_level_from_total_points(new_total_points)

@@ -37,6 +37,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { normalizeMediaUrl, normalizeProfilePicture } from "../../utils/imageUrlFix";
 import { BlurView } from 'expo-blur';
 import CofauVerifiedBadge from "../../components/CofauVerifiedBadge";
+import FirstDiscoveryBadge from "../../components/FirstDiscoveryBadge";
 
 const BACKEND =
   process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
@@ -910,6 +911,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                   <Text style={styles.topUsername}>{post.username}</Text>
                   {post.user_badge === 'verified' && <CofauVerifiedBadge size={14} />}
                 </View>
+                {post.is_first_discovery && <FirstDiscoveryBadge size={9} />}
                 <Text style={styles.topTimestamp}>{formatTime(post.created_at)}</Text>
               </View>
             </TouchableOpacity>
@@ -1155,6 +1157,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
                       <Text style={styles.detailsUsername}>{post.username}</Text>
                       {post.user_badge === 'verified' && <CofauVerifiedBadge size={14} />}
                     </View>
+                    {post.is_first_discovery && <FirstDiscoveryBadge size={9} />}
                     <Text style={styles.detailsTimestamp}>{formatTime(post.created_at)}</Text>
                   </View>
                 </TouchableOpacity>

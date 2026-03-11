@@ -209,7 +209,7 @@ export default function ProfileBadge({
               />
               <View style={styles.levelTextContainer}>
                 <Text style={styles.levelName}>Levels 1-4: Reviewer</Text>
-                <Text style={styles.levelPoints}>25 points per post</Text>
+                <Text style={styles.levelPoints}>10 points per post</Text>
               </View>
             </View>
 
@@ -233,7 +233,7 @@ export default function ProfileBadge({
               />
               <View style={styles.levelTextContainer}>
                 <Text style={styles.levelName}>Levels 9-12: Influencer</Text>
-                <Text style={styles.levelPoints}>5 points per post</Text>
+                <Text style={styles.levelPoints}>20 points per post</Text>
               </View>
             </View>
 

@@ -30,6 +30,7 @@ import ShareToUsersModal from "./ShareToUsersModal";
 import SimpleShareModal from "./SimpleShareModal";
 import ReportModal from "./ReportModal";
 import CofauVerifiedBadge from "./CofauVerifiedBadge";
+import FirstDiscoveryBadge from "./FirstDiscoveryBadge";
 import { useAuth } from "../context/AuthContext";
 import {
 likePost,
@@ -514,13 +515,18 @@ size={36}
 level={post.user_level}
 showLevelBadge
 />
-<View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-  <Text style={styles.username}>{post.username}</Text>
-  {post.user_badge === 'verified' && (
-    <CofauVerifiedBadge size={16} />
-  )}
-  {post.account_type === 'restaurant' && (
-    <Ionicons name="storefront" size={14} color="#FF2E2E" />
+<View>
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+    <Text style={styles.username}>{post.username}</Text>
+    {post.user_badge === 'verified' && (
+      <CofauVerifiedBadge size={16} />
+    )}
+    {post.account_type === 'restaurant' && (
+      <Ionicons name="storefront" size={14} color="#FF2E2E" />
+    )}
+  </View>
+  {post.is_first_discovery && (
+    <FirstDiscoveryBadge size={10} />
   )}
 </View>
 </TouchableOpacity>
@@ -631,15 +637,20 @@ postId={post.id}
               showLevelBadge
             />
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-  <Text style={styles.videoUsername}>{post.username}</Text>
-  {post.user_badge === 'verified' && (
-    <CofauVerifiedBadge size={14} />
-  )}
-  {post.account_type === 'restaurant' && (
-    <Ionicons name="storefront" size={14} color="#fff" />
-  )}
-</View>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={styles.videoUsername}>{post.username}</Text>
+                {post.user_badge === 'verified' && (
+                  <CofauVerifiedBadge size={14} />
+                )}
+                {post.account_type === 'restaurant' && (
+                  <Ionicons name="storefront" size={14} color="#fff" />
+                )}
+              </View>
+              {post.is_first_discovery && (
+                <FirstDiscoveryBadge size={9} />
+              )}
+            </View>
 
             {!isOwnPost && !isFollowing && (
               <TouchableOpacity

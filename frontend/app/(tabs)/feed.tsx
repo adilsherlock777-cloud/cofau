@@ -186,9 +186,11 @@ export default function FeedScreen() {
   // Post upload animation states
   const [showPointsAnimation, setShowPointsAnimation] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
+  const [levelData, setLevelData] = useState<any>(null);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardData, setRewardData] = useState<any>(null);
   const pendingPointsRef = useRef<number | null>(null);
+  const pendingLevelDataRef = useRef<any>(null);
   const pendingLevelUpRef = useRef<number | null>(null);
 
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
@@ -447,14 +449,16 @@ useEffect(() => {
         // Update the stored level
         previousLevelRef.current = data.level_update.level || prevLevel;
 
-        const earnedPoints = data.level_update.pointsEarned || 25;
+        const earnedPoints = data.level_update.pointsEarned || 10;
 
         if (!hasWalletReward) {
           setPointsEarned(earnedPoints);
+          setLevelData(data.level_update);
           setShowPointsAnimation(true);
         } else {
           // Store pending points to show after reward modal closes
           pendingPointsRef.current = earnedPoints;
+          pendingLevelDataRef.current = data.level_update;
         }
       }
     }
@@ -1302,20 +1306,23 @@ const renderPost = useCallback(
             showLevelUpAnimation(pendingLevelUpRef.current);
             pendingLevelUpRef.current = null;
           }
-          // Show pending points GIF
+          // Show pending points animation
           if (pendingPointsRef.current !== null) {
             setPointsEarned(pendingPointsRef.current);
+            setLevelData(pendingLevelDataRef.current);
             setShowPointsAnimation(true);
             pendingPointsRef.current = null;
+            pendingLevelDataRef.current = null;
           }
         }}
         rewardData={rewardData}
       />
 
-      {/* Points Earned GIF Animation */}
+      {/* Points Earned Animation */}
       <PointsEarnedAnimation
         visible={showPointsAnimation}
         pointsEarned={pointsEarned}
+        levelData={levelData}
         onClose={() => setShowPointsAnimation(false)}
       />
     </View>

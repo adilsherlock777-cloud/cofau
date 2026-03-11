@@ -1195,9 +1195,9 @@ async def send_leaderboard_rank_notifications():
                 })
 
                 if already_rewarded == 0:
-                    RANK1_REWARD = 25.0
+                    RANK1_REWARD = 10.0
 
-                    # Credit ₹25 to wallet
+                    # Credit ₹10 to wallet
                     await db.users.update_one(
                         {"_id": ObjectId(user_id)},
                         {
@@ -1225,7 +1225,7 @@ async def send_leaderboard_rank_notifications():
                             "fromUserProfilePicture": None,
                             "toUserId": user_id,
                             "postId": post_id,
-                            "message": "Congratulations! ₹25 added to your wallet for Rank #1 in Foodies",
+                            "message": "Congratulations! ₹10 added to your wallet for Rank #1 in Foodies",
                             "isRead": False,
                             "createdAt": now,
                         }
@@ -1236,8 +1236,8 @@ async def send_leaderboard_rank_notifications():
                         if device_tokens:
                             await send_push_notification(
                                 device_tokens=device_tokens,
-                                title="💰 ₹25 Wallet Reward!",
-                                body="Congratulations! ₹25 added to your wallet for Rank #1 in Foodies",
+                                title="💰 ₹10 Wallet Reward!",
+                                body="Congratulations! ₹10 added to your wallet for Rank #1 in Foodies",
                                 data={
                                     "type": "wallet_reward",
                                     "postId": post_id,

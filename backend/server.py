@@ -1010,7 +1010,8 @@ async def create_post(
     # ======================================================
     final_location_name = None
     normalized_location = None
-    
+    match = None
+
     if location_name and location_name.strip():
         final_location_name = location_name.strip()
         
@@ -1039,6 +1040,16 @@ async def create_post(
             print(f"📍 Location matched: '{location_name.strip()}' → '{final_location_name}' ({match.get('similarity_score', 0)}% similar)")
         
         normalized_location = normalize_location_name(final_location_name)
+
+    # ======================================================
+    # FIRST DISCOVERY CHECK - New location not in DB
+    # ======================================================
+    is_first_discovery = False
+    if final_location_name and current_user.get("account_type") != "restaurant":
+        # If no match was found during normalization, this is a brand new location
+        if not match:
+            is_first_discovery = True
+            print(f"⭐ First Discovery! New location: '{final_location_name}' by user {current_user.get('username', 'unknown')}")
 
     # ======================================================
     # QUALITY SCORING - Analyze media quality for leaderboard
@@ -1078,6 +1089,7 @@ async def create_post(
         "quality_score": quality_score,
         "engagement_score": 0.0,
         "combined_score": quality_score * 0.6,
+        "is_first_discovery": is_first_discovery,
         "created_at": datetime.utcnow(),
     }
 
@@ -1158,7 +1170,7 @@ async def create_post(
         }}
     )
     
-    print(f"✅ Points updated for user {user_id}: {total_posts_count} posts × 25 = {level_update['total_points']} points, Level {level_update['level']}")
+    print(f"✅ Points updated for user {user_id}: {total_posts_count} posts × 10 = {level_update['total_points']} points, Level {level_update['level']}")
 
     # Notify followers
     followers = await db.follows.find({"followingId": str(current_user["_id"])}).to_list(None)
@@ -1504,6 +1516,7 @@ async def get_feed(
                 "description": post.get("about", ""),
                 "map_link": post.get("map_link"),
                 "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
                 "category": post.get("category"),
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
@@ -1585,6 +1598,7 @@ async def get_feed(
                 "description": post.get("review_text", ""),
                 "map_link": post.get("map_link"),
                 "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
                 "category": post.get("category"),
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
@@ -1715,6 +1729,7 @@ async def get_last_3_days_posts(current_user: dict = Depends(get_current_user)):
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "category": post.get("category"),
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
@@ -2057,6 +2072,7 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
                 "review_text": post.get("about", ""),
                 "map_link": post.get("map_link"),
                 "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
                 "dish_name": post.get("dish_name"),
                 "thumbnail_url": post.get("thumbnail_url"),
                 "likes_count": post.get("likes_count", 0),
@@ -2093,6 +2109,7 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
                 "review_text": post.get("review_text", ""),
                 "map_link": post.get("map_link"),
                 "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
                 "dish_name": post.get("dish_name"),
                 "thumbnail_url": post.get("thumbnail_url"),
                 "likes_count": post.get("likes_count", 0),
@@ -2148,6 +2165,7 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
             "review_text": post.get("about", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "dish_name": post.get("dish_name"),
             "thumbnail_url": post.get("thumbnail_url"),
             "likes_count": post.get("likes_count", 0),
@@ -2202,6 +2220,7 @@ async def list_liked_posts(skip: int = 0, limit: int = 100, current_user: dict =
             "rating": post.get("rating", 0),
             "review_text": post.get("review_text", ""),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
@@ -2258,10 +2277,10 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
 
     user_id = str(current_user["_id"])
 
-    # Deduct ₹25 from wallet on any post deletion
+    # Deduct ₹10 from wallet on any post deletion
     wallet_deducted = 0.0
     if current_user.get("account_type") != "restaurant":
-        deduct_amount = 25.0
+        deduct_amount = 10.0
         await db.users.update_one(
             {"_id": current_user["_id"]},
             {"$inc": {"wallet_balance": -deduct_amount}}
@@ -2297,7 +2316,7 @@ async def delete_post(post_id: str, current_user: dict = Depends(get_current_use
         }}
     )
 
-    print(f"✅ Points recalculated for user {user_id}: {remaining_posts_count} posts × 25 = {level_update['total_points']} points, Level {level_update['level']}")
+    print(f"✅ Points recalculated for user {user_id}: {remaining_posts_count} posts × 10 = {level_update['total_points']} points, Level {level_update['level']}")
 
     return {
         "message": "Post deleted successfully",
@@ -2346,6 +2365,7 @@ async def get_saved_posts(user_id: str, skip: int = 0, limit: int = 50, current_
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
@@ -2495,6 +2515,7 @@ async def get_trending_posts(skip: int = 0, limit: int = 20, current_user: dict 
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "category": post.get("category"),
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
@@ -2567,6 +2588,7 @@ async def get_top_rated_posts(skip: int = 0, limit: int = 20, current_user: dict
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "category": post.get("category"),
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
@@ -2672,6 +2694,7 @@ async def get_explore_all(skip: int = 0, limit: int = 20, current_user: dict = D
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "category": post.get("category"),
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
@@ -2754,6 +2777,7 @@ async def get_posts_by_category(name: str, skip: int = 0, limit: int = 20, curre
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "category": post.get("category"),
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
@@ -3190,6 +3214,7 @@ async def search_posts(
                 "review_text": post.get("review_text") or post.get("caption", ""),
                 "caption": post.get("review_text") or post.get("caption", ""),
                 "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
                 "map_link": post.get("map_link"),
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
@@ -3232,6 +3257,7 @@ async def search_posts(
                 "review_text": post.get("review_text", ""),
                 "caption": post.get("review_text", ""),
                 "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
                 "map_link": post.get("map_link"),
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
@@ -3667,6 +3693,7 @@ async def get_restaurant_reviews(
             "rating": post.get("rating"),
             "review_text": post.get("review_text", ""),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "likes_count": post.get("likes_count", 0),
             "comments_count": post.get("comments_count", 0),
             "shares_count": post.get("shares_count", 0),
@@ -4422,7 +4449,8 @@ async def get_user_posts(user_id: str, media_type: str = None, skip: int = 0, li
             "rating": post["rating"],
             "review_text": post["review_text"],
             "map_link": post.get("map_link"),
-            "location_name": post.get("location_name"),  # ✅ Include location_name
+            "location_name": post.get("location_name"),
+            "is_first_discovery": post.get("is_first_discovery", False),
             "location": post.get("location_name"),  # For backward compatibility
             "place_name": post.get("location_name"),  # For backward compatibility
             "category": post.get("category"), 
@@ -4495,6 +4523,7 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
                 "dish_details": post.get("dish_details", ""),
                 "map_link": post.get("map_link"),
                 "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
                 "category": post.get("category"),
                 "dish_name": post.get("dish_name"),
                 "likes_count": post.get("likes_count", 0),
@@ -4549,6 +4578,7 @@ async def get_post(post_id: str, current_user: dict = Depends(get_current_user))
             "review_text": post.get("review_text", ""),
             "map_link": post.get("map_link"),
             "location_name": post.get("location_name"),
+                "is_first_discovery": post.get("is_first_discovery", False),
             "category": post.get("category"),
             "dish_name": post.get("dish_name"),
             "likes_count": post.get("likes_count", 0),
