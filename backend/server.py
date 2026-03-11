@@ -2146,10 +2146,9 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
 
         media_type = post.get("media_type", "image")
 
-        # Resolve coordinates from map_link if not stored
+        # Resolve coordinates from map_link or location_name if not stored
         post_lat = post.get("latitude")
         post_lng = post.get("longitude")
-        print(f"📍 Saved post {saved['post_id']}: lat={post_lat}, lng={post_lng}, map_link={post.get('map_link')}, location={post.get('location_name')}")
         if not post_lat or not post_lng:
             map_link = post.get("map_link")
             if map_link:
@@ -2158,15 +2157,36 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
                     if coords:
                         post_lat = coords.get("latitude")
                         post_lng = coords.get("longitude")
-                        # Cache coordinates in the DB for future use
-                        if post_lat and post_lng:
-                            collection = db.restaurant_posts if is_restaurant_post else db.posts
-                            await collection.update_one(
-                                {"_id": post["_id"]},
-                                {"$set": {"latitude": post_lat, "longitude": post_lng}}
-                            )
                 except Exception as e:
-                    print(f"⚠️ Error resolving coords for saved post: {e}")
+                    print(f"⚠️ Error resolving coords from map_link: {e}")
+
+            # Fallback: geocode from location_name using Google Geocoding API
+            if (not post_lat or not post_lng) and post.get("location_name"):
+                try:
+                    import httpx
+                    geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+                    params = {
+                        "address": post["location_name"],
+                        "key": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
+                    }
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(geocode_url, params=params, timeout=5)
+                        data = resp.json()
+                        if data.get("results"):
+                            loc = data["results"][0]["geometry"]["location"]
+                            post_lat = loc["lat"]
+                            post_lng = loc["lng"]
+                            print(f"📍 Geocoded '{post['location_name']}' -> {post_lat}, {post_lng}")
+                except Exception as e:
+                    print(f"⚠️ Error geocoding location_name: {e}")
+
+            # Cache coordinates in the DB for future use
+            if post_lat and post_lng:
+                collection = db.restaurant_posts if is_restaurant_post else db.posts
+                await collection.update_one(
+                    {"_id": post["_id"]},
+                    {"$set": {"latitude": post_lat, "longitude": post_lng}}
+                )
 
         if is_restaurant_post:
             restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
@@ -2273,7 +2293,7 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
 
         media_type = post.get("media_type", "image")
 
-        # Resolve coordinates from map_link if not stored
+        # Resolve coordinates from map_link or location_name if not stored
         rp_lat = post.get("latitude")
         rp_lng = post.get("longitude")
         if not rp_lat or not rp_lng:
@@ -2284,13 +2304,35 @@ async def list_saved_posts(skip: int = 0, limit: int = 50, current_user: dict = 
                     if coords:
                         rp_lat = coords.get("latitude")
                         rp_lng = coords.get("longitude")
-                        if rp_lat and rp_lng:
-                            await db.restaurant_posts.update_one(
-                                {"_id": post["_id"]},
-                                {"$set": {"latitude": rp_lat, "longitude": rp_lng}}
-                            )
                 except Exception as e:
-                    print(f"⚠️ Error resolving coords for saved restaurant post: {e}")
+                    print(f"⚠️ Error resolving coords from map_link: {e}")
+
+            # Fallback: geocode from location_name
+            if (not rp_lat or not rp_lng) and post.get("location_name"):
+                try:
+                    import httpx
+                    geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+                    params = {
+                        "address": post["location_name"],
+                        "key": "AIzaSyDLBWLLuXT7hMU2LySIervGx6b2iZwWqyE"
+                    }
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(geocode_url, params=params, timeout=5)
+                        data = resp.json()
+                        if data.get("results"):
+                            loc = data["results"][0]["geometry"]["location"]
+                            rp_lat = loc["lat"]
+                            rp_lng = loc["lng"]
+                            print(f"📍 Geocoded '{post['location_name']}' -> {rp_lat}, {rp_lng}")
+                except Exception as e:
+                    print(f"⚠️ Error geocoding location_name: {e}")
+
+            # Cache coordinates in the DB
+            if rp_lat and rp_lng:
+                await db.restaurant_posts.update_one(
+                    {"_id": post["_id"]},
+                    {"$set": {"latitude": rp_lat, "longitude": rp_lng}}
+                )
 
         result.append({
             "_id": str(post["_id"]),
