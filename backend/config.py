@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: set = {"jpg", "jpeg", "png", "gif", "mp4", "mov"}
     
     # Sightengine API for content moderation
-    SIGHTENGINE_API_USER: str = os.getenv("SIGHTENGINE_API_USER", "144214407")
+    SIGHTENGINE_API_USER: str = os.getenv("SIGHTENGINE_API_USER", "578418047")
     SIGHTENGINE_API_SECRET: str = os.getenv("SIGHTENGINE_API_SECRET", "LFTjPLgaJs3sz4RPmUs5fdtLeUJnEMVq")
     
     class Config:

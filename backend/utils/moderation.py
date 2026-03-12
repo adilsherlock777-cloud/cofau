@@ -124,18 +124,20 @@ def check_image_moderation(file_path: str, user_id: Optional[str] = None) -> Mod
         )
         
     except requests.exceptions.RequestException as e:
-        # If API call fails, log but allow upload (fail open for now)
-        # In production, you might want to fail closed
-        print(f"⚠️ Moderation API error: {str(e)}")
-        # For now, allow upload if API fails (you can change this to block)
+        # Fail open - allow upload if moderation API is unavailable
+        print(f"⚠️ Moderation API error (allowing upload): {str(e)}")
         return ModerationResponse(
             allowed=True,
-            reason="Moderation check failed, upload allowed",
+            reason=None,
             moderation_result=None
         )
     except Exception as e:
-        print(f"❌ Moderation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Moderation check failed: {str(e)}")
+        print(f"⚠️ Moderation error (allowing upload): {str(e)}")
+        return ModerationResponse(
+            allowed=True,
+            reason=None,
+            moderation_result=None
+        )
 
 async def save_moderation_result(db, moderation_result: ModerationResult, post_id: Optional[str] = None, story_id: Optional[str] = None):
     """

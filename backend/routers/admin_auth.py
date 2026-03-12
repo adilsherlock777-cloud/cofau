@@ -1,9 +1,13 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordBearer
+from bson import ObjectId
 from datetime import datetime, timedelta
 from database import get_database
 from utils.hashing import hash_password, verify_password
 from utils.jwt import create_access_token, verify_token
+from utils.level_system import recalculate_points_from_post_count
+from config import settings
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -245,3 +249,124 @@ async def get_new_users(
     total = await db.users.count_documents({"created_at": {"$gte": thirty_days_ago}})
 
     return {"users": users, "total": total}
+
+
+@router.get("/users/{username}/posts")
+async def get_user_posts_by_username(
+    username: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_admin: dict = Depends(get_current_admin),
+):
+    """Get all posts by a specific username (admin only)"""
+    db = get_database()
+
+    # Find the user by username
+    user = await db.users.find_one({"username": username.lower().strip()})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_id = str(user["_id"])
+
+    cursor = (
+        db.posts.find({"user_id": user_id})
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+
+    posts = []
+    async for post in cursor:
+        posts.append({
+            "id": str(post["_id"]),
+            "user_id": post.get("user_id"),
+            "username": username,
+            "media_url": post.get("media_url") or post.get("image_url"),
+            "media_type": post.get("media_type"),
+            "rating": post.get("rating"),
+            "review_text": post.get("review_text"),
+            "category": post.get("category"),
+            "dish_name": post.get("dish_name"),
+            "location_name": post.get("location_name"),
+            "likes_count": post.get("likes_count", 0),
+            "comments_count": post.get("comments_count", 0),
+            "created_at": post["created_at"].isoformat() if post.get("created_at") else None,
+        })
+
+    total = await db.posts.count_documents({"user_id": user_id})
+
+    return {
+        "user": {
+            "user_id": user_id,
+            "username": user.get("username"),
+            "full_name": user.get("full_name"),
+            "email": user.get("email"),
+        },
+        "posts": posts,
+        "total": total,
+    }
+
+
+@router.delete("/posts/{post_id}")
+async def admin_delete_post(
+    post_id: str,
+    current_admin: dict = Depends(get_current_admin),
+):
+    """Delete any user's post (admin only)"""
+    db = get_database()
+
+    try:
+        post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    user_id = post.get("user_id")
+
+    # Delete the media file from server
+    media_url = post.get("media_url") or post.get("image_url")
+    if media_url:
+        try:
+            if "/api/static/uploads/" in media_url:
+                filename = media_url.split("/api/static/uploads/")[-1]
+                file_path = os.path.join(settings.UPLOAD_DIR, filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+        except Exception as e:
+            print(f"Warning: Error deleting media file: {e}")
+
+    # Delete related data
+    await db.likes.delete_many({"post_id": post_id})
+    await db.comments.delete_many({"post_id": post_id})
+    await db.saved_posts.delete_many({"post_id": post_id})
+
+    # Delete the post
+    result = await db.posts.delete_one({"_id": ObjectId(post_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to delete post")
+
+    # Recalculate user points
+    if user_id:
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if user:
+            remaining_posts = await db.posts.count_documents({"user_id": user_id})
+            level_update = recalculate_points_from_post_count(remaining_posts)
+            await db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {
+                    "total_points": level_update["total_points"],
+                    "points": level_update["total_points"],
+                    "level": level_update["level"],
+                    "currentPoints": level_update["currentPoints"],
+                    "requiredPoints": level_update["requiredPoints"],
+                    "title": level_update["title"],
+                }}
+            )
+
+    return {
+        "message": "Post deleted successfully by admin",
+        "deleted_post_id": post_id,
+        "deleted_by": current_admin.get("username"),
+    }

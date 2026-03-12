@@ -16,7 +16,7 @@ module.exports = {
       GOOGLE_GEMINI_API_KEY: 'AIzaSyBo2pwhYdspCmkY_GrGnawl4bxMM9SplfI',
       MONGO_URL: 'mongodb+srv://moinmisba92:quickSell%40121@quicksellify.mdhrm.mongodb.net/quickSellify?retryWrites=true&w=majority&appName=quickSellify',
       SECRET_KEY: 'your-secret-key-change-in-production-12345678',
-      SIGHTENGINE_API_USER: '144214407',
+      SIGHTENGINE_API_USER: '578418047',
       SIGHTENGINE_API_SECRET: 'LFTjPLgaJs3sz4RPmUs5fdtLeUJnEMVq'
     },
     error_file: '/root/backend/backend/logs/pm2-error.log',

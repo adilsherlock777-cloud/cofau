@@ -3,6 +3,7 @@ import axios from 'axios';
 import BadgeRequests from './BadgeRequests';
 import VoucherClaims from './VoucherClaims';
 import NewUsers from './NewUsers';
+import ManagePosts from './ManagePosts';
 
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000/api'
@@ -139,6 +140,11 @@ export default function Dashboard({ admin, onLogout }) {
             count={stats?.new_users_30d}
           />
           <TabButton
+            active={activeTab === 'manage-posts'}
+            onClick={() => setActiveTab('manage-posts')}
+            label="Manage Posts"
+          />
+          <TabButton
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
             label="Overview"
@@ -156,6 +162,10 @@ export default function Dashboard({ admin, onLogout }) {
 
         {activeTab === 'new-users' && (
           <NewUsers token={admin.token} />
+        )}
+
+        {activeTab === 'manage-posts' && (
+          <ManagePosts token={admin.token} />
         )}
 
         {activeTab === 'overview' && (
