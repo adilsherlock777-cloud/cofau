@@ -261,8 +261,13 @@ async def get_user_posts_by_username(
     """Get all posts by a specific username (admin only)"""
     db = get_database()
 
-    # Find the user by username
-    user = await db.users.find_one({"username": username.lower().strip()})
+    # Find the user by username (normalize same as signup: lowercase, no spaces)
+    normalized = username.lower().strip().replace(" ", "")
+    user = await db.users.find_one({"username": normalized})
+    # Fallback: case-insensitive regex search
+    if not user:
+        import re
+        user = await db.users.find_one({"username": {"$regex": f"^{re.escape(normalized)}$", "$options": "i"}})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 

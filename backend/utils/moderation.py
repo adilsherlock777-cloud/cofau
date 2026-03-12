@@ -55,22 +55,32 @@ def check_image_moderation(file_path: str, user_id: Optional[str] = None) -> Mod
             params = {
                 'api_user': settings.SIGHTENGINE_API_USER,
                 'api_secret': settings.SIGHTENGINE_API_SECRET,
-                'models': 'nudity-2.0,wad,offensive,scam,celebrities,face-attributes',
+                'models': 'nudity-2.1,wad,offensive',
             }
-            
+
+            print(f"🔍 Moderation check - API User: {settings.SIGHTENGINE_API_USER}, File: {file_path}")
             response = requests.post(SIGHTENGINE_API_URL, files=files, params=params, timeout=30)
             response.raise_for_status()
             result = response.json()
-        
+
+        print(f"📋 Sightengine raw response: {result}")
+
+        # Check if API returned an error
+        if result.get('status') != 'success':
+            print(f"❌ Sightengine API returned error: {result}")
+            return ModerationResponse(allowed=True, reason=None, moderation_result=None)
+
         # Extract scores from response
         nudity_score = result.get('nudity', {}).get('sexual_activity', 0.0) + \
                       result.get('nudity', {}).get('sexual_display', 0.0) + \
                       result.get('nudity', {}).get('erotica', 0.0)
-        
+
         alcohol_score = result.get('alcohol', 0.0)
-        weapons_score = result.get('weapons', 0.0)
+        weapons_score = result.get('weapon', 0.0)
         drugs_score = result.get('drugs', 0.0)
         offensive_score = result.get('offensive', {}).get('prob', 0.0)
+
+        print(f"📊 Moderation scores - Nudity: {nudity_score:.2f}, Alcohol: {alcohol_score:.2f}, Weapons: {weapons_score:.2f}, Drugs: {drugs_score:.2f}, Offensive: {offensive_score:.2f}")
         
         # Calculate overall moderation score (inverse - higher is safer)
         # Take the maximum of all category scores as the risk level
@@ -85,6 +95,7 @@ def check_image_moderation(file_path: str, user_id: Optional[str] = None) -> Mod
             drugs_score >= BLOCK_THRESHOLDS["drugs"] or
             offensive_score >= BLOCK_THRESHOLDS["offensive"]
         )
+        print(f"🚦 Moderation decision - Blocked: {is_blocked}")
         
         # Create moderation result
         moderation_result = ModerationResult(
