@@ -121,7 +121,35 @@ async def create_restaurant_post(
     
     # Detect media type
     media_type = "video" if file_ext in ["mp4", "mov", "m4v"] else "image"
-    
+
+    # Content moderation for images
+    if media_type == "image":
+        from utils.moderation import check_image_moderation, save_moderation_result
+        moderation_response = check_image_moderation(
+            file_path=file_path,
+            user_id=str(current_restaurant["_id"])
+        )
+
+        if not moderation_response.allowed:
+            print(f"🚫 BANNED CONTENT DETECTED - Restaurant: {current_restaurant.get('restaurant_name', 'Unknown')} (ID: {current_restaurant['_id']})")
+            print(f"   Reason: {moderation_response.reason}")
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except:
+                pass
+
+            if moderation_response.moderation_result:
+                await save_moderation_result(
+                    db=db,
+                    moderation_result=moderation_response.moderation_result
+                )
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"Content not allowed: {moderation_response.reason}"
+            )
+
     # Video optimization (if needed)
     thumbnail_url = None
     if media_type == "video":

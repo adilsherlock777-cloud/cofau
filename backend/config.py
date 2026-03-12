@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     
     # Sightengine API for content moderation
     SIGHTENGINE_API_USER: str = os.getenv("SIGHTENGINE_API_USER", "144214407")
-    SIGHTENGINE_API_SECRET: str = os.getenv("SIGHTENGINE_API_SECRET", "JYA4RySafgQeKMUqnNGiQcdBFBuTKDk9")
+    SIGHTENGINE_API_SECRET: str = os.getenv("SIGHTENGINE_API_SECRET", "LFTjPLgaJs3sz4RPmUs5fdtLeUJnEMVq")
     
     class Config:
         env_file = ".env"
