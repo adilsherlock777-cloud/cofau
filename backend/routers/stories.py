@@ -7,6 +7,7 @@ import uuid
 from typing import List, Optional
 from pydantic import BaseModel
 
+import asyncio
 from database import get_database
 from routers.auth import get_current_user
 from config import settings
@@ -61,40 +62,7 @@ async def upload_story(
             f.write(content)
         
         # ======================================================
-        # VIDEO OPTIMIZATION - Convert MOV to MP4 and optimize Android MP4
-        # ======================================================
-        if media_type == "video":
-            from utils.video_transcode import optimize_video_with_thumbnail
-            
-            video_source = "iOS MOV" if file_ext == "mov" or file.content_type == "video/quicktime" else "Android/Other MP4"
-            print(f"🎬 Story video detected ({video_source}) - converting/optimizing to 720p H.264 MP4...")
-            
-            try:
-                # Optimize video to 720p and generate thumbnail
-                video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
-                
-                # Update file_path and filename to point to the optimized file
-                file_path = video_path
-                unique_filename = os.path.basename(video_path)
-                
-                print(f"✅ Story video converted/optimized to 720p MP4: {unique_filename}")
-            except Exception as e:
-                print(f"❌ Story video optimization failed: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                # Clean up and fail
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                    except:
-                        pass
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Video processing failed. Please ensure your video is in a supported format (MP4 or MOV). Error: {str(e)}"
-                )
-        
-        # ======================================================
-        # CONTENT MODERATION - Check for banned content
+        # CONTENT MODERATION - Check for banned content (images only, before saving)
         # ======================================================
         moderation_result = None
         if media_type == "image":
@@ -102,13 +70,13 @@ async def upload_story(
                 file_path=file_path,
                 user_id=str(current_user["_id"])
             )
-            
+
             if not moderation_response.allowed:
                 # ❌ BANNED CONTENT DETECTED - Delete file immediately (NOT uploaded to server)
                 print(f"🚫 BANNED CONTENT DETECTED (Story) - User: {current_user.get('full_name', 'Unknown')} (ID: {current_user['_id']})")
                 print(f"   Reason: {moderation_response.reason}")
                 print(f"   File: {file_path}")
-                
+
                 # Delete the file immediately - it will NOT be saved to server
                 try:
                     if os.path.exists(file_path):
@@ -123,7 +91,7 @@ async def upload_story(
                         os.remove(file_path)
                     except:
                         pass
-                
+
                 # Save moderation result for tracking (even though file is deleted)
                 if moderation_response.moderation_result:
                     await save_moderation_result(
@@ -131,22 +99,22 @@ async def upload_story(
                         moderation_result=moderation_response.moderation_result,
                         story_id=None  # No story created - upload was blocked
                     )
-                
+
                 # Block the upload - return error to user
                 raise HTTPException(
                     status_code=400,
                     detail=f"Content not allowed: {moderation_response.reason or 'Banned content detected. Image contains nudity, alcohol, or other prohibited content.'}"
                 )
-            
+
             # Save moderation result for allowed content
             if moderation_response.moderation_result:
                 moderation_result = moderation_response.moderation_result
         # Note: For videos, moderation is optional
-        
-        # Create story document
+
+        # Create story document immediately (for videos, processing happens in background)
         now = datetime.utcnow()
         expires_at = now + timedelta(hours=24)
-        
+
         story_doc = {
             "user_id": str(current_user["_id"]),
             "media_url": f"/api/static/uploads/{unique_filename}",
@@ -156,11 +124,15 @@ async def upload_story(
             "location_name": location_name if location_name else None,
             "map_link": map_link if map_link else None,
         }
-        
+
+        # For videos, mark as processing so frontend can show a loading state
+        if media_type == "video":
+            story_doc["processing"] = True
+
         result = await db.stories.insert_one(story_doc)
         story_id = str(result.inserted_id)
         story_doc["_id"] = story_id
-        
+
         # Save moderation result with story_id
         if moderation_result:
             await save_moderation_result(
@@ -168,9 +140,54 @@ async def upload_story(
                 moderation_result=moderation_result,
                 story_id=story_id
             )
-        
+
+        # ======================================================
+        # VIDEO OPTIMIZATION - Process in background so user doesn't wait
+        # ======================================================
+        if media_type == "video":
+            async def _process_video_background(story_id: str, file_path: str):
+                """Background task to transcode video and update the story document."""
+                try:
+                    from utils.video_transcode import optimize_video_with_thumbnail
+
+                    video_source = "iOS MOV" if file_ext == "mov" or file.content_type == "video/quicktime" else "Android/Other MP4"
+                    print(f"🎬 [Background] Story video detected ({video_source}) - converting to 720p H.264 MP4...")
+
+                    video_path, thumbnail_path = await optimize_video_with_thumbnail(file_path)
+                    optimized_filename = os.path.basename(video_path)
+
+                    print(f"✅ [Background] Story video optimized: {optimized_filename}")
+
+                    # Update story with the optimized video URL and remove processing flag
+                    db = get_database()
+                    await db.stories.update_one(
+                        {"_id": ObjectId(story_id)},
+                        {"$set": {
+                            "media_url": f"/api/static/uploads/{optimized_filename}",
+                            "processing": False
+                        }}
+                    )
+                    print(f"✅ [Background] Story {story_id} updated with optimized video")
+
+                except Exception as e:
+                    print(f"❌ [Background] Story video optimization failed: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    # Mark story as processing failed but keep the raw video accessible
+                    try:
+                        db = get_database()
+                        await db.stories.update_one(
+                            {"_id": ObjectId(story_id)},
+                            {"$set": {"processing": False, "processing_failed": True}}
+                        )
+                    except:
+                        pass
+
+            # Fire and forget - user can navigate away immediately
+            asyncio.create_task(_process_video_background(story_id, file_path))
+
         return {
-            "message": "Story uploaded successfully",
+            "message": "Story uploaded successfully" if media_type == "image" else "Story uploaded! Video is being optimized in the background.",
             "story": {
                 "id": story_id,
                 "user_id": story_doc["user_id"],
@@ -180,6 +197,7 @@ async def upload_story(
                 "expires_at": story_doc["expires_at"].isoformat(),
                 "location_name": story_doc.get("location_name"),
                 "map_link": story_doc.get("map_link"),
+                "processing": story_doc.get("processing", False),
             }
         }
     
@@ -275,6 +293,7 @@ async def get_stories_feed(
                         "location_name": s.get("location_name"),
                         "map_link": s.get("map_link"),
                         "from_post": s.get("from_post"),
+                        "processing": s.get("processing", False),
                     }
                     
                     # Include shared story information if it's a shared story

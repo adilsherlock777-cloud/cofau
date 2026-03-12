@@ -193,6 +193,11 @@ const handlePostStory = async () => {
       }
     );
 
+    // For videos, show a message that optimization is happening in the background
+    if (mediaType === 'video') {
+      Alert.alert('Story Posted!', 'Your video is being optimized in the background. It will appear in your stories shortly.');
+    }
+
     router.replace('/(tabs)/feed');
   } catch (error: any) {
     console.error('❌ Error uploading story:', error.response?.data || error.message);

@@ -297,9 +297,16 @@ async def share_post_to_users(
     db = get_database()
     current_user_id = str(current_user["_id"])
     
+    # Check posts, restaurant_posts, and stories collections
     post = await db.posts.find_one({"_id": ObjectId(request.post_id)})
+    is_story = False
     if not post:
         post = await db.restaurant_posts.find_one({"_id": ObjectId(request.post_id)})
+    if not post:
+        # Also check stories collection (when sharing a story to users)
+        post = await db.stories.find_one({"_id": ObjectId(request.post_id)})
+        if post:
+            is_story = True
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -308,38 +315,47 @@ async def share_post_to_users(
     if not post_owner and owner_id:
         post_owner = await db.restaurants.find_one({"_id": ObjectId(owner_id)})
     post_username = post_owner.get("username") or post_owner.get("restaurant_name") if post_owner else "Unknown"
-    
+
     now = datetime.utcnow()
     shared_count = 0
-    
+
     for user_id in request.user_ids:
         if user_id == current_user_id:
             continue
-            
+
         target_user = await db.users.find_one({"_id": ObjectId(user_id)})
         if not target_user:
             continue
-        
+
         msg_doc = {
             "from_user": current_user_id,
             "to_user": user_id,
-            "message": "Hey, Look out this Dish 🍽",
-            "post_id": request.post_id,
+            "message": "Check out this Story! 📸" if is_story else "Hey, Look out this Dish 🍽",
             "created_at": now,
             "is_read": False,
         }
-        
+
+        # Use story_id field for stories, post_id for posts
+        if is_story:
+            msg_doc["story_id"] = request.post_id
+        else:
+            msg_doc["post_id"] = request.post_id
+
         await db.messages.insert_one(msg_doc)
-        
+
         msg_payload = {
             "type": "message",
             "id": str(msg_doc.get("_id", "")),
             "from_user": current_user_id,
             "to_user": user_id,
             "message": msg_doc["message"],
-            "post_id": request.post_id,
             "created_at": now.isoformat() + "Z",
         }
+
+        if is_story:
+            msg_payload["story_id"] = request.post_id
+        else:
+            msg_payload["post_id"] = request.post_id
         
         await manager.send_personal_message(user_id, msg_payload)
         

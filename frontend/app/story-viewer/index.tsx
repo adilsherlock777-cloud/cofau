@@ -903,7 +903,15 @@ const handlePrevious = () => {
   </View>
 )}
 
-        {mediaError && (
+        {currentStory?.processing && (
+          <View style={styles.errorContainer}>
+            <ActivityIndicator size="large" color="#FF9A4D" />
+            <Text style={[styles.errorText, { marginTop: 16 }]}>Video is being optimized...</Text>
+            <Text style={[styles.errorText, { fontSize: 13, opacity: 0.7, marginTop: 4 }]}>This will be ready in a moment</Text>
+          </View>
+        )}
+
+        {mediaError && !currentStory?.processing && (
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={48} color="#FFF" />
             <Text style={styles.errorText}>Failed to load story</Text>

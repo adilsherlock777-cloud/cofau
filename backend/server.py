@@ -1324,15 +1324,52 @@ async def get_feed(
 
         # Fetch restaurant posts
         restaurant_posts_raw = await db.restaurant_posts.find(restaurant_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
-        
+
         # Add source identifier
         for post in user_posts_raw:
             post["_source"] = "user"
         for post in restaurant_posts_raw:
             post["_source"] = "restaurant"
-        
+
         # Combine all posts
         all_posts = user_posts_raw + restaurant_posts_raw
+
+        # ======================================================
+        # DISCOVERY POSTS - Mix in random older posts for variety
+        # Prevents the feed from showing the same posts every day
+        # ======================================================
+        recent_post_ids = {str(p["_id"]) for p in all_posts}
+        discovery_count = max(3, page_size // 5)  # ~20% of feed page = discovery posts
+
+        # Fetch random posts from both collections using $sample
+        discovery_pipeline = [{"$sample": {"size": discovery_count * 2}}]
+        if user_query:
+            discovery_pipeline.insert(0, {"$match": user_query})
+
+        restaurant_discovery_pipeline = [{"$sample": {"size": discovery_count * 2}}]
+        if restaurant_query:
+            restaurant_discovery_pipeline.insert(0, {"$match": restaurant_query})
+
+        try:
+            user_discovery = await db.posts.aggregate(discovery_pipeline).to_list(discovery_count * 2)
+            restaurant_discovery = await db.restaurant_posts.aggregate(restaurant_discovery_pipeline).to_list(discovery_count * 2)
+
+            for post in user_discovery:
+                post["_source"] = "user"
+            for post in restaurant_discovery:
+                post["_source"] = "restaurant"
+
+            # Filter out duplicates (posts already in the recent feed)
+            discovery_posts = [
+                p for p in (user_discovery + restaurant_discovery)
+                if str(p["_id"]) not in recent_post_ids
+            ][:discovery_count]
+
+            if discovery_posts:
+                all_posts.extend(discovery_posts)
+                print(f"🔀 Added {len(discovery_posts)} discovery posts to feed for variety")
+        except Exception as e:
+            print(f"⚠️ Discovery posts fetch failed (non-critical): {e}")
 
         # Calculate engagement scores with time decay for each post
         posts_with_scores = []
