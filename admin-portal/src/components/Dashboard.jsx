@@ -4,6 +4,7 @@ import BadgeRequests from './BadgeRequests';
 import VoucherClaims from './VoucherClaims';
 import NewUsers from './NewUsers';
 import ManagePosts from './ManagePosts';
+import SendNotification from './SendNotification';
 
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000/api'
@@ -145,6 +146,11 @@ export default function Dashboard({ admin, onLogout }) {
             label="Manage Posts"
           />
           <TabButton
+            active={activeTab === 'send-notification'}
+            onClick={() => setActiveTab('send-notification')}
+            label="Send Notification"
+          />
+          <TabButton
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
             label="Overview"
@@ -166,6 +172,10 @@ export default function Dashboard({ admin, onLogout }) {
 
         {activeTab === 'manage-posts' && (
           <ManagePosts token={admin.token} />
+        )}
+
+        {activeTab === 'send-notification' && (
+          <SendNotification token={admin.token} />
         )}
 
         {activeTab === 'overview' && (

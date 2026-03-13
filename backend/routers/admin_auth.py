@@ -9,6 +9,8 @@ from utils.jwt import create_access_token, verify_token
 from utils.level_system import recalculate_points_from_post_count
 from config import settings
 from pydantic import BaseModel
+from typing import Optional, List
+from utils.push_notifications import send_push_notification, separate_tokens_by_platform
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
@@ -375,3 +377,130 @@ async def admin_delete_post(
         "deleted_post_id": post_id,
         "deleted_by": current_admin.get("username"),
     }
+
+
+class SendNotificationRequest(BaseModel):
+    title: str
+    body: str
+    target: str = "all"  # "all", "users", "restaurants"
+
+
+@router.post("/send-notification")
+async def admin_send_notification(
+    payload: SendNotificationRequest,
+    current_admin: dict = Depends(get_current_admin),
+):
+    """Send push notification to all users and/or restaurants (admin only)"""
+    db = get_database()
+
+    all_tokens = []
+    user_count = 0
+    restaurant_count = 0
+
+    # Collect user tokens
+    if payload.target in ("all", "users"):
+        async for user in db.users.find(
+            {"device_tokens": {"$exists": True, "$ne": []}},
+            {"device_tokens": 1}
+        ):
+            tokens = user.get("device_tokens", [])
+            valid = [t for t in tokens if t and str(t).strip()]
+            if valid:
+                all_tokens.extend(valid)
+                user_count += 1
+
+    # Collect restaurant tokens
+    if payload.target in ("all", "restaurants"):
+        async for rest in db.restaurants.find(
+            {"device_tokens": {"$exists": True, "$ne": []}},
+            {"device_tokens": 1}
+        ):
+            tokens = rest.get("device_tokens", [])
+            valid = [t for t in tokens if t and str(t).strip()]
+            if valid:
+                all_tokens.extend(valid)
+                restaurant_count += 1
+
+    if not all_tokens:
+        return {
+            "success": False,
+            "message": "No devices with push tokens found",
+            "total_tokens": 0,
+        }
+
+    # Deduplicate tokens
+    unique_tokens = list(set(all_tokens))
+
+    # Separate by platform
+    ios_tokens, android_tokens = separate_tokens_by_platform(unique_tokens)
+
+    # Send to all devices
+    data = {"type": "admin_broadcast"}
+    result = await send_push_notification(
+        device_tokens=unique_tokens,
+        title=payload.title,
+        body=payload.body,
+        data=data,
+    )
+
+    # Log the campaign
+    await db.admin_notifications_log.insert_one({
+        "title": payload.title,
+        "body": payload.body,
+        "target": payload.target,
+        "total_tokens": len(unique_tokens),
+        "ios_tokens": len(ios_tokens),
+        "android_tokens": len(android_tokens),
+        "users_reached": user_count,
+        "restaurants_reached": restaurant_count,
+        "sent_by": current_admin.get("username"),
+        "sent_at": datetime.utcnow(),
+        "result": str(result) if result else None,
+    })
+
+    return {
+        "success": True,
+        "message": "Notification sent successfully",
+        "total_tokens": len(unique_tokens),
+        "ios_tokens": len(ios_tokens),
+        "android_tokens": len(android_tokens),
+        "users_reached": user_count,
+        "restaurants_reached": restaurant_count,
+    }
+
+
+@router.get("/notification-history")
+async def admin_notification_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_admin: dict = Depends(get_current_admin),
+):
+    """Get history of sent admin notifications"""
+    db = get_database()
+
+    cursor = (
+        db.admin_notifications_log.find()
+        .sort("sent_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+
+    history = []
+    async for entry in cursor:
+        history.append({
+            "id": str(entry["_id"]),
+            "title": entry.get("title"),
+            "body": entry.get("body"),
+            "target": entry.get("target"),
+            "total_tokens": entry.get("total_tokens", 0),
+            "ios_tokens": entry.get("ios_tokens", 0),
+            "android_tokens": entry.get("android_tokens", 0),
+            "users_reached": entry.get("users_reached", 0),
+            "restaurants_reached": entry.get("restaurants_reached", 0),
+            "sent_by": entry.get("sent_by"),
+            "sent_at": entry["sent_at"].isoformat() if entry.get("sent_at") else None,
+        })
+
+    total = await db.admin_notifications_log.count_documents({})
+
+    return {"history": history, "total": total}
