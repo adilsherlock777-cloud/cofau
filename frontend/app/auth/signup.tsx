@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
+import { logSignUp } from '../../utils/analytics';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
 let auth: any = null;
@@ -320,6 +321,7 @@ export default function SignupScreen() {
       }
 
       if (result.success) {
+        logSignUp('email');
         Alert.alert(
           'Account Created!',
           'Welcome to Cofau',
