@@ -124,7 +124,6 @@
         }
       ],
       "@react-native-firebase/auth",
-      "@react-native-firebase/analytics",
       "./plugins/withAndroidManifestFix.js",
       "expo-router"
     ],
