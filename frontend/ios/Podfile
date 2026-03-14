@@ -30,6 +30,7 @@ source 'https://cdn.cocoapods.org/'
 # This is the ONLY CocoaPods-safe way to fix this.
 # =============================================================================
 $SDWebImageAVIFCoderEnabled = false
+$RNFirebaseAsStaticFramework = true
 
 def ccache_enabled?(podfile_properties)
   return ENV['USE_CCACHE'] == '1' if ENV['USE_CCACHE']
