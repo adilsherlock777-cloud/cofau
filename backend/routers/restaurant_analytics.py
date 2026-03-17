@@ -543,7 +543,7 @@ async def get_best_post(
     click_data = await db.restaurant_analytics.aggregate(click_pipeline).to_list(None)
     clicks_map = {item["_id"]: item["clicks"] for item in click_data}
 
-    # Find the post with the highest combined score
+    # Find the post with the highest combined score (likes + views + clicks + comments)
     best_post = None
     best_score = -1
 
@@ -551,8 +551,9 @@ async def get_best_post(
         post_id = str(post["_id"])
         likes = post.get("likes_count", 0)
         comments = post.get("comments_count", 0)
+        views = post.get("views_count", 0)
         clicks = clicks_map.get(post_id, 0)
-        score = likes + comments + clicks
+        score = likes + views + clicks + comments
 
         if score > best_score:
             best_score = score
@@ -565,6 +566,7 @@ async def get_best_post(
                 "thumbnail_url": post.get("thumbnail_url", ""),
                 "likes_count": likes,
                 "comments_count": comments,
+                "views_count": views,
                 "clicks_count": clicks,
                 "total_score": score,
                 "created_at": str(post.get("created_at", "")),

@@ -3,14 +3,15 @@ import { View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 /**
- * Spoon & Fork badge for restaurant accounts.
- * Orange gradient background (Cofau theme) with white utensils.
+ * Restaurant badge – straight fork & knife inside a plate circle.
  */
 const RestaurantBadge = ({ size = 18 }) => {
-  const utensilColor = "#fff";
-  const utensilHeight = size * 0.6;
-  const handleWidth = size * 0.11;
-  const gap = size * 0.14;
+  const iconH = size * 0.52;
+  const tineW = size * 0.04;
+  const tineH = iconH * 0.38;
+  const handleW = size * 0.065;
+  const handleH = iconH * 0.52;
+  const knifeW = size * 0.09;
 
   return (
     <LinearGradient
@@ -23,77 +24,45 @@ const RestaurantBadge = ({ size = 18 }) => {
         borderRadius: size / 2,
         alignItems: "center",
         justifyContent: "center",
-        flexDirection: "row",
       }}
     >
-      {/* Fork - left */}
-      <View style={{ alignItems: "center", marginRight: gap / 2 }}>
-        {/* Fork tines */}
-        <View style={{ flexDirection: "row", gap: size * 0.025 }}>
-          <View
-            style={{
-              width: handleWidth * 0.55,
-              height: utensilHeight * 0.4,
-              backgroundColor: utensilColor,
-              borderTopLeftRadius: size * 0.06,
-              borderTopRightRadius: size * 0.06,
-            }}
-          />
-          <View
-            style={{
-              width: handleWidth * 0.55,
-              height: utensilHeight * 0.4,
-              backgroundColor: utensilColor,
-              borderTopLeftRadius: size * 0.06,
-              borderTopRightRadius: size * 0.06,
-            }}
-          />
-          <View
-            style={{
-              width: handleWidth * 0.55,
-              height: utensilHeight * 0.4,
-              backgroundColor: utensilColor,
-              borderTopLeftRadius: size * 0.06,
-              borderTopRightRadius: size * 0.06,
-            }}
-          />
-        </View>
-        {/* Fork handle */}
-        <View
-          style={{
-            width: handleWidth,
-            height: utensilHeight * 0.55,
-            backgroundColor: utensilColor,
-            borderBottomLeftRadius: size * 0.05,
-            borderBottomRightRadius: size * 0.05,
-          }}
-        />
-      </View>
+      {/* Inner plate circle */}
+      <View
+        style={{
+          position: "absolute",
+          width: size * 0.78,
+          height: size * 0.78,
+          borderRadius: size * 0.39,
+          borderWidth: size * 0.06,
+          borderColor: "rgba(255,255,255,0.45)",
+        }}
+      />
 
-      {/* Spoon - right */}
-      <View style={{ alignItems: "center", marginLeft: gap / 2 }}>
-        {/* Spoon bowl */}
-        <View
-          style={{
-            width: handleWidth * 2,
-            height: utensilHeight * 0.4,
-            backgroundColor: utensilColor,
-            borderTopLeftRadius: size * 0.2,
-            borderTopRightRadius: size * 0.2,
-            borderBottomLeftRadius: size * 0.08,
-            borderBottomRightRadius: size * 0.08,
-          }}
-        />
-        {/* Spoon handle */}
-        <View
-          style={{
-            width: handleWidth,
-            height: utensilHeight * 0.55,
-            backgroundColor: utensilColor,
-            borderBottomLeftRadius: size * 0.05,
-            borderBottomRightRadius: size * 0.05,
-          }}
-        />
+      {/* Utensils container */}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: size * 0.12 }}>
+        {/* Fork - straight */}
+        <View style={{ alignItems: "center" }}>
+          <View style={{ flexDirection: "row", gap: size * 0.02 }}>
+            <View style={{ width: tineW, height: tineH, backgroundColor: "#fff", borderRadius: tineW / 2 }} />
+            <View style={{ width: tineW, height: tineH, backgroundColor: "#fff", borderRadius: tineW / 2 }} />
+            <View style={{ width: tineW, height: tineH, backgroundColor: "#fff", borderRadius: tineW / 2 }} />
+          </View>
+          <View style={{ width: handleW, height: handleH, backgroundColor: "#fff", borderRadius: handleW / 2, marginTop: -1 }} />
+        </View>
+
+        {/* Knife - straight */}
+        <View style={{ alignItems: "center" }}>
+          <View style={{
+            width: knifeW,
+            height: tineH + 1,
+            backgroundColor: "#fff",
+            borderTopLeftRadius: knifeW / 2,
+            borderTopRightRadius: knifeW / 2,
+            borderBottomLeftRadius: knifeW * 0.15,
+            borderBottomRightRadius: knifeW * 0.15,
+          }} />
+          <View style={{ width: handleW, height: handleH, backgroundColor: "#fff", borderRadius: handleW / 2, marginTop: -1 }} />
+        </View>
       </View>
     </LinearGradient>
   );

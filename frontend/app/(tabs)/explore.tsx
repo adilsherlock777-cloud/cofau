@@ -22,6 +22,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useExploreRefresh } from "./_layout";
 import axios from "axios";
 import { Image } from "expo-image";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
@@ -274,7 +275,7 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
         </>
       )}
       <View style={styles.clicksBadge}>
-        <Ionicons name="eye" size={12} color="#fff" />
+        <Ionicons name="eye" size={13} color="#fff" />
         <Text style={styles.clicksText}>{(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}</Text>
       </View>
       {item.dish_name && (
@@ -298,7 +299,7 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => {
         <View style={[styles.tileImage, styles.placeholderImage]}><Ionicons name="image-outline" size={32} color="#ccc" /></View>
       )}
       <View style={styles.clicksBadge}>
-        <Ionicons name="eye" size={12} color="#fff" />
+        <Ionicons name="eye" size={13} color="#fff" />
         <Text style={styles.clicksText}>{(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}</Text>
       </View>
       {item.dish_name && (
@@ -1795,6 +1796,7 @@ export default function ExploreScreen() {
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const auth = useAuth() as { user: any; token: string | null; accountType: string | null };
   const { user, token, accountType } = auth;
+  const { register: registerExploreRefresh } = useExploreRefresh();
 
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
@@ -1826,14 +1828,16 @@ export default function ExploreScreen() {
   const [trendingPosts, setTrendingPosts] = useState<any[]>([]);
   const [showTrendingBanner, setShowTrendingBanner] = useState(false);
   const [trendingSlide, setTrendingSlide] = useState(0);
-  const [trendingCountdown, setTrendingCountdown] = useState(7);
+  const [trendingCountdown, setTrendingCountdown] = useState(15);
   const trendingBannerY = useRef(new Animated.Value(-400)).current;
   const trendingScale = useRef(new Animated.Value(0.8)).current;
   const trendingOpacity = useRef(new Animated.Value(0)).current;
   const trendingSlideAnim = useRef(new Animated.Value(0)).current;
   const trendingBannerShown = useRef(false);
+  const [trendingTrigger, setTrendingTrigger] = useState(0);
+  const trendingTimerRotation = useRef(new Animated.Value(0)).current;
 
-  // Typewriter animated placeholder
+  // Slide animated placeholder
   const PLACEHOLDER_PHRASES = [
     'Best Shawarma in JP Nagar',
     'Top Rated Biryani',
@@ -1842,62 +1846,37 @@ export default function ExploreScreen() {
     'Trending Momos in Indiranagar',
     'Best Biryani Near Me',
   ];
-  const [typedText, setTypedText] = useState('');
+  const [currentPhrase, setCurrentPhrase] = useState(PLACEHOLDER_PHRASES[0]);
   const phraseIndexRef = useRef(0);
-  const charIndexRef = useRef(0);
-  const isDeletingRef = useRef(false);
-  const pauseRef = useRef(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (searchQuery || searchFocused) {
-      // Reset so animation starts fresh when search bar loses focus
-      charIndexRef.current = 0;
-      isDeletingRef.current = false;
-      pauseRef.current = false;
-      setTypedText('');
       return;
     }
 
-    const tick = () => {
-      const currentPhrase = PLACEHOLDER_PHRASES[phraseIndexRef.current];
-
-      if (pauseRef.current) {
-        // Pause after typing completes, then start deleting
-        pauseRef.current = false;
-        isDeletingRef.current = true;
-        return 1200; // pause before deleting
-      }
-
-      if (!isDeletingRef.current) {
-        // Typing forward
-        charIndexRef.current++;
-        setTypedText(currentPhrase.slice(0, charIndexRef.current));
-        if (charIndexRef.current >= currentPhrase.length) {
-          pauseRef.current = true;
-          return 80;
-        }
-        return 60; // typing speed
-      } else {
-        // Deleting
-        charIndexRef.current--;
-        setTypedText(currentPhrase.slice(0, charIndexRef.current));
-        if (charIndexRef.current <= 0) {
-          isDeletingRef.current = false;
-          phraseIndexRef.current = (phraseIndexRef.current + 1) % PLACEHOLDER_PHRASES.length;
-          return 400; // pause before typing next phrase
-        }
-        return 35; // deleting speed (faster)
-      }
+    const cycle = () => {
+      // Slide up + fade out
+      Animated.parallel([
+        Animated.timing(slideAnim, { toValue: -14, duration: 300, useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => {
+        // Switch phrase
+        phraseIndexRef.current = (phraseIndexRef.current + 1) % PLACEHOLDER_PHRASES.length;
+        setCurrentPhrase(PLACEHOLDER_PHRASES[phraseIndexRef.current]);
+        // Position below
+        slideAnim.setValue(14);
+        // Slide up into place + fade in
+        Animated.parallel([
+          Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        ]).start();
+      });
     };
 
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const run = () => {
-      const delay = tick();
-      timeoutId = setTimeout(run, delay);
-    };
-    timeoutId = setTimeout(run, 500);
-
-    return () => clearTimeout(timeoutId);
+    const id = setInterval(cycle, 2500);
+    return () => clearInterval(id);
   }, [searchQuery, searchFocused]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [appliedCategories, setAppliedCategories] = useState<string[]>([]);
@@ -2628,36 +2607,85 @@ useFocusEffect(
   // ======================================================
   // TRENDING BANNER - fetch and auto-slide
   // ======================================================
+  // Also trigger banner on screen focus (single tab click)
+  useFocusEffect(
+    useCallback(() => {
+      if (token && !trendingBannerShown.current && !showTrendingBanner) {
+        setTrendingTrigger(t => t + 1);
+      }
+    }, [token, showTrendingBanner])
+  );
+
   useEffect(() => {
     if (!token || trendingBannerShown.current) return;
+    const buildTrending = (posts: any[]) => {
+      const allPosts = posts.map((p: any) => ({
+        ...p,
+        full_image_url: fixUrl(p.media_url || p.image_url),
+        full_thumbnail_url: fixUrl(p.thumbnail_url),
+      }));
+      const scored = allPosts.sort((a: any, b: any) => ((b.likes_count || 0) + (b.clicks_count || 0)) - ((a.likes_count || 0) + (a.clicks_count || 0)));
+      const restaurantPost = scored.find((p: any) => p.account_type === 'restaurant');
+      const regularPosts = scored.filter((p: any) => p.account_type !== 'restaurant');
+      let trending: any[];
+      if (restaurantPost) {
+        trending = [...regularPosts.slice(0, 2), restaurantPost, ...regularPosts.slice(2, 4)];
+      } else {
+        trending = regularPosts.slice(0, 5);
+      }
+      return trending.slice(0, 5);
+    };
+
+    const animateBannerIn = () => {
+      trendingBannerY.setValue(-400);
+      trendingScale.setValue(0.8);
+      trendingOpacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(trendingBannerY, { toValue: 0, useNativeDriver: true, tension: 50, friction: 8 }),
+        Animated.spring(trendingScale, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }),
+        Animated.timing(trendingOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    };
+
     const fetchTrending = async () => {
       try {
-        const res = await axios.get(`${API_URL}/posts/last-3-days`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!mountedRef.current) return;
-        const allPosts = (res.data || []).map((p: any) => ({
-          ...p,
-          full_image_url: fixUrl(p.media_url || p.image_url),
-          full_thumbnail_url: fixUrl(p.thumbnail_url),
-        }));
-        // Score by likes + clicks, pick top 5 with at least 1 restaurant post
-        const scored = allPosts.sort((a: any, b: any) => ((b.likes_count || 0) + (b.clicks_count || 0)) - ((a.likes_count || 0) + (a.clicks_count || 0)));
-        const restaurantPost = scored.find((p: any) => p.account_type === 'restaurant');
-        const userPosts = scored.filter((p: any) => p.account_type !== 'restaurant').slice(0, restaurantPost ? 4 : 5);
-        const trending = restaurantPost ? [...userPosts.slice(0, 2), restaurantPost, ...userPosts.slice(2)] : userPosts;
-        if (trending.length === 0) return;
-        setTrendingPosts(trending.slice(0, 5));
-        trendingBannerShown.current = true;
-        setShowTrendingBanner(true);
-        // Animate in: drop from top with 3D scale
-        Animated.parallel([
-          Animated.spring(trendingBannerY, { toValue: 0, useNativeDriver: true, tension: 50, friction: 8 }),
-          Animated.spring(trendingScale, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }),
-          Animated.timing(trendingOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        ]).start();
-      } catch {}
+        // Fast endpoint first - show banner immediately
+        const topRes = await axios.get(`${API_URL}/posts/last-3-days`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!mountedRef.current || trendingBannerShown.current) return;
+        const topData = topRes.data || [];
+        if (topData.length > 0) {
+          const trending = buildTrending(topData);
+          if (trending.length > 0) {
+            setTrendingPosts(trending);
+            trendingBannerShown.current = true;
+            setShowTrendingBanner(true);
+            animateBannerIn();
+          }
+        }
+        // Silently enhance with full feed data (no re-animation)
+        try {
+          const feedRes = await axios.get(`${API_URL}/feed?skip=0&limit=50&sort=engagement`, { headers: { Authorization: `Bearer ${token}` } });
+          if (!mountedRef.current) return;
+          const feedData = feedRes.data || [];
+          if (feedData.length > 0) {
+            const seen = new Set();
+            const combined = [...topData, ...feedData].filter((p: any) => {
+              const pid = p.id || p._id;
+              if (seen.has(pid)) return false;
+              seen.add(pid);
+              return true;
+            });
+            if (combined.length > topData.length) {
+              setTrendingPosts(buildTrending(combined));
+            }
+          }
+        } catch {}
+      } catch (err) {
+        console.log('Trending banner fetch error:', err);
+      }
     };
     fetchTrending();
-  }, [token]);
+  }, [token, trendingTrigger]);
 
   // Auto-slide trending posts every 1 second
   useEffect(() => {
@@ -2673,13 +2701,21 @@ useFocusEffect(
         Animated.timing(trendingSlideAnim, { toValue: 0, duration: 250, useNativeDriver: true, easing: Easing.out(Easing.cubic) }).start();
         return next;
       });
-    }, 1200);
+    }, 3000);
     return () => clearInterval(slideInterval);
   }, [showTrendingBanner, trendingPosts.length]);
 
-  // Countdown timer for trending banner
+  // Countdown timer for trending banner with rotation animation
   useEffect(() => {
     if (!showTrendingBanner) return;
+    trendingTimerRotation.setValue(0);
+    // Animate full rotation over 15 seconds (anti-clockwise)
+    Animated.timing(trendingTimerRotation, {
+      toValue: 1,
+      duration: 15000,
+      useNativeDriver: true,
+      easing: Easing.linear,
+    }).start();
     const countdownInterval = setInterval(() => {
       setTrendingCountdown(prev => {
         if (prev <= 1) {
@@ -2700,7 +2736,7 @@ useFocusEffect(
       Animated.timing(trendingOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
     ]).start(() => {
       setShowTrendingBanner(false);
-      setTrendingCountdown(7);
+      setTrendingCountdown(15);
       setTrendingSlide(0);
     });
   }, []);
@@ -2946,6 +2982,24 @@ useFocusEffect(
     } catch {}
   };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
+
+  // Register explore tab tap to refresh + re-show trending banner
+  // Don't call onRefresh() which shows loading spinner - refresh silently in background
+  useEffect(() => {
+    registerExploreRefresh(() => {
+      // Show banner immediately
+      trendingBannerShown.current = false;
+      setShowTrendingBanner(false);
+      setTrendingPosts([]);
+      setTrendingSlide(0);
+      setTrendingCountdown(15);
+      setTrendingTrigger(t => t + 1);
+      // Silent background refresh - no loading spinner
+      setPlayingVideos([]);
+      fetchPostsRef.current?.(true);
+    });
+  }, []);
+
   const handlePostPressGrid = async (postId: string) => {
   setPlayingVideos([]);
 
@@ -3131,8 +3185,19 @@ return (
                 {!searchQuery && !searchFocused && (
                   <View style={styles.animatedPlaceholder} pointerEvents="none">
                     <Text style={styles.animatedPlaceholderStatic}>Search for </Text>
-                    <Text style={styles.animatedPlaceholderTyping}>{typedText}</Text>
-                    <Text style={styles.animatedPlaceholderCursor}>|</Text>
+                    <View style={{ height: 18, overflow: 'hidden', justifyContent: 'center' }}>
+                      <Animated.Text
+                        style={[
+                          styles.animatedPlaceholderTyping,
+                          {
+                            transform: [{ translateY: slideAnim }],
+                            opacity: opacityAnim,
+                          },
+                        ]}
+                      >
+                        {currentPhrase}
+                      </Animated.Text>
+                    </View>
                   </View>
                 )}
               </View>
@@ -3410,28 +3475,52 @@ return (
                       contentFit="contain"
                       placeholder={{ blurhash: BLUR_HASH }}
                     />
+                    {/* Gradient overlay for depth */}
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.5)']}
+                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 }}
+                    />
+                    {/* Dish name floating tag */}
+                    {topPosts[0].dish_name && (
+                      <View style={styles.heroImageDishTag}>
+                        <Text style={styles.heroImageDishText} numberOfLines={1}>{topPosts[0].dish_name}</Text>
+                      </View>
+                    )}
                   </View>
+
+                  {/* Review text snippet */}
+                  {topPosts[0].review_text && (
+                    <Text style={styles.heroReviewText} numberOfLines={2}>
+                      "{topPosts[0].review_text}"
+                    </Text>
+                  )}
 
                   {/* Score Bar */}
                   <View style={styles.heroScoreRow}>
                     <View style={styles.heroScoreItem}>
-                      <Ionicons name="star" size={14} color="#F2CF68" />
-                      <Text style={styles.heroScoreLabel}>Quality</Text>
+                      <View style={styles.heroScoreIconCircle}>
+                        <Ionicons name="star" size={16} color="#F2CF68" />
+                      </View>
                       <Text style={styles.heroScoreValue}>{Math.round(topPosts[0].quality_score)}</Text>
+                      <Text style={styles.heroScoreLabel}>Quality</Text>
                     </View>
                     <View style={styles.heroScoreDivider} />
                     <View style={styles.heroScoreItem}>
-                      <MaskedView maskElement={<Ionicons name="heart" size={14} color="#000" />}>
-                        <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 14, height: 14 }} />
-                      </MaskedView>
-                      <Text style={styles.heroScoreLabel}>Likes</Text>
+                      <View style={styles.heroScoreIconCircle}>
+                        <MaskedView maskElement={<Ionicons name="heart" size={16} color="#000" />}>
+                          <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 16, height: 16 }} />
+                        </MaskedView>
+                      </View>
                       <Text style={styles.heroScoreValue}>{topPosts[0].likes_count}</Text>
+                      <Text style={styles.heroScoreLabel}>Likes</Text>
                     </View>
                     <View style={styles.heroScoreDivider} />
                     <View style={styles.heroScoreItem}>
-                      <Ionicons name="trophy" size={14} color="#F2CF68" />
-                      <Text style={styles.heroScoreLabel}>Score</Text>
-                      <Text style={styles.heroScoreValue}>{Math.round(topPosts[0].combined_score)}</Text>
+                      <View style={[styles.heroScoreIconCircle, { backgroundColor: 'rgba(242, 207, 104, 0.15)' }]}>
+                        <Ionicons name="trophy" size={16} color="#F2CF68" />
+                      </View>
+                      <Text style={[styles.heroScoreValue, { color: '#E94A37', fontSize: 22 }]}>{Math.round(topPosts[0].combined_score)}</Text>
+                      <Text style={[styles.heroScoreLabel, { fontWeight: '700', color: '#E94A37' }]}>Score</Text>
                     </View>
                   </View>
                 </View>
@@ -3486,7 +3575,7 @@ return (
                       )}
                     </View>
 
-                    {/* Image Preview - same as hero */}
+                    {/* Image Preview */}
                     <View style={styles.regularImageWrapper}>
                       <Image
                         source={{ uri: fixUrl(item.image_url || item.media_url || item.thumbnail_url) || undefined }}
@@ -3500,28 +3589,46 @@ return (
                         contentFit="contain"
                         placeholder={{ blurhash: BLUR_HASH }}
                       />
+                      {/* Gradient overlay */}
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.45)']}
+                        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }}
+                      />
+                      {/* Dish name overlay */}
+                      {item.dish_name && (
+                        <View style={styles.regularImageDishTag}>
+                          <Text style={styles.regularImageDishText} numberOfLines={1}>{item.dish_name}</Text>
+                        </View>
+                      )}
                     </View>
+
+                    {/* Review text snippet */}
+                    {item.review_text && (
+                      <Text style={styles.regularReviewText} numberOfLines={2}>
+                        "{item.review_text}"
+                      </Text>
+                    )}
 
                     {/* Scores row */}
                     <View style={styles.regularScoresRow}>
                       <View style={styles.regularScoreItem}>
                         <Ionicons name="star" size={13} color="#F2CF68" />
-                        <Text style={styles.regularScoreLabel}>Quality</Text>
                         <Text style={styles.regularScoreValue}>{Math.round(item.quality_score)}</Text>
+                        <Text style={styles.regularScoreLabel}>Quality</Text>
                       </View>
                       <View style={styles.regularScoreDividerV} />
                       <View style={styles.regularScoreItem}>
                         <MaskedView maskElement={<Ionicons name="heart" size={13} color="#000" />}>
                           <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 13, height: 13 }} />
                         </MaskedView>
-                        <Text style={styles.regularScoreLabel}>Likes</Text>
                         <Text style={styles.regularScoreValue}>{item.likes_count}</Text>
+                        <Text style={styles.regularScoreLabel}>Likes</Text>
                       </View>
                       <View style={styles.regularScoreDividerV} />
                       <View style={styles.regularScoreItem}>
                         <Ionicons name="trophy" size={13} color="#F2CF68" />
-                        <Text style={[styles.regularScoreLabel, { fontWeight: '700' }]}>Score</Text>
                         <Text style={[styles.regularScoreValue, { fontWeight: '700', color: '#E94A37' }]}>{Math.round(item.combined_score)}</Text>
+                        <Text style={[styles.regularScoreLabel, { fontWeight: '700', color: '#E94A37' }]}>Score</Text>
                       </View>
                     </View>
                   </View>
@@ -3769,18 +3876,27 @@ return (
               { rotateX: trendingBannerY.interpolate({ inputRange: [-400, 0], outputRange: ['15deg', '0deg'] }) },
             ],
           }]}>
-            {/* Header */}
-            <View style={styles.trendingHeader}>
+            {/* Gradient Header */}
+            <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.trendingHeaderGradient}>
               <View style={styles.trendingHeaderLeft}>
-                <Text style={{ fontSize: 16 }}>🔥</Text>
-                <Text style={styles.trendingTitle}>Trending Dish in Cofau</Text>
+                <Text style={{ fontSize: 18 }}>🔥</Text>
+                <View>
+                  <Text style={styles.trendingTitle}>TRENDING DISH</Text>
+                  <Text style={styles.trendingSubtitle}>in Cofau right now</Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={closeTrendingBanner} style={styles.trendingClose} activeOpacity={0.7}>
-                <Ionicons name="close" size={20} color="#666" />
-              </TouchableOpacity>
-            </View>
+              <View style={styles.trendingDots}>
+                {trendingPosts.map((_: any, i: number) => (
+                  i === trendingSlide ? (
+                    <View key={i} style={[styles.trendingDot, styles.trendingDotActive]} />
+                  ) : (
+                    <View key={i} style={styles.trendingDot} />
+                  )
+                ))}
+              </View>
+            </LinearGradient>
 
-            {/* Slide content */}
+            {/* Slide content - vertical layout */}
             <Animated.View style={[styles.trendingSlideContainer, {
               transform: [{ translateX: trendingSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) }],
               opacity: trendingSlideAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.3, 0] }),
@@ -3791,51 +3907,86 @@ return (
                   onPress={() => { closeTrendingBanner(); router.push(`/post-details/${trendingPosts[trendingSlide].id || trendingPosts[trendingSlide]._id}`); }}
                   style={styles.trendingCard}
                 >
-                  <Image
-                    source={{ uri: trendingPosts[trendingSlide].full_thumbnail_url || trendingPosts[trendingSlide].full_image_url }}
-                    style={styles.trendingImage}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    transition={150}
-                  />
+                  {/* Big food image */}
+                  <View style={styles.trendingImageWrapper}>
+                    <Image
+                      source={{ uri: trendingPosts[trendingSlide].full_thumbnail_url || trendingPosts[trendingSlide].full_image_url }}
+                      style={styles.trendingImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={150}
+                    />
+                    {/* Rank label - stretched to left edge */}
+                    <LinearGradient colors={['#FFD700', '#FFA500']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.trendingRankBadge}>
+                      <Text style={styles.trendingRankText}>#{trendingSlide + 1} Trending</Text>
+                    </LinearGradient>
+                  </View>
+                  {/* Stats pills - sitting half on image, half on info */}
+                  <View style={styles.trendingStatsRow}>
+                    <LinearGradient colors={['#FFE8E8', '#FFF0F0']} style={styles.trendingStatPill}>
+                      <Text style={{ fontSize: 12 }}>❤️</Text>
+                      <Text style={styles.trendingStatTextLikes}>{(trendingPosts[trendingSlide].likes_count || 0) > 1000 ? `${((trendingPosts[trendingSlide].likes_count || 0) / 1000).toFixed(1)}K` : (trendingPosts[trendingSlide].likes_count || 0)}</Text>
+                    </LinearGradient>
+                    <LinearGradient colors={['#E8F4FF', '#F0F8FF']} style={styles.trendingStatPill}>
+                      <Ionicons name="eye" size={13} color="#3B82F6" />
+                      <Text style={styles.trendingStatTextViews}>{(trendingPosts[trendingSlide].clicks_count || 0) > 1000 ? `${((trendingPosts[trendingSlide].clicks_count || 0) / 1000).toFixed(1)}K` : (trendingPosts[trendingSlide].clicks_count || 0)}</Text>
+                    </LinearGradient>
+                  </View>
+                  {/* Info below image */}
                   <View style={styles.trendingCardInfo}>
-                    <View style={styles.trendingCardTop}>
-                      <Text style={styles.trendingDishName} numberOfLines={1}>
-                        {trendingPosts[trendingSlide].dish_name || trendingPosts[trendingSlide].review_text?.slice(0, 30) || 'Trending Dish'}
-                      </Text>
-                      {trendingPosts[trendingSlide].account_type === 'restaurant' && (
-                        <View style={styles.trendingRestaurantTag}>
-                          <Ionicons name="restaurant" size={9} color="#fff" />
-                          <Text style={styles.trendingRestaurantTagText}>Restaurant</Text>
+                    <View style={styles.trendingUserRow}>
+                      <UserAvatar
+                        profilePicture={trendingPosts[trendingSlide].user_profile_picture}
+                        username={trendingPosts[trendingSlide].username}
+                        size={36}
+                        showLevelBadge={true}
+                        level={trendingPosts[trendingSlide].user_level || 1}
+                      />
+                      <View style={styles.trendingUserInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={styles.trendingUsername} numberOfLines={1}>{trendingPosts[trendingSlide].username}</Text>
                         </View>
-                      )}
-                    </View>
-                    <Text style={styles.trendingUsername} numberOfLines={1}>@{trendingPosts[trendingSlide].username}</Text>
-                    <View style={styles.trendingStats}>
-                      <View style={styles.trendingStat}>
-                        <Ionicons name="heart" size={12} color="#FF2E2E" />
-                        <Text style={styles.trendingStatText}>{trendingPosts[trendingSlide].likes_count || 0}</Text>
+                        {trendingPosts[trendingSlide].account_type === 'restaurant' ? (
+                          <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.trendingRestaurantTag}>
+                            <Ionicons name="storefront-outline" size={8} color="#fff" />
+                            <Text style={styles.trendingRestaurantTagText}>Restaurant</Text>
+                          </LinearGradient>
+                        ) : trendingPosts[trendingSlide].location_name ? (
+                          <View style={styles.trendingLocationTag}>
+                            <Ionicons name="location-sharp" size={9} color="#E94A37" />
+                            <Text style={styles.trendingLocationText} numberOfLines={1}>{trendingPosts[trendingSlide].location_name}</Text>
+                          </View>
+                        ) : null}
                       </View>
-                      <View style={styles.trendingStat}>
-                        <Ionicons name="eye" size={12} color="#666" />
-                        <Text style={styles.trendingStatText}>{trendingPosts[trendingSlide].clicks_count || 0}</Text>
-                      </View>
+                      <Text style={styles.trendingDishName} numberOfLines={1}>
+                        {trendingPosts[trendingSlide].dish_name || trendingPosts[trendingSlide].review_text?.slice(0, 25) || 'Trending Dish'}
+                      </Text>
                     </View>
                   </View>
                 </TouchableOpacity>
               )}
             </Animated.View>
 
-            {/* Slide indicators + countdown */}
+            {/* Timer + close at bottom center */}
             <View style={styles.trendingFooter}>
-              <View style={styles.trendingDots}>
-                {trendingPosts.map((_: any, i: number) => (
-                  <View key={i} style={[styles.trendingDot, i === trendingSlide && styles.trendingDotActive]} />
-                ))}
-              </View>
-              <View style={styles.trendingCountdown}>
-                <Text style={styles.trendingCountdownText}>{trendingCountdown}</Text>
-              </View>
+              <TouchableOpacity onPress={closeTrendingBanner} activeOpacity={0.7} style={styles.trendingCloseBottom}>
+                {/* Circular timer */}
+                <View style={styles.trendingTimerOuter}>
+                  <Animated.View style={[styles.trendingTimerRing, {
+                    transform: [{ rotate: trendingTimerRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] }) }],
+                  }]}>
+                    <View style={styles.trendingTimerArc} />
+                  </Animated.View>
+                  <View style={styles.trendingTimerInner}>
+                    <Text style={styles.trendingCountdownText}>{trendingCountdown}</Text>
+                  </View>
+                </View>
+                <View style={styles.trendingCloseLabels}>
+                  <Text style={styles.trendingCloseBottomLabel}>Closes in {trendingCountdown}s</Text>
+                  <Ionicons name="close-circle" size={16} color="#ccc" />
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.trendingDoubleTapHint}>Double Tap to see Trending</Text>
             </View>
           </Animated.View>
         </Animated.View>
@@ -3924,18 +4075,12 @@ const styles = StyleSheet.create({
   },
   animatedPlaceholderStatic: {
     fontSize: 14,
-    color: '#999',
+    color: '#bbb',
   },
   animatedPlaceholderTyping: {
     fontSize: 14,
-    color: '#E94A37',
-    fontWeight: '600' as const,
-  },
-  animatedPlaceholderCursor: {
-    fontSize: 14,
-    color: '#E94A37',
-    fontWeight: '300' as const,
-    marginLeft: 1,
+    color: '#D4A07A',
+    fontWeight: '400' as const,
   },
   inlineFilterButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#E94A37", borderRadius: 18, paddingVertical: 5, paddingHorizontal: 12, gap: 4 },
   gradientBorder: { borderRadius: 20, padding: 2 },
@@ -4069,6 +4214,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
+    paddingBottom: 14,
     overflow: 'hidden' as const,
   },
   heroRankBadge: {
@@ -4127,7 +4273,7 @@ const styles = StyleSheet.create({
   },
   heroImageWrapper: {
     width: 'auto' as any,
-    height: 300,
+    height: 320,
     marginHorizontal: -16,
     marginBottom: 12,
     overflow: 'hidden' as const,
@@ -4147,14 +4293,52 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
+  heroImageDishTag: {
+    position: 'absolute' as const,
+    bottom: 12,
+    left: 16,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(233, 74, 55, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 5,
+    maxWidth: '60%' as any,
+  },
+  heroImageDishText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  heroReviewText: {
+    fontSize: 13,
+    color: '#555',
+    fontStyle: 'italic' as const,
+    lineHeight: 18,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
   heroScoreRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-around' as const,
     alignItems: 'center' as const,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginHorizontal: -4,
   },
   heroScoreItem: {
     alignItems: 'center' as const,
-    gap: 2,
+    gap: 4,
+  },
+  heroScoreIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 46, 46, 0.08)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   heroScoreLabel: {
     fontSize: 11,
@@ -4162,26 +4346,26 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
   },
   heroScoreValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700' as const,
     color: '#333',
   },
   heroScoreDivider: {
     width: 1,
-    height: 30,
+    height: 40,
     backgroundColor: '#E5E5E5',
   },
   regularCardBorder: {
-    borderRadius: 14,
-    marginBottom: 12,
+    borderRadius: 16,
+    marginBottom: 14,
     backgroundColor: '#FFF',
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: '#F0F0F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   regularCardInner: {
     backgroundColor: '#fff',
@@ -4230,7 +4414,7 @@ const styles = StyleSheet.create({
   },
   regularImageWrapper: {
     width: 'auto' as any,
-    height: 200,
+    height: 220,
     marginHorizontal: -12,
     marginBottom: 10,
     overflow: 'hidden' as const,
@@ -4250,10 +4434,40 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
+  regularImageDishTag: {
+    position: 'absolute' as const,
+    bottom: 10,
+    left: 12,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(233, 74, 55, 0.85)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 4,
+    maxWidth: '55%' as any,
+  },
+  regularImageDishText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600' as const,
+  },
+  regularReviewText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic' as const,
+    lineHeight: 17,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
   regularScoresRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-around' as const,
     alignItems: 'center' as const,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginHorizontal: -2,
   },
   regularScoreItem: {
     alignItems: 'center' as const,
@@ -5590,44 +5804,51 @@ toggleTabTextActive: {
   trendingOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
   },
   trendingBanner: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    width: SCREEN_WIDTH * 0.88,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
+    borderRadius: 24,
+    width: SCREEN_WIDTH * 0.92,
+    overflow: 'hidden',
+    shadowColor: '#FF2E2E',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    elevation: 28,
   },
-  trendingHeader: {
+  trendingHeaderGradient: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
   },
   trendingHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   trendingTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1a1a1a',
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: 1.5,
+  },
+  trendingSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 1,
   },
   trendingClose: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -5635,103 +5856,221 @@ toggleTabTextActive: {
     overflow: 'hidden',
   },
   trendingCard: {
-    flexDirection: 'row',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 14,
+    flexDirection: 'column',
+    backgroundColor: '#fff',
     overflow: 'hidden',
-    height: 110,
+  },
+  trendingImageWrapper: {
+    position: 'relative',
+    width: '100%',
   },
   trendingImage: {
-    width: 110,
-    height: 110,
+    width: '100%',
+    height: SCREEN_WIDTH * 0.75,
+  },
+  trendingRankBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+  trendingRankText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  trendingStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: -18,
+    zIndex: 10,
+    paddingHorizontal: 16,
   },
   trendingCardInfo: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'center',
-    gap: 4,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
-  trendingCardTop: {
+  trendingUserRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
+    gap: 10,
+  },
+  trendingAvatarRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendingAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  trendingAvatarPlaceholder: {
+    backgroundColor: '#bbb',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    borderColor: '#fff',
+  },
+  trendingUserInfo: {
+    gap: 3,
+  },
+  trendingUsername: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '700',
   },
   trendingDishName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    flexShrink: 1,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    textAlign: 'right' as const,
   },
   trendingRestaurantTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#E94A37',
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
+    alignSelf: 'flex-start' as const,
   },
   trendingRestaurantTagText: {
     fontSize: 8,
     fontWeight: '700',
     color: '#fff',
   },
-  trendingUsername: {
-    fontSize: 12,
-    color: '#888',
-    fontWeight: '500',
-  },
-  trendingStats: {
+  trendingLocationTag: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
+    alignItems: 'center',
+    gap: 3,
+    alignSelf: 'flex-start' as const,
   },
-  trendingStat: {
+  trendingLocationText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#777',
+    maxWidth: 120,
+  },
+  trendingLevelBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FF7A18',
+    backgroundColor: '#FFF5EB',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    overflow: 'hidden' as const,
+  },
+  trendingStatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  trendingStatTextLikes: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E94A37',
+  },
+  trendingStatTextViews: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#3B82F6',
+  },
+  trendingFooter: {
+    alignItems: 'center',
+    paddingBottom: 14,
+    paddingTop: 8,
+    gap: 8,
+  },
+  trendingCloseBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  trendingTimerOuter: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendingTimerRing: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 3,
+    borderColor: '#E8E8E8',
+    borderTopColor: '#1a1a1a',
+    borderRightColor: '#1a1a1a',
+  },
+  trendingTimerArc: {
+    width: '100%',
+    height: '100%',
+  },
+  trendingTimerInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendingCloseLabels: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  trendingStatText: {
-    fontSize: 12,
+  trendingCloseBottomLabel: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#555',
+    color: '#999',
   },
-  trendingFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 14,
-    paddingHorizontal: 4,
+  trendingDoubleTapHint: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#bbb',
+    letterSpacing: 0.3,
   },
   trendingDots: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
+    alignItems: 'center',
   },
   trendingDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#ddd',
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   trendingDotActive: {
-    backgroundColor: '#E94A37',
     width: 18,
-    borderRadius: 4,
-  },
-  trendingCountdown: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E94A37',
+    backgroundColor: '#fff',
   },
   trendingCountdownText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#E94A37',
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#fff',
   },
 });

@@ -19,20 +19,19 @@ import { useAuth } from "../context/AuthContext";
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from "../utils/imageUrlFix";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_WIDTH = SCREEN_WIDTH * 0.38;
-const CARD_HEIGHT = CARD_WIDTH * 1.4;
+const CARD_WIDTH = SCREEN_WIDTH - 32;
 
 export default function SuggestedUsersBar({ refreshTrigger }) {
   const router = useRouter();
   const { token } = useAuth();
-  
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingFollow, setLoadingFollow] = useState(null);
 
   const fetchSuggestedUsers = useCallback(async () => {
     if (!token) return;
-    
+
     try {
       setLoading(true);
       const response = await axios.get(`${BACKEND_URL}/api/users/suggestions?limit=10`, {
@@ -59,7 +58,6 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
       await axios.post(`${BACKEND_URL}/api/users/${userId}/follow`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Remove the user card immediately after following
       setUsers(prev => prev.filter(u => u.id !== userId));
     } catch (error) {
     } finally {
@@ -67,100 +65,88 @@ export default function SuggestedUsersBar({ refreshTrigger }) {
     }
   };
 
-  // Navigate to user profile
-const handleUserPress = (userId) => {
-  router.push(`/profile?userId=${userId}`);
-};
-
-// Navigate to user profile when tapping post image
-const handlePostPress = (userId) => {
-  router.push(`/profile?userId=${userId}`);
-};
-  // Get badge color based on level
   const getLevelBadgeColor = (level) => {
-    if (level >= 10) return "#FFD700"; // Gold
-    if (level >= 7) return "#C0C0C0";  // Silver
-    if (level >= 4) return "#CD7F32";  // Bronze
-    return "#1B7C82";                   // Default teal
+    if (level >= 10) return ["#FFD700", "#FFA500"];
+    if (level >= 7) return ["#C0C0C0", "#A0A0A0"];
+    if (level >= 4) return ["#CD7F32", "#A0522D"];
+    return ["#1B7C82", "#15656A"];
+  };
+
+  const formatCount = (count) => {
+    if (count >= 1000000) return (count / 1000000).toFixed(1) + "M";
+    if (count >= 1000) return (count / 1000).toFixed(1) + "K";
+    return String(count || 0);
   };
 
   const renderUserCard = ({ item }) => {
     const isLoadingThis = loadingFollow === item.id;
-    const mediaUrl = normalizeMediaUrl(item.latest_post?.media_url);
     const profilePic = normalizeProfilePicture(item.profile_picture);
     const userLevel = item.level || 1;
+    const recentPosts = (item.recent_posts || []).slice(0, 4);
+    const badgeColors = getLevelBadgeColor(userLevel);
 
     return (
       <View style={styles.cardContainer}>
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => router.push(`/profile?userId=${item.id}`)}
-          style={styles.imageContainer}
+          style={styles.cardInner}
         >
-          {mediaUrl ? (
-            <Image
-              source={{ uri: mediaUrl }}
-              style={styles.backgroundImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.backgroundImage, styles.placeholderBg]}>
-              <Ionicons name="image-outline" size={40} color="#ccc" />
-            </View>
-          )}
-          
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.8)"]}
-            style={styles.gradientOverlay}
-          />
-
-          {item.latest_post?.media_type === "video" && (
-            <View style={styles.videoIndicator}>
-              <Ionicons name="play" size={12} color="#fff" />
-            </View>
-          )}
-
-          <View style={styles.userInfoOverlay}>
-            <TouchableOpacity
-              onPress={() => router.push(`/profile?userId=${item.id}`)} 
-              style={styles.userRow}
-            >
-              {/* Avatar with Level Badge */}
-              <View style={styles.avatarContainer}>
-                {profilePic ? (
-                  <Image source={{ uri: profilePic }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Text style={styles.avatarText}>
-                      {item.username?.charAt(0)?.toUpperCase() || "?"}
-                    </Text>
-                  </View>
-                )}
-                
-                {/* Level Badge */}
-                <View 
-                  style={[
-                    styles.levelBadge, 
-                    { backgroundColor: getLevelBadgeColor(userLevel) }
-                  ]}
-                >
-                  <Text style={styles.levelBadgeText}>{userLevel}</Text>
+          {/* Left Side - Avatar, Stats, Follow */}
+          <View style={styles.leftSection}>
+            {/* Avatar with Level Badge */}
+            <View style={styles.avatarWrapper}>
+              <LinearGradient
+                colors={badgeColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarRing}
+              >
+                <View style={styles.avatarInner}>
+                  {profilePic ? (
+                    <Image source={{ uri: profilePic }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                      <Text style={styles.avatarText}>
+                        {item.username?.charAt(0)?.toUpperCase() || "?"}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              </View>
+              </LinearGradient>
+              <LinearGradient
+                colors={badgeColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.levelBadge}
+              >
+                <Text style={styles.levelBadgeText}>{userLevel}</Text>
+              </LinearGradient>
+            </View>
 
-              <View style={styles.usernameContainer}>
-                <Text style={styles.username} numberOfLines={1}>
-                  {item.username}
-                </Text>
-                <Text style={styles.postCount}>
-                  {item.post_count} {item.post_count === 1 ? "post" : "posts"}
-                </Text>
-              </View>
-            </TouchableOpacity>
+            {/* Username */}
+            <Text style={styles.username} numberOfLines={1}>
+              {item.username}
+            </Text>
 
+            {/* Stats Row */}
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{formatCount(item.post_count)}</Text>
+                <Text style={styles.statLabel}>Posts</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{formatCount(item.followers_count)}</Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </View>
+            </View>
+
+            {/* Follow Button */}
             <TouchableOpacity
               onPress={() => handleFollow(item.id)}
               disabled={isLoadingThis}
+              style={styles.followButtonWrap}
             >
               <LinearGradient
                 colors={["#FF2E2E", "#FF7A18"]}
@@ -175,6 +161,44 @@ const handlePostPress = (userId) => {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+          </View>
+
+          {/* Right Side - Post Grid */}
+          <View style={styles.rightSection}>
+            <View style={styles.postGrid}>
+              {[0, 1, 2, 3].map((idx) => {
+                const post = recentPosts[idx];
+                const postMedia = post ? normalizeMediaUrl(post.media_url) : null;
+
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.gridItem}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      if (post) router.push(`/profile?userId=${item.id}`);
+                    }}
+                  >
+                    {postMedia ? (
+                      <Image
+                        source={{ uri: postMedia }}
+                        style={styles.gridImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                        <Ionicons name="image-outline" size={20} color="#ccc" />
+                      </View>
+                    )}
+                    {post?.media_type === "video" && (
+                      <View style={styles.videoIcon}>
+                        <Ionicons name="play" size={10} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </TouchableOpacity>
       </View>
@@ -206,7 +230,7 @@ const handlePostPress = (userId) => {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
-          snapToInterval={CARD_WIDTH + 12}
+          snapToInterval={CARD_WIDTH + 16}
           decelerationRate="fast"
         />
       )}
@@ -236,7 +260,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   loadingContainer: {
-    height: CARD_HEIGHT,
+    height: 160,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -245,69 +269,57 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    marginHorizontal: 6,
+    marginHorizontal: 8,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
+  },
+  cardInner: {
+    flexDirection: "row",
+    padding: 14,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#f0f0f0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  imageContainer: {
-    flex: 1,
+  // Left Section
+  leftSection: {
+    width: "38%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: "#f0f0f0",
+  },
+  avatarWrapper: {
     position: "relative",
+    marginBottom: 8,
   },
-  backgroundImage: {
-    width: "100%",
-    height: "100%",
-  },
-  placeholderBg: {
-    backgroundColor: "#e0e0e0",
+  avatarRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    padding: 2.5,
     justifyContent: "center",
     alignItems: "center",
   },
-  gradientOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: "65%",
-  },
-  videoIndicator: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 12,
-    width: 24,
-    height: 24,
+  avatarInner: {
+    width: 59,
+    height: 59,
+    borderRadius: 30,
+    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-  },
-  userInfoOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
-  },
-  userRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  avatarContainer: {
-    position: "relative",
+    overflow: "hidden",
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "#fff",
+    width: 55,
+    height: 55,
+    borderRadius: 28,
   },
   avatarPlaceholder: {
     backgroundColor: "#E94A37",
@@ -316,19 +328,19 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 22,
     fontWeight: "700",
   },
   levelBadge: {
     position: "absolute",
     bottom: -2,
     right: -2,
-    width: 15,
-    height: 15,
-    borderRadius: 7,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: "#fff",
   },
   levelBadgeText: {
@@ -336,33 +348,92 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
   },
-  usernameContainer: {
-    flex: 1,
-    marginLeft: 8,
-  },
   username: {
-    color: "#fff",
     fontSize: 13,
     fontWeight: "700",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    color: "#222",
+    textAlign: "center",
+    marginBottom: 8,
+    maxWidth: "100%",
   },
-  postCount: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 11,
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  statItem: {
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  statNumber: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#222",
+  },
+  statLabel: {
+    fontSize: 10,
+    color: "#888",
+    fontWeight: "500",
+    marginTop: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: "#e0e0e0",
+  },
+  followButtonWrap: {
+    width: "100%",
   },
   followButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 20,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 30,
+    minHeight: 32,
   },
   followButtonText: {
     color: "#fff",
     fontSize: 13,
     fontWeight: "700",
+  },
+  // Right Section
+  rightSection: {
+    flex: 1,
+    paddingLeft: 12,
+    justifyContent: "center",
+  },
+  postGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  gridItem: {
+    width: "48.5%",
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#f5f5f5",
+    position: "relative",
+  },
+  gridImage: {
+    width: "100%",
+    height: "100%",
+  },
+  gridPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+  },
+  videoIcon: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 8,
+    width: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

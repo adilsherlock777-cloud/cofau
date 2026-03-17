@@ -328,7 +328,7 @@ export default function LocationDetailsScreen() {
         )}
 
         <View style={styles.clicksBadge}>
-          <Ionicons name="eye-outline" size={10} color="#fff" />
+          <Ionicons name="eye" size={10} color="#fff" />
           <Text style={styles.clicksText}>{formatCount(item._isVideo ? viewsCount : clicksCount)}</Text>
         </View>
 
@@ -639,16 +639,15 @@ const styles = StyleSheet.create({
     right: 6,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.55)",
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 10,
     gap: 3,
   },
   clicksText: {
     color: "#fff",
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: "700",
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   dishTag: {
     position: "absolute",

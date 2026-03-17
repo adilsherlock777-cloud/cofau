@@ -1473,6 +1473,20 @@ export default function PostDetailsScreen() {
       setVisiblePostId(singlePost.id);
       setLoading(false);  // Stop loading immediately
 
+      // Track post click for restaurant posts
+      if (singlePost.account_type === 'restaurant' || singlePost.is_restaurant_post || accountType === 'restaurant') {
+        const restaurantId = singlePost.restaurant_id || singlePost.user_id;
+        if (restaurantId) {
+          axios.post(`${API_URL}/restaurant/analytics/track`, {
+            restaurant_id: restaurantId,
+            event_type: 'post_click',
+            post_id: singlePost.id,
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => {});
+        }
+      }
+
       // ✅ Load more posts in the BACKGROUND for scrolling (delayed to not interfere with rendering)
       setTimeout(() => {
         loadMorePostsInBackground();

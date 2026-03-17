@@ -41,12 +41,25 @@ const ProfileRefreshContext = createContext<{
 
 export const useProfileRefresh = () => useContext(ProfileRefreshContext);
 
+// Context to let explore.tsx know when Explore tab is double-tapped
+type ExploreRefreshFn = () => void;
+const ExploreRefreshContext = createContext<{
+  register: (fn: ExploreRefreshFn) => void;
+  trigger: () => void;
+}>({
+  register: () => {},
+  trigger: () => {},
+});
+
+export const useExploreRefresh = () => useContext(ExploreRefreshContext);
+
 export default function TabsLayout() {
   const { accountType } = useAuth();
   const isRestaurant = accountType === "restaurant";
   const router = useRouter();
   const feedRefreshRef = useRef<FeedRefreshFn | null>(null);
   const profileRefreshRef = useRef<ProfileRefreshFn | null>(null);
+  const exploreRefreshRef = useRef<ExploreRefreshFn | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   const feedRefreshValue = {
@@ -67,9 +80,19 @@ export default function TabsLayout() {
     },
   };
 
+  const exploreRefreshValue = {
+    register: (fn: ExploreRefreshFn) => {
+      exploreRefreshRef.current = fn;
+    },
+    trigger: () => {
+      exploreRefreshRef.current?.();
+    },
+  };
+
   return (
     <FeedRefreshContext.Provider value={feedRefreshValue}>
     <ProfileRefreshContext.Provider value={profileRefreshValue}>
+    <ExploreRefreshContext.Provider value={exploreRefreshValue}>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -111,6 +134,11 @@ export default function TabsLayout() {
                   color="#000"
                 />
               ),
+          }}
+          listeners={{
+            tabPress: () => {
+              exploreRefreshRef.current?.();
+            },
           }}
         />
         <Tabs.Screen
@@ -240,6 +268,7 @@ export default function TabsLayout() {
           </View>
         </TouchableOpacity>
       </Modal>
+    </ExploreRefreshContext.Provider>
     </ProfileRefreshContext.Provider>
     </FeedRefreshContext.Provider>
   );

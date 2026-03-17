@@ -335,7 +335,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
             </View>
           )}
           <View style={mapStyles.markerViewsBadge}>
-            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Ionicons name="eye" size={8} color="#fff" />
             <Text style={mapStyles.markerViewsText}>{viewCountDisplay}</Text>
           </View>
         </View>
@@ -390,7 +390,7 @@ const ClusterMarker = memo(({ cluster, onPress }: any) => {
                 </View>
               )}
               <View style={mapStyles.markerViewsBadge}>
-                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Ionicons name="eye" size={8} color="#fff" />
                 <Text style={mapStyles.markerViewsText}>
                   {(post.clicks_count || 0) > 1000
                     ? `${((post.clicks_count || 0) / 1000).toFixed(1)}K`
@@ -657,6 +657,20 @@ export default function SavedLocationsScreen() {
   };
 
   const handlePostPress = (postId: string) => {
+    // Track post click for restaurant posts
+    const post = savedPosts.find(p => (p._id || p.id) === postId);
+    if (post && post.account_type === 'restaurant') {
+      const restaurantId = post.restaurant_id || post.user_id;
+      if (restaurantId && token) {
+        axios.post(`${API_URL}/restaurant/analytics/track`, {
+          restaurant_id: restaurantId,
+          event_type: 'post_click',
+          post_id: postId,
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {});
+      }
+    }
     router.push(`/post-details/${postId}`);
   };
 
@@ -768,6 +782,20 @@ export default function SavedLocationsScreen() {
   }, [postsWithCoords]);
 
   const handlePostMarkerPress = (post: any) => {
+    // Track post click for restaurant posts from map
+    if (post.account_type === 'restaurant') {
+      const restaurantId = post.restaurant_id || post.user_id;
+      const postId = post._id || post.id;
+      if (restaurantId && token) {
+        axios.post(`${API_URL}/restaurant/analytics/track`, {
+          restaurant_id: restaurantId,
+          event_type: 'post_click',
+          post_id: postId,
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {});
+      }
+    }
     router.push(`/post-details/${post._id || post.id}`);
   };
 

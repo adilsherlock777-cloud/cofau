@@ -75,7 +75,7 @@ export default function LocationPostsScreen() {
 
         {/* Clicks/Views badge */}
         <View style={styles.clicksBadge}>
-          <Ionicons name="eye-outline" size={10} color="#fff" />
+          <Ionicons name="eye" size={10} color="#fff" />
           <Text style={styles.clicksText}>{formatCount(viewsCount || clicksCount)}</Text>
         </View>
 

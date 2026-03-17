@@ -4207,41 +4207,66 @@ async def get_suggested_users(
     
     # Get users with at least 1 post, excluding already followed and blocked
     pipeline = [
+        # Sort posts by creation date descending so $push preserves order
+        {"$sort": {"created_at": -1}},
         # Get all posts grouped by user
         {"$group": {
             "_id": "$user_id",
             "post_count": {"$sum": 1},
-            "latest_post": {"$last": "$$ROOT"}
+            "latest_post": {"$first": "$$ROOT"},
+            "recent_posts_all": {"$push": "$$ROOT"}
         }},
         # Filter users not in exclude list
         {"$match": {
             "_id": {"$nin": exclude_ids},
             "post_count": {"$gte": 1}
         }},
+        # Slice to keep only 4 recent posts
+        {"$addFields": {
+            "recent_posts_all": {"$slice": ["$recent_posts_all", 4]}
+        }},
         # Sort by post count (more active users first) with some randomness
         {"$sample": {"size": limit * 3}},  # Get more than needed for variety
         {"$limit": limit}
     ]
-    
+
     user_posts = await db.posts.aggregate(pipeline).to_list(limit)
-    
+
     result = []
     for item in user_posts:
         user_id = item["_id"]
         latest_post = item["latest_post"]
-        
+
         # Get user details
         user = await db.users.find_one({"_id": ObjectId(user_id)})
         if not user:
             continue
-        
+
+        # Get followers count
+        followers_count = await db.follows.count_documents({"followingId": user_id})
+
         # Determine media URL (use thumbnail for videos)
         media_type = latest_post.get("media_type", "image")
         if media_type == "video":
             display_media = latest_post.get("thumbnail_url") or latest_post.get("media_url")
         else:
             display_media = latest_post.get("media_url") or latest_post.get("image_url")
-        
+
+        # Build recent_posts array
+        recent_posts = []
+        for p in item.get("recent_posts_all", []):
+            p_media_type = p.get("media_type", "image")
+            if p_media_type == "video":
+                p_media = p.get("thumbnail_url") or p.get("media_url")
+            else:
+                p_media = p.get("media_url") or p.get("image_url")
+            recent_posts.append({
+                "id": str(p["_id"]),
+                "media_url": p_media,
+                "media_type": p_media_type,
+                "thumbnail_url": p.get("thumbnail_url"),
+            })
+
         result.append({
             "id": user_id,
             "user_id": user_id,
@@ -4249,6 +4274,7 @@ async def get_suggested_users(
             "profile_picture": user.get("profile_picture"),
             "level": user.get("level", 1),
             "post_count": item["post_count"],
+            "followers_count": followers_count,
             "latest_post": {
                 "id": str(latest_post["_id"]),
                 "media_url": display_media,
@@ -4257,6 +4283,7 @@ async def get_suggested_users(
                 "rating": latest_post.get("rating"),
                 "location_name": latest_post.get("location_name"),
             },
+            "recent_posts": recent_posts,
             "is_following": False  # Always false since we filtered these out
         })
     

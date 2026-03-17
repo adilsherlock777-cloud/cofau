@@ -679,7 +679,7 @@ export default function HappeningPlaces({ embedded = false }) {
     const overlayBadges = (
       <>
         <View style={styles.gridClicksBadge}>
-          <Ionicons name="eye-outline" size={13} color="#fff" />
+          <Ionicons name="eye" size={13} color="#fff" />
           <Text style={styles.gridClicksText}>{formatCount(isVideo ? viewsCount : clicksCount)}</Text>
         </View>
         {dishName && (
@@ -728,6 +728,160 @@ export default function HappeningPlaces({ embedded = false }) {
         </View>
       );
     }
+  };
+
+  // ============================================
+  // PREMIUM CARD RENDER HELPER
+  // ============================================
+  const renderPremiumCard = (location, index, keyPrefix = '') => {
+    const images = location.images || [];
+    const thumbnails = location.thumbnails || [];
+    const imagesData = location.images_data || [];
+    const locationKey = keyPrefix ? `${keyPrefix}-${location.location}-${index}` : (location.location || location.location_name || index);
+    const heroUrl = images.length > 0 ? fixUrl(images[0]) : null;
+    const heroData = imagesData[0] || {};
+    const heroThumbnail = heroData.thumbnail_url ? fixUrl(heroData.thumbnail_url) : (thumbnails[0] ? fixUrl(thumbnails[0]) : null);
+    const isHeroVideo = isVideoFile(images[0]) || heroData.media_type === 'video';
+    const heroVideoId = `${locationKey}-hero`;
+
+    return (
+      <TouchableOpacity
+        key={locationKey}
+        style={styles.premiumCardOuter}
+        onPress={() => handleLocationPress(location)}
+        activeOpacity={0.92}
+      >
+        {/* Card Header - Location Name */}
+        <View style={styles.premiumCardHeader}>
+          <View style={styles.premiumRankBadge}>
+            <Text style={styles.premiumRankText}>{index + 1}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.premiumLocationName} numberOfLines={1}>
+              {location.location || location.location_name}
+            </Text>
+            <View style={styles.premiumMetaRow}>
+              <Text style={styles.premiumMetaText}>{formatUploadCount(location.uploads)} posts</Text>
+              {location.distance_km != null && location.distance_km !== 0 && location.distance_km !== 49 && (
+                <Text style={styles.premiumMetaText}> · {location.distance_km} km away</Text>
+              )}
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#999" />
+        </View>
+
+        {/* Hero Image Section */}
+        <View style={styles.heroImageContainer}>
+          {heroUrl ? (
+            isHeroVideo ? (
+              <VideoThumbnail
+                videoId={heroVideoId}
+                videoUrl={heroUrl}
+                thumbnailUrl={heroThumbnail}
+                style={StyleSheet.absoluteFill}
+                shouldPlay={playingVideos.includes(heroVideoId)}
+                onLayout={(id, e) => {
+                  e.target.measureInWindow((x, y, width, height) => {
+                    videoPositions.current.set(id, { top: y, height });
+                  });
+                }}
+              />
+            ) : (
+              <Image
+                source={{ uri: heroUrl }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                placeholder={{ blurhash: BLUR_HASH }}
+                transition={300}
+                cachePolicy="disk"
+              />
+            )
+          ) : (
+            <View style={styles.heroPlaceholder}>
+              <Ionicons name="image-outline" size={40} color="#ccc" />
+            </View>
+          )}
+
+          {/* Hero dish tag */}
+          {heroData.dish_name && (
+            <View style={styles.heroDishTag}>
+              <Text style={styles.heroDishText} numberOfLines={1}>{heroData.dish_name.toUpperCase()}</Text>
+            </View>
+          )}
+
+          {/* Bottom gradient overlay for depth */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.3)']}
+            style={styles.heroGradientOverlay}
+          />
+        </View>
+
+        {/* Thumbnail Strip */}
+        {images.length > 1 && (
+          <View style={styles.thumbnailStrip}>
+            {images.slice(1, 5).map((imageUrl, imgIndex) => {
+              const actualIndex = imgIndex + 1;
+              const imgData = imagesData[actualIndex] || {};
+              const thumbUrl = imgData.thumbnail_url ? fixUrl(imgData.thumbnail_url) : (thumbnails[actualIndex] ? fixUrl(thumbnails[actualIndex]) : null);
+              const isVideo = isVideoFile(imageUrl) || imgData.media_type === 'video';
+              const videoId = `${locationKey}-${actualIndex}`;
+              const thumbFixedUrl = fixUrl(imageUrl, { thumbnail: true });
+              if (!thumbFixedUrl) return null;
+
+              if (imgIndex === 3 && images.length > 5) {
+                return (
+                  <View key={actualIndex} style={styles.thumbnailItem}>
+                    <Image
+                      source={{ uri: thumbFixedUrl }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                      blurRadius={6}
+                      placeholder={{ blurhash: BLUR_HASH }}
+                    />
+                    <View style={styles.thumbnailMoreOverlay}>
+                      <Text style={styles.thumbnailMoreText}>+{(location.uploads || images.length) - 5}</Text>
+                    </View>
+                  </View>
+                );
+              }
+
+              return (
+                <View key={actualIndex} style={styles.thumbnailItem}>
+                  {isVideo ? (
+                    <VideoThumbnail
+                      videoId={videoId}
+                      videoUrl={thumbFixedUrl}
+                      thumbnailUrl={thumbUrl}
+                      style={StyleSheet.absoluteFill}
+                      shouldPlay={playingVideos.includes(videoId)}
+                      onLayout={(id, e) => {
+                        e.target.measureInWindow((x, y, width, height) => {
+                          videoPositions.current.set(id, { top: y, height });
+                        });
+                      }}
+                    />
+                  ) : (
+                    <Image
+                      source={{ uri: thumbFixedUrl }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                      placeholder={{ blurhash: BLUR_HASH }}
+                      transition={200}
+                      cachePolicy="disk"
+                    />
+                  )}
+                  {imgData.dish_name && (
+                    <View style={styles.gridDishTag}>
+                      <Text style={styles.gridDishText} numberOfLines={1}>{imgData.dish_name.toUpperCase()}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
   };
 
   // ============================================
@@ -1328,111 +1482,7 @@ export default function HappeningPlaces({ embedded = false }) {
                   <Text style={styles.emptySubtext}>No posts with this category yet</Text>
                 </View>
               ) : (
-                foodSpotLocations.map((location, index) => {
-                  const images = location.images || [];
-                  const thumbnails = location.thumbnails || [];
-                  const imagesData = location.images_data || [];
-                  const locationKey = `foodspot-${location.location}-${index}`;
-
-                  return (
-                    <TouchableOpacity
-                      key={locationKey}
-                      style={styles.cardOuter}
-                      onPress={() => handleLocationPress(location)}
-                      activeOpacity={0.8}
-                    >
-                      <LinearGradient
-                        colors={['rgba(255, 122, 24, 0.35)', 'rgba(255, 122, 24, 0.15)', 'rgba(255, 255, 255, 1)']}
-                        locations={[0, 0.3, 1]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                        style={styles.card}
-                      >
-                        <View style={styles.cardHeader}>
-                          <View style={styles.rankNumber}>
-                            <LinearGradient
-                              colors={['#FF2E2E', '#FF7A18']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={styles.rankGradient}
-                            >
-                              <Text style={styles.rankNumberText}>{index + 1}</Text>
-                            </LinearGradient>
-                          </View>
-                          <View style={styles.locationInfo}>
-                            <Text style={styles.locationName} numberOfLines={1}>
-                              {location.location || location.location_name}
-                            </Text>
-                            <Text style={styles.uploadCount}>
-                              ({formatUploadCount(location.uploads)} uploaded)
-                              {location.distance_km != null && location.distance_km !== 0 && ` • ${location.distance_km} km away`}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.imageGrid}>
-                          {images.length > 0 ? (
-                            <>
-                              <View style={styles.imageRow}>
-                                {images.slice(0, 3).map((imageUrl, imgIndex) =>
-                                  renderMediaItem(imageUrl, imgIndex, imagesData, thumbnails, locationKey)
-                                )}
-                              </View>
-                              <View style={styles.imageRow}>
-                                {images[3] && renderMediaItem(images[3], 3, imagesData, thumbnails, locationKey)}
-                                {images.length === 5 ? (
-                                  renderMediaItem(images[4], 4, imagesData, thumbnails, locationKey)
-                                ) : images.length > 5 ? (
-                                  <View style={styles.blurredImageWrapper}>
-                                    {(() => {
-                                      const imageData = imagesData[4] || {};
-                                      const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
-                                      let displayUrl = null;
-                                      if (isVideo) {
-                                        const thumbnailUrl = imageData.thumbnail_url
-                                          ? fixUrl(imageData.thumbnail_url)
-                                          : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
-                                        displayUrl = thumbnailUrl || fixUrl(images[4], { thumbnail: true });
-                                      } else {
-                                        displayUrl = fixUrl(images[4], { thumbnail: true });
-                                      }
-                                      if (!displayUrl) return null;
-                                      return (
-                                        <Image
-                                          source={{ uri: displayUrl }}
-                                          style={styles.gridImageSquare}
-                                          contentFit="cover"
-                                          blurRadius={8}
-                                          placeholder={{ blurhash: BLUR_HASH }}
-                                        />
-                                      );
-                                    })()}
-                                    <View style={styles.countButtonOverlay}>
-                                      <LinearGradient
-                                        colors={['#FF2E2E', '#FF7A18']}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={styles.countButtonGradientBorder}
-                                      >
-                                        <Text style={styles.countButtonText}>
-                                          +{location.uploads || images.length}
-                                        </Text>
-                                      </LinearGradient>
-                                    </View>
-                                  </View>
-                                ) : null}
-                              </View>
-                            </>
-                          ) : (
-                            <View style={styles.noImagePlaceholder}>
-                              <Ionicons name="image-outline" size={32} color="#CCC" />
-                            </View>
-                          )}
-                        </View>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  );
-                })
+                foodSpotLocations.map((location, index) => renderPremiumCard(location, index, 'foodspot'))
               )}
             </View>
           )}
@@ -1483,120 +1533,7 @@ export default function HappeningPlaces({ embedded = false }) {
                   // Sort by highest number of posts first
                   .sort((a, b) => b.uploads - a.uploads);
 
-                  return areaLocations.map((location, index) => {
-                    const images = location.images || [];
-                    const thumbnails = location.thumbnails || [];
-                    const imagesData = location.images_data || [];
-                    const locationKey = `area-${location.location}-${index}`;
-
-                    return (
-                      <TouchableOpacity
-                        key={locationKey}
-                        style={styles.cardOuter}
-                        onPress={() => handleLocationPress(location)}
-                        activeOpacity={0.8}
-                      >
-                        <LinearGradient
-                          colors={['rgba(255, 122, 24, 0.35)', 'rgba(255, 122, 24, 0.15)', 'rgba(255, 255, 255, 1)']}
-                          locations={[0, 0.3, 1]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 0, y: 1 }}
-                          style={styles.card}
-                        >
-                          <View style={styles.cardHeader}>
-                            <View style={styles.rankNumber}>
-                              <LinearGradient
-                                colors={['#FF2E2E', '#FF7A18']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.rankGradient}
-                              >
-                                <Text style={styles.rankNumberText}>{index + 1}</Text>
-                              </LinearGradient>
-                            </View>
-                            <View style={styles.locationInfo}>
-                              <Text style={styles.locationName} numberOfLines={1}>
-                                {location.location}
-                              </Text>
-                              <Text style={styles.uploadCount}>
-                                ({formatUploadCount(location.uploads)} uploaded)
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.imageGrid}>
-                            {images.length > 0 ? (
-                              <>
-                                {/* First Row - 3 images/videos */}
-                                <View style={styles.imageRow}>
-                                  {images.slice(0, 3).map((imageUrl, imgIndex) =>
-                                    renderMediaItem(imageUrl, imgIndex, imagesData, thumbnails, locationKey)
-                                  )}
-                                </View>
-
-                                {/* Second Row - 2 images/videos */}
-                                <View style={styles.imageRow}>
-                                  {images[3] && renderMediaItem(images[3], 3, imagesData, thumbnails, locationKey)}
-
-                                  {images.length === 5 ? (
-                                    renderMediaItem(images[4], 4, imagesData, thumbnails, locationKey)
-                                  ) : images.length > 5 ? (
-                                    <View style={styles.blurredImageWrapper}>
-                                      {(() => {
-                                        const imageData = imagesData[4] || {};
-                                        const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
-
-                                        let displayUrl = null;
-                                        if (isVideo) {
-                                          const thumbnailUrl = imageData.thumbnail_url
-                                            ? fixUrl(imageData.thumbnail_url)
-                                            : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
-                                          if (thumbnailUrl) {
-                                            displayUrl = thumbnailUrl;
-                                          } else {
-                                            displayUrl = fixUrl(images[4], { thumbnail: true });
-                                          }
-                                        } else {
-                                          displayUrl = fixUrl(images[4], { thumbnail: true });
-                                        }
-
-                                        if (!displayUrl) return null;
-                                        return (
-                                          <Image
-                                            source={{ uri: displayUrl }}
-                                            style={styles.gridImageSquare}
-                                            contentFit="cover"
-                                            blurRadius={8}
-                                            placeholder={{ blurhash: BLUR_HASH }}
-                                          />
-                                        );
-                                      })()}
-                                      <View style={styles.countButtonOverlay}>
-                                        <LinearGradient
-                                          colors={['#FF2E2E', '#FF7A18']}
-                                          start={{ x: 0, y: 0 }}
-                                          end={{ x: 1, y: 1 }}
-                                          style={styles.countButtonGradientBorder}
-                                        >
-                                          <Text style={styles.countButtonText}>
-                                            +{location.uploads || images.length}
-                                          </Text>
-                                        </LinearGradient>
-                                      </View>
-                                    </View>
-                                  ) : null}
-                                </View>
-                              </>
-                            ) : (
-                              <View style={styles.noImagePlaceholder}>
-                                <Ionicons name="image-outline" size={32} color="#CCC" />
-                              </View>
-                            )}
-                          </View>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    );
-                  });
+                  return areaLocations.map((location, index) => renderPremiumCard(location, index, 'area'));
                 })()
               )}
             </View>
@@ -1620,126 +1557,10 @@ export default function HappeningPlaces({ embedded = false }) {
             </View>
           )}
 
-          {/* Location Cards - only show when "All" is selected and no food spot filter active */}
-          {selectedArea === 'All' && !selectedFoodSpot && topLocations.slice(0, visibleCards).map((location, index) => {
-            const images = location.images || [];
-            const thumbnails = location.thumbnails || [];
-            const imagesData = location.images_data || [];
-            const locationKey = location.location || location.location_name || index;
-
-            return (
-              <TouchableOpacity
-                key={locationKey}
-                style={styles.cardOuter}
-                onPress={() => handleLocationPress(location)}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={['rgba(255, 122, 24, 0.35)', 'rgba(255, 122, 24, 0.15)', 'rgba(255, 255, 255, 1)']}
-                  locations={[0, 0.3, 1]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={styles.card}
-                >
-                  <View style={styles.cardHeader}>
-                    <View style={styles.rankNumber}>
-                      <LinearGradient
-                        colors={['#FF2E2E', '#FF7A18']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.rankGradient}
-                      >
-                        <Text style={styles.rankNumberText}>{index + 1}</Text>
-                      </LinearGradient>
-                    </View>
-                    <View style={styles.locationInfo}>
-                      <Text style={styles.locationName} numberOfLines={1}>
-                        {location.location || location.location_name}
-                      </Text>
-                      <Text style={styles.uploadCount}>
-  ({formatUploadCount(location.uploads)} uploaded)
-  {location.distance_km !== undefined && location.distance_km !== 49 && ` • ${location.distance_km} km away`}
-</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.imageGrid}>
-                    {images.length > 0 ? (
-                      <>
-                        {/* First Row - 3 images/videos */}
-                        <View style={styles.imageRow}>
-                          {images.slice(0, 3).map((imageUrl, imgIndex) => 
-                            renderMediaItem(imageUrl, imgIndex, imagesData, thumbnails, locationKey)
-                          )}
-                        </View>
-
-                        {/* Second Row - 2 images/videos */}
-                        <View style={styles.imageRow}>
-                          {images[3] && renderMediaItem(images[3], 3, imagesData, thumbnails, locationKey)}
-
-                          {images.length === 5 ? (
-                            renderMediaItem(images[4], 4, imagesData, thumbnails, locationKey)
-                          ) : images.length > 5 ? (
-                            // More than 5 - show blurred with total count
-                            <View style={styles.blurredImageWrapper}>
-                              {(() => {
-                                const imageData = imagesData[4] || {};
-                                const isVideo = isVideoFile(images[4]) || imageData.media_type === 'video';
-
-                                let displayUrl = null;
-                                if (isVideo) {
-                                  const thumbnailUrl = imageData.thumbnail_url
-                                    ? fixUrl(imageData.thumbnail_url)
-                                    : (thumbnails[4] ? fixUrl(thumbnails[4]) : null);
-                                  if (thumbnailUrl) {
-                                    displayUrl = thumbnailUrl;
-                                  } else {
-                                    displayUrl = fixUrl(images[4], { thumbnail: true });
-                                  }
-                                } else {
-                                  displayUrl = fixUrl(images[4], { thumbnail: true });
-                                }
-
-                                if (!displayUrl) return null;
-                                return (
-                                  <Image
-                                    source={{ uri: displayUrl }}
-                                    style={styles.gridImageSquare}
-                                    contentFit="cover"
-                                    blurRadius={8}
-                                    placeholder={{ blurhash: BLUR_HASH }}
-                                    onError={(error) => {
-                                      console.error("❌ Blurred image load error:", displayUrl, error);
-                                    }}
-                                  />
-                                );
-                              })()}
-                              <View style={styles.countButtonOverlay}>
-                                <LinearGradient
-                                  colors={['#FF2E2E', '#FF7A18']}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 1 }}
-                                  style={styles.countButtonGradientBorder}
-                                >
-                                  <Text style={styles.countButtonText}>
-                                    +{location.uploads || images.length}
-                                  </Text>
-                                </LinearGradient>
-                              </View>
-                            </View>
-                          ) : null}
-                        </View>
-                      </>
-                    ) : (
-                      <View style={styles.noImagePlaceholder}>
-                        <Ionicons name="image-outline" size={32} color="#CCC" />
-                      </View>
-                    )}
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            );
-          })}
+          {/* Location Cards - Premium Design */}
+          {selectedArea === 'All' && !selectedFoodSpot && topLocations.slice(0, visibleCards).map((location, index) =>
+            renderPremiumCard(location, index)
+          )}
 
           {/* Load More Button */}
           {selectedArea === 'All' && !selectedFoodSpot && visibleCards < topLocations.length && (
@@ -1827,6 +1648,151 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 15,
     backgroundColor: '#fff',
+  },
+
+  // Premium card styles
+  premiumCardOuter: {
+    marginHorizontal: 16,
+    marginBottom: 18,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  heroImageContainer: {
+    width: '100%',
+    height: 210,
+    position: 'relative',
+    backgroundColor: '#F0F0F0',
+  },
+  heroPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  premiumCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+    backgroundColor: '#FFF5F0',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE8DE',
+  },
+  premiumRankBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E94A37',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumRankText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  premiumLocationName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  premiumMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  premiumMetaText: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
+  },
+  heroDishTag: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(233, 74, 55, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    maxWidth: '50%',
+  },
+  heroDishText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  heroGradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 50,
+    paddingBottom: 14,
+    paddingHorizontal: 14,
+  },
+  heroLocationName: {
+    color: '#fff',
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 8,
+  },
+  heroMetaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  heroMetaText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  thumbnailStrip: {
+    flexDirection: 'row',
+    padding: 8,
+    gap: 6,
+  },
+  thumbnailItem: {
+    flex: 1,
+    height: 76,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#F0F0F0',
+  },
+  thumbnailMoreOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailMoreText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
   },
   card: {
     backgroundColor: '#FFF',
@@ -2446,16 +2412,15 @@ skeletonImageLarge: {
     right: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 8,
     gap: 3,
   },
   gridClicksText: {
     color: '#fff',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   gridDishTag: {
     position: 'absolute',

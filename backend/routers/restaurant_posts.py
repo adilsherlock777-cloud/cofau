@@ -1157,7 +1157,24 @@ async def reply_to_review(
         raise HTTPException(status_code=500, detail="Failed to save reply")
     
     print(f"✅ Restaurant {current_restaurant['_id']} replied to review {review_id}")
-    
+
+    # Send notification to the reviewer
+    try:
+        reviewer_user_id = post.get("user_id")
+        if reviewer_user_id:
+            restaurant_name = current_restaurant.get("restaurant_name") or current_restaurant.get("full_name") or "Restaurant"
+            await create_notification(
+                db=db,
+                notification_type="restaurant_reply",
+                from_user_id=str(current_restaurant["_id"]),
+                to_user_id=reviewer_user_id,
+                post_id=review_id,
+                message=f"{restaurant_name} replied to your review",
+                send_push=True
+            )
+    except Exception as e:
+        print(f"⚠️ Failed to send reply notification: {e}")
+
     return {
         "success": True,
         "message": "Reply sent successfully"

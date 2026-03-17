@@ -57,38 +57,37 @@ const BACKEND = BACKEND_URL;
 let globalMuteState = true;
 
 /* -------------------------
-   Animated Typewriter Pill
+   Animated Slide Pill
 ------------------------- */
 const PILL_WORDS = ['EARN REWARDS', 'GET FEATURED', 'LEVEL UP', 'EXPLORE DISHES'];
 
 const AnimatedPillText = React.memo(() => {
-  const [text, setText] = useState('');
-  const ref = useRef({ wordIdx: 0, charIdx: 0, deleting: false, wait: 0 });
+  const [currentWord, setCurrentWord] = useState(PILL_WORDS[0]);
+  const wordIdxRef = useRef(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const id = setInterval(() => {
-      const s = ref.current;
-      if (s.wait > 0) { s.wait--; return; }
-      const word = PILL_WORDS[s.wordIdx];
-      if (!s.deleting) {
-        if (s.charIdx < word.length) {
-          s.charIdx++;
-          setText(word.substring(0, s.charIdx));
-        } else {
-          s.deleting = true;
-          s.wait = 12;
-        }
-      } else {
-        if (s.charIdx > 0) {
-          s.charIdx--;
-          setText(word.substring(0, s.charIdx));
-        } else {
-          s.deleting = false;
-          s.wordIdx = (s.wordIdx + 1) % PILL_WORDS.length;
-          s.wait = 3;
-        }
-      }
-    }, 100);
+    const cycle = () => {
+      // Slide up + fade out
+      Animated.parallel([
+        Animated.timing(slideAnim, { toValue: -20, duration: 300, useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => {
+        // Switch word
+        wordIdxRef.current = (wordIdxRef.current + 1) % PILL_WORDS.length;
+        setCurrentWord(PILL_WORDS[wordIdxRef.current]);
+        // Position below
+        slideAnim.setValue(20);
+        // Slide up into place + fade in
+        Animated.parallel([
+          Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        ]).start();
+      });
+    };
+
+    const id = setInterval(cycle, 2500);
     return () => clearInterval(id);
   }, []);
 
@@ -97,11 +96,20 @@ const AnimatedPillText = React.memo(() => {
       <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '700', color: '#AAAAAA', letterSpacing: 0.3, lineHeight: 14 }}>
         SHARE YOUR FOOD EXPERIENCE &
       </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 3 }}>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: '#E94A37', letterSpacing: 0.4, lineHeight: 18 }}>
-          {text}
-        </Text>
-        <Text style={{ fontSize: 13, fontWeight: '300', color: '#E94A37', lineHeight: 18 }}>|</Text>
+      <View style={{ height: 20, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', marginTop: 3 }}>
+        <Animated.Text
+          style={{
+            fontSize: 13,
+            fontWeight: '800',
+            color: '#E94A37',
+            letterSpacing: 0.4,
+            lineHeight: 18,
+            transform: [{ translateY: slideAnim }],
+            opacity: opacityAnim,
+          }}
+        >
+          {currentWord}
+        </Animated.Text>
       </View>
     </View>
   );

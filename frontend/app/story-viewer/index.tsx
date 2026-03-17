@@ -1388,7 +1388,7 @@ const handlePrevious = () => {
               />
             ) : (
               <View style={styles.emptyViewers}>
-                <Ionicons name="eye-outline" size={48} color="#ccc" />
+                <Ionicons name="eye" size={48} color="#ccc" />
                 <Text style={styles.emptyViewersText}>No views yet</Text>
               </View>
             )}

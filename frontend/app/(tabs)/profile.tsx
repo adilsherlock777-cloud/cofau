@@ -433,6 +433,7 @@ export default function ProfileScreen() {
   const [menuUploadModalVisible, setMenuUploadModalVisible] = useState(false);
   const [isRestaurantProfile, setIsRestaurantProfile] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<string | null>(null);
+  const [reviewViewMode, setReviewViewMode] = useState<'grid' | 'list'>('grid');
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
@@ -2200,7 +2201,7 @@ const renderGridWithLikes = useCallback(({ item }: { item: any }) => {
 
       {/* Views Badge - Top Right */}
       <View style={styles.gridLikesBadge}>
-        <Ionicons name="eye-outline" size={14} color="#fff" />
+        <Ionicons name="eye" size={14} color="#fff" />
         <Text style={styles.gridLikesText}>
           {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
         </Text>
@@ -2620,7 +2621,7 @@ const renderRestaurantProfile = () => {
                   end={{ x: 1, y: 1 }}
                   style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name="create-outline" size={18} color="#fff" />
+                  <Ionicons name="create" size={18} color="#fff" />
                   <Text style={restaurantStyles.actionButtonTextGradient}>Edit Profile</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -2640,7 +2641,7 @@ const renderRestaurantProfile = () => {
                   end={{ x: 1, y: 1 }}
                   style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name={userData?.phone_number ? 'call-outline' : 'add-circle-outline'} size={18} color="#fff" />
+                  <Ionicons name={userData?.phone_number ? 'call' : 'add-circle'} size={18} color="#fff" />
                   <Text style={restaurantStyles.actionButtonTextGradient}>
                     {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
                   </Text>
@@ -2658,7 +2659,7 @@ const renderRestaurantProfile = () => {
                   end={{ x: 1, y: 1 }}
                   style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+                  <Ionicons name="chatbubble" size={18} color="#fff" />
                   <Text style={restaurantStyles.actionButtonTextGradient}>Messages</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -2830,83 +2831,260 @@ const renderRestaurantProfile = () => {
 
         {/* ================= TAB CONTENT ================= */}
         {restaurantActiveTab === 'posts' && (
-  <FlatList
-    key="restaurant-posts-grid-3col"
-    data={userPosts}
-    renderItem={renderGridWithLikes}
-    keyExtractor={(item) => item.id}
-    numColumns={3}
-    scrollEnabled={false}
-    columnWrapperStyle={{ gap: 1 }}
-    initialNumToRender={9}
-    maxToRenderPerBatch={9}
-    windowSize={5}
-    removeClippedSubviews={Platform.OS === 'android'}
-            ListEmptyComponent={() => (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="images-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyText}>No posts yet</Text>
-              </View>
-            )}
-          />
+          userPosts.length > 0 ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 1 }}>
+              {userPosts.map((item: any) => {
+                const rawUrl = item.full_image_url || item.media_url || item.image_url;
+                const mediaUrl = fixUrl(rawUrl);
+                const thumbnailUrl = item.thumbnail_url ? fixUrl(item.thumbnail_url) : null;
+                const isVideo = item.media_type === 'video' || mediaUrl?.toLowerCase().endsWith('.mp4');
+                const displayUrl = isVideo ? (thumbnailUrl || mediaUrl) : mediaUrl;
+
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={{
+                      width: '33.2%' as any,
+                      aspectRatio: 1,
+                      position: 'relative' as const,
+                    }}
+                    onPress={() => router.push(`/post-details/${item.id}?profileUserId=${userData?.id}&profilePicture=${encodeURIComponent(userData?.profile_picture || '')}&profileUsername=${encodeURIComponent(userData?.full_name || userData?.username || '')}&profileLevel=${userData?.level || 1}`)}
+                    activeOpacity={0.85}
+                  >
+                    {displayUrl ? (
+                      <ExpoImage
+                        source={{ uri: displayUrl }}
+                        style={{ width: '100%', height: '100%' }}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        recyclingKey={item.id}
+                        transition={200}
+                      />
+                    ) : (
+                      <View style={{ width: '100%', height: '100%', backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center' }}>
+                        <Ionicons name="image-outline" size={30} color="#ddd" />
+                      </View>
+                    )}
+                    {/* Price badge top-right */}
+                    {item.price && (
+                      <View style={{
+                        position: 'absolute', top: 6, right: 6,
+                        backgroundColor: 'rgba(233, 74, 55, 0.9)', paddingHorizontal: 6, paddingVertical: 2,
+                        borderRadius: 8,
+                      }}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>₹{item.price}</Text>
+                      </View>
+                    )}
+                    {/* Dish name bottom-left */}
+                    {item.dish_name && (
+                      <View style={{
+                        position: 'absolute', bottom: 6, left: 6,
+                        backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 5, paddingVertical: 2,
+                        borderRadius: 6, maxWidth: '75%' as any,
+                      }}>
+                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '600' }} numberOfLines={1}>{item.dish_name.toUpperCase()}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="images-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No posts yet</Text>
+            </View>
+          )
         )}
 
         {restaurantActiveTab === 'reviews' && (
   <>
-    {/* Filter Button Row */}
+    {/* Filter & View Toggle Row */}
     <View style={restaurantStyles.reviewFilterContainer}>
       <Text style={restaurantStyles.reviewFilterCount}>
         {getFilteredReviews().length} {getFilteredReviews().length === 1 ? 'Review' : 'Reviews'}
       </Text>
-      <TouchableOpacity
-        style={[
-          restaurantStyles.reviewFilterButton,
-          reviewFilter && restaurantStyles.reviewFilterButtonActive,
-        ]}
-        onPress={() => setReviewFilterModalVisible(true)}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name="filter"
-          size={16}
-          color={reviewFilter ? '#fff' : '#666'}
-        />
-        <Text
-          style={[
-            restaurantStyles.reviewFilterButtonText,
-            reviewFilter && restaurantStyles.reviewFilterButtonTextActive,
-          ]}
-        >
-          {reviewFilter
-            ? reviewFilter === 'topRated'
-              ? 'Top Rated'
-              : reviewFilter === 'mostLoved'
-              ? 'Most Loved'
-              : reviewFilter === 'newest'
-              ? 'Newest'
-              : 'Disliked'
-            : 'Filter'}
-        </Text>
-        {reviewFilter && (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {/* View Mode Toggle */}
+        <View style={{ flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 2 }}>
           <TouchableOpacity
-            onPress={(e) => {
-              e.stopPropagation();
-              setReviewFilter(null);
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => setReviewViewMode('grid')}
+            style={{ padding: 6, borderRadius: 6, backgroundColor: reviewViewMode === 'grid' ? '#fff' : 'transparent' }}
           >
-            <Ionicons name="close-circle" size={16} color="#fff" />
+            <Ionicons name="grid" size={16} color={reviewViewMode === 'grid' ? '#E94A37' : '#999'} />
           </TouchableOpacity>
-        )}
-      </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setReviewViewMode('list')}
+            style={{ padding: 6, borderRadius: 6, backgroundColor: reviewViewMode === 'list' ? '#fff' : 'transparent' }}
+          >
+            <Ionicons name="list" size={16} color={reviewViewMode === 'list' ? '#E94A37' : '#999'} />
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          style={[
+            restaurantStyles.reviewFilterButton,
+            reviewFilter && restaurantStyles.reviewFilterButtonActive,
+          ]}
+          onPress={() => setReviewFilterModalVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="filter"
+            size={16}
+            color={reviewFilter ? '#fff' : '#666'}
+          />
+          <Text
+            style={[
+              restaurantStyles.reviewFilterButtonText,
+              reviewFilter && restaurantStyles.reviewFilterButtonTextActive,
+            ]}
+          >
+            {reviewFilter
+              ? reviewFilter === 'topRated'
+                ? 'Top Rated'
+                : reviewFilter === 'mostLoved'
+                ? 'Most Loved'
+                : reviewFilter === 'newest'
+                ? 'Newest'
+                : 'Disliked'
+              : 'Filter'}
+          </Text>
+          {reviewFilter && (
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setReviewFilter(null);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close-circle" size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
 
-    {/* Reviews List */}
+    {/* Reviews Content */}
     {loadingReviews ? (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#4dd0e1" />
       </View>
     ) : getFilteredReviews().length > 0 ? (
+      reviewViewMode === 'grid' ? (
+        /* ===== GRID VIEW ===== */
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 8, paddingTop: 8 }}>
+          {getFilteredReviews().map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={{
+                width: '48.5%' as any,
+                borderRadius: 14,
+                overflow: 'hidden',
+                backgroundColor: '#fff',
+                marginBottom: 4,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.1,
+                shadowRadius: 6,
+                elevation: 4,
+              }}
+              onPress={() => router.push(`/post-details/${item.id}`)}
+              activeOpacity={0.85}
+            >
+              {/* Image */}
+              <View style={{ width: '100%', height: 180, position: 'relative' }}>
+                {item.media_url ? (
+                  <RNImage
+                    source={{ uri: fixUrl(item.media_url) }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={{ width: '100%', height: '100%', backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="image-outline" size={36} color="#ddd" />
+                  </View>
+                )}
+                {/* Gradient overlay */}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.6)']}
+                  style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 70 }}
+                />
+                {/* Rating badge top-right */}
+                <View style={{
+                  position: 'absolute', top: 8, right: 8,
+                  flexDirection: 'row', alignItems: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 7, paddingVertical: 3,
+                  borderRadius: 10, gap: 3,
+                }}>
+                  <Ionicons name="star" size={12} color="#F2CF68" />
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{item.rating}/10</Text>
+                </View>
+                {/* Dish name bottom-left on image */}
+                {item.dish_name && (
+                  <View style={{
+                    position: 'absolute', bottom: 8, left: 8,
+                    backgroundColor: 'rgba(233, 74, 55, 0.85)',
+                    paddingHorizontal: 8, paddingVertical: 3,
+                    borderRadius: 10, maxWidth: '80%' as any,
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{item.dish_name.toUpperCase()}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Bottom info */}
+              <View style={{ padding: 10 }}>
+                {/* User row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <UserAvatar
+                    profilePicture={item.user_profile_picture}
+                    username={item.username}
+                    size={22}
+                    level={item.user_level || 1}
+                    showLevelBadge={false}
+                  />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#333', flex: 1 }} numberOfLines={1}>
+                    {item.username || 'User'}
+                  </Text>
+                </View>
+                {/* Review text */}
+                {item.review_text && (
+                  <Text style={{ fontSize: 11, color: '#666', lineHeight: 16, fontStyle: 'italic' }} numberOfLines={2}>
+                    "{item.review_text}"
+                  </Text>
+                )}
+                {/* Restaurant reply - visible to everyone */}
+                {item.restaurant_reply && (
+                  <View style={{
+                    marginTop: 6, backgroundColor: '#FFF9F0', borderRadius: 6,
+                    padding: 6, borderLeftWidth: 2, borderLeftColor: '#E94A37',
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 2 }}>
+                      <Ionicons name="business" size={10} color="#E94A37" />
+                      <Text style={{ fontSize: 9, color: '#E94A37', fontWeight: '600' }}>Owner Reply</Text>
+                    </View>
+                    <Text style={{ fontSize: 10, color: '#666', lineHeight: 14 }} numberOfLines={2}>
+                      {item.restaurant_reply}
+                    </Text>
+                  </View>
+                )}
+                {/* Reply button for owner - only when no reply yet */}
+                {isOwnProfile && !item.restaurant_reply && (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}
+                    onPress={() => { setSelectedReviewForReply(item); setReplyModalVisible(true); }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="return-down-forward" size={11} color="#999" />
+                    <Text style={{ fontSize: 10, color: '#999', fontWeight: '500' }}>Reply</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (
+        /* ===== LIST VIEW (original but polished) ===== */
 <FlatList
   data={getFilteredReviews()}
   renderItem={({ item }) => (
@@ -2940,7 +3118,7 @@ const renderRestaurantProfile = () => {
 
         {/* Views Badge */}
         <View style={restaurantStyles.reviewLikesBadge}>
-          <Ionicons name="eye-outline" size={14} color="#fff" />
+          <Ionicons name="eye" size={14} color="#fff" />
           <Text style={restaurantStyles.reviewLikesText}>
             {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
           </Text>
@@ -2972,11 +3150,11 @@ const renderRestaurantProfile = () => {
         {/* Review Text - Icon stays at top */}
         {item.review_text && (
           <View style={restaurantStyles.reviewTextRow}>
-            <Ionicons 
-              name="chatbubble" 
-              size={18} 
-              color="#F2CF68" 
-              style={{ marginTop: 2 }}  // Keep icon at top
+            <Ionicons
+              name="chatbubble"
+              size={18}
+              color="#F2CF68"
+              style={{ marginTop: 2 }}
             />
             <Text style={restaurantStyles.reviewFullText}>
               {item.review_text}
@@ -2989,7 +3167,6 @@ const renderRestaurantProfile = () => {
           <TouchableOpacity
             style={restaurantStyles.replyButton}
             onPress={() => {
-              // Handle reply - you can open a modal or navigate
               setSelectedReviewForReply(item);
               setReplyModalVisible(true);
             }}
@@ -3020,6 +3197,7 @@ const renderRestaurantProfile = () => {
   windowSize={5}
   removeClippedSubviews={Platform.OS === 'android'}
 />
+      )
     ) : (
       <View style={styles.emptyContainer}>
         <Ionicons name="star-outline" size={64} color="#ccc" />
@@ -4471,7 +4649,7 @@ const renderRestaurantProfile = () => {
       <View style={styles.listDetails}>
         {/* Views - Eye Icon */}
         <View style={styles.listDetailRow}>
-          <Ionicons name="eye-outline" size={20} color="#E94A37" />
+          <Ionicons name="eye" size={20} color="#E94A37" />
           <Text style={styles.listDetailText}>
             {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
           </Text>
@@ -4579,7 +4757,7 @@ const renderRestaurantProfile = () => {
         <View style={styles.listDetails}>
           {/* Views - Eye Icon */}
           <View style={styles.listDetailRow}>
-            <Ionicons name="eye-outline" size={20} color="#E94A37" />
+            <Ionicons name="eye" size={20} color="#E94A37" />
             <Text style={styles.listDetailText}>
               {(() => { const c = item.clicks_count || 0; return c > 1000 ? `${(c / 1000).toFixed(1)}K` : c; })()}
             </Text>
@@ -4693,7 +4871,7 @@ const renderCategoryFilter = () => {
           onPress={() => setSortMode('mostViewed')}
           activeOpacity={0.7}
         >
-          <Ionicons name="eye-outline" size={14} color={sortMode === 'mostViewed' ? '#fff' : '#666'} />
+          <Ionicons name="eye" size={14} color={sortMode === 'mostViewed' ? '#fff' : '#666'} />
           <Text style={[styles.sortChipText, sortMode === 'mostViewed' && styles.sortChipTextActive]}>Most Viewed</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -6591,18 +6769,23 @@ actionButtonGradient: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  paddingVertical: 7,
-  paddingHorizontal: 12,
+  paddingVertical: 9,
+  paddingHorizontal: 14,
   borderRadius: 20,
-  gap: 4,
+  gap: 5,
+  shadowColor: '#D62828',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 4,
 },
 actionButtonTextGradient: {
   color: '#fff',
-  fontSize: 11,
-  fontWeight: '600',
+  fontSize: 12,
+  fontWeight: '700',
 },
  bannerContainer: {
-  height: 200,
+  height: 260,
   borderRadius: 0,
   backgroundColor: '#E0E0E0',
   position: 'relative',
@@ -6951,7 +7134,7 @@ bannerUploadingOverlay: {
   },
 profileOnBanner: {
   position: 'absolute',
-  top: 140,
+  top: 210,
   left: 20,
   elevation: 100,
   zIndex: 100,

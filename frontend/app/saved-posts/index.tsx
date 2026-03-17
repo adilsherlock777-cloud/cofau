@@ -93,7 +93,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
             </View>
           )}
           <View style={mapStyles.markerViewsBadge}>
-            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Ionicons name="eye" size={8} color="#fff" />
             <Text style={mapStyles.markerViewsText}>{viewCountDisplay}</Text>
           </View>
         </View>
@@ -124,7 +124,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
             </View>
           )}
           <View style={mapStyles.markerViewsBadge}>
-            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Ionicons name="eye" size={8} color="#fff" />
             <Text style={mapStyles.markerViewsText}>{viewCountDisplay}</Text>
           </View>
         </View>
@@ -171,7 +171,7 @@ const ClusterMarker = memo(({ cluster, onPress }: any) => {
                 onLoad={() => setImagesLoaded(prev => prev + 1)}
               />
               <View style={mapStyles.markerViewsBadge}>
-                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Ionicons name="eye" size={8} color="#fff" />
                 <Text style={mapStyles.markerViewsText}>
                   {(latestPosts[1]?.clicks_count || 0) > 1000
                     ? `${((latestPosts[1]?.clicks_count || 0) / 1000).toFixed(1)}K`
@@ -195,7 +195,7 @@ const ClusterMarker = memo(({ cluster, onPress }: any) => {
               </View>
             )}
             <View style={mapStyles.markerViewsBadge}>
-              <Ionicons name="eye-outline" size={8} color="#fff" />
+              <Ionicons name="eye" size={8} color="#fff" />
               <Text style={mapStyles.markerViewsText}>
                 {(latestPosts[0]?.clicks_count || 0) > 1000
                   ? `${((latestPosts[0]?.clicks_count || 0) / 1000).toFixed(1)}K`
@@ -249,7 +249,7 @@ const ClusterMarker = memo(({ cluster, onPress }: any) => {
                 </View>
               )}
               <View style={mapStyles.markerViewsBadge}>
-                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Ionicons name="eye" size={8} color="#fff" />
                 <Text style={mapStyles.markerViewsText}>
                   {(post.clicks_count || 0) > 1000
                     ? `${((post.clicks_count || 0) / 1000).toFixed(1)}K`

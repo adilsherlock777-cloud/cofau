@@ -26,7 +26,7 @@ export default function RestaurantDashboard() {
   const { token, user } = useAuth() as any;
   const [loading, setLoading] = useState(true);
   const [bestPost, setBestPost] = useState<any>(null);
-  const [analytics, setAnalytics] = useState({
+  const [analytics, setAnalytics] = useState<any>({
     total_posts: 0,
     followers_count: 0,
     customer_reviews: 0,
@@ -62,12 +62,24 @@ export default function RestaurantDashboard() {
       post_clicks_trend: response.data.post_clicks_trend || '',
     });
     
-    // Fetch best performing post
+    // Fetch hero product (best performing post)
     try {
       const bestPostRes = await axios.get(`${API_URL}/restaurant/analytics/best-post`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setBestPost(bestPostRes.data);
+      if (bestPostRes.data) {
+        // Normalize media URLs - backend returns relative paths
+        const post = bestPostRes.data;
+        if (post.media_url && !post.media_url.startsWith('http')) {
+          post.media_url = `${BACKEND_URL}${post.media_url.startsWith('/') ? '' : '/'}${post.media_url}`;
+        }
+        if (post.thumbnail_url && !post.thumbnail_url.startsWith('http')) {
+          post.thumbnail_url = `${BACKEND_URL}${post.thumbnail_url.startsWith('/') ? '' : '/'}${post.thumbnail_url}`;
+        }
+        setBestPost(post);
+      } else {
+        setBestPost(null);
+      }
     } catch (e) {
       setBestPost(null);
     }
@@ -258,21 +270,32 @@ const LargeStatCard = ({
   trend={analytics.post_clicks_trend}
 />
 
-        {/* Best Performing Post */}
-        {bestPost && bestPost.total_score > 0 && (
+        {/* Hero Product */}
+        {bestPost && (
           <>
             <View style={styles.sectionTitle}>
-              <Ionicons name="trophy" size={20} color="#333" />
-              <Text style={styles.sectionTitleText}>Best Performing Post</Text>
+              <Ionicons name="flame" size={20} color="#E94A37" />
+              <Text style={styles.sectionTitleText}>Hero Product</Text>
             </View>
 
             <View style={styles.bestPostCard}>
               {bestPost.media_url ? (
-                <Image
-                  source={{ uri: bestPost.media_type === 'video' && bestPost.thumbnail_url ? bestPost.thumbnail_url : bestPost.media_url }}
-                  style={styles.bestPostImage}
-                  resizeMode="cover"
-                />
+                <View>
+                  <Image
+                    source={{ uri: bestPost.media_type === 'video' && bestPost.thumbnail_url ? bestPost.thumbnail_url : bestPost.media_url }}
+                    style={styles.bestPostImage}
+                    resizeMode="cover"
+                  />
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.6)']}
+                    style={styles.heroGradientOverlay}
+                  >
+                    <View style={styles.heroBadge}>
+                      <Ionicons name="flame" size={14} color="#fff" />
+                      <Text style={styles.heroBadgeText}>Hero Product</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
               ) : null}
               <View style={styles.bestPostContent}>
                 {bestPost.dish_name ? (
@@ -287,12 +310,16 @@ const LargeStatCard = ({
                     <Text style={styles.bestPostMetricValue}>{bestPost.likes_count}</Text>
                   </View>
                   <View style={styles.bestPostMetricItem}>
-                    <Ionicons name="chatbubble" size={16} color="#2196F3" />
-                    <Text style={styles.bestPostMetricValue}>{bestPost.comments_count}</Text>
+                    <Ionicons name="eye" size={16} color="#9C27B0" />
+                    <Text style={styles.bestPostMetricValue}>{bestPost.views_count || 0}</Text>
                   </View>
                   <View style={styles.bestPostMetricItem}>
                     <Ionicons name="hand-left" size={16} color="#4CAF50" />
                     <Text style={styles.bestPostMetricValue}>{bestPost.clicks_count}</Text>
+                  </View>
+                  <View style={styles.bestPostMetricItem}>
+                    <Ionicons name="chatbubble" size={16} color="#2196F3" />
+                    <Text style={styles.bestPostMetricValue}>{bestPost.comments_count}</Text>
                   </View>
                 </View>
                 <View style={styles.bestPostTotalRow}>
@@ -587,6 +614,31 @@ headerTitle: {
   bestPostImage: {
     width: '100%',
     height: 180,
+  },
+  heroGradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(233, 74, 55, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  heroBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   bestPostContent: {
     padding: 14,

@@ -93,6 +93,8 @@ async def create_notification(
             message = f"{from_user['full_name']} liked your story"
         elif notification_type == "wallet_reward":
             message = "Congratulations! Wallet reward earned"
+        elif notification_type == "restaurant_reply":
+            message = f"{from_user['full_name']} replied to your review"
     
     notification_doc = {
         "type": notification_type,
