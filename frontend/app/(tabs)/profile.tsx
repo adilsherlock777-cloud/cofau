@@ -9035,7 +9035,7 @@ gridLikesBadge: {
   right: 6,
   flexDirection: 'row',
   alignItems: 'center',
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  backgroundColor: 'transparent',
   paddingHorizontal: 6,
   paddingVertical: 3,
   borderRadius: 10,

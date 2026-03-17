@@ -4075,12 +4075,13 @@ const styles = StyleSheet.create({
   },
   animatedPlaceholderStatic: {
     fontSize: 14,
-    color: '#bbb',
+    color: '#888',
+    fontWeight: '500' as const,
   },
   animatedPlaceholderTyping: {
     fontSize: 14,
-    color: '#D4A07A',
-    fontWeight: '400' as const,
+    color: '#E94A37',
+    fontWeight: '600' as const,
   },
   inlineFilterButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#E94A37", borderRadius: 18, paddingVertical: 5, paddingHorizontal: 12, gap: 4 },
   gradientBorder: { borderRadius: 20, padding: 2 },

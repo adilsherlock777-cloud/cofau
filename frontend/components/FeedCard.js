@@ -249,8 +249,6 @@ useEffect(() => {
         }
       } else {
         // FULLY STOP video when not visible - pause, stop audio, and reset position
-        // Don't reset videoReady here — keep last frame visible to avoid flash.
-        // videoReady resets naturally when the Video unmounts (shouldPlay=false removes it).
         if (status.isLoaded) {
           try {
             // First pause the video
@@ -284,15 +282,11 @@ useEffect(() => {
   };
 }, [shouldPlay, isVideo, videoLoaded]);
 
-// Reset videoReady after Video unmounts — delayed so last frame stays during scroll
+// Reset videoReady immediately when not playing — thumbnail is always visible underneath
 useEffect(() => {
   if (!isVideo) return;
   if (!shouldPlay && videoReady) {
-    // Keep last frame visible briefly, then reset for next time
-    const timer = setTimeout(() => {
-      setVideoReady(false);
-    }, 500);
-    return () => clearTimeout(timer);
+    setVideoReady(false);
   }
 }, [shouldPlay, isVideo]);
 
@@ -727,8 +721,8 @@ postId={post.id}
           </TouchableOpacity>
         </View>
 
-        {/* Thumbnail overlay — covers video until first frame is rendered */}
-        {!videoReady && (
+        {/* Thumbnail overlay — always visible underneath, covers video until playing */}
+        {(!videoReady || !shouldPlay) && (
           <View
             style={[
               styles.video,
@@ -750,8 +744,8 @@ postId={post.id}
           </View>
         )}
 
-        {/* Video — mount when shouldPlay, thumbnail covers loading gap */}
-        {shouldPlay && !videoError && (
+        {/* Video — always mounted for video posts, playback controlled via API */}
+        {!videoError && (
           <Video
             key="video"
             ref={videoRef}
@@ -764,7 +758,7 @@ postId={post.id}
             }}
             style={styles.video}
             resizeMode="contain"
-            shouldPlay={shouldPlay}
+            shouldPlay={false}
             isLooping
             isMuted={isMuted}
             useNativeControls={false}
@@ -774,7 +768,7 @@ postId={post.id}
             posterSource={null}
             videoStyle={{ backgroundColor: 'black' }}
             onReadyForDisplay={() => {
-              if (!videoReady) {
+              if (!videoReady && shouldPlay) {
                 setVideoReady(true);
               }
             }}
@@ -1059,15 +1053,6 @@ postId={post.id}
     <Text style={styles.engagementCount}>{sharesCount}</Text>
   </TouchableOpacity>
 
-  <TouchableOpacity
-    style={styles.engagementBtn}
-    onPress={() => setShowNudgeModal(true)}
-  >
-    <View style={[styles.engagementIcon, { backgroundColor: '#FF3D00' }]}>
-      <Ionicons name="at" size={17} color="#FFF" />
-    </View>
-  </TouchableOpacity>
-
   <TouchableOpacity style={styles.engagementBtn} onPress={handleSave}>
     <View style={styles.engagementIcon}>
       {isSaved ? (
@@ -1077,6 +1062,22 @@ postId={post.id}
       )}
     </View>
     <Text style={[styles.engagementCount, isSaved && { color: '#FF2E2E' }]}>{savesCount}</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={styles.nudgeBtn}
+    onPress={() => setShowNudgeModal(true)}
+    activeOpacity={0.8}
+  >
+    <LinearGradient
+      colors={['#FF3D00', '#FF6E40']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.nudgeBtnGradient}
+    >
+      <Ionicons name="at" size={15} color="#FFF" />
+      <Text style={styles.nudgeBtnText}>Tag this Dish</Text>
+    </LinearGradient>
   </TouchableOpacity>
 </View>
 
@@ -1716,6 +1717,33 @@ engagementCount: {
   fontSize: 12,
   fontWeight: '700',
   color: '#333',
+},
+nudgeBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+nudgeBtnGradient: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 20,
+  borderBottomWidth: 3,
+  borderBottomColor: 'rgba(180, 30, 0, 0.5)',
+  borderRightWidth: 1.5,
+  borderRightColor: 'rgba(180, 30, 0, 0.3)',
+  shadowColor: '#FF3D00',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.35,
+  shadowRadius: 5,
+  elevation: 5,
+},
+nudgeBtnText: {
+  color: '#FFF',
+  fontSize: 11,
+  fontWeight: '700',
+  letterSpacing: 0.3,
 },
 });
 

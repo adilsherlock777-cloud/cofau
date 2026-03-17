@@ -1645,23 +1645,23 @@ const styles = StyleSheet.create({
 
   cardOuter: {
     marginHorizontal: 4,
-    marginBottom: 12,
+    marginBottom: 6,
     borderRadius: 15,
     backgroundColor: '#fff',
   },
 
   // Premium card styles
   premiumCardOuter: {
-    marginHorizontal: 16,
-    marginBottom: 18,
+    marginHorizontal: 12,
+    marginBottom: 8,
     borderRadius: 20,
     backgroundColor: '#fff',
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   heroImageContainer: {
     width: '100%',

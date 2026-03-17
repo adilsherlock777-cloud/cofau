@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: -18,
+    marginTop: -28,
   },
   centerItem: {
     marginTop: 0,
