@@ -71,7 +71,7 @@ export default function NotificationsScreen() {
     const type = notification.type;
 
     // Post-related notifications
-    if (type === 'like' || type === 'comment' || type === 'new_post') {
+    if (type === 'like' || type === 'comment' || type === 'new_post' || type === 'nudge') {
       if (notification.postId) {
         router.push(`/post-details/${notification.postId}`);
       }

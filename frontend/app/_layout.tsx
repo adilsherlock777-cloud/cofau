@@ -32,8 +32,10 @@ function RootLayoutNav() {
       const url = event.url;
       let postId: string | null = null;
 
-      // Handle cofau://post/{postId}
-      if (url.startsWith("cofau://post/")) {
+      // Handle cofau://post-details/{postId} and cofau://post/{postId} (legacy)
+      if (url.startsWith("cofau://post-details/")) {
+        postId = url.replace("cofau://post-details/", "").split("?")[0];
+      } else if (url.startsWith("cofau://post/")) {
         postId = url.replace("cofau://post/", "").split("?")[0];
       }
       // Handle https://api.cofau.com/share/{postId}

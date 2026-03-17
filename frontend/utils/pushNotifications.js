@@ -338,6 +338,8 @@ export function setupNotificationListeners(navigation) {
           navigation?.push(`/post-details/${data.postId}`);
         } else if (data?.type === 'new_post' && data?.postId) {
           navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'nudge' && data?.postId) {
+          navigation?.push(`/post-details/${data.postId}`);
         } else if (data?.type === 'follow' && data?.fromUserId) {
           navigation?.push(`/profile?userId=${data.fromUserId}`);
         } else if (data?.type === 'compliment' && data?.fromUserId) {
@@ -391,6 +393,8 @@ export function setupNotificationListeners(navigation) {
               navigation?.push(`/post-details/${data.postId}`);
             } else if (data?.type === 'new_post' && data?.postId) {
               navigation?.push(`/post-details/${data.postId}`);
+            } else if (data?.type === 'nudge' && data?.postId) {
+              navigation?.push(`/post-details/${data.postId}`);
             } else if (data?.type === 'follow' && data?.fromUserId) {
               navigation?.push(`/profile?userId=${data.fromUserId}`);
             } else if (data?.type === 'compliment' && data?.fromUserId) {
@@ -419,6 +423,8 @@ export function setupNotificationListeners(navigation) {
               } else if (data?.type === 'comment' && data?.postId) {
                 navigation?.push(`/post-details/${data.postId}`);
               } else if (data?.type === 'new_post' && data?.postId) {
+                navigation?.push(`/post-details/${data.postId}`);
+              } else if (data?.type === 'nudge' && data?.postId) {
                 navigation?.push(`/post-details/${data.postId}`);
               } else if (data?.type === 'follow' && data?.fromUserId) {
                 navigation?.push(`/profile?userId=${data.fromUserId}`);
@@ -460,6 +466,8 @@ export function setupNotificationListeners(navigation) {
         } else if (data?.type === 'comment' && data?.postId) {
           navigation?.push(`/post-details/${data.postId}`);
         } else if (data?.type === 'new_post' && data?.postId) {
+          navigation?.push(`/post-details/${data.postId}`);
+        } else if (data?.type === 'nudge' && data?.postId) {
           navigation?.push(`/post-details/${data.postId}`);
         } else if (data?.type === 'follow' && data?.fromUserId) {
           navigation?.push(`/profile?userId=${data.fromUserId}`);
