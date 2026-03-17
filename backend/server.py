@@ -4151,9 +4151,13 @@ async def get_following(user_id: str):
         if user:
             result.append({
                 "id": str(user["_id"]),
-                "full_name": user["full_name"],
+                "user_id": str(user["_id"]),
+                "full_name": user.get("full_name") or user.get("username") or "Unknown",
+                "username": user.get("username") or user.get("full_name") or "Unknown",
                 "profile_picture": user.get("profile_picture"),
-                "badge": user.get("badge")
+                "profile_picture_url": user.get("profile_picture"),
+                "badge": user.get("badge"),
+                "level": user.get("level", 1)
             })
     
     return result
@@ -4920,7 +4924,7 @@ async def share_preview(request: Request, post_id: str):
         return HTMLResponse("<h1>Post not found</h1>", status_code=404)
 
     BASE_URL = "https://api.cofau.com"
-    DEEP_LINK_URL = f"cofau://post/{post_id}"
+    DEEP_LINK_URL = f"cofau://post-details/{post_id}"
     APP_STORE_URL = "https://apps.apple.com/app/cofau/id6758019920"
     PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.cofau.app"
 
