@@ -15,7 +15,6 @@ import {
   setupNotificationListeners,
   registerForPushNotificationsAsync  // ⬅️ ADD THIS IMPORT
 } from "../utils/pushNotifications";
-import { setUserId, setUserProperties, logScreenView } from "../utils/analytics";
 
 function RootLayoutNav() {
   const { isAuthenticated, loading, user, token, accountType } = useAuth();
@@ -81,26 +80,6 @@ function RootLayoutNav() {
         });
     }
   }, [isAuthenticated, token, accountType]);
-
-  // Firebase Analytics - set user identity when authenticated
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      const userId = user._id || user.id;
-      if (userId) setUserId(userId);
-      setUserProperties({
-        account_type: accountType || 'user',
-        platform: Platform.OS,
-      });
-    }
-  }, [isAuthenticated, user, accountType]);
-
-  // Firebase Analytics - track screen views on navigation
-  useEffect(() => {
-    if (segments && segments.length > 0) {
-      const screenName = segments.join('/');
-      logScreenView(screenName);
-    }
-  }, [segments]);
 
   useEffect(() => {
     if (loading) return;

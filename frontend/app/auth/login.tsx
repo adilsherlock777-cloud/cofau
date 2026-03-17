@@ -17,7 +17,6 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Image } from 'react-native';
-import { logLogin } from '../../utils/analytics';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
 let auth: any = null;
@@ -140,7 +139,6 @@ export default function LoginScreen() {
       await auth().signOut();
 
       if (result.success) {
-        logLogin(isRestaurant ? 'phone_restaurant' : 'phone');
         const welcomeMessage = isRestaurant
           ? 'Welcome back, Restaurant!'
           : 'Welcome back to Cofau';
@@ -204,7 +202,6 @@ const handleLogin = async () => {
       const result = await login(email, password, isRestaurant);
 
       if (result.success) {
-        logLogin(isRestaurant ? 'email_restaurant' : 'email');
         const welcomeMessage = isRestaurant
           ? 'Welcome back to Cofau Restaurant!'
           : 'Welcome back to Cofau';

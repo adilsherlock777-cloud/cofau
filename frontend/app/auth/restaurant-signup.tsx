@@ -19,7 +19,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LocationPicker from '../../components/LocationPicker';
 import axios from 'axios';
 import * as DocumentPicker from 'expo-document-picker';
-import { logSignUp } from '../../utils/analytics';
 
 // Conditional Firebase import - returns null if not available (Expo Go)
 let auth: any = null;
@@ -384,7 +383,6 @@ const handleVerifyOtp = async () => {
           await auth().signOut();
         }
 
-        logSignUp('restaurant');
         showAlert(
           'Account Created! 🎉',
           'Welcome to Cofau! Your restaurant account has been created.',

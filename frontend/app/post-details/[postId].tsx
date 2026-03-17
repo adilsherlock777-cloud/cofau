@@ -27,6 +27,7 @@ import { useAuth } from "../../context/AuthContext";
 import UserAvatar from "../../components/UserAvatar";
 import SimpleShareModal from "../../components/SimpleShareModal";
 import ReportModal from "../../components/ReportModal";
+import NudgeModal from "../../components/NudgeModal";
 import { followUser, unfollowUser, getComments, addComment } from "../../utils/api";
 import axios from "axios";
 import { Image } from "expo-image";
@@ -129,6 +130,7 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showNudgeModal, setShowNudgeModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -1039,6 +1041,11 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       <Text style={styles.rightActionCount}>{sharesCount}</Text>
     </TouchableOpacity>
 
+    {/* Nudge */}
+    <TouchableOpacity style={styles.rightActionBtn} onPress={() => setShowNudgeModal(true)}>
+      <Ionicons name="hand-right-outline" size={26} color="#FFF" />
+    </TouchableOpacity>
+
     {/* Location - opens Google Maps */}
     <TouchableOpacity
       style={styles.rightActionBtn}
@@ -1370,6 +1377,13 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       <SimpleShareModal
         visible={showShareModal}
         onClose={() => setShowShareModal(false)}
+        post={post}
+      />
+
+      {/* Nudge Modal */}
+      <NudgeModal
+        visible={showNudgeModal}
+        onClose={() => setShowNudgeModal(false)}
         post={post}
       />
     </View>

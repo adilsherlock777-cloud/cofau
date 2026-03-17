@@ -29,6 +29,7 @@ import SharePreviewModal from "./SharePreviewModal";
 import ShareToUsersModal from "./ShareToUsersModal";
 import SimpleShareModal from "./SimpleShareModal";
 import ReportModal from "./ReportModal";
+import NudgeModal from "./NudgeModal";
 import CofauVerifiedBadge from "./CofauVerifiedBadge";
 import FirstDiscoveryBadge from "./FirstDiscoveryBadge";
 import { useAuth } from "../context/AuthContext";
@@ -109,6 +110,7 @@ const [showShareModal, setShowShareModal] = useState(false);
 const [showSimpleShareModal, setShowSimpleShareModal] = useState(false);
 const [showShareToUsersModal, setShowShareToUsersModal] = useState(false);
 const [showSharePreviewModal, setShowSharePreviewModal] = useState(false);
+const [showNudgeModal, setShowNudgeModal] = useState(false);
 const [videoLoaded, setVideoLoaded] = useState(false);
 const [videoError, setVideoError] = useState(false);
 const [thumbnailError, setThumbnailError] = useState(false);
@@ -1017,6 +1019,28 @@ postId={post.id}
     <Text style={styles.engagementCount}>{sharesCount}</Text>
   </TouchableOpacity>
 
+  <TouchableOpacity
+    style={styles.engagementBtn}
+    onPress={() => setShowNudgeModal(true)}
+  >
+    <View style={styles.engagementIcon}>
+      <MaskedView
+        maskElement={
+          <View style={{ backgroundColor: 'transparent' }}>
+            <Ionicons name="hand-right" size={17} color="#000" />
+          </View>
+        }
+      >
+        <LinearGradient
+          colors={["#FF2E2E", "#FF7A18"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: 17, height: 17 }}
+        />
+      </MaskedView>
+    </View>
+  </TouchableOpacity>
+
   <TouchableOpacity style={styles.engagementBtn} onPress={handleSave}>
     <View style={styles.engagementIcon}>
       {isSaved ? (
@@ -1074,6 +1098,13 @@ console.error("Error sharing post:", error);
 visible={showSimpleShareModal}
 onClose={() => setShowSimpleShareModal(false)}
 post={post}
+/>
+
+{/* Nudge Modal */}
+<NudgeModal
+  visible={showNudgeModal}
+  onClose={() => setShowNudgeModal(false)}
+  post={post}
 />
 </View>
 );

@@ -87,6 +87,8 @@ async def create_notification(
             message = f"{from_user['full_name']} sent you a message"
         elif notification_type == "compliment":
             message = f"{from_user['full_name']} sent you a compliment"
+        elif notification_type == "nudge":
+            message = f"{from_user['full_name']} nudged you to check out a post"
         elif notification_type == "story_like":
             message = f"{from_user['full_name']} liked your story"
         elif notification_type == "wallet_reward":
@@ -152,6 +154,8 @@ async def create_notification(
                     title = "New Comment"
                 elif notification_type == "follow":
                     title = "New Follower"
+                elif notification_type == "nudge":
+                    title = "You've Been Nudged! 👋"
                 elif notification_type == "new_post":
                     title = "New Post"
                 elif notification_type == "compliment":

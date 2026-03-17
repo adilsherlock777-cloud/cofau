@@ -1,4 +1,5 @@
-from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form, WebSocket, Request 
+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status, Form, WebSocket, Request
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -1415,24 +1416,33 @@ async def get_feed(
         following_docs = await db.follows.find({"followerId": current_uid}).to_list(None)
         following_ids = {doc["followingId"] for doc in following_docs}
 
-        # 1) Extract own recent posts (uploaded within last 2 hours) -> show first
-        recent_cutoff = current_time - timedelta(hours=2)
+        # 1) Extract ALL recent posts (uploaded within last 3 hours) -> show first
+        #    This ensures new content from any user gets visibility at the top of everyone's feed
+        recent_cutoff = current_time - timedelta(hours=3)
         recent_own = [p for p in spread_result
                       if p.get("user_id") == current_uid
                       and p.get("created_at", datetime.min) >= recent_cutoff]
+        recent_others = [p for p in spread_result
+                         if p.get("user_id") != current_uid
+                         and p.get("created_at", datetime.min) >= recent_cutoff]
+        # Sort other recent posts newest first
+        recent_others.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+        # Combined: own recent posts first, then other recent posts
+        recent_all = recent_own + recent_others
 
-        # 2) Extract following users' posts (sorted newest first)
+        # 2) Extract following users' posts (sorted newest first) that aren't already in recent
+        recent_ids = set(id(p) for p in recent_all)
         following_posts = [p for p in spread_result
                           if p.get("user_id") in following_ids
-                          and p not in recent_own]
+                          and id(p) not in recent_ids]
         following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
 
         # 3) Remaining engagement-ranked posts
-        boosted_ids = set(id(p) for p in recent_own) | set(id(p) for p in following_posts)
+        boosted_ids = recent_ids | set(id(p) for p in following_posts)
         other_posts = [p for p in spread_result if id(p) not in boosted_ids]
 
-        # 4) Build final feed: own recent first, then interleave following every 5 posts
-        final_feed = list(recent_own)
+        # 4) Build final feed: recent posts first, then interleave following every 5 posts
+        final_feed = list(recent_all)
         following_idx = 0
         for i, post in enumerate(other_posts):
             final_feed.append(post)
@@ -2011,6 +2021,38 @@ async def share_post(post_id: str, current_user: dict = Depends(get_current_user
         raise HTTPException(status_code=404, detail="Post not found")
 
     return {"message": "Share count updated"}
+
+# ==================== NUDGE ENDPOINT ====================
+
+class NudgeRequest(BaseModel):
+    post_id: str
+    to_user_id: str
+    dish_name: str = ""
+    restaurant_name: str = ""
+
+@app.post("/api/nudge")
+async def send_nudge(req: NudgeRequest, current_user: dict = Depends(get_current_user)):
+    """Send a nudge notification to a Cofau friend about a post"""
+    db = get_database()
+    from_user_id = str(current_user["_id"])
+    from_name = current_user.get("full_name", "Someone")
+
+    # Build the nudge message
+    dish_part = req.dish_name or "this post"
+    restaurant_part = f" at {req.restaurant_name}" if req.restaurant_name else ""
+    message = f"{from_name} thinks you'd love {dish_part}{restaurant_part}"
+
+    await create_notification(
+        db=db,
+        notification_type="nudge",
+        from_user_id=from_user_id,
+        to_user_id=req.to_user_id,
+        post_id=req.post_id,
+        message=message,
+        send_push=True,
+    )
+
+    return {"message": "Nudge sent successfully"}
 
 # ==================== SAVE POSTS ENDPOINTS ====================
 
