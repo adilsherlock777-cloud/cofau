@@ -274,7 +274,7 @@ const VideoTile = memo(({ item, onPress, onLike, shouldPlay, onLayout, onView }:
         </>
       )}
       <View style={styles.clicksBadge}>
-        <Ionicons name="eye-outline" size={13} color="#fff" />
+        <Ionicons name="eye" size={12} color="#fff" />
         <Text style={styles.clicksText}>{(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}</Text>
       </View>
       {item.dish_name && (
@@ -298,7 +298,7 @@ const ImageTile = memo(({ item, onPress, onLike }: any) => {
         <View style={[styles.tileImage, styles.placeholderImage]}><Ionicons name="image-outline" size={32} color="#ccc" /></View>
       )}
       <View style={styles.clicksBadge}>
-        <Ionicons name="eye-outline" size={13} color="#fff" />
+        <Ionicons name="eye" size={12} color="#fff" />
         <Text style={styles.clicksText}>{(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}</Text>
       </View>
       {item.dish_name && (
@@ -484,7 +484,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
             </View>
           )}
           <View style={styles.markerViewsBadge}>
-            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Ionicons name="eye" size={8} color="#fff" />
             <Text style={styles.markerViewsText}>{viewCountDisplay}</Text>
           </View>
         </View>
@@ -523,7 +523,7 @@ const PostMarker = memo(({ post, onPress }: any) => {
             </View>
           )}
           <View style={styles.markerViewsBadge}>
-            <Ionicons name="eye-outline" size={8} color="#fff" />
+            <Ionicons name="eye" size={8} color="#fff" />
             <Text style={styles.markerViewsText}>{viewCountDisplay}</Text>
           </View>
         </View>
@@ -580,7 +580,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
                 onLoad={() => setImagesLoaded(prev => prev + 1)}
               />
               <View style={styles.markerViewsBadge}>
-                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Ionicons name="eye" size={8} color="#fff" />
                 <Text style={styles.markerViewsText}>{(latestPosts[1]?.clicks_count || 0) > 1000 ? `${((latestPosts[1]?.clicks_count || 0) / 1000).toFixed(1)}K` : (latestPosts[1]?.clicks_count || 0)}</Text>
               </View>
             </View>
@@ -608,7 +608,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
               </View>
             )}
             <View style={styles.markerViewsBadge}>
-              <Ionicons name="eye-outline" size={8} color="#fff" />
+              <Ionicons name="eye" size={8} color="#fff" />
               <Text style={styles.markerViewsText}>{(latestPosts[0]?.clicks_count || 0) > 1000 ? `${((latestPosts[0]?.clicks_count || 0) / 1000).toFixed(1)}K` : (latestPosts[0]?.clicks_count || 0)}</Text>
             </View>
           </View>
@@ -676,7 +676,7 @@ const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
                 </View>
               )}
               <View style={styles.markerViewsBadge}>
-                <Ionicons name="eye-outline" size={8} color="#fff" />
+                <Ionicons name="eye" size={8} color="#fff" />
                 <Text style={styles.markerViewsText}>{(post.clicks_count || 0) > 1000 ? `${((post.clicks_count || 0) / 1000).toFixed(1)}K` : (post.clicks_count || 0)}</Text>
               </View>
             </View>
@@ -1224,7 +1224,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
         </MapErrorBoundary>
       ) : (
         <View style={styles.mapLoadingContainer}>
-          <ActivityIndicator size="large" color="#4dd0e1" />
+          <ActivityIndicator size="large" color="#E94A37" />
           <Text style={styles.mapLoadingText}>Getting your location...</Text>
         </View>
       )}
@@ -1814,8 +1814,24 @@ export default function ExploreScreen() {
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const loadingRef = useRef(true);
+  const pageRef = useRef(1);
+  const feedSeedRef = useRef(Date.now().toString());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+
+  // Trending banner state
+  const [trendingPosts, setTrendingPosts] = useState<any[]>([]);
+  const [showTrendingBanner, setShowTrendingBanner] = useState(false);
+  const [trendingSlide, setTrendingSlide] = useState(0);
+  const [trendingCountdown, setTrendingCountdown] = useState(7);
+  const trendingBannerY = useRef(new Animated.Value(-400)).current;
+  const trendingScale = useRef(new Animated.Value(0.8)).current;
+  const trendingOpacity = useRef(new Animated.Value(0)).current;
+  const trendingSlideAnim = useRef(new Animated.Value(0)).current;
+  const trendingBannerShown = useRef(false);
 
   // Typewriter animated placeholder
   const PLACEHOLDER_PHRASES = [
@@ -2610,6 +2626,86 @@ useFocusEffect(
 );
 
   // ======================================================
+  // TRENDING BANNER - fetch and auto-slide
+  // ======================================================
+  useEffect(() => {
+    if (!token || trendingBannerShown.current) return;
+    const fetchTrending = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/posts/last-3-days`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!mountedRef.current) return;
+        const allPosts = (res.data || []).map((p: any) => ({
+          ...p,
+          full_image_url: fixUrl(p.media_url || p.image_url),
+          full_thumbnail_url: fixUrl(p.thumbnail_url),
+        }));
+        // Score by likes + clicks, pick top 5 with at least 1 restaurant post
+        const scored = allPosts.sort((a: any, b: any) => ((b.likes_count || 0) + (b.clicks_count || 0)) - ((a.likes_count || 0) + (a.clicks_count || 0)));
+        const restaurantPost = scored.find((p: any) => p.account_type === 'restaurant');
+        const userPosts = scored.filter((p: any) => p.account_type !== 'restaurant').slice(0, restaurantPost ? 4 : 5);
+        const trending = restaurantPost ? [...userPosts.slice(0, 2), restaurantPost, ...userPosts.slice(2)] : userPosts;
+        if (trending.length === 0) return;
+        setTrendingPosts(trending.slice(0, 5));
+        trendingBannerShown.current = true;
+        setShowTrendingBanner(true);
+        // Animate in: drop from top with 3D scale
+        Animated.parallel([
+          Animated.spring(trendingBannerY, { toValue: 0, useNativeDriver: true, tension: 50, friction: 8 }),
+          Animated.spring(trendingScale, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }),
+          Animated.timing(trendingOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        ]).start();
+      } catch {}
+    };
+    fetchTrending();
+  }, [token]);
+
+  // Auto-slide trending posts every 1 second
+  useEffect(() => {
+    if (!showTrendingBanner || trendingPosts.length === 0) return;
+    const slideInterval = setInterval(() => {
+      setTrendingSlide(prev => {
+        const next = prev + 1;
+        if (next >= trendingPosts.length) {
+          return prev; // stay on last
+        }
+        // Animate slide transition
+        trendingSlideAnim.setValue(1);
+        Animated.timing(trendingSlideAnim, { toValue: 0, duration: 250, useNativeDriver: true, easing: Easing.out(Easing.cubic) }).start();
+        return next;
+      });
+    }, 1200);
+    return () => clearInterval(slideInterval);
+  }, [showTrendingBanner, trendingPosts.length]);
+
+  // Countdown timer for trending banner
+  useEffect(() => {
+    if (!showTrendingBanner) return;
+    const countdownInterval = setInterval(() => {
+      setTrendingCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          closeTrendingBanner();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(countdownInterval);
+  }, [showTrendingBanner]);
+
+  const closeTrendingBanner = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(trendingBannerY, { toValue: -500, duration: 400, useNativeDriver: true, easing: Easing.in(Easing.back(1.5)) }),
+      Animated.timing(trendingScale, { toValue: 0.5, duration: 400, useNativeDriver: true }),
+      Animated.timing(trendingOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+    ]).start(() => {
+      setShowTrendingBanner(false);
+      setTrendingCountdown(7);
+      setTrendingSlide(0);
+    });
+  }, []);
+
+  // ======================================================
   // EXISTING FEED LOGIC (for USERS tab)
   // ======================================================
 
@@ -2637,14 +2733,16 @@ useFocusEffect(
     });
   }, [posts]);
 
+  const fetchPostsRef = useRef<any>(null);
+
   const handleScroll = useCallback((event: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     scrollYRef.current = contentOffset.y;
     calculateVisibleVideos(contentOffset.y);
     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - SCREEN_HEIGHT * 3) {
-      if (hasMore && !loadingMore && !loading) fetchPosts(false);
+      if (hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) fetchPostsRef.current(false);
     }
-  }, [calculateVisibleVideos, hasMore, loadingMore, loading]);
+  }, [calculateVisibleVideos]);
 
   useEffect(() => {
     if (posts.length > 0) {
@@ -2670,21 +2768,30 @@ useFocusEffect(
 
   const fetchPosts = async (refresh = false, categories?: string[], tab?: 'map' | 'users') => {
     try {
-      if (refresh) { setLoading(true); setPage(1); setHasMore(true); videoPositions.current.clear(); }
-      else { if (!hasMore || loadingMore) return; setLoadingMore(true); }
+      if (refresh) {
+        setLoading(true); loadingRef.current = true;
+        setPage(1); pageRef.current = 1;
+        setHasMore(true); hasMoreRef.current = true;
+        feedSeedRef.current = Date.now().toString();
+        videoPositions.current.clear();
+      } else {
+        if (!hasMoreRef.current || loadingMoreRef.current) return;
+        setLoadingMore(true); loadingMoreRef.current = true;
+      }
       const categoriesToUse = categories ?? appliedCategories;
       const currentTab = tab ?? activeTab;
-      const skip = refresh ? 0 : (page - 1) * POSTS_PER_PAGE;
+      const skip = refresh ? 0 : (pageRef.current - 1) * POSTS_PER_PAGE;
 
       const categoryParam = categoriesToUse.length > 0
         ? `&categories=${encodeURIComponent(categoriesToUse.join(","))}`
         : '';
       const sortParam = '&sort=mixed';
+      const seedParam = `&seed=${feedSeedRef.current}`;
 
       // Progressive loading: on refresh, fetch first 6 posts fast, then load the rest
       if (refresh) {
         const INITIAL_BATCH = 6;
-        const firstUrl = `${API_URL}/feed?skip=0&limit=${INITIAL_BATCH}${categoryParam}${sortParam}`;
+        const firstUrl = `${API_URL}/feed?skip=0&limit=${INITIAL_BATCH}${categoryParam}${sortParam}${seedParam}`;
         const firstRes = await axios.get(firstUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
@@ -2698,7 +2805,7 @@ useFocusEffect(
         const firstPosts = firstRes.data.map(mapPostData);
         setPosts(firstPosts);
         feedPostsLoadedRef.current = true;
-        setLoading(false); // Show first cards immediately
+        setLoading(false); loadingRef.current = false; // Show first cards immediately
 
         // Pre-fetch thumbnails after UI settles (non-blocking)
         InteractionManager.runAfterInteractions(() => {
@@ -2711,13 +2818,13 @@ useFocusEffect(
         });
 
         if (firstRes.data.length < INITIAL_BATCH) {
-          setHasMore(false);
-          setPage(2);
+          setHasMore(false); hasMoreRef.current = false;
+          setPage(2); pageRef.current = 2;
           return;
         }
 
         // Load remaining posts in background
-        const restUrl = `${API_URL}/feed?skip=${INITIAL_BATCH}&limit=${POSTS_PER_PAGE - INITIAL_BATCH}${categoryParam}${sortParam}`;
+        const restUrl = `${API_URL}/feed?skip=${INITIAL_BATCH}&limit=${POSTS_PER_PAGE - INITIAL_BATCH}${categoryParam}${sortParam}${seedParam}`;
         const restRes = await axios.get(restUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
@@ -2730,35 +2837,37 @@ useFocusEffect(
         }
 
         const totalFetched = firstRes.data.length + (restRes.data?.length || 0);
-        if (totalFetched < POSTS_PER_PAGE) setHasMore(false);
-        setPage(2);
+        if (totalFetched < POSTS_PER_PAGE) { setHasMore(false); hasMoreRef.current = false; }
+        setPage(2); pageRef.current = 2;
       } else {
         // Pagination: load next page normally
-        let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}${sortParam}`;
+        let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}${sortParam}${seedParam}`;
         const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
         if (res.data.length === 0) {
-          setHasMore(false);
+          setHasMore(false); hasMoreRef.current = false;
           return;
         }
 
         const newPosts = res.data.map(mapPostData);
         setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]);
-        setPage((prev) => prev + 1);
+        setPage((prev) => { pageRef.current = prev + 1; return prev + 1; });
 
-        if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
+        if (newPosts.length < POSTS_PER_PAGE) { setHasMore(false); hasMoreRef.current = false; }
       }
     } catch (err) {
       if (!mountedRef.current) return;
       console.error("Fetch error:", err);
     } finally {
       if (!mountedRef.current) return;
-      setLoading(false);
-      setLoadingMore(false);
+      setLoading(false); loadingRef.current = false;
+      setLoadingMore(false); loadingMoreRef.current = false;
       setRefreshing(false);
     }
   };
+
+  fetchPostsRef.current = fetchPosts;
 
   const fetchPostsWithCategories = (categories: string[]) => fetchPosts(true, categories);
   const getBadgeTitle = (level: number): string => {
@@ -2877,7 +2986,7 @@ useFocusEffect(
 
   const columns = React.useMemo(() => distributePosts(posts), [posts]);
 
-  if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#4dd0e1" /><Text>Authenticating…</Text></View>;
+  if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#E94A37" /><Text>Authenticating…</Text></View>;
 
 return (
   <View style={styles.container}>
@@ -3464,7 +3573,7 @@ return (
               </View>
             </ScrollView>
           ) : (
-            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={Platform.OS === 'android' ? 64 : 16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4dd0e1" />}>
+            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={Platform.OS === 'android' ? 64 : 16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E94A37" />}>
               <View style={styles.masonryContainer}>
                 {columns.map((column, columnIndex) => (
                   <View key={columnIndex} style={styles.column}>
@@ -3472,7 +3581,7 @@ return (
                   </View>
                 ))}
               </View>
-              {loadingMore && <View style={styles.loadingMore}><ActivityIndicator size="small" color="#4dd0e1" /></View>}
+              {loadingMore && <View style={styles.loadingMore}><ActivityIndicator size="small" color="#E94A37" /></View>}
               {!loading && posts.length === 0 && (
                 <View style={styles.emptyState}>
                   <Ionicons name="images-outline" size={64} color="#ccc" />
@@ -3648,6 +3757,90 @@ return (
         onFollowSuggestion={handleFollowSuggestion}
         onViewProfile={handleViewSuggestedProfile}
       />
+
+      {/* TRENDING BANNER OVERLAY */}
+      {showTrendingBanner && trendingPosts.length > 0 && (
+        <Animated.View style={[styles.trendingOverlay, { opacity: trendingOpacity }]}>
+          <Animated.View style={[styles.trendingBanner, {
+            transform: [
+              { translateY: trendingBannerY },
+              { scale: trendingScale },
+              { perspective: 1000 },
+              { rotateX: trendingBannerY.interpolate({ inputRange: [-400, 0], outputRange: ['15deg', '0deg'] }) },
+            ],
+          }]}>
+            {/* Header */}
+            <View style={styles.trendingHeader}>
+              <View style={styles.trendingHeaderLeft}>
+                <Text style={{ fontSize: 16 }}>🔥</Text>
+                <Text style={styles.trendingTitle}>Trending Dish in Cofau</Text>
+              </View>
+              <TouchableOpacity onPress={closeTrendingBanner} style={styles.trendingClose} activeOpacity={0.7}>
+                <Ionicons name="close" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Slide content */}
+            <Animated.View style={[styles.trendingSlideContainer, {
+              transform: [{ translateX: trendingSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) }],
+              opacity: trendingSlideAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.3, 0] }),
+            }]}>
+              {trendingPosts[trendingSlide] && (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => { closeTrendingBanner(); router.push(`/post-details/${trendingPosts[trendingSlide].id || trendingPosts[trendingSlide]._id}`); }}
+                  style={styles.trendingCard}
+                >
+                  <Image
+                    source={{ uri: trendingPosts[trendingSlide].full_thumbnail_url || trendingPosts[trendingSlide].full_image_url }}
+                    style={styles.trendingImage}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={150}
+                  />
+                  <View style={styles.trendingCardInfo}>
+                    <View style={styles.trendingCardTop}>
+                      <Text style={styles.trendingDishName} numberOfLines={1}>
+                        {trendingPosts[trendingSlide].dish_name || trendingPosts[trendingSlide].review_text?.slice(0, 30) || 'Trending Dish'}
+                      </Text>
+                      {trendingPosts[trendingSlide].account_type === 'restaurant' && (
+                        <View style={styles.trendingRestaurantTag}>
+                          <Ionicons name="restaurant" size={9} color="#fff" />
+                          <Text style={styles.trendingRestaurantTagText}>Restaurant</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.trendingUsername} numberOfLines={1}>@{trendingPosts[trendingSlide].username}</Text>
+                    <View style={styles.trendingStats}>
+                      <View style={styles.trendingStat}>
+                        <Ionicons name="heart" size={12} color="#FF2E2E" />
+                        <Text style={styles.trendingStatText}>{trendingPosts[trendingSlide].likes_count || 0}</Text>
+                      </View>
+                      <View style={styles.trendingStat}>
+                        <Ionicons name="eye" size={12} color="#666" />
+                        <Text style={styles.trendingStatText}>{trendingPosts[trendingSlide].clicks_count || 0}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </Animated.View>
+
+            {/* Slide indicators + countdown */}
+            <View style={styles.trendingFooter}>
+              <View style={styles.trendingDots}>
+                {trendingPosts.map((_: any, i: number) => (
+                  <View key={i} style={[styles.trendingDot, i === trendingSlide && styles.trendingDotActive]} />
+                ))}
+              </View>
+              <View style={styles.trendingCountdown}>
+                <Text style={styles.trendingCountdownText}>{trendingCountdown}</Text>
+              </View>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      )}
+
     </View>
   );
 }
@@ -3764,8 +3957,8 @@ const styles = StyleSheet.create({
   placeholderImage: { backgroundColor: "#2a2a2a", justifyContent: "center", alignItems: "center" },
   playIconContainer: { position: "absolute", top: "50%", left: "50%", transform: [{ translateX: -20 }, { translateY: -20 }], width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   likeBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", padding: 8, borderRadius: 20 },
-  clicksBadge: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, gap: 3 },
-  clicksText: { color: "#fff", fontSize: 11, fontWeight: "600" },
+  clicksBadge: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", gap: 3 },
+  clicksText: { color: "#fff", fontSize: 11, fontWeight: "700", textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   topPostsButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF5E6", borderRadius: 22, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: "#F2CF68" },
   topPostsButtonText: { fontSize: 13, fontWeight: "600", color: "#E94A37" },
   topPostsModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%", minHeight: 400 },
@@ -4527,20 +4720,19 @@ postMarkerArrow: {
 },
 markerViewsBadge: {
   position: 'absolute',
-  bottom: 2,
-  alignSelf: 'center',
+  top: 2,
+  right: 2,
   flexDirection: 'row',
   alignItems: 'center',
-  backgroundColor: 'rgba(0,0,0,0.55)',
-  paddingHorizontal: 4,
-  paddingVertical: 1,
-  borderRadius: 6,
-  gap: 2,
+  gap: 1,
 },
 markerViewsText: {
   color: '#fff',
   fontSize: 7,
-  fontWeight: '600',
+  fontWeight: '700',
+  textShadowColor: 'rgba(0,0,0,0.8)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 // Android-specific PostMarker styles with explicit sizing
 postMarkerContainerAndroid: {
@@ -5393,5 +5585,153 @@ toggleTabTextActive: {
     fontSize: 13,
     fontWeight: '600' as const,
     flexShrink: 1,
+  },
+  // Trending banner styles
+  trendingOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  trendingBanner: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: SCREEN_WIDTH * 0.88,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  trendingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  trendingHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trendingTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1a1a1a',
+  },
+  trendingClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendingSlideContainer: {
+    overflow: 'hidden',
+  },
+  trendingCard: {
+    flexDirection: 'row',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 14,
+    overflow: 'hidden',
+    height: 110,
+  },
+  trendingImage: {
+    width: 110,
+    height: 110,
+  },
+  trendingCardInfo: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  trendingCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  trendingDishName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    flexShrink: 1,
+  },
+  trendingRestaurantTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#E94A37',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  trendingRestaurantTagText: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  trendingUsername: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
+  },
+  trendingStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  trendingStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trendingStatText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#555',
+  },
+  trendingFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingHorizontal: 4,
+  },
+  trendingDots: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  trendingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ddd',
+  },
+  trendingDotActive: {
+    backgroundColor: '#E94A37',
+    width: 18,
+    borderRadius: 4,
+  },
+  trendingCountdown: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E94A37',
+  },
+  trendingCountdownText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#E94A37',
   },
 });

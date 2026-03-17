@@ -30,6 +30,7 @@ import ShareToUsersModal from "./ShareToUsersModal";
 import SimpleShareModal from "./SimpleShareModal";
 import ReportModal from "./ReportModal";
 import NudgeModal from "./NudgeModal";
+import RestaurantBadge from "./RestaurantBadge";
 import CofauVerifiedBadge from "./CofauVerifiedBadge";
 import FirstDiscoveryBadge from "./FirstDiscoveryBadge";
 import { useAuth } from "../context/AuthContext";
@@ -75,6 +76,26 @@ const GradientBookmark = ({ size = 24 }) => (
     />
   </MaskedView>
 );
+const getTimeAgo = (dateString) => {
+  if (!dateString) return '';
+  const now = new Date();
+  const date = new Date(dateString);
+  const seconds = Math.floor((now - date) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+};
+
 function FeedCard({
   post,
   onLikeUpdate,
@@ -112,6 +133,7 @@ const [showShareToUsersModal, setShowShareToUsersModal] = useState(false);
 const [showSharePreviewModal, setShowSharePreviewModal] = useState(false);
 const [showNudgeModal, setShowNudgeModal] = useState(false);
 const [videoLoaded, setVideoLoaded] = useState(false);
+const [videoReady, setVideoReady] = useState(false);
 const [videoError, setVideoError] = useState(false);
 const [thumbnailError, setThumbnailError] = useState(false);
 const [isFollowing, setIsFollowing] = useState(post.is_following || false);
@@ -227,6 +249,8 @@ useEffect(() => {
         }
       } else {
         // FULLY STOP video when not visible - pause, stop audio, and reset position
+        // Don't reset videoReady here — keep last frame visible to avoid flash.
+        // videoReady resets naturally when the Video unmounts (shouldPlay=false removes it).
         if (status.isLoaded) {
           try {
             // First pause the video
@@ -259,6 +283,18 @@ useEffect(() => {
     }
   };
 }, [shouldPlay, isVideo, videoLoaded]);
+
+// Reset videoReady after Video unmounts — delayed so last frame stays during scroll
+useEffect(() => {
+  if (!isVideo) return;
+  if (!shouldPlay && videoReady) {
+    // Keep last frame visible briefly, then reset for next time
+    const timer = setTimeout(() => {
+      setVideoReady(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }
+}, [shouldPlay, isVideo]);
 
 // Update mute state when isMuted prop changes
 useEffect(() => {
@@ -524,12 +560,14 @@ showLevelBadge
       <CofauVerifiedBadge size={16} />
     )}
     {post.account_type === 'restaurant' && (
-      <Ionicons name="storefront" size={14} color="#FF2E2E" />
+      <RestaurantBadge size={20} />
     )}
   </View>
-  {post.is_first_discovery && (
+  {post.is_first_discovery ? (
     <FirstDiscoveryBadge size={10} />
-  )}
+  ) : post.created_at ? (
+    <Text style={styles.timestamp}>{getTimeAgo(post.created_at)}</Text>
+  ) : null}
 </View>
 </TouchableOpacity>
 
@@ -646,12 +684,14 @@ postId={post.id}
                   <CofauVerifiedBadge size={14} />
                 )}
                 {post.account_type === 'restaurant' && (
-                  <Ionicons name="storefront" size={14} color="#fff" />
+                  <RestaurantBadge size={20} />
                 )}
               </View>
-              {post.is_first_discovery && (
+              {post.is_first_discovery ? (
                 <FirstDiscoveryBadge size={9} />
-              )}
+              ) : post.created_at ? (
+                <Text style={styles.videoTimestamp}>{getTimeAgo(post.created_at)}</Text>
+              ) : null}
             </View>
 
             {!isOwnPost && !isFollowing && (
@@ -687,29 +727,36 @@ postId={post.id}
           </TouchableOpacity>
         </View>
 
-        {/* Thumbnail - Show when video is not preloaded */}
-        {(!shouldPlay || !videoLoaded) && (
-          <View style={[styles.video, styles.videoPlaceholder]}>
+        {/* Thumbnail overlay — covers video until first frame is rendered */}
+        {!videoReady && (
+          <View
+            style={[
+              styles.video,
+              styles.videoPlaceholder,
+              { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 },
+            ]}
+          >
             <Image
               source={{ uri: thumbnailUrl || generatedThumbnail || mediaUrl }}
               style={StyleSheet.absoluteFill}
               resizeMode="contain"
               blurRadius={0}
             />
-            <View style={styles.playIconContainer}>
-              <Ionicons name="play-circle" size={56} color="rgba(255,255,255,0.7)" />
-            </View>
+            {!shouldPlay && (
+              <View style={styles.playIconContainer}>
+                <Ionicons name="play-circle" size={56} color="rgba(255,255,255,0.7)" />
+              </View>
+            )}
           </View>
         )}
 
-        {/* Video - Only render when shouldPlay is true and no error */}
+        {/* Video — mount when shouldPlay, thumbnail covers loading gap */}
         {shouldPlay && !videoError && (
           <Video
             key="video"
             ref={videoRef}
             source={{
               uri: mediaUrl,
-              // iOS requires headers for proper video loading
               headers: {
                 'Accept': 'video/mp4, video/quicktime, video/*',
                 'User-Agent': 'Cofau/1.0',
@@ -723,33 +770,30 @@ postId={post.id}
             useNativeControls={false}
             allowsExternalPlayback={false}
             playInSilentModeIOS={true}
-            // iOS-specific props for better compatibility
             usePoster={false}
             posterSource={null}
-            videoStyle={{ backgroundColor: 'black' }} 
-            // Preload video for iOS
+            videoStyle={{ backgroundColor: 'black' }}
+            onReadyForDisplay={() => {
+              if (!videoReady) {
+                setVideoReady(true);
+              }
+            }}
             onLoad={(status) => {
-              // Only update state if it changed to prevent flickering
               if (!videoLoaded) {
                 setVideoLoaded(true);
               }
               if (videoError) {
                 setVideoError(false);
               }
-              // Ensure video plays after load (iOS needs explicit play)
               if (shouldPlay && videoRef.current) {
                 setTimeout(async () => {
                   try {
                     const currentStatus = await videoRef.current.getStatusAsync();
                     if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
-                      // iOS needs explicit play call
                       await videoRef.current.playAsync();
-                      // Set mute state
                       await videoRef.current.setIsMutedAsync(isMuted);
-                      // Ensure it's actually playing
                       const afterPlayStatus = await videoRef.current.getStatusAsync();
                       if (!afterPlayStatus.isPlaying && shouldPlay) {
-                        // Retry play if it didn't start
                         setTimeout(async () => {
                           try {
                             await videoRef.current.playAsync();
@@ -760,7 +804,7 @@ postId={post.id}
                     }
                   } catch (err) {
                   }
-                }, 200); // Reduced delay to prevent flickering
+                }, 200);
               }
             }}
             onError={(error) => {
@@ -774,16 +818,12 @@ postId={post.id}
               }
             }}
             onPlaybackStatusUpdate={(status) => {
-              // Ensure video stops if shouldPlay becomes false
               if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
                 videoRef.current.pauseAsync().catch(() => { });
                 videoRef.current.setPositionAsync(0).catch(() => { });
               }
-              // Only attempt to play if video is loaded and should play
               if (status.isLoaded && !status.isPlaying && shouldPlay && videoLoaded) {
-                videoRef.current?.playAsync().catch((err) => {
-                  // Silently handle - don't log to prevent spam
-                });
+                videoRef.current?.playAsync().catch(() => { });
               }
             }}
             progressUpdateIntervalMillis={1000}
@@ -799,7 +839,7 @@ postId={post.id}
         )}
         
         {/* Mute/Unmute Button - Bottom right corner, only show when video is playing */}
-        {shouldPlay && videoLoaded && !videoError && (
+        {shouldPlay && videoReady && !videoError && (
           <TouchableOpacity
             style={styles.muteButton}
             onPress={(e) => {
@@ -897,7 +937,7 @@ postId={post.id}
         onPress={() => router.push(`/profile?userId=${post.tagged_restaurant.id}`)}
         activeOpacity={0.8}
       >
-        <Ionicons name="storefront" size={12} color="#FFF" />
+        <RestaurantBadge size={14} />
         <Text style={styles.restaurantTagText} numberOfLines={1}>
           {post.tagged_restaurant.restaurant_name}
         </Text>
@@ -1023,21 +1063,8 @@ postId={post.id}
     style={styles.engagementBtn}
     onPress={() => setShowNudgeModal(true)}
   >
-    <View style={styles.engagementIcon}>
-      <MaskedView
-        maskElement={
-          <View style={{ backgroundColor: 'transparent' }}>
-            <Ionicons name="hand-right" size={17} color="#000" />
-          </View>
-        }
-      >
-        <LinearGradient
-          colors={["#FF2E2E", "#FF7A18"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ width: 17, height: 17 }}
-        />
-      </MaskedView>
+    <View style={[styles.engagementIcon, { backgroundColor: '#FF3D00' }]}>
+      <Ionicons name="at" size={17} color="#FFF" />
     </View>
   </TouchableOpacity>
 
@@ -1164,6 +1191,21 @@ fontSize: 14,
 alignItems: "top",
 fontWeight: "600",
 color: "#333",
+},
+
+timestamp: {
+fontSize: 11,
+color: '#999',
+marginTop: 1,
+},
+
+videoTimestamp: {
+fontSize: 11,
+color: 'rgba(255, 255, 255, 0.7)',
+marginTop: 1,
+textShadowColor: 'rgba(0, 0, 0, 0.75)',
+textShadowOffset: { width: 1, height: 1 },
+textShadowRadius: 3,
 },
 
 image: {

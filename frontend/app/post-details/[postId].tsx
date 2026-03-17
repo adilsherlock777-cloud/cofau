@@ -1041,9 +1041,9 @@ function PostItem({ post, currentPostId, token, bottomInset, accountType }: any)
       <Text style={styles.rightActionCount}>{sharesCount}</Text>
     </TouchableOpacity>
 
-    {/* Nudge */}
+    {/* Tag */}
     <TouchableOpacity style={styles.rightActionBtn} onPress={() => setShowNudgeModal(true)}>
-      <Ionicons name="hand-right-outline" size={26} color="#FFF" />
+      <Ionicons name="at" size={28} color="#FFF" />
     </TouchableOpacity>
 
     {/* Location - opens Google Maps */}

@@ -156,11 +156,11 @@ export default function NudgeModal({ visible, onClose, post }) {
         }
       );
 
-      Alert.alert("Nudge Sent!", `${friendName} will see your nudge 🍛`);
+      Alert.alert("Tagged!", `${friendName} has been tagged 🍛`);
       onClose();
     } catch (err) {
       console.error("Error sending nudge:", err);
-      Alert.alert("Oops", "Couldn't send nudge. Try again!");
+      Alert.alert("Oops", "Couldn't tag. Try again!");
     } finally {
       setSendingTo(null);
     }
@@ -203,7 +203,7 @@ export default function NudgeModal({ visible, onClose, post }) {
           end={{ x: 1, y: 0 }}
           style={styles.nudgeSendBtn}
         >
-          <Text style={styles.nudgeSendBtnText}>Nudge</Text>
+          <Text style={styles.nudgeSendBtnText}>Tag</Text>
         </LinearGradient>
       )}
     </TouchableOpacity>
@@ -252,7 +252,7 @@ export default function NudgeModal({ visible, onClose, post }) {
               <MaskedView
                 maskElement={
                   <Text style={[styles.headerTitle, { opacity: 1 }]}>
-                    {mode === null ? "Nudge a Friend" : "Choose a Cofau Friend"}
+                    {mode === null ? "Tag your Foodie Friend" : "Tag a Cofau Friend"}
                   </Text>
                 }
               >
@@ -262,7 +262,7 @@ export default function NudgeModal({ visible, onClose, post }) {
                   end={{ x: 1, y: 0 }}
                 >
                   <Text style={[styles.headerTitle, { opacity: 0 }]}>
-                    {mode === null ? "Nudge a Friend" : "Choose a Cofau Friend"}
+                    {mode === null ? "Tag your Foodie Friend" : "Tag a Cofau Friend"}
                   </Text>
                 </LinearGradient>
               </MaskedView>
@@ -285,9 +285,9 @@ export default function NudgeModal({ visible, onClose, post }) {
                     <Ionicons name="people" size={26} color="#FFF" />
                   </LinearGradient>
                   <View style={styles.optionTextWrap}>
-                    <Text style={styles.optionTitle}>Nudge a Cofau Friend</Text>
+                    <Text style={styles.optionTitle}>Tag a Cofau Friend</Text>
                     <Text style={styles.optionDesc}>
-                      Send an in-app nudge — they'll see it instantly
+                      They'll get notified instantly in the app
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#CCC" />
@@ -307,9 +307,9 @@ export default function NudgeModal({ visible, onClose, post }) {
                     <Ionicons name="logo-whatsapp" size={26} color="#FFF" />
                   </LinearGradient>
                   <View style={styles.optionTextWrap}>
-                    <Text style={styles.optionTitle}>Nudge via WhatsApp</Text>
+                    <Text style={styles.optionTitle}>Tag via WhatsApp</Text>
                     <Text style={styles.optionDesc}>
-                      Invite a friend who's not on Cofau yet
+                      Share with a friend who's not on Cofau yet
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#CCC" />
@@ -361,7 +361,7 @@ export default function NudgeModal({ visible, onClose, post }) {
                     </LinearGradient>
                     <Text style={styles.emptyTitle}>No friends yet</Text>
                     <Text style={styles.emptyDesc}>
-                      Follow foodies on Cofau to nudge them{"\n"}about your favorite dishes!
+                      Follow foodies on Cofau to tag them{"\n"}on your favorite dishes!
                     </Text>
                     <TouchableOpacity
                       activeOpacity={0.8}

@@ -1266,11 +1266,12 @@ def calculate_engagement_score(post, current_time):
 # ======================================================
 @app.get("/api/feed")
 async def get_feed(
-    skip: int = 0, 
-    limit: int = None, 
-    category: str = None, 
+    skip: int = 0,
+    limit: int = None,
+    category: str = None,
     categories: str = None,
     sort: str = "engagement",
+    seed: str = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -1463,6 +1464,9 @@ async def get_feed(
             posts = posts[:limit]
     elif sort == "mixed":
         # Mixed feed: every 9 posts = 3 newest + 3 oldest + 3 most liked, shuffled
+        # Use deterministic seed so pagination returns consistent order across pages
+        feed_seed = seed or str(current_user["_id"]) + current_time.strftime("%Y-%m-%d")
+        feed_rng = random.Random(feed_seed)
         page_size = limit or 30
         fetch_limit = 3000
 
@@ -1520,7 +1524,7 @@ async def get_feed(
                     count += 1
                 likes_idx += 1
 
-            random.shuffle(batch)
+            feed_rng.shuffle(batch)
             mixed.extend(batch)
 
         # Get following IDs
@@ -2037,10 +2041,18 @@ async def send_nudge(req: NudgeRequest, current_user: dict = Depends(get_current
     from_user_id = str(current_user["_id"])
     from_name = current_user.get("full_name", "Someone")
 
-    # Build the nudge message
-    dish_part = req.dish_name or "this post"
-    restaurant_part = f" at {req.restaurant_name}" if req.restaurant_name else ""
-    message = f"{from_name} thinks you'd love {dish_part}{restaurant_part}"
+    # Build the tag message
+    dish_part = req.dish_name if req.dish_name else ""
+    restaurant_part = req.restaurant_name if req.restaurant_name else ""
+
+    if dish_part and restaurant_part:
+        message = f"{from_name} thinks you're a foodie and would love {dish_part} at {restaurant_part}"
+    elif dish_part:
+        message = f"{from_name} thinks you're a foodie and would love {dish_part}"
+    elif restaurant_part:
+        message = f"{from_name} thinks you're a foodie and would love this at {restaurant_part}"
+    else:
+        message = f"{from_name} thinks you're a foodie and would love this"
 
     await create_notification(
         db=db,

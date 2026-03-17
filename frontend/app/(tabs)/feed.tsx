@@ -451,8 +451,8 @@ const visibleVideoIdRef = useRef<string | null>(null);
 const viewabilityDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
 const viewabilityConfigRef = useRef({
-  itemVisiblePercentThreshold: 60,
-  minimumViewTime: 300,
+  itemVisiblePercentThreshold: 30,
+  minimumViewTime: 200,
 });
 
 const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
