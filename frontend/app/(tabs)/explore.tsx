@@ -1014,55 +1014,23 @@ const MapViewComponent = memo(({
       });
     });
 
-    // Step 3: Zoom-based clustering — merge nearby locations when zoomed out
+    // Step 3: Google Maps-style visibility — show/hide based on zoom + post count
+    // Higher post count = visible even when zoomed out. Lower = only when zoomed in.
     const delta = currentRegion?.latitudeDelta || 0.05;
-    let clusterPrecision: number | null = null;
-    if (delta > 0.3) clusterPrecision = 1;        // ~30km+ region view — ~11km clusters
-    else if (delta > 0.08) clusterPrecision = 2;   // ~8-30km city view — ~1.1km clusters
-    else if (delta > 0.02) clusterPrecision = 3;   // ~2-8km neighborhood — ~111m clusters
+    let minPosts: number;
+    if (delta > 0.3) minPosts = 10;       // Region view: only 10+ post locations
+    else if (delta > 0.08) minPosts = 5;   // City view: 5+ post locations
+    else if (delta > 0.02) minPosts = 2;   // Neighborhood: 2+ post locations
+    else minPosts = 1;                      // Street level: show ALL
 
-    if (clusterPrecision === null) {
-      // Street level (<2km view) — show individual location markers
-      return { locations: allLocations, zoomClusters: [], followingLocations };
-    }
+    const visibleLocations = allLocations.filter(loc => loc.count >= minPosts);
 
-    // Cluster locations by lower precision grid
-    const clusterGroups = new Map<string, any[]>();
-    allLocations.forEach(loc => {
-      const cKey = `${loc.latitude.toFixed(clusterPrecision!)},${loc.longitude.toFixed(clusterPrecision!)}`;
-      if (!clusterGroups.has(cKey)) clusterGroups.set(cKey, []);
-      clusterGroups.get(cKey)!.push(loc);
-    });
+    // Sort by post count descending — cap visible markers to prevent clutter
+    visibleLocations.sort((a: any, b: any) => b.count - a.count);
+    const maxMarkers = delta > 0.3 ? 8 : delta > 0.08 ? 15 : delta > 0.02 ? 30 : 999;
+    const locations = visibleLocations.slice(0, maxMarkers);
 
-    const locations: any[] = [];
-    const zoomClusters: any[] = [];
-
-    // When zoomed out, ALL locations become heat circles — no individual markers
-    clusterGroups.forEach((groupLocs, key) => {
-      const avgLat = groupLocs.reduce((s: number, l: any) => s + l.latitude, 0) / groupLocs.length;
-      const avgLng = groupLocs.reduce((s: number, l: any) => s + l.longitude, 0) / groupLocs.length;
-      const totalPosts = groupLocs.reduce((s: number, l: any) => s + l.count, 0);
-
-      // Compute span so tapping zooms to show all children
-      const lats = groupLocs.map((l: any) => l.latitude);
-      const lngs = groupLocs.map((l: any) => l.longitude);
-      const spanLat = Math.max(...lats) - Math.min(...lats) || 0.01;
-      const spanLng = Math.max(...lngs) - Math.min(...lngs) || 0.01;
-
-      zoomClusters.push({
-        id: key,
-        latitude: avgLat,
-        longitude: avgLng,
-        locationCount: groupLocs.length,
-        totalPosts,
-        locations: groupLocs,
-        spanLat,
-        spanLng,
-      });
-    });
-
-    // No individual locations when zoomed out — only heat circles
-    return { locations: [], zoomClusters, followingLocations };
+    return { locations, zoomClusters: [], followingLocations };
   }, [posts, filterType, selectedFollowingUser, currentRegion]);
 
  // Get category emoji
@@ -1154,40 +1122,6 @@ const getCategoryEmoji = (categoryName: string | null) => {
             />
           ))}
 
-          {/* Near Me / Following with user: Heat circles when zoomed out */}
-          {(filterType === 'posts' || (filterType === 'following' && selectedFollowingUser)) && zoomClusters.map((cluster: any) => {
-            const intensity = Math.min(1, cluster.totalPosts / 50);
-            // Radius: 200m (few posts) → 1500m (50+ posts)
-            const radius = Math.min(1500, Math.max(200, 200 + Math.log2(cluster.totalPosts + 1) * 200));
-            // Color: faint orange → deep red based on density
-            const r = 255;
-            const g = Math.round(140 - intensity * 100); // 140 → 40
-            const b = Math.round(30 - intensity * 30);   // 30 → 0
-            const fillOpacity = 0.15 + intensity * 0.35;  // 0.15 → 0.50
-            const strokeOpacity = 0.3 + intensity * 0.4;  // 0.3 → 0.7
-            return (
-              <Circle
-                key={`heat-${cluster.id}`}
-                center={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-                radius={radius}
-                fillColor={`rgba(${r}, ${g}, ${b}, ${fillOpacity})`}
-                strokeColor={`rgba(${r}, ${g}, ${b}, ${strokeOpacity})`}
-                strokeWidth={1}
-                tappable={true}
-                onPress={() => {
-                  if (mapRef?.current) {
-                    mapRef.current.animateToRegion({
-                      latitude: cluster.latitude,
-                      longitude: cluster.longitude,
-                      latitudeDelta: cluster.spanLat * 2 || 0.02,
-                      longitudeDelta: cluster.spanLng * 2 || 0.02,
-                    }, 500);
-                  }
-                }}
-              />
-            );
-          })}
-
           {/* Following without user selected: map is empty, grid overlay is shown */}
         </MapView>
         </MapErrorBoundary>
@@ -1233,7 +1167,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
       <View style={styles.resultsCountContainer}>
         <Text style={styles.resultsCountText}>
           {filterType === 'posts'
-            ? `${posts.length} posts at ${locations.length + zoomClusters.reduce((s: number, c: any) => s + c.locationCount, 0)} locations`
+            ? `${posts.length} posts at ${locations.length} locations`
             : filterType === 'restaurants'
             ? `${restaurants.length} restaurants nearby`
             : selectedFollowingUser
