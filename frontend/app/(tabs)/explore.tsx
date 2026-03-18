@@ -36,11 +36,13 @@ import { ActiveUsersList } from "../../components/ActiveUsersList";
 let MapView: any;
 let Marker: any;
 let Callout: any;
+let Circle: any;
 try {
   const maps = require("react-native-maps");
   MapView = maps.default;
   Marker = maps.Marker;
   Callout = maps.Callout;
+  Circle = maps.Circle;
 } catch {
   MapView = ({ children, style, ...props }: any) => (
     <View style={[style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
@@ -1035,41 +1037,32 @@ const MapViewComponent = memo(({
     const locations: any[] = [];
     const zoomClusters: any[] = [];
 
+    // When zoomed out, ALL locations become heat circles — no individual markers
     clusterGroups.forEach((groupLocs, key) => {
-      if (groupLocs.length === 1) {
-        // Only one location in this grid cell — show as normal marker
-        locations.push(groupLocs[0]);
-      } else {
-        // Multiple locations — merge into a zoom cluster
-        const avgLat = groupLocs.reduce((s: number, l: any) => s + l.latitude, 0) / groupLocs.length;
-        const avgLng = groupLocs.reduce((s: number, l: any) => s + l.longitude, 0) / groupLocs.length;
-        const totalPosts = groupLocs.reduce((s: number, l: any) => s + l.count, 0);
-        const allPosts = groupLocs.flatMap((l: any) => l.posts);
-        allPosts.sort((a: any, b: any) =>
-          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-        );
+      const avgLat = groupLocs.reduce((s: number, l: any) => s + l.latitude, 0) / groupLocs.length;
+      const avgLng = groupLocs.reduce((s: number, l: any) => s + l.longitude, 0) / groupLocs.length;
+      const totalPosts = groupLocs.reduce((s: number, l: any) => s + l.count, 0);
 
-        // Compute span so tapping zooms to show all children
-        const lats = groupLocs.map((l: any) => l.latitude);
-        const lngs = groupLocs.map((l: any) => l.longitude);
-        const spanLat = Math.max(...lats) - Math.min(...lats) || 0.01;
-        const spanLng = Math.max(...lngs) - Math.min(...lngs) || 0.01;
+      // Compute span so tapping zooms to show all children
+      const lats = groupLocs.map((l: any) => l.latitude);
+      const lngs = groupLocs.map((l: any) => l.longitude);
+      const spanLat = Math.max(...lats) - Math.min(...lats) || 0.01;
+      const spanLng = Math.max(...lngs) - Math.min(...lngs) || 0.01;
 
-        zoomClusters.push({
-          id: key,
-          latitude: avgLat,
-          longitude: avgLng,
-          locationCount: groupLocs.length,
-          totalPosts,
-          latestImageUrl: allPosts[0]?.full_thumbnail_url || allPosts[0]?.full_image_url,
-          locations: groupLocs,
-          spanLat,
-          spanLng,
-        });
-      }
+      zoomClusters.push({
+        id: key,
+        latitude: avgLat,
+        longitude: avgLng,
+        locationCount: groupLocs.length,
+        totalPosts,
+        locations: groupLocs,
+        spanLat,
+        spanLng,
+      });
     });
 
-    return { locations, zoomClusters, followingLocations };
+    // No individual locations when zoomed out — only heat circles
+    return { locations: [], zoomClusters, followingLocations };
   }, [posts, filterType, selectedFollowingUser, currentRegion]);
 
  // Get category emoji
@@ -1161,14 +1154,39 @@ const getCategoryEmoji = (categoryName: string | null) => {
             />
           ))}
 
-          {/* Near Me / Following with user: Zoom Cluster Markers (merged locations when zoomed out) */}
-          {(filterType === 'posts' || (filterType === 'following' && selectedFollowingUser)) && zoomClusters.map((cluster: any) => (
-            <ZoomClusterMarker
-              key={`zcluster-${cluster.id}`}
-              cluster={cluster}
-              mapRef={mapRef}
-            />
-          ))}
+          {/* Near Me / Following with user: Heat circles when zoomed out */}
+          {(filterType === 'posts' || (filterType === 'following' && selectedFollowingUser)) && zoomClusters.map((cluster: any) => {
+            const intensity = Math.min(1, cluster.totalPosts / 50);
+            // Radius: 200m (few posts) → 1500m (50+ posts)
+            const radius = Math.min(1500, Math.max(200, 200 + Math.log2(cluster.totalPosts + 1) * 200));
+            // Color: faint orange → deep red based on density
+            const r = 255;
+            const g = Math.round(140 - intensity * 100); // 140 → 40
+            const b = Math.round(30 - intensity * 30);   // 30 → 0
+            const fillOpacity = 0.15 + intensity * 0.35;  // 0.15 → 0.50
+            const strokeOpacity = 0.3 + intensity * 0.4;  // 0.3 → 0.7
+            return (
+              <Circle
+                key={`heat-${cluster.id}`}
+                center={{ latitude: cluster.latitude, longitude: cluster.longitude }}
+                radius={radius}
+                fillColor={`rgba(${r}, ${g}, ${b}, ${fillOpacity})`}
+                strokeColor={`rgba(${r}, ${g}, ${b}, ${strokeOpacity})`}
+                strokeWidth={1}
+                tappable={true}
+                onPress={() => {
+                  if (mapRef?.current) {
+                    mapRef.current.animateToRegion({
+                      latitude: cluster.latitude,
+                      longitude: cluster.longitude,
+                      latitudeDelta: cluster.spanLat * 2 || 0.02,
+                      longitudeDelta: cluster.spanLng * 2 || 0.02,
+                    }, 500);
+                  }
+                }}
+              />
+            );
+          })}
 
           {/* Following without user selected: map is empty, grid overlay is shown */}
         </MapView>
