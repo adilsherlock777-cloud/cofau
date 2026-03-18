@@ -221,20 +221,16 @@ const handleMutePress = () => {
 
 // Control video playback based on shouldPlay prop (iOS compatible)
 useEffect(() => {
-  console.log(`[FEEDCARD VIDEO] effect fired: isVideo=${isVideo} shouldPlay=${shouldPlay} hasRef=${!!videoRef.current} videoLoaded=${videoLoaded} postId=${post.id}`);
   if (!isVideo || !videoRef.current) return;
 
   const controlVideo = async () => {
     try {
       // Get current status to check if video is loaded
       const status = await videoRef.current.getStatusAsync();
-      console.log(`[FEEDCARD VIDEO] controlVideo: shouldPlay=${shouldPlay} isLoaded=${status.isLoaded} isPlaying=${status.isPlaying} postId=${post.id}`);
-
       if (shouldPlay) {
         // For iOS, ensure video is loaded before playing
         if (status.isLoaded) {
           if (!status.isPlaying) {
-            console.log(`[FEEDCARD VIDEO] calling playAsync postId=${post.id}`);
             await videoRef.current.playAsync();
           }
           // Reveal video by setting videoReady (thumbnail overlay hides when this is true)
@@ -244,7 +240,6 @@ useEffect(() => {
           // Set mute state based on global state
           await videoRef.current.setIsMutedAsync(isMuted);
         } else {
-          console.log(`[FEEDCARD VIDEO] not loaded yet, retrying in 300ms postId=${post.id}`);
           // If not loaded, wait a bit and try again (iOS sometimes needs this)
           setTimeout(async () => {
             try {
@@ -254,7 +249,6 @@ useEffect(() => {
                 await videoRef.current.setIsMutedAsync(isMuted);
               }
             } catch (err) {
-              console.log(`[FEEDCARD VIDEO] retry error: ${err}`);
             }
           }, 300);
         }

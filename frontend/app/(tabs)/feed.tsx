@@ -470,19 +470,16 @@ const viewabilityConfigCallbackPairs = useRef([
       }
 
       viewabilityDebounceRef.current = setTimeout(() => {
-        console.log(`[VIEWABILITY] viewableItems count=${viewableItems.length}`);
         const visibleVideo = viewableItems.find((item) => {
           const post = item.item;
           if (post.type === 'suggested_header') return false;
           const isVideo =
             post.media_type === "video" ||
             post.media_url?.toLowerCase().endsWith(".mp4");
-          if (isVideo) console.log(`[VIEWABILITY] found video post=${post.id} isViewable=${item.isViewable} media_type=${post.media_type}`);
           return isVideo && item.isViewable;
         });
 
         const newVisibleId = visibleVideo ? String(visibleVideo.item.id) : null;
-        console.log(`[VIEWABILITY] newVisibleId=${newVisibleId} prev=${visibleVideoIdRef.current}`);
 
         if (newVisibleId !== visibleVideoIdRef.current) {
           visibleVideoIdRef.current = newVisibleId;
@@ -872,9 +869,6 @@ const renderPost = useCallback(
       post.media_type === "video" ||
       post.media_url?.toLowerCase().endsWith(".mp4");
     const shouldPlay = isVideo && visibleVideoId === String(post.id);
-    if (isVideo) {
-      console.log(`[VIDEO DEBUG] post=${post.id} isVideo=${isVideo} visibleVideoId=${visibleVideoId} shouldPlay=${shouldPlay} media_type=${post.media_type} url=${post.media_url?.substring(0, 60)}`);
-    }
 
     // Count real posts (not dividers) for SuggestedUsersBar placement
     const realPostIndex = displayData
