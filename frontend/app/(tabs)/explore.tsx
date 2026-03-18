@@ -429,64 +429,76 @@ const RestaurantMarker = memo(({ restaurant, onPress }: any) => {
   );
 });
 
-// Single Post Marker (for locations with 1 post)
-const PostMarker = memo(({ post, onPress }: any) => {
+// Location Marker (one marker per restaurant/location - shows latest post photo + "X posts" badge)
+const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => {
   const [imageLoaded, setImageLoaded] = useState(false);
-
-  if (!post.latitude || !post.longitude) {
-    return null;
-  }
-
-  // Stop tracking after image loads or timeout
   const [tracksChanges, setTracksChanges] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setTracksChanges(false);
-    }, Platform.OS === 'android' ? 2000 : 5000);
+    const timer = setTimeout(() => setTracksChanges(false), Platform.OS === 'android' ? 2000 : 5000);
     return () => clearTimeout(timer);
   }, []);
 
-  const viewCount = post.clicks_count || 0;
-  const viewCountDisplay = viewCount > 1000 ? `${(viewCount / 1000).toFixed(1)}K` : viewCount;
+  const { latitude, longitude, posts, count } = location;
+  if (!latitude || !longitude) return null;
 
-  // Android - Use expo-image for reliable rendering inside map markers
+  const latestPost = posts[0]; // already sorted newest first
+  const imageUrl = latestPost?.full_thumbnail_url || latestPost?.full_image_url;
+  const totalViews = posts.reduce((sum: number, p: any) => sum + (p.clicks_count || 0), 0);
+  const viewDisplay = totalViews > 1000 ? `${(totalViews / 1000).toFixed(1)}K` : `${totalViews}`;
+
+  const handlePress = () => {
+    if (count === 1) {
+      onPostPress(posts[0]);
+    } else {
+      onClusterPress(location);
+    }
+  };
+
+  // Android rendering
   if (Platform.OS === 'android') {
-    const imageUrl = post.full_thumbnail_url || post.full_image_url;
-
     return (
       <Marker
-        coordinate={{
-          latitude: post.latitude,
-          longitude: post.longitude,
-        }}
-        onPress={() => onPress(post)}
+        coordinate={{ latitude, longitude }}
+        onPress={handlePress}
         tracksViewChanges={tracksChanges && !imageLoaded}
       >
-        <View style={{
-          backgroundColor: '#FFFFFF',
-          padding: 3,
-          elevation: 5,
-        }}>
-          {imageUrl ? (
-            <Image
-              source={{ uri: imageUrl }}
-              style={{ width: 60, height: 60 }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              onLoad={() => {
-                setImageLoaded(true);
-                setTracksChanges(false);
-              }}
-            />
-          ) : (
-            <View style={{ width: 60, height: 60, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="image" size={24} color="#fff" />
+        <View style={{ alignItems: 'center' }}>
+          {/* Post count pill badge */}
+          <View style={{
+            backgroundColor: '#E94A37',
+            borderRadius: 10,
+            paddingVertical: 2,
+            paddingHorizontal: 8,
+            marginBottom: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+            elevation: 6,
+          }}>
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+              {count} {count === 1 ? 'post' : 'posts'}
+            </Text>
+          </View>
+          {/* Photo thumbnail */}
+          <View style={{ backgroundColor: '#FFFFFF', padding: 3, elevation: 5, borderRadius: 8 }}>
+            {imageUrl ? (
+              <Image
+                source={{ uri: imageUrl }}
+                style={{ width: 56, height: 56, borderRadius: 6 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => { setImageLoaded(true); setTracksChanges(false); }}
+              />
+            ) : (
+              <View style={{ width: 56, height: 56, borderRadius: 6, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="image" size={24} color="#fff" />
+              </View>
+            )}
+            {/* View count overlay */}
+            <View style={styles.markerViewsBadge}>
+              <Ionicons name="eye" size={8} color="#fff" />
+              <Text style={styles.markerViewsText}>{viewDisplay}</Text>
             </View>
-          )}
-          <View style={styles.markerViewsBadge}>
-            <Ionicons name="eye" size={8} color="#fff" />
-            <Text style={styles.markerViewsText}>{viewCountDisplay}</Text>
           </View>
         </View>
       </Marker>
@@ -496,36 +508,39 @@ const PostMarker = memo(({ post, onPress }: any) => {
   // iOS rendering
   return (
     <Marker
-      coordinate={{
-        latitude: post.latitude,
-        longitude: post.longitude,
-      }}
-      onPress={(e: any) => {
-        e?.stopPropagation?.();
-        onPress(post);
-      }}
+      coordinate={{ latitude, longitude }}
+      onPress={(e: any) => { e?.stopPropagation?.(); handlePress(); }}
       tracksViewChanges={tracksChanges && !imageLoaded}
-      zIndex={post.id ? parseInt(String(post.id).replace(/\D/g, '').slice(-6) || '1', 10) : 1}
+      zIndex={count > 1 ? 1000 + count : (latestPost?.id ? parseInt(String(latestPost.id).replace(/\D/g, '').slice(-6) || '1', 10) : 1)}
       stopPropagation={true}
+      anchor={{ x: 0.5, y: 1 }}
     >
-      <View style={styles.postMarkerContainer}>
-        <View style={styles.postMarkerBubble}>
-          {post.full_thumbnail_url || post.full_image_url ? (
+      <View style={{ alignItems: 'center' }}>
+        {/* Post count pill badge */}
+        <View style={styles.locationPostsBadge}>
+          <Text style={styles.locationPostsBadgeText}>
+            {count} {count === 1 ? 'post' : 'posts'}
+          </Text>
+        </View>
+        {/* Photo thumbnail */}
+        <View style={styles.locationMarkerBubble}>
+          {imageUrl ? (
             <Image
-              source={{ uri: post.full_thumbnail_url || post.full_image_url }}
-              style={styles.postMarkerImage}
+              source={{ uri: imageUrl }}
+              style={styles.locationMarkerImage}
               contentFit="cover"
               cachePolicy="memory-disk"
               onLoad={() => setImageLoaded(true)}
             />
           ) : (
-            <View style={styles.postMarkerPlaceholder}>
+            <View style={styles.locationMarkerPlaceholder}>
               <Ionicons name="image" size={24} color="#fff" />
             </View>
           )}
+          {/* View count overlay */}
           <View style={styles.markerViewsBadge}>
             <Ionicons name="eye" size={8} color="#fff" />
-            <Text style={styles.markerViewsText}>{viewCountDisplay}</Text>
+            <Text style={styles.markerViewsText}>{viewDisplay}</Text>
           </View>
         </View>
         <View style={styles.postMarkerArrow} />
@@ -534,174 +549,111 @@ const PostMarker = memo(({ post, onPress }: any) => {
   );
 });
 
-// Cluster Marker (for locations with multiple posts)
-const ClusterMarker = memo(({ cluster, onPress, categoryEmoji }: any) => {
-  const [imagesLoaded, setImagesLoaded] = useState(0);
+// Zoom Cluster Marker (merges nearby locations when zoomed out)
+const ZoomClusterMarker = memo(({ cluster, mapRef }: any) => {
+  const { latitude, longitude, locationCount, totalPosts, latestImageUrl } = cluster;
   const [tracksChanges, setTracksChanges] = useState(true);
-  const { posts, latitude, longitude, count } = cluster;
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(0)).current;
 
-  // Get latest 3 posts (sorted by newest first)
-  const latestPosts = [...posts]
-    .sort((a: any, b: any) => (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime()))
-    .slice(0, 3);
-
-  // Stop tracking after images load or timeout
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setTracksChanges(false);
-    }, Platform.OS === 'android' ? 2000 : 5000);
+    Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
+    const timer = setTimeout(() => setTracksChanges(false), Platform.OS === 'android' ? 2000 : 5000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Android - Use expo-image for reliable rendering inside map markers
-  if (Platform.OS === 'android') {
-    const image1 = latestPosts[0]?.full_thumbnail_url || latestPosts[0]?.full_image_url;
-    const image2 = latestPosts[1]?.full_thumbnail_url || latestPosts[1]?.full_image_url;
+  const handlePress = () => {
+    if (mapRef?.current) {
+      mapRef.current.animateToRegion({
+        latitude,
+        longitude,
+        latitudeDelta: cluster.spanLat * 2 || 0.02,
+        longitudeDelta: cluster.spanLng * 2 || 0.02,
+      }, 500);
+    }
+  };
 
+  // Android rendering
+  if (Platform.OS === 'android') {
     return (
       <Marker
         coordinate={{ latitude, longitude }}
-        onPress={() => onPress(cluster)}
-        tracksViewChanges={tracksChanges}
+        onPress={handlePress}
+        tracksViewChanges={tracksChanges && !imageLoaded}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {/* Second image (behind) */}
-          {image2 && (
-            <View style={{
-              backgroundColor: '#FFFFFF',
-              padding: 2,
-              elevation: 4,
-              marginRight: -20,
-            }}>
-              <Image
-                source={{ uri: image2 }}
-                style={{ width: 50, height: 50 }}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                onLoad={() => setImagesLoaded(prev => prev + 1)}
-              />
-              <View style={styles.markerViewsBadge}>
-                <Ionicons name="eye" size={8} color="#fff" />
-                <Text style={styles.markerViewsText}>{(latestPosts[1]?.clicks_count || 0) > 1000 ? `${((latestPosts[1]?.clicks_count || 0) / 1000).toFixed(1)}K` : (latestPosts[1]?.clicks_count || 0)}</Text>
-              </View>
-            </View>
-          )}
-          {/* First image (front) */}
+        <View style={{ alignItems: 'center' }}>
           <View style={{
-            backgroundColor: '#FFFFFF',
-            padding: 2,
-            elevation: 6,
-          }}>
-            {image1 ? (
-              <Image
-                source={{ uri: image1 }}
-                style={{ width: 50, height: 50 }}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                onLoad={() => {
-                  setImagesLoaded(prev => prev + 1);
-                  setTracksChanges(false);
-                }}
-              />
-            ) : (
-              <View style={{ width: 50, height: 50, backgroundColor: '#E94A37', justifyContent: 'center', alignItems: 'center' }}>
-                <Ionicons name="image" size={20} color="#fff" />
-              </View>
-            )}
-            <View style={styles.markerViewsBadge}>
-              <Ionicons name="eye" size={8} color="#fff" />
-              <Text style={styles.markerViewsText}>{(latestPosts[0]?.clicks_count || 0) > 1000 ? `${((latestPosts[0]?.clicks_count || 0) / 1000).toFixed(1)}K` : (latestPosts[0]?.clicks_count || 0)}</Text>
-            </View>
-          </View>
-          {/* Count badge */}
-          <View style={{
+            width: 64,
+            height: 64,
+            borderRadius: 32,
             backgroundColor: '#E94A37',
-            borderRadius: 12,
-            minWidth: 24,
-            height: 24,
             justifyContent: 'center',
             alignItems: 'center',
-            paddingHorizontal: 6,
-            marginLeft: -12,
-            marginTop: -30,
+            borderWidth: 3,
+            borderColor: '#fff',
             elevation: 8,
+            overflow: 'hidden',
           }}>
-            <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>{count}</Text>
+            {latestImageUrl ? (
+              <>
+                <Image
+                  source={{ uri: latestImageUrl }}
+                  style={{ width: 58, height: 58, borderRadius: 29, opacity: 0.4 }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  onLoad={() => { setImageLoaded(true); setTracksChanges(false); }}
+                />
+                <View style={{ position: 'absolute', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>{locationCount}</Text>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '600' }}>places</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>{locationCount}</Text>
+                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '600' }}>places</Text>
+              </>
+            )}
           </View>
         </View>
       </Marker>
     );
   }
 
-  // iOS layout with overlapping images
-  const clusterWidth = 60 + (latestPosts.length - 1) * 45;
+  // iOS rendering
   return (
     <Marker
       coordinate={{ latitude, longitude }}
-      onPress={(e: any) => {
-        e?.stopPropagation?.();
-        onPress(cluster);
-      }}
-      tracksViewChanges={tracksChanges}
-      zIndex={1000 + count}
+      onPress={(e: any) => { e?.stopPropagation?.(); handlePress(); }}
+      tracksViewChanges={tracksChanges && !imageLoaded}
+      zIndex={2000 + locationCount}
       stopPropagation={true}
-      anchor={{ x: 0.5, y: 1 }}
     >
-      <View style={[styles.clusterMarkerContainer, { width: clusterWidth }]}>
-        {/* Preview Images */}
-        <View style={[styles.clusterPreviewContainer, { width: clusterWidth }]}>
-          {latestPosts.map((post: any, index: number) => (
-            <View
-              key={post.id}
-              style={[
-                styles.clusterPreviewImage,
-                {
-                  position: 'absolute',
-                  left: index * 45,
-                  zIndex: 3 - index,
-                  elevation: 4 + (3 - index),
-                }
-              ]}
-            >
-              {post.full_thumbnail_url || post.full_image_url ? (
-                <Image
-                  source={{ uri: post.full_thumbnail_url || post.full_image_url }}
-                  style={styles.clusterImage}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  onLoad={() => setImagesLoaded(prev => prev + 1)}
-                />
-              ) : (
-                <View style={styles.clusterImagePlaceholder}>
-                  <Ionicons name="image" size={16} color="#fff" />
-                </View>
-              )}
-              <View style={styles.markerViewsBadge}>
-                <Ionicons name="eye" size={8} color="#fff" />
-                <Text style={styles.markerViewsText}>{(post.clicks_count || 0) > 1000 ? `${((post.clicks_count || 0) / 1000).toFixed(1)}K` : (post.clicks_count || 0)}</Text>
+      <Animated.View style={{ alignItems: 'center', transform: [{ scale: scaleAnim }] }}>
+        <View style={styles.zoomClusterBubble}>
+          {latestImageUrl ? (
+            <>
+              <Image
+                source={{ uri: latestImageUrl }}
+                style={styles.zoomClusterImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => setImageLoaded(true)}
+              />
+              <View style={styles.zoomClusterOverlay}>
+                <Text style={styles.zoomClusterCount}>{locationCount}</Text>
+                <Text style={styles.zoomClusterLabel}>places</Text>
               </View>
+            </>
+          ) : (
+            <View style={styles.zoomClusterOverlay}>
+              <Text style={styles.zoomClusterCount}>{locationCount}</Text>
+              <Text style={styles.zoomClusterLabel}>places</Text>
             </View>
-          ))}
+          )}
         </View>
-
-        {/* Pin with count */}
-        <View style={styles.clusterPinContainer}>
-          <View style={[
-            styles.clusterPin,
-            categoryEmoji && styles.clusterPinWithEmoji
-          ]}>
-            {categoryEmoji ? (
-              renderCategoryIcon(categoryEmoji, 18)
-            ) : (
-              <Ionicons name="location" size={18} color="#fff" />
-            )}
-          </View>
-          <View style={styles.clusterCountBadge}>
-            <Text style={styles.clusterCountText}>{count}</Text>
-          </View>
-          <View style={styles.clusterPinArrow} />
-        </View>
-      </View>
+        <View style={styles.zoomClusterArrow} />
+      </Animated.View>
     </Marker>
   );
 });
@@ -993,9 +945,12 @@ const MapViewComponent = memo(({
     }
   }, []);
 
-  // Group posts by location — use toFixed(3) (~111m) so nearby posts cluster
-  // instead of overlapping as separate markers (which blocks taps on iOS)
-  const { singlePosts, clusters, followingLocations } = React.useMemo(() => {
+  // Track current map region for zoom-based clustering
+  const [currentRegion, setCurrentRegion] = React.useState<any>(null);
+
+  // Group posts by location, then cluster locations by zoom level
+  const { locations, zoomClusters, followingLocations } = React.useMemo(() => {
+    // Step 1: Group all posts by location using toFixed(3) (~111m precision)
     const groups = new Map<string, any[]>();
 
     posts.forEach((post: any) => {
@@ -1008,32 +963,9 @@ const MapViewComponent = memo(({
       }
     });
 
-    const singlePosts: any[] = [];
-    const clusters: any[] = [];
     const followingLocations: any[] = [];
 
-    if (filterType === 'following' && selectedFollowingUser) {
-      // Following with user selected: use same single/cluster logic as Near Me
-      // (mapPosts is already filtered to this user's posts)
-      groups.forEach((groupPosts, key) => {
-        const [lat, lng] = key.split(',').map(Number);
-        groupPosts.sort((a: any, b: any) =>
-          (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
-        );
-        if (groupPosts.length === 1) {
-          singlePosts.push(groupPosts[0]);
-        } else {
-          clusters.push({
-            id: key,
-            latitude: lat,
-            longitude: lng,
-            count: groupPosts.length,
-            posts: groupPosts,
-            locationName: groupPosts[0].location_name || 'This location',
-          });
-        }
-      });
-    } else if (filterType === 'following') {
+    if (filterType === 'following' && !selectedFollowingUser) {
       // Following mode without user selected: group by location, then sub-group by user
       groups.forEach((locationPosts, key) => {
         const [lat, lng] = key.split(',').map(Number);
@@ -1063,7 +995,6 @@ const MapViewComponent = memo(({
           });
         });
 
-        // Sort users by latest post date (newest first)
         users.sort((a: any, b: any) =>
           new Date(b.latestPost.created_at || 0).getTime() -
           new Date(a.latestPost.created_at || 0).getTime()
@@ -1079,32 +1010,85 @@ const MapViewComponent = memo(({
           totalUserCount: users.length,
         });
       });
-    } else {
-      // Near me / Restaurants mode: existing logic
-      groups.forEach((groupPosts, key) => {
-        const [lat, lng] = key.split(',').map(Number);
 
-        groupPosts.sort((a: any, b: any) =>
-          (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
-        );
-
-        if (groupPosts.length === 1) {
-          singlePosts.push(groupPosts[0]);
-        } else {
-          clusters.push({
-            id: key,
-            latitude: lat,
-            longitude: lng,
-            count: groupPosts.length,
-            posts: groupPosts,
-            locationName: groupPosts[0].location_name || 'This location',
-          });
-        }
-      });
+      return { locations: [], zoomClusters: [], followingLocations };
     }
 
-    return { singlePosts, clusters, followingLocations };
-  }, [posts, filterType, selectedFollowingUser]);
+    // Step 2: Build location objects (one per restaurant/location)
+    const allLocations: any[] = [];
+    groups.forEach((groupPosts, key) => {
+      const [lat, lng] = key.split(',').map(Number);
+      groupPosts.sort((a: any, b: any) =>
+        (new Date(b.created_at || 0).getTime()) - (new Date(a.created_at || 0).getTime())
+      );
+      allLocations.push({
+        id: key,
+        latitude: lat,
+        longitude: lng,
+        count: groupPosts.length,
+        posts: groupPosts,
+        locationName: groupPosts[0].location_name || 'This location',
+      });
+    });
+
+    // Step 3: Zoom-based clustering — merge nearby locations when zoomed out
+    const delta = currentRegion?.latitudeDelta || 0.05;
+    let clusterPrecision: number | null = null;
+    if (delta > 0.5) clusterPrecision = 1;       // ~11km clusters
+    else if (delta > 0.15) clusterPrecision = 2;  // ~1.1km clusters
+
+    if (clusterPrecision === null) {
+      // Zoomed in enough — show individual location markers
+      return { locations: allLocations, zoomClusters: [], followingLocations };
+    }
+
+    // Cluster locations by lower precision grid
+    const clusterGroups = new Map<string, any[]>();
+    allLocations.forEach(loc => {
+      const cKey = `${loc.latitude.toFixed(clusterPrecision!)},${loc.longitude.toFixed(clusterPrecision!)}`;
+      if (!clusterGroups.has(cKey)) clusterGroups.set(cKey, []);
+      clusterGroups.get(cKey)!.push(loc);
+    });
+
+    const locations: any[] = [];
+    const zoomClusters: any[] = [];
+
+    clusterGroups.forEach((groupLocs, key) => {
+      if (groupLocs.length === 1) {
+        // Only one location in this grid cell — show as normal marker
+        locations.push(groupLocs[0]);
+      } else {
+        // Multiple locations — merge into a zoom cluster
+        const avgLat = groupLocs.reduce((s: number, l: any) => s + l.latitude, 0) / groupLocs.length;
+        const avgLng = groupLocs.reduce((s: number, l: any) => s + l.longitude, 0) / groupLocs.length;
+        const totalPosts = groupLocs.reduce((s: number, l: any) => s + l.count, 0);
+        const allPosts = groupLocs.flatMap((l: any) => l.posts);
+        allPosts.sort((a: any, b: any) =>
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        );
+
+        // Compute span so tapping zooms to show all children
+        const lats = groupLocs.map((l: any) => l.latitude);
+        const lngs = groupLocs.map((l: any) => l.longitude);
+        const spanLat = Math.max(...lats) - Math.min(...lats) || 0.01;
+        const spanLng = Math.max(...lngs) - Math.min(...lngs) || 0.01;
+
+        zoomClusters.push({
+          id: key,
+          latitude: avgLat,
+          longitude: avgLng,
+          locationCount: groupLocs.length,
+          totalPosts,
+          latestImageUrl: allPosts[0]?.full_thumbnail_url || allPosts[0]?.full_image_url,
+          locations: groupLocs,
+          spanLat,
+          spanLng,
+        });
+      }
+    });
+
+    return { locations, zoomClusters, followingLocations };
+  }, [posts, filterType, selectedFollowingUser, currentRegion]);
 
  // Get category emoji
 const getCategoryEmoji = (categoryName: string | null) => {
@@ -1174,6 +1158,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
           showsUserLocation={true}
           showsMyLocationButton={false}
           showsCompass={true}
+          onRegionChangeComplete={(region: any) => setCurrentRegion(region)}
         >
           {/* Restaurant Markers */}
           {filterType === 'restaurants' && restaurants.map((restaurant: any) => (
@@ -1184,39 +1169,22 @@ const getCategoryEmoji = (categoryName: string | null) => {
             />
           ))}
 
-          {/* Near Me: Single Post Markers */}
-          {filterType === 'posts' && singlePosts.map((post: any) => (
-            <PostMarker
-              key={`post-${post.id}-${post.clicks_count || 0}`}
-              post={post}
-              onPress={onPostPress}
+          {/* Near Me / Following with user: Location Markers (one per location) */}
+          {(filterType === 'posts' || (filterType === 'following' && selectedFollowingUser)) && locations.map((location: any) => (
+            <LocationMarker
+              key={`loc-${location.id}`}
+              location={location}
+              onPostPress={onPostPress}
+              onClusterPress={onClusterPress}
             />
           ))}
 
-          {/* Near Me: Cluster Markers */}
-          {filterType === 'posts' && clusters.map((cluster: any) => (
-            <ClusterMarker
-              key={`cluster-${cluster.id}`}
+          {/* Near Me / Following with user: Zoom Cluster Markers (merged locations when zoomed out) */}
+          {(filterType === 'posts' || (filterType === 'following' && selectedFollowingUser)) && zoomClusters.map((cluster: any) => (
+            <ZoomClusterMarker
+              key={`zcluster-${cluster.id}`}
               cluster={cluster}
-              onPress={onClusterPress}
-              categoryEmoji={categoryEmoji}
-            />
-          ))}
-
-          {/* Following with user selected: show food posts like Near Me */}
-          {filterType === 'following' && selectedFollowingUser && singlePosts.map((post: any) => (
-            <PostMarker
-              key={`following-post-${post.id}-${post.clicks_count || 0}`}
-              post={post}
-              onPress={onPostPress}
-            />
-          ))}
-          {filterType === 'following' && selectedFollowingUser && clusters.map((cluster: any) => (
-            <ClusterMarker
-              key={`following-cluster-${cluster.id}`}
-              cluster={cluster}
-              onPress={onClusterPress}
-              categoryEmoji={categoryEmoji}
+              mapRef={mapRef}
             />
           ))}
 
@@ -1265,7 +1233,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
       <View style={styles.resultsCountContainer}>
         <Text style={styles.resultsCountText}>
           {filterType === 'posts'
-            ? `${posts.length} posts at ${singlePosts.length + clusters.length} locations`
+            ? `${posts.length} posts at ${locations.length + zoomClusters.reduce((s: number, c: any) => s + c.locationCount, 0)} locations`
             : filterType === 'restaurants'
             ? `${restaurants.length} restaurants nearby`
             : selectedFollowingUser
@@ -2013,6 +1981,32 @@ const QUICK_CATEGORIES = [
   { id: 'goan', name: 'Goan', emoji: '🏖️' },
   { id: 'kashmiri', name: 'Kashmiri', emoji: '🏔️' },
 ];
+
+// Compute category previews (latest image + count) from cached map posts
+const categoryPreviews = React.useMemo(() => {
+  const cache = mapFilterType === 'following'
+    ? (selectedFollowingUser
+        ? cachedFollowersPosts.current.filter((p: any) => p.user_id === selectedFollowingUser.user_id)
+        : cachedFollowersPosts.current)
+    : cachedMapPosts.current;
+
+  const previews: { [id: string]: { count: number; imageUrl: string | null } } = {};
+  QUICK_CATEGORIES.forEach(cat => {
+    const catPosts = cache.filter((post: any) => {
+      const postCategory = post.category?.toLowerCase().trim();
+      return postCategory === cat.name.toLowerCase().trim();
+    });
+    // Sort by newest first
+    catPosts.sort((a: any, b: any) =>
+      new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    );
+    previews[cat.id] = {
+      count: catPosts.length,
+      imageUrl: catPosts[0]?.full_thumbnail_url || catPosts[0]?.full_image_url || null,
+    };
+  });
+  return previews;
+}, [mapPosts, mapFilterType, selectedFollowingUser]);
 
 const centerOnUserLocation = useCallback(async () => {
   if (userLocation && mapRef.current) {
@@ -3219,32 +3213,59 @@ return (
             </View>
           </View>
 
-          {/* QUICK CATEGORY CHIPS */}
+          {/* QUICK CATEGORY CAROUSEL WITH PHOTO PREVIEWS */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.quickCategoryScroll}
-            contentContainerStyle={styles.quickCategoryContainer}
+            style={styles.categoryCarouselScroll}
+            contentContainerStyle={styles.categoryCarouselContainer}
           >
-            {QUICK_CATEGORIES.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.quickCategoryChip,
-                  selectedQuickCategory === category.id && styles.quickCategoryChipActive
-                ]}
-                onPress={() => handleQuickCategoryPress(category)}
-                activeOpacity={0.7}
-              >
-                {renderCategoryIcon(category.emoji, 13, 4)}
-                <Text style={[
-                  styles.quickCategoryText,
-                  selectedQuickCategory === category.id && styles.quickCategoryTextActive
-                ]}>
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {QUICK_CATEGORIES.map((category) => {
+              const preview = categoryPreviews[category.id];
+              const isActive = selectedQuickCategory === category.id;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.categoryCard,
+                    isActive && styles.categoryCardActive,
+                  ]}
+                  onPress={() => handleQuickCategoryPress(category)}
+                  activeOpacity={0.7}
+                >
+                  {/* Image preview with count badge */}
+                  <View style={[styles.categoryCardImageWrapper, isActive && styles.categoryCardImageWrapperActive]}>
+                    {preview?.imageUrl ? (
+                      <Image
+                        source={{ uri: preview.imageUrl }}
+                        style={styles.categoryCardImage}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <View style={styles.categoryCardPlaceholder}>
+                        {renderCategoryIcon(category.emoji, 20, 0)}
+                      </View>
+                    )}
+                    {(preview?.count ?? 0) > 0 && (
+                      <View style={styles.categoryCardCountBadge}>
+                        <Text style={styles.categoryCardCountText}>{preview!.count}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {/* Label */}
+                  <Text
+                    style={[
+                      styles.categoryCardLabel,
+                      isActive && styles.categoryCardLabelActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </>
       )}
@@ -4933,6 +4954,111 @@ postMarkerArrow: {
   borderTopColor: '#fff',
   marginTop: -2,
 },
+// ======================================================
+// LOCATION MARKER STYLES (one marker per location)
+// ======================================================
+locationPostsBadge: {
+  backgroundColor: '#E94A37',
+  borderRadius: 10,
+  paddingVertical: 2,
+  paddingHorizontal: 8,
+  marginBottom: 4,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.3,
+  shadowRadius: 2,
+  elevation: 6,
+},
+locationPostsBadgeText: {
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: 'bold',
+},
+locationMarkerBubble: {
+  width: 56,
+  height: 56,
+  borderRadius: 8,
+  backgroundColor: '#F2CF68',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2.5,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 5,
+},
+locationMarkerImage: {
+  width: 50,
+  height: 50,
+  borderRadius: 6,
+},
+locationMarkerPlaceholder: {
+  width: 50,
+  height: 50,
+  borderRadius: 6,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#F2CF68',
+},
+// ======================================================
+// ZOOM CLUSTER MARKER STYLES (merged locations when zoomed out)
+// ======================================================
+zoomClusterBubble: {
+  width: 64,
+  height: 64,
+  borderRadius: 32,
+  backgroundColor: '#E94A37',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: '#fff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.4,
+  shadowRadius: 5,
+  elevation: 8,
+  overflow: 'hidden',
+},
+zoomClusterImage: {
+  width: 58,
+  height: 58,
+  borderRadius: 29,
+  opacity: 0.4,
+},
+zoomClusterOverlay: {
+  position: 'absolute',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+zoomClusterCount: {
+  color: '#fff',
+  fontSize: 18,
+  fontWeight: 'bold',
+  textShadowColor: 'rgba(0,0,0,0.5)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 3,
+},
+zoomClusterLabel: {
+  color: '#fff',
+  fontSize: 9,
+  fontWeight: '600',
+  textShadowColor: 'rgba(0,0,0,0.5)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+zoomClusterArrow: {
+  width: 0,
+  height: 0,
+  borderLeftWidth: 8,
+  borderRightWidth: 8,
+  borderTopWidth: 10,
+  borderLeftColor: 'transparent',
+  borderRightColor: 'transparent',
+  borderTopColor: '#fff',
+  marginTop: -3,
+},
 markerViewsBadge: {
   position: 'absolute',
   top: 2,
@@ -5179,6 +5305,83 @@ searchBarBtnText: {
 // ======================================================
 // QUICK CATEGORY CHIPS STYLES
 // ======================================================
+// ======================================================
+// CATEGORY CAROUSEL STYLES (photo preview cards)
+// ======================================================
+categoryCarouselScroll: {
+  maxHeight: 90,
+  marginBottom: 6,
+  marginTop: 2,
+},
+categoryCarouselContainer: {
+  paddingHorizontal: 12,
+  gap: 8,
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+categoryCard: {
+  alignItems: 'center',
+  width: 64,
+},
+categoryCardActive: {
+  // active state handled by border on image wrapper
+},
+categoryCardImageWrapper: {
+  width: 56,
+  height: 56,
+  borderRadius: 10,
+  overflow: 'hidden',
+  backgroundColor: '#f0f0f0',
+  borderWidth: 2,
+  borderColor: '#F2CF68',
+},
+categoryCardImageWrapperActive: {
+  borderColor: '#E94A37',
+  borderWidth: 2.5,
+},
+categoryCardImage: {
+  width: 52,
+  height: 52,
+  borderRadius: 8,
+},
+categoryCardPlaceholder: {
+  width: 52,
+  height: 52,
+  borderRadius: 8,
+  backgroundColor: '#FFF8F0',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+categoryCardCountBadge: {
+  position: 'absolute',
+  top: 2,
+  right: 2,
+  backgroundColor: '#E94A37',
+  borderRadius: 10,
+  minWidth: 20,
+  height: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 4,
+  borderWidth: 1.5,
+  borderColor: '#fff',
+},
+categoryCardCountText: {
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: 'bold',
+},
+categoryCardLabel: {
+  fontSize: 10,
+  fontWeight: '500',
+  color: '#555',
+  marginTop: 3,
+  textAlign: 'center',
+},
+categoryCardLabelActive: {
+  color: '#E94A37',
+  fontWeight: '700',
+},
 quickCategoryScroll: {
   maxHeight: 34,
   marginBottom: 6,
