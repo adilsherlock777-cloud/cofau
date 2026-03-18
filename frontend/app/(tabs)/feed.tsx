@@ -458,34 +458,40 @@ const loadUnreadMessagesCount = async () => {
 const visibleVideoIdRef = useRef<string | null>(null);
 const viewabilityDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-const viewabilityConfigRef = useRef({
-  itemVisiblePercentThreshold: 30,
-  minimumViewTime: 200,
-});
+const viewabilityConfigCallbackPairs = useRef([
+  {
+    viewabilityConfig: {
+      itemVisiblePercentThreshold: 30,
+      minimumViewTime: 200,
+    },
+    onViewableItemsChanged: ({ viewableItems }: { viewableItems: any[] }) => {
+      if (viewabilityDebounceRef.current) {
+        clearTimeout(viewabilityDebounceRef.current);
+      }
 
-const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-  if (viewabilityDebounceRef.current) {
-    clearTimeout(viewabilityDebounceRef.current);
-  }
+      viewabilityDebounceRef.current = setTimeout(() => {
+        console.log(`[VIEWABILITY] viewableItems count=${viewableItems.length}`);
+        const visibleVideo = viewableItems.find((item) => {
+          const post = item.item;
+          if (post.type === 'suggested_header') return false;
+          const isVideo =
+            post.media_type === "video" ||
+            post.media_url?.toLowerCase().endsWith(".mp4");
+          if (isVideo) console.log(`[VIEWABILITY] found video post=${post.id} isViewable=${item.isViewable} media_type=${post.media_type}`);
+          return isVideo && item.isViewable;
+        });
 
-  viewabilityDebounceRef.current = setTimeout(() => {
-    const visibleVideo = viewableItems.find((item) => {
-      const post = item.item;
-      if (post.type === 'suggested_header') return false;
-      const isVideo =
-        post.media_type === "video" ||
-        post.media_url?.toLowerCase().endsWith(".mp4");
-      return isVideo && item.isViewable;
-    });
+        const newVisibleId = visibleVideo ? String(visibleVideo.item.id) : null;
+        console.log(`[VIEWABILITY] newVisibleId=${newVisibleId} prev=${visibleVideoIdRef.current}`);
 
-    const newVisibleId = visibleVideo ? String(visibleVideo.item.id) : null;
-    
-    if (newVisibleId !== visibleVideoIdRef.current) {
-      visibleVideoIdRef.current = newVisibleId;
-      setVisibleVideoId(newVisibleId);
-    }
-  }, 150);
-}).current;
+        if (newVisibleId !== visibleVideoIdRef.current) {
+          visibleVideoIdRef.current = newVisibleId;
+          setVisibleVideoId(newVisibleId);
+        }
+      }, 150);
+    },
+  },
+]);
 
   const fetchOwnStory = async () => {
     if (!token || !user?.id) return;
@@ -866,6 +872,9 @@ const renderPost = useCallback(
       post.media_type === "video" ||
       post.media_url?.toLowerCase().endsWith(".mp4");
     const shouldPlay = isVideo && visibleVideoId === String(post.id);
+    if (isVideo) {
+      console.log(`[VIDEO DEBUG] post=${post.id} isVideo=${isVideo} visibleVideoId=${visibleVideoId} shouldPlay=${shouldPlay} media_type=${post.media_type} url=${post.media_url?.substring(0, 60)}`);
+    }
 
     // Count real posts (not dividers) for SuggestedUsersBar placement
     const realPostIndex = displayData
@@ -1280,8 +1289,7 @@ const renderPost = useCallback(
   scrollEventThrottle={16}
   showsVerticalScrollIndicator={false}
   contentContainerStyle={{ paddingBottom: 90 }}
-  viewabilityConfig={viewabilityConfigRef.current}
-  onViewableItemsChanged={handleViewableItemsChanged}
+  viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
   removeClippedSubviews={Platform.OS === "android"}
   maxToRenderPerBatch={5}
   windowSize={7}

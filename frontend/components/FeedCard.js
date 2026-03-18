@@ -121,6 +121,8 @@ function FeedCard({
   const router = useRouter();
   const { user } = useAuth();
   const videoRef = useRef(null);
+  const shouldPlayRef = useRef(shouldPlay);
+  shouldPlayRef.current = shouldPlay;
 
 const [isLiked, setIsLiked] = useState(post.is_liked || false);
 const [likesCount, setLikes] = useState(post.likes || 0);
@@ -219,22 +221,30 @@ const handleMutePress = () => {
 
 // Control video playback based on shouldPlay prop (iOS compatible)
 useEffect(() => {
+  console.log(`[FEEDCARD VIDEO] effect fired: isVideo=${isVideo} shouldPlay=${shouldPlay} hasRef=${!!videoRef.current} videoLoaded=${videoLoaded} postId=${post.id}`);
   if (!isVideo || !videoRef.current) return;
 
   const controlVideo = async () => {
     try {
       // Get current status to check if video is loaded
       const status = await videoRef.current.getStatusAsync();
+      console.log(`[FEEDCARD VIDEO] controlVideo: shouldPlay=${shouldPlay} isLoaded=${status.isLoaded} isPlaying=${status.isPlaying} postId=${post.id}`);
 
       if (shouldPlay) {
         // For iOS, ensure video is loaded before playing
         if (status.isLoaded) {
           if (!status.isPlaying) {
+            console.log(`[FEEDCARD VIDEO] calling playAsync postId=${post.id}`);
             await videoRef.current.playAsync();
+          }
+          // Reveal video by setting videoReady (thumbnail overlay hides when this is true)
+          if (!videoReady) {
+            setVideoReady(true);
           }
           // Set mute state based on global state
           await videoRef.current.setIsMutedAsync(isMuted);
         } else {
+          console.log(`[FEEDCARD VIDEO] not loaded yet, retrying in 300ms postId=${post.id}`);
           // If not loaded, wait a bit and try again (iOS sometimes needs this)
           setTimeout(async () => {
             try {
@@ -244,6 +254,7 @@ useEffect(() => {
                 await videoRef.current.setIsMutedAsync(isMuted);
               }
             } catch (err) {
+              console.log(`[FEEDCARD VIDEO] retry error: ${err}`);
             }
           }, 300);
         }
@@ -768,7 +779,7 @@ postId={post.id}
             posterSource={null}
             videoStyle={{ backgroundColor: 'black' }}
             onReadyForDisplay={() => {
-              if (!videoReady && shouldPlay) {
+              if (!videoReady && shouldPlayRef.current) {
                 setVideoReady(true);
               }
             }}
@@ -779,22 +790,14 @@ postId={post.id}
               if (videoError) {
                 setVideoError(false);
               }
-              if (shouldPlay && videoRef.current) {
+              if (shouldPlayRef.current && videoRef.current) {
                 setTimeout(async () => {
                   try {
+                    if (!shouldPlayRef.current || !videoRef.current) return;
                     const currentStatus = await videoRef.current.getStatusAsync();
-                    if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlay) {
+                    if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlayRef.current) {
                       await videoRef.current.playAsync();
                       await videoRef.current.setIsMutedAsync(isMuted);
-                      const afterPlayStatus = await videoRef.current.getStatusAsync();
-                      if (!afterPlayStatus.isPlaying && shouldPlay) {
-                        setTimeout(async () => {
-                          try {
-                            await videoRef.current.playAsync();
-                          } catch (retryErr) {
-                          }
-                        }, 300);
-                      }
                     }
                   } catch (err) {
                   }
@@ -812,12 +815,9 @@ postId={post.id}
               }
             }}
             onPlaybackStatusUpdate={(status) => {
-              if (!shouldPlay && status.isLoaded && status.isPlaying && videoRef.current) {
+              if (!shouldPlayRef.current && status.isLoaded && status.isPlaying && videoRef.current) {
                 videoRef.current.pauseAsync().catch(() => { });
                 videoRef.current.setPositionAsync(0).catch(() => { });
-              }
-              if (status.isLoaded && !status.isPlaying && shouldPlay && videoLoaded) {
-                videoRef.current?.playAsync().catch(() => { });
               }
             }}
             progressUpdateIntervalMillis={1000}
@@ -1075,7 +1075,6 @@ postId={post.id}
       end={{ x: 1, y: 1 }}
       style={styles.nudgeBtnGradient}
     >
-      <Ionicons name="at" size={15} color="#FFF" />
       <Text style={styles.nudgeBtnText}>Tag this Dish</Text>
     </LinearGradient>
   </TouchableOpacity>
@@ -1725,23 +1724,17 @@ nudgeBtn: {
 nudgeBtnGradient: {
   flexDirection: 'row',
   alignItems: 'center',
-  gap: 5,
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  borderRadius: 20,
-  borderBottomWidth: 3,
+  paddingHorizontal: 8,
+  paddingVertical: 5,
+  borderRadius: 12,
+  borderBottomWidth: 2,
   borderBottomColor: 'rgba(180, 30, 0, 0.5)',
-  borderRightWidth: 1.5,
+  borderRightWidth: 1,
   borderRightColor: 'rgba(180, 30, 0, 0.3)',
-  shadowColor: '#FF3D00',
-  shadowOffset: { width: 0, height: 3 },
-  shadowOpacity: 0.35,
-  shadowRadius: 5,
-  elevation: 5,
 },
 nudgeBtnText: {
   color: '#FFF',
-  fontSize: 11,
+  fontSize: 9,
   fontWeight: '700',
   letterSpacing: 0.3,
 },

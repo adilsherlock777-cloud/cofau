@@ -551,14 +551,13 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
 
 // Zoom Cluster Marker (merges nearby locations when zoomed out)
 const ZoomClusterMarker = memo(({ cluster, mapRef }: any) => {
-  const { latitude, longitude, locationCount, totalPosts, latestImageUrl } = cluster;
+  const { latitude, longitude, locationCount, totalPosts } = cluster;
   const [tracksChanges, setTracksChanges] = useState(true);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
-    const timer = setTimeout(() => setTracksChanges(false), Platform.OS === 'android' ? 2000 : 5000);
+    const timer = setTimeout(() => setTracksChanges(false), Platform.OS === 'android' ? 2000 : 3000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -573,47 +572,40 @@ const ZoomClusterMarker = memo(({ cluster, mapRef }: any) => {
     }
   };
 
+  // Dynamic size based on total posts: min 40, max 80
+  const size = Math.min(80, Math.max(40, 40 + Math.log2(totalPosts + 1) * 8));
+  // Dynamic color: fewer posts = lighter orange, more posts = deep red
+  const intensity = Math.min(1, totalPosts / 50);
+  const r = Math.round(255);
+  const g = Math.round(122 - intensity * 80);  // 122 → 42
+  const b = Math.round(24 - intensity * 24);    // 24 → 0
+  const bgColor = `rgba(${r}, ${g}, ${b}, ${0.7 + intensity * 0.3})`;
+  const countDisplay = totalPosts > 99 ? '99+' : `${totalPosts}`;
+  const fontSize = size > 60 ? 18 : size > 50 ? 15 : 12;
+  const labelSize = size > 60 ? 9 : 7;
+
   // Android rendering
   if (Platform.OS === 'android') {
     return (
       <Marker
         coordinate={{ latitude, longitude }}
         onPress={handlePress}
-        tracksViewChanges={tracksChanges && !imageLoaded}
+        tracksViewChanges={tracksChanges}
       >
         <View style={{ alignItems: 'center' }}>
           <View style={{
-            width: 64,
-            height: 64,
-            borderRadius: 32,
-            backgroundColor: '#E94A37',
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: bgColor,
             justifyContent: 'center',
             alignItems: 'center',
-            borderWidth: 3,
-            borderColor: '#fff',
-            elevation: 8,
-            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: 'rgba(255,255,255,0.8)',
+            elevation: 6 + Math.min(4, totalPosts / 10),
           }}>
-            {latestImageUrl ? (
-              <>
-                <Image
-                  source={{ uri: latestImageUrl }}
-                  style={{ width: 58, height: 58, borderRadius: 29, opacity: 0.4 }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  onLoad={() => { setImageLoaded(true); setTracksChanges(false); }}
-                />
-                <View style={{ position: 'absolute', justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>{locationCount}</Text>
-                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '600' }}>places</Text>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>{locationCount}</Text>
-                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '600' }}>places</Text>
-              </>
-            )}
+            <Text style={{ color: '#fff', fontSize, fontWeight: 'bold' }}>{countDisplay}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: labelSize, fontWeight: '600' }}>posts</Text>
           </View>
         </View>
       </Marker>
@@ -625,34 +617,23 @@ const ZoomClusterMarker = memo(({ cluster, mapRef }: any) => {
     <Marker
       coordinate={{ latitude, longitude }}
       onPress={(e: any) => { e?.stopPropagation?.(); handlePress(); }}
-      tracksViewChanges={tracksChanges && !imageLoaded}
-      zIndex={2000 + locationCount}
+      tracksViewChanges={tracksChanges}
+      zIndex={2000 + totalPosts}
       stopPropagation={true}
     >
       <Animated.View style={{ alignItems: 'center', transform: [{ scale: scaleAnim }] }}>
-        <View style={styles.zoomClusterBubble}>
-          {latestImageUrl ? (
-            <>
-              <Image
-                source={{ uri: latestImageUrl }}
-                style={styles.zoomClusterImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                onLoad={() => setImageLoaded(true)}
-              />
-              <View style={styles.zoomClusterOverlay}>
-                <Text style={styles.zoomClusterCount}>{locationCount}</Text>
-                <Text style={styles.zoomClusterLabel}>places</Text>
-              </View>
-            </>
-          ) : (
-            <View style={styles.zoomClusterOverlay}>
-              <Text style={styles.zoomClusterCount}>{locationCount}</Text>
-              <Text style={styles.zoomClusterLabel}>places</Text>
-            </View>
-          )}
+        <View style={[styles.zoomClusterBubble, {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bgColor,
+          shadowColor: bgColor,
+          shadowOpacity: 0.5,
+          shadowRadius: 8,
+        }]}>
+          <Text style={[styles.zoomClusterCount, { fontSize }]}>{countDisplay}</Text>
+          <Text style={[styles.zoomClusterLabel, { fontSize: labelSize }]}>posts</Text>
         </View>
-        <View style={styles.zoomClusterArrow} />
       </Animated.View>
     </Marker>
   );
@@ -1034,11 +1015,12 @@ const MapViewComponent = memo(({
     // Step 3: Zoom-based clustering — merge nearby locations when zoomed out
     const delta = currentRegion?.latitudeDelta || 0.05;
     let clusterPrecision: number | null = null;
-    if (delta > 0.5) clusterPrecision = 1;       // ~11km clusters
-    else if (delta > 0.15) clusterPrecision = 2;  // ~1.1km clusters
+    if (delta > 0.3) clusterPrecision = 1;        // ~30km+ region view — ~11km clusters
+    else if (delta > 0.08) clusterPrecision = 2;   // ~8-30km city view — ~1.1km clusters
+    else if (delta > 0.02) clusterPrecision = 3;   // ~2-8km neighborhood — ~111m clusters
 
     if (clusterPrecision === null) {
-      // Zoomed in enough — show individual location markers
+      // Street level (<2km view) — show individual location markers
       return { locations: allLocations, zoomClusters: [], followingLocations };
     }
 
@@ -2637,20 +2619,25 @@ useFocusEffect(
   useEffect(() => {
     if (!token || trendingBannerShown.current) return;
     const buildTrending = (posts: any[]) => {
-      const allPosts = posts.map((p: any) => ({
+      const mapped = posts.map((p: any) => ({
         ...p,
         full_image_url: fixUrl(p.media_url || p.image_url),
         full_thumbnail_url: fixUrl(p.thumbnail_url),
       }));
-      const scored = allPosts.sort((a: any, b: any) => ((b.likes_count || 0) + (b.clicks_count || 0)) - ((a.likes_count || 0) + (a.clicks_count || 0)));
-      const restaurantPost = scored.find((p: any) => p.account_type === 'restaurant');
-      const regularPosts = scored.filter((p: any) => p.account_type !== 'restaurant');
-      let trending: any[];
-      if (restaurantPost) {
-        trending = [...regularPosts.slice(0, 2), restaurantPost, ...regularPosts.slice(2, 4)];
-      } else {
-        trending = regularPosts.slice(0, 5);
-      }
+      mapped.sort((a: any, b: any) => ((b.likes_count || 0) + (b.clicks_count || 0)) - ((a.likes_count || 0) + (a.clicks_count || 0)));
+      // Balanced mix: 3 regular + up to 2 restaurant (or fill with whatever is available)
+      const regular = mapped.filter((p: any) => p.account_type !== 'restaurant');
+      const restaurant = mapped.filter((p: any) => p.account_type === 'restaurant');
+      const trending: any[] = [];
+      // Take top 3 regular
+      trending.push(...regular.slice(0, 3));
+      // Insert up to 2 restaurant posts at positions 2 and 4
+      if (restaurant.length > 0) trending.splice(2, 0, restaurant[0]);
+      if (restaurant.length > 1) trending.splice(4, 0, restaurant[1]);
+      // If not enough regular posts, fill remaining slots from restaurant
+      if (trending.length < 5) trending.push(...restaurant.slice(trending.length - regular.length > 0 ? trending.length - regular.length : 0).filter((p: any) => !trending.includes(p)));
+      // If not enough restaurant posts, fill from remaining regular
+      if (trending.length < 5) trending.push(...regular.slice(3, 3 + (5 - trending.length)));
       return trending.slice(0, 5);
     };
 
@@ -2682,10 +2669,11 @@ useFocusEffect(
       };
 
       const tryShowBanner = () => {
-        if (!mountedRef.current || trendingBannerShown.current) return;
+        if (!mountedRef.current) return;
         const trending = buildTrending(allPosts);
-        if (trending.length >= 1) {
-          setTrendingPosts(trending);
+        if (trending.length === 0) return;
+        setTrendingPosts(trending);
+        if (!trendingBannerShown.current) {
           trendingBannerShown.current = true;
           setShowTrendingBanner(true);
           animateBannerIn();
@@ -2693,9 +2681,9 @@ useFocusEffect(
         }
       };
 
-      // Fire all 3 requests in parallel — show banner as soon as we have 3+ posts
+      // Fast small request for instant banner + full request for complete data
       const promises = [
-        axios.get(`${API_URL}/posts/last-3-days`, { headers }).then(res => {
+        axios.get(`${API_URL}/feed?skip=0&limit=15&sort=engagement`, { headers }).then(res => {
           addPosts(res.data || []);
           tryShowBanner();
         }).catch(() => {}),
@@ -2703,15 +2691,10 @@ useFocusEffect(
           addPosts(res.data || []);
           tryShowBanner();
         }).catch(() => {}),
-        axios.get(`${API_URL}/feed?skip=0&limit=30&sort=popular`, { headers }).then(res => {
-          addPosts(res.data || []);
-          tryShowBanner();
-        }).catch(() => {}),
       ];
 
       await Promise.allSettled(promises);
 
-      // Final update with all collected data
       if (!mountedRef.current) return;
       const trending = buildTrending(allPosts);
       if (trending.length > 0) {
@@ -2726,14 +2709,25 @@ useFocusEffect(
     fetchTrending();
   }, [token, trendingTrigger]);
 
+  // Keep a ref of trending posts length to avoid stale closures
+  const trendingPostsLenRef = useRef(trendingPosts.length);
+  trendingPostsLenRef.current = trendingPosts.length;
+
+  // Reset slide to 0 when posts list grows (more data arrived)
+  useEffect(() => {
+    if (trendingPosts.length > 1) {
+      setTrendingSlide(0);
+    }
+  }, [trendingPosts.length]);
+
   // Auto-slide trending posts — 2 seconds per post
   useEffect(() => {
-    if (!showTrendingBanner || trendingPosts.length === 0) return;
+    if (!showTrendingBanner || trendingPosts.length <= 1) return;
 
     const slideInterval = setInterval(() => {
       setTrendingSlide(prev => {
         const next = prev + 1;
-        if (next >= trendingPosts.length) {
+        if (next >= trendingPostsLenRef.current) {
           return prev; // stay on last
         }
         trendingSlideAnim.setValue(1);
@@ -3279,9 +3273,9 @@ return (
                   onPress={() => handleQuickCategoryPress(category)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.categoryCardImageInner}>
-                    <View style={[styles.categoryCardShadow, isActive && { shadowOpacity: 1, shadowRadius: 8 }]} />
-                    <View style={styles.categoryCardImageClip}>
+                  <View style={[styles.categoryCardImageInner, isActive && { transform: [{ scale: 1.1 }] }]}>
+                    <View style={[styles.categoryCardShadow, isActive && { shadowOpacity: 1, shadowRadius: 10 }]} />
+                    <View style={[styles.categoryCardImageClip, isActive && { borderWidth: 2.5, borderColor: '#E94A37' }]}>
                       {CATEGORY_IMAGES[category.id] ? (
                         <Image
                           source={CATEGORY_IMAGES[category.id]}
@@ -5437,7 +5431,8 @@ categoryCardLabel: {
 },
 categoryCardLabelActive: {
   color: '#E94A37',
-  fontWeight: '700',
+  fontWeight: '800',
+  fontSize: 11,
 },
 quickCategoryScroll: {
   maxHeight: 34,
