@@ -54,7 +54,7 @@ import { FeedSkeleton } from "../../components/FeedSkeleton";
 import CofauWalletModal from "../../components/CofauWalletModal";
 
 const BACKEND = BACKEND_URL;
-let globalMuteState = true;
+import { muteState } from "../../utils/muteState";
 
 /* -------------------------
    Animated Slide Pill
@@ -204,7 +204,7 @@ export default function FeedScreen() {
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [isMuted, setIsMuted] = useState(globalMuteState);
+  const isMutedRef = useRef(muteState.isMuted);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [ownStoryData, setOwnStoryData] = useState<any>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -249,10 +249,10 @@ export default function FeedScreen() {
     return result;
   }, [feedPosts, hasMore, suggestedPosts]);
 
-  // Handle mute toggle
+  // Handle mute toggle - only update global ref, FeedCard manages its own mute state
 const handleMuteToggle = useCallback((newMuteState: boolean) => {
-    globalMuteState = newMuteState;
-    setIsMuted(newMuteState);
+    muteState.isMuted = newMuteState;
+    isMutedRef.current = newMuteState;
   }, []);
 
 // Keep previous level ref in sync with user data
@@ -885,7 +885,6 @@ const renderPost = useCallback(
             onStoryCreated={() => fetchOwnStory()}
             shouldPlay={shouldPlay}
             shouldPreload={shouldPlay}
-            isMuted={isMuted}
             onMuteToggle={handleMuteToggle}
           />
         </View>
@@ -897,7 +896,7 @@ const renderPost = useCallback(
       </View>
     );
   },
-  [visibleVideoId, isMuted, handleMuteToggle, refreshing, displayData]
+  [visibleVideoId, handleMuteToggle, refreshing, displayData]
 );
 
   // List Header Component

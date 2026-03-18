@@ -30,6 +30,7 @@ import ShareToUsersModal from "./ShareToUsersModal";
 import SimpleShareModal from "./SimpleShareModal";
 import ReportModal from "./ReportModal";
 import NudgeModal from "./NudgeModal";
+import { muteState } from "../utils/muteState";
 import RestaurantBadge from "./RestaurantBadge";
 import CofauVerifiedBadge from "./CofauVerifiedBadge";
 import FirstDiscoveryBadge from "./FirstDiscoveryBadge";
@@ -103,7 +104,6 @@ function FeedCard({
   showOptionsMenuProp = true,
   shouldPlay = false,
   shouldPreload = false,
-  isMuted = true,
   onMuteToggle,
 }) {
   // Add debug log HERE - inside the function
@@ -123,6 +123,7 @@ function FeedCard({
   const videoRef = useRef(null);
   const shouldPlayRef = useRef(shouldPlay);
   shouldPlayRef.current = shouldPlay;
+  const [isMuted, setIsMuted] = useState(muteState.isMuted);
 
 const [isLiked, setIsLiked] = useState(post.is_liked || false);
 const [likesCount, setLikes] = useState(post.likes || 0);
@@ -212,10 +213,13 @@ useEffect(() => {
 
 const dpRaw = normalizeProfilePicture(post.user_profile_picture);
 
-// Handle mute toggle
+// Handle mute toggle - update local state + shared global state
 const handleMutePress = () => {
+  const newMuteState = !isMuted;
+  setIsMuted(newMuteState);
+  muteState.isMuted = newMuteState;
   if (onMuteToggle) {
-    onMuteToggle(!isMuted);
+    onMuteToggle(newMuteState);
   }
 };
 
@@ -295,7 +299,16 @@ useEffect(() => {
   }
 }, [shouldPlay, isVideo]);
 
-// Update mute state when isMuted prop changes
+// Sync local mute state from global when this card starts playing
+useEffect(() => {
+  if (!isVideo || !shouldPlay) return;
+  // Read global mute state when becoming the active video
+  if (isMuted !== muteState.isMuted) {
+    setIsMuted(muteState.isMuted);
+  }
+}, [shouldPlay, isVideo]);
+
+// Update mute state on the video when isMuted changes
 useEffect(() => {
   if (!isVideo || !videoRef.current || !shouldPlay) return;
 
@@ -1738,7 +1751,6 @@ export default React.memo(FeedCard, (prevProps, nextProps) => {
   return (
     prevProps.post.id === nextProps.post.id &&
     prevProps.shouldPlay === nextProps.shouldPlay &&
-    prevProps.isMuted === nextProps.isMuted &&
     prevProps.post.is_liked === nextProps.post.is_liked &&
     prevProps.post.is_saved_by_user === nextProps.post.is_saved_by_user
   );

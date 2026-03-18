@@ -1015,6 +1015,11 @@ const MapViewComponent = memo(({
     });
 
     // Step 3: Google Maps-style visibility — show/hide based on zoom + post count
+    // Skip filtering for Following mode — show all posts from followed users
+    if (filterType === 'following' && selectedFollowingUser) {
+      return { locations: allLocations, zoomClusters: [], followingLocations };
+    }
+
     // Higher post count = visible even when zoomed out. Lower = only when zoomed in.
     const delta = currentRegion?.latitudeDelta || 0.05;
     let minPosts: number;
@@ -1910,6 +1915,9 @@ const CATEGORY_IMAGES: { [id: string]: any } = {
   'maharashtrian-style': require('../../assets/categories/maharashtrian-style.png'),
   'rajasthani-style': require('../../assets/categories/rajasthani-style.png'),
   'mangaluru-style': require('../../assets/categories/mangaluru-style.png'),
+  'asian': require('../../assets/categories/asian.png'),
+  'dosa': require('../../assets/categories/dosa.png'),
+  'kashmiri': require('../../assets/categories/kashmiri-style.png'),
 };
 
 // Show only popular categories in quick chips (names must match CATEGORIES exactly)
@@ -3225,9 +3233,9 @@ return (
                   onPress={() => handleQuickCategoryPress(category)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.categoryCardImageInner, isActive && { transform: [{ scale: 1.1 }] }]}>
-                    <View style={[styles.categoryCardShadow, isActive && { shadowOpacity: 1, shadowRadius: 10 }]} />
-                    <View style={[styles.categoryCardImageClip, isActive && { borderWidth: 2.5, borderColor: '#E94A37' }]}>
+                  <View style={[styles.categoryCardImageInner, isActive && { transform: [{ scale: 1.08 }] }]}>
+                    {isActive && <View style={styles.categoryCardNeonGlow} />}
+                    <View style={styles.categoryCardImagePlain}>
                       {CATEGORY_IMAGES[category.id] ? (
                         <Image
                           source={CATEGORY_IMAGES[category.id]}
@@ -5324,23 +5332,23 @@ categoryCardImageInner: {
   borderRadius: 27,
   overflow: 'visible',
 },
-categoryCardShadow: {
-  position: 'absolute',
-  width: 54,
-  height: 54,
-  borderRadius: 27,
-  backgroundColor: '#FF7A18',
-  shadowColor: '#FF7A18',
-  shadowOffset: { width: 0, height: 0 },
-  shadowOpacity: 0.8,
-  shadowRadius: 6,
-  elevation: 8,
-},
-categoryCardImageClip: {
+categoryCardImagePlain: {
   width: 54,
   height: 54,
   borderRadius: 27,
   overflow: 'hidden',
+},
+categoryCardNeonGlow: {
+  position: 'absolute',
+  width: 54,
+  height: 54,
+  borderRadius: 27,
+  backgroundColor: '#E94A37',
+  shadowColor: '#E94A37',
+  shadowOffset: { width: 0, height: 0 },
+  shadowOpacity: 1,
+  shadowRadius: 10,
+  elevation: 10,
 },
 categoryCardImage: {
   width: 54,
