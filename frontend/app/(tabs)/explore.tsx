@@ -1796,7 +1796,7 @@ export default function ExploreScreen() {
   const [trendingPosts, setTrendingPosts] = useState<any[]>([]);
   const [showTrendingBanner, setShowTrendingBanner] = useState(false);
   const [trendingSlide, setTrendingSlide] = useState(0);
-  const [trendingCountdown, setTrendingCountdown] = useState(15);
+  const [trendingCountdown, setTrendingCountdown] = useState(10);
   const trendingBannerY = useRef(new Animated.Value(-400)).current;
   const trendingScale = useRef(new Animated.Value(0.8)).current;
   const trendingOpacity = useRef(new Animated.Value(0)).current;
@@ -1953,6 +1953,30 @@ export default function ExploreScreen() {
   { id: 'pizza', name: 'Pizza', emoji: '🍕' },
   { id: 'dosa', name: 'Dosa', emoji: '🫕' },
 ];
+
+// Static food images per category (fallback when no posts exist)
+const CATEGORY_IMAGES: { [id: string]: any } = {
+  'vegetarian-vegan': require('../../assets/categories/vegetarian-vegan.png'),
+  'non-vegetarian': require('../../assets/categories/non-vegetarian.png'),
+  'biryani': require('../../assets/categories/biryani.png'),
+  'italian': require('../../assets/categories/italian.png'),
+  'desserts': require('../../assets/categories/desserts.png'),
+  'arabic': require('../../assets/categories/arabic.png'),
+  'karnataka-style': require('../../assets/categories/karnataka-style.png'),
+  'north-indian-style': require('../../assets/categories/north-indian-style.png'),
+  'south-indian-style': require('../../assets/categories/south-indian-style.png'),
+  'hyderabadi-style': require('../../assets/categories/hyderabadi-style.png'),
+  'kerala-style': require('../../assets/categories/kerala-style.png'),
+  'andhra-style': require('../../assets/categories/andhra-style.png'),
+  'punjabi-style': require('../../assets/categories/punjabi-style.png'),
+  'tea-coffee': require('../../assets/categories/tea-coffee.png'),
+  'bengali-style': require('../../assets/categories/bengali-style.png'),
+  'odia-style': require('../../assets/categories/odia-style.png'),
+  'gujarati-style': require('../../assets/categories/gujarati-style.png'),
+  'maharashtrian-style': require('../../assets/categories/maharashtrian-style.png'),
+  'rajasthani-style': require('../../assets/categories/rajasthani-style.png'),
+  'mangaluru-style': require('../../assets/categories/mangaluru-style.png'),
+};
 
 // Show only popular categories in quick chips (names must match CATEGORIES exactly)
 const QUICK_CATEGORIES = [
@@ -2642,60 +2666,82 @@ useFocusEffect(
     };
 
     const fetchTrending = async () => {
-      try {
-        // Fast endpoint first - show banner immediately
-        const topRes = await axios.get(`${API_URL}/posts/last-3-days`, { headers: { Authorization: `Bearer ${token}` } });
+      const headers = { Authorization: `Bearer ${token}` };
+      const allPosts: any[] = [];
+      const seenIds = new Set();
+      let bannerShown = false;
+
+      const addPosts = (posts: any[]) => {
+        posts.forEach((p: any) => {
+          const pid = p.id || p._id;
+          if (!seenIds.has(pid)) {
+            seenIds.add(pid);
+            allPosts.push(p);
+          }
+        });
+      };
+
+      const tryShowBanner = () => {
         if (!mountedRef.current || trendingBannerShown.current) return;
-        const topData = topRes.data || [];
-        if (topData.length > 0) {
-          const trending = buildTrending(topData);
-          if (trending.length > 0) {
-            setTrendingPosts(trending);
-            trendingBannerShown.current = true;
-            setShowTrendingBanner(true);
-            animateBannerIn();
-          }
+        const trending = buildTrending(allPosts);
+        if (trending.length >= 1) {
+          setTrendingPosts(trending);
+          trendingBannerShown.current = true;
+          setShowTrendingBanner(true);
+          animateBannerIn();
+          bannerShown = true;
         }
-        // Silently enhance with full feed data (no re-animation)
-        try {
-          const feedRes = await axios.get(`${API_URL}/feed?skip=0&limit=50&sort=engagement`, { headers: { Authorization: `Bearer ${token}` } });
-          if (!mountedRef.current) return;
-          const feedData = feedRes.data || [];
-          if (feedData.length > 0) {
-            const seen = new Set();
-            const combined = [...topData, ...feedData].filter((p: any) => {
-              const pid = p.id || p._id;
-              if (seen.has(pid)) return false;
-              seen.add(pid);
-              return true;
-            });
-            if (combined.length > topData.length) {
-              setTrendingPosts(buildTrending(combined));
-            }
-          }
-        } catch {}
-      } catch (err) {
-        console.log('Trending banner fetch error:', err);
+      };
+
+      // Fire all 3 requests in parallel — show banner as soon as we have 3+ posts
+      const promises = [
+        axios.get(`${API_URL}/posts/last-3-days`, { headers }).then(res => {
+          addPosts(res.data || []);
+          tryShowBanner();
+        }).catch(() => {}),
+        axios.get(`${API_URL}/feed?skip=0&limit=50&sort=engagement`, { headers }).then(res => {
+          addPosts(res.data || []);
+          tryShowBanner();
+        }).catch(() => {}),
+        axios.get(`${API_URL}/feed?skip=0&limit=30&sort=popular`, { headers }).then(res => {
+          addPosts(res.data || []);
+          tryShowBanner();
+        }).catch(() => {}),
+      ];
+
+      await Promise.allSettled(promises);
+
+      // Final update with all collected data
+      if (!mountedRef.current) return;
+      const trending = buildTrending(allPosts);
+      if (trending.length > 0) {
+        setTrendingPosts(trending);
+        if (!bannerShown && !trendingBannerShown.current) {
+          trendingBannerShown.current = true;
+          setShowTrendingBanner(true);
+          animateBannerIn();
+        }
       }
     };
     fetchTrending();
   }, [token, trendingTrigger]);
 
-  // Auto-slide trending posts every 1 second
+  // Auto-slide trending posts — 2 seconds per post
   useEffect(() => {
     if (!showTrendingBanner || trendingPosts.length === 0) return;
+
     const slideInterval = setInterval(() => {
       setTrendingSlide(prev => {
         const next = prev + 1;
         if (next >= trendingPosts.length) {
           return prev; // stay on last
         }
-        // Animate slide transition
         trendingSlideAnim.setValue(1);
         Animated.timing(trendingSlideAnim, { toValue: 0, duration: 250, useNativeDriver: true, easing: Easing.out(Easing.cubic) }).start();
         return next;
       });
-    }, 3000);
+    }, 2000);
+
     return () => clearInterval(slideInterval);
   }, [showTrendingBanner, trendingPosts.length]);
 
@@ -2703,10 +2749,10 @@ useFocusEffect(
   useEffect(() => {
     if (!showTrendingBanner) return;
     trendingTimerRotation.setValue(0);
-    // Animate full rotation over 15 seconds (anti-clockwise)
+    // Animate full rotation over 10 seconds (anti-clockwise)
     Animated.timing(trendingTimerRotation, {
       toValue: 1,
-      duration: 15000,
+      duration: 10000,
       useNativeDriver: true,
       easing: Easing.linear,
     }).start();
@@ -2730,7 +2776,7 @@ useFocusEffect(
       Animated.timing(trendingOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
     ]).start(() => {
       setShowTrendingBanner(false);
-      setTrendingCountdown(15);
+      setTrendingCountdown(10);
       setTrendingSlide(0);
     });
   }, []);
@@ -2986,7 +3032,7 @@ useFocusEffect(
       setShowTrendingBanner(false);
       setTrendingPosts([]);
       setTrendingSlide(0);
-      setTrendingCountdown(15);
+      setTrendingCountdown(10);
       setTrendingTrigger(t => t + 1);
       // Silent background refresh - no loading spinner
       setPlayingVideos([]);
@@ -3213,7 +3259,7 @@ return (
             </View>
           </View>
 
-          {/* QUICK CATEGORY CAROUSEL WITH PHOTO PREVIEWS */}
+          {/* CATEGORIES — photo carousel on both Dishes and Map (Map shows count badges) */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -3221,8 +3267,8 @@ return (
             contentContainerStyle={styles.categoryCarouselContainer}
           >
             {QUICK_CATEGORIES.map((category) => {
-              const preview = categoryPreviews[category.id];
               const isActive = selectedQuickCategory === category.id;
+              const preview = activeTab === 'map' ? categoryPreviews[category.id] : null;
               return (
                 <TouchableOpacity
                   key={category.id}
@@ -3233,27 +3279,28 @@ return (
                   onPress={() => handleQuickCategoryPress(category)}
                   activeOpacity={0.7}
                 >
-                  {/* Image preview with count badge */}
-                  <View style={[styles.categoryCardImageWrapper, isActive && styles.categoryCardImageWrapperActive]}>
-                    {preview?.imageUrl ? (
-                      <Image
-                        source={{ uri: preview.imageUrl }}
-                        style={styles.categoryCardImage}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                      />
-                    ) : (
-                      <View style={styles.categoryCardPlaceholder}>
-                        {renderCategoryIcon(category.emoji, 20, 0)}
-                      </View>
-                    )}
-                    {(preview?.count ?? 0) > 0 && (
+                  <View style={styles.categoryCardImageInner}>
+                    <View style={[styles.categoryCardShadow, isActive && { shadowOpacity: 1, shadowRadius: 8 }]} />
+                    <View style={styles.categoryCardImageClip}>
+                      {CATEGORY_IMAGES[category.id] ? (
+                        <Image
+                          source={CATEGORY_IMAGES[category.id]}
+                          style={styles.categoryCardImage}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View style={styles.categoryCardPlaceholder}>
+                          {renderCategoryIcon(category.emoji, 20, 0)}
+                        </View>
+                      )}
+                    </View>
+                    {/* Count badge — only on Map tab when posts exist */}
+                    {activeTab === 'map' && (preview?.count ?? 0) > 0 && (
                       <View style={styles.categoryCardCountBadge}>
-                        <Text style={styles.categoryCardCountText}>{preview!.count}</Text>
+                        <Text style={styles.categoryCardCountText}>{preview!.count > 99 ? '99+' : preview!.count}</Text>
                       </View>
                     )}
                   </View>
-                  {/* Label */}
                   <Text
                     style={[
                       styles.categoryCardLabel,
@@ -5321,54 +5368,64 @@ categoryCarouselContainer: {
 },
 categoryCard: {
   alignItems: 'center',
-  width: 64,
+  width: 74,
 },
 categoryCardActive: {
-  // active state handled by border on image wrapper
 },
-categoryCardImageWrapper: {
-  width: 56,
-  height: 56,
-  borderRadius: 10,
+categoryCardImageInner: {
+  width: 54,
+  height: 54,
+  borderRadius: 27,
+  overflow: 'visible',
+},
+categoryCardShadow: {
+  position: 'absolute',
+  width: 54,
+  height: 54,
+  borderRadius: 27,
+  backgroundColor: '#FF7A18',
+  shadowColor: '#FF7A18',
+  shadowOffset: { width: 0, height: 0 },
+  shadowOpacity: 0.8,
+  shadowRadius: 6,
+  elevation: 8,
+},
+categoryCardImageClip: {
+  width: 54,
+  height: 54,
+  borderRadius: 27,
   overflow: 'hidden',
-  backgroundColor: '#f0f0f0',
-  borderWidth: 2,
-  borderColor: '#F2CF68',
-},
-categoryCardImageWrapperActive: {
-  borderColor: '#E94A37',
-  borderWidth: 2.5,
 },
 categoryCardImage: {
-  width: 52,
-  height: 52,
-  borderRadius: 8,
+  width: 54,
+  height: 54,
+  borderRadius: 27,
 },
 categoryCardPlaceholder: {
-  width: 52,
-  height: 52,
-  borderRadius: 8,
+  width: 54,
+  height: 54,
+  borderRadius: 27,
   backgroundColor: '#FFF8F0',
   justifyContent: 'center',
   alignItems: 'center',
 },
 categoryCardCountBadge: {
   position: 'absolute',
-  top: 2,
-  right: 2,
+  top: 0,
+  right: -2,
   backgroundColor: '#E94A37',
-  borderRadius: 10,
-  minWidth: 20,
-  height: 20,
+  borderRadius: 8,
+  minWidth: 16,
+  height: 16,
   justifyContent: 'center',
   alignItems: 'center',
-  paddingHorizontal: 4,
-  borderWidth: 1.5,
+  paddingHorizontal: 3,
+  borderWidth: 1,
   borderColor: '#fff',
 },
 categoryCardCountText: {
   color: '#fff',
-  fontSize: 10,
+  fontSize: 8,
   fontWeight: 'bold',
 },
 categoryCardLabel: {
