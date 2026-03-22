@@ -46,6 +46,22 @@ function RootLayoutNav() {
         }
       }
 
+      // Handle profile deep links: cofau://profile/{userId} or https://api.cofau.com/profile/{username}
+      let profileId: string | null = null;
+      if (url.startsWith("cofau://profile/")) {
+        profileId = url.replace("cofau://profile/", "").split("?")[0];
+      } else if (url.includes("/profile/") && !url.includes("/profile/picture")) {
+        const parts = url.split("/profile/");
+        if (parts[1]) {
+          profileId = parts[1].split("?")[0];
+        }
+      }
+
+      if (profileId && isAuthenticated) {
+        router.push(`/profile?userId=${profileId}`);
+        return;
+      }
+
       if (postId && isAuthenticated) {
         router.push(`/post-details/${postId}`);
       }

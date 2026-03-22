@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from bson import ObjectId
 from database import get_database
 from routers.auth import get_current_user
-from utils.wallet_system import get_wallet_info
+from utils.wallet_system import get_wallet_info, get_current_milestone
 
 router = APIRouter(prefix="/api/wallet", tags=["Wallet"])
 
@@ -144,13 +144,14 @@ async def mark_wallet_viewed(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/claim-voucher")
-async def claim_amazon_voucher(
+async def claim_reward(
     request: dict,
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Claim Amazon voucher when wallet balance reaches 500.
-    Deducts ₹500 from wallet and sends notification email to admin.
+    Claim milestone reward or Amazon voucher.
+    Milestones < 500: requires email + phone + UPI ID, deducts milestone amount.
+    Milestone 500: requires email + phone, deducts ₹500, sends Amazon voucher request.
     """
     import smtplib
     from email.mime.text import MIMEText
@@ -162,6 +163,7 @@ async def claim_amazon_voucher(
 
     user_email = request.get("email")
     user_phone = request.get("phone")
+    user_upi = request.get("upi_id")
     if not user_email:
         raise HTTPException(status_code=400, detail="Email is required")
     if not user_phone:
@@ -177,37 +179,59 @@ async def claim_amazon_voucher(
 
     wallet_balance = user.get("wallet_balance", 0.0)
 
-    # Check if balance is at least 500
-    if wallet_balance < 500:
+    # Determine current milestone
+    claims_count = await db.voucher_claims.count_documents({"user_id": user_id})
+    milestone_info = get_current_milestone(claims_count)
+    current_target = milestone_info["target_amount"]
+    is_amazon = milestone_info["is_amazon_voucher"]
+
+    # Check if balance meets current milestone
+    if wallet_balance < current_target:
         raise HTTPException(
             status_code=400,
-            detail=f"Please complete ₹500 and then claim your voucher. Current balance: ₹{wallet_balance}"
+            detail=f"Please complete ₹{int(current_target)} and then claim your reward. Current balance: ₹{wallet_balance}"
         )
 
-    # Send email notification to admin
+    # For non-Amazon milestones, UPI ID is required
+    if not is_amazon and not user_upi:
+        raise HTTPException(status_code=400, detail="UPI ID is required for milestone rewards")
+
     admin_email = "adilmb9596@gmail.com"
     username = user.get("username", "Unknown User")
+    deduct_amount = current_target
+
+    if is_amazon:
+        claim_type = "voucher_claim"
+        claim_description = "Amazon voucher claimed"
+        email_subject = f"Amazon Voucher Claim Request - {username}"
+        success_message = "Congratulations! You will receive your Amazon voucher soon. Check your mail inbox."
+    else:
+        claim_type = "milestone_claim"
+        claim_description = f"Milestone ₹{int(current_target)} claimed"
+        email_subject = f"Milestone ₹{int(current_target)} Claim Request - {username}"
+        success_message = f"Congratulations! ₹{int(current_target)} milestone reward claimed. Amount will be sent to your UPI."
 
     try:
         # Create email message
         msg = MIMEMultipart()
         msg['From'] = os.getenv("SMTP_FROM_EMAIL", "noreply@cofau.com")
         msg['To'] = admin_email
-        msg['Subject'] = f"Amazon Voucher Claim Request - {username}"
+        msg['Subject'] = email_subject
 
+        upi_line = f"- UPI ID: {user_upi}\n" if user_upi else ""
         body = f"""
-Amazon Voucher Claim Request
+{"Amazon Voucher" if is_amazon else "Milestone Reward"} Claim Request
 
 User Details:
 - Username: {username}
 - User Email: {user_email}
 - Phone Number: {user_phone}
-- Wallet Balance: ₹{wallet_balance}
+{upi_line}- Wallet Balance: ₹{wallet_balance}
+- Milestone: ₹{int(current_target)}
+- Claim Type: {"Amazon Voucher" if is_amazon else "UPI Transfer"}
 - User ID: {user_id}
 
-The user has requested to claim their Amazon voucher.
-Please process this request and send the voucher to: {user_email}
-Contact phone: {user_phone}
+{"Please process this request and send the Amazon voucher to: " + user_email if is_amazon else "Please transfer ₹" + str(int(current_target)) + " to UPI: " + str(user_upi)}
 
 ---
 Cofau Rewards System
@@ -222,78 +246,85 @@ Cofau Rewards System
         smtp_password = os.getenv("SMTP_PASSWORD")
 
         if smtp_user and smtp_password:
-            # Send email via SMTP
             server = smtplib.SMTP(smtp_host, smtp_port)
             server.starttls()
             server.login(smtp_user, smtp_password)
             server.send_message(msg)
             server.quit()
         else:
-            # Log the request if SMTP is not configured
-            print(f"[VOUCHER CLAIM] User: {username}, Email: {user_email}, Phone: {user_phone}, Balance: ₹{wallet_balance}")
+            print(f"[CLAIM] User: {username}, Email: {user_email}, Phone: {user_phone}, UPI: {user_upi}, Milestone: ₹{int(current_target)}, Type: {claim_type}")
 
         # Record the claim in database
-        await db.voucher_claims.insert_one({
+        claim_doc = {
             "user_id": user_id,
             "username": username,
             "user_email": user_email,
             "user_phone": user_phone,
             "wallet_balance": wallet_balance,
-            "amount_deducted": 500.0,
+            "amount_deducted": deduct_amount,
+            "claim_type": claim_type,
+            "milestone_amount": current_target,
             "status": "pending",
             "created_at": datetime.utcnow()
-        })
+        }
+        if user_upi:
+            claim_doc["user_upi"] = user_upi
+        await db.voucher_claims.insert_one(claim_doc)
 
-        # Deduct ₹500 from wallet balance
+        # Deduct milestone amount from wallet balance
         await db.users.update_one(
             {"_id": ObjectId(user_id)},
-            {"$inc": {"wallet_balance": -500.0}}
+            {"$inc": {"wallet_balance": -deduct_amount}}
         )
 
         # Record the deduction as a wallet transaction
         await db.wallet_transactions.insert_one({
             "user_id": user_id,
-            "amount": -500.0,
-            "type": "voucher_claim",
-            "description": "Amazon voucher claimed",
+            "amount": -deduct_amount,
+            "type": claim_type,
+            "description": claim_description,
             "created_at": datetime.utcnow()
         })
 
         return {
             "success": True,
-            "message": "Congratulations! You will receive your voucher soon. Check your mail inbox."
+            "message": success_message
         }
 
     except Exception as e:
-        print(f"Error sending voucher claim email: {e}")
+        print(f"Error processing claim: {e}")
         # Still record the claim even if email fails
-        await db.voucher_claims.insert_one({
+        claim_doc = {
             "user_id": user_id,
             "username": username,
             "user_email": user_email,
             "user_phone": user_phone,
             "wallet_balance": wallet_balance,
-            "amount_deducted": 500.0,
+            "amount_deducted": deduct_amount,
+            "claim_type": claim_type,
+            "milestone_amount": current_target,
             "status": "pending",
             "email_sent": False,
             "created_at": datetime.utcnow()
-        })
+        }
+        if user_upi:
+            claim_doc["user_upi"] = user_upi
+        await db.voucher_claims.insert_one(claim_doc)
 
-        # Still deduct ₹500 even if email fails
         await db.users.update_one(
             {"_id": ObjectId(user_id)},
-            {"$inc": {"wallet_balance": -500.0}}
+            {"$inc": {"wallet_balance": -deduct_amount}}
         )
 
         await db.wallet_transactions.insert_one({
             "user_id": user_id,
-            "amount": -500.0,
-            "type": "voucher_claim",
-            "description": "Amazon voucher claimed",
+            "amount": -deduct_amount,
+            "type": claim_type,
+            "description": claim_description,
             "created_at": datetime.utcnow()
         })
 
         return {
             "success": True,
-            "message": "Congratulations! You will receive your voucher soon. Check your mail inbox."
+            "message": success_message
         }

@@ -10,6 +10,7 @@ export default function UserAvatar({
   size = 40,
   showLevelBadge = true,
   level,
+  badgeSize = 'small',
   style,
 }) {
   const fullUrl = normalizeProfilePicture(profilePicture);
@@ -76,7 +77,7 @@ export default function UserAvatar({
       {/* Level Badge - positioned at bottom-left */}
       {showLevelBadge && level && (
         <View style={styles.badgeContainer}>
-          <LevelBadge level={level} size="small" />
+          <LevelBadge level={level} size={badgeSize} />
         </View>
       )}
     </View>

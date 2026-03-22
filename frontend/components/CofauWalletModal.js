@@ -34,15 +34,18 @@ const CofauWalletModal = ({ visible, onClose }) => {
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [claimEmail, setClaimEmail] = useState("");
   const [claimPhone, setClaimPhone] = useState("");
+  const [claimUpi, setClaimUpi] = useState("");
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimMessage, setClaimMessage] = useState(null);
   const [transactionsVersion, setTransactionsVersion] = useState(0);
   const [walletData, setWalletData] = useState({
     balance: 0,
-    target_amount: 500,
-    amount_needed: 500,
+    target_amount: 100,
+    amount_needed: 100,
     progress_percent: 0,
-    can_claim_voucher: false,
+    can_claim: false,
+    is_amazon_voucher: false,
+    milestone_index: 0,
     recent_transactions: [],
   });
   const transactionsScrollRef = React.useRef(null);
@@ -95,16 +98,27 @@ const CofauWalletModal = ({ visible, onClose }) => {
       return;
     }
 
+    // UPI validation for non-Amazon milestones
+    if (!walletData.is_amazon_voucher && !claimUpi.trim()) {
+      Alert.alert("Error", "Please enter your UPI ID");
+      return;
+    }
+
     setClaimLoading(true);
     setClaimMessage(null);
 
     try {
+      const payload = {
+        email: claimEmail.trim(),
+        phone: claimPhone.trim(),
+      };
+      if (!walletData.is_amazon_voucher) {
+        payload.upi_id = claimUpi.trim();
+      }
+
       const response = await axios.post(
         `${BACKEND_URL}/api/wallet/claim-voucher`,
-        {
-          email: claimEmail.trim(),
-          phone: claimPhone.trim()
-        },
+        payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -112,15 +126,8 @@ const CofauWalletModal = ({ visible, onClose }) => {
         setClaimMessage({ type: "success", text: response.data.message });
         setClaimEmail("");
         setClaimPhone("");
-        // Reset wallet display to 0 after successful claim
-        setWalletData(prev => ({
-          ...prev,
-          balance: 0,
-          amount_needed: 500,
-          progress_percent: 0,
-          can_claim_voucher: false,
-        }));
-        // Refresh from backend to get actual remaining balance
+        setClaimUpi("");
+        // Refresh from backend to get next milestone target
         await fetchWalletData();
         setTransactionsVersion((prev) => prev + 1);
       }
@@ -212,10 +219,14 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
                 </View>
 
-                {/* Amazon Icon */}
+                {/* Reward Icon */}
                 <View style={styles.giftBoxContainer}>
                   <View style={styles.giftBox}>
-                    <FontAwesome5 name="amazon" size={26} color="#FF9800" />
+                    {walletData.is_amazon_voucher ? (
+                      <FontAwesome5 name="amazon" size={26} color="#FF9800" />
+                    ) : (
+                      <Ionicons name="gift" size={26} color="#FF9800" />
+                    )}
                   </View>
                 </View>
               </View>
@@ -224,7 +235,9 @@ const CofauWalletModal = ({ visible, onClose }) => {
                 <Text style={styles.unlockText}>
                   <Text style={styles.unlockAmount}>₹{walletData.amount_needed}</Text>
                   <Text> more to unlock </Text>
-                  <Text style={styles.amazonVoucherHighlight}>Amazon Voucher</Text>
+                  <Text style={styles.amazonVoucherHighlight}>
+                    {walletData.is_amazon_voucher ? "Amazon Voucher" : `₹${walletData.target_amount} Reward`}
+                  </Text>
                 </Text>
                 <TouchableOpacity
                   style={styles.claimButtonActive}
@@ -306,38 +319,38 @@ const CofauWalletModal = ({ visible, onClose }) => {
                 {/* Amazon Voucher */}
                 <View style={[
                   styles.voucherCard,
-                  !walletData.can_claim_voucher && styles.voucherCardLocked
+                  !walletData.can_claim && styles.voucherCardLocked
                 ]}>
                   <View style={[
                     styles.voucherIconContainer,
-                    !walletData.can_claim_voucher && styles.voucherIconLocked
+                    !walletData.can_claim && styles.voucherIconLocked
                   ]}>
                     <Ionicons
-                      name={walletData.can_claim_voucher ? "gift" : "lock-closed"}
+                      name={walletData.can_claim ? "gift" : "lock-closed"}
                       size={24}
-                      color={walletData.can_claim_voucher ? "#FF9800" : "#999"}
+                      color={walletData.can_claim ? "#FF9800" : "#999"}
                     />
                   </View>
                   <View style={styles.voucherContent}>
                     <Text style={[
                       styles.voucherTitle,
-                      !walletData.can_claim_voucher && styles.voucherTitleLocked
+                      !walletData.can_claim && styles.voucherTitleLocked
                     ]}>
-                      AMAZON VOUCHER
+                      {walletData.is_amazon_voucher ? "AMAZON VOUCHER" : `₹${walletData.target_amount} MILESTONE`}
                     </Text>
                     <Text style={styles.voucherSubtext}>
                       <Text>Minimum </Text>
                       <Text style={styles.highlightText}>₹{walletData.target_amount}</Text>
                       <Text> required</Text>
                     </Text>
-                    {!walletData.can_claim_voucher && (
+                    {!walletData.can_claim && (
                       <Text style={styles.voucherSubtext}>
                         <Text>You need </Text>
                         <Text style={styles.highlightText}>₹{walletData.amount_needed}</Text>
                         <Text> more</Text>
                       </Text>
                     )}
-                    {walletData.can_claim_voucher && (
+                    {walletData.can_claim && (
                       <Text style={[styles.voucherSubtext, { color: "#4CAF50", fontWeight: "600" }]}>
                         You can claim your voucher now!
                       </Text>
@@ -345,7 +358,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
                 </View>
 
-                {walletData.can_claim_voucher && (
+                {walletData.can_claim && (
                   <TouchableOpacity
                     style={styles.claimVoucherButton}
                     activeOpacity={0.8}
@@ -356,7 +369,9 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     }}
                   >
                     <Ionicons name="gift" size={18} color="#FFF" />
-                    <Text style={styles.claimVoucherButtonText}>Claim Amazon Voucher</Text>
+                    <Text style={styles.claimVoucherButtonText}>
+                      {walletData.is_amazon_voucher ? "Claim Amazon Voucher" : `Claim ₹${walletData.target_amount} Reward`}
+                    </Text>
                   </TouchableOpacity>
                 )}
 
@@ -392,7 +407,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     <Text style={styles.pointEmoji}>🎉</Text>
                     <View style={styles.pointContent}>
                       <Text style={styles.pointTitle}>First Post Bonus</Text>
-                      <Text style={styles.pointDesc}>Get ₹50 on your very first post. Welcome to Cofau!</Text>
+                      <Text style={styles.pointDesc}>Get ₹25 on your very first post. Welcome to Cofau!</Text>
                     </View>
                   </View>
 
@@ -421,20 +436,18 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </View>
 
                   <View style={styles.pointItem}>
-                    <View style={styles.pointAmazonIcon}>
-                      <FontAwesome5 name="amazon" size={22} color="#FF9800" />
-                    </View>
-                    <View style={styles.pointContent}>
-                      <Text style={styles.pointTitle}>Amazon Voucher</Text>
-                      <Text style={styles.pointDesc}>Reach ₹500 to claim your Amazon voucher!</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.pointItem}>
                     <Text style={styles.pointEmoji}>⭐</Text>
                     <View style={styles.pointContent}>
                       <Text style={styles.pointTitle}>Points Per Post</Text>
                       <Text style={styles.pointDesc}>Earn 10-20 points with every post based on your level</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.pointItem}>
+                    <Text style={styles.pointEmoji}>🎁</Text>
+                    <View style={styles.pointContent}>
+                      <Text style={styles.pointTitle}>Amazon Voucher</Text>
+                      <Text style={styles.pointDesc}>Keep posting & earning — claim a ₹500 Amazon voucher when your wallet reaches ₹500!</Text>
                     </View>
                   </View>
                 </ScrollView>
@@ -500,6 +513,7 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     setShowEmailModal(false);
                     setClaimEmail("");
                     setClaimPhone("");
+                    setClaimUpi("");
                     setClaimMessage(null);
                   }}
                 >
@@ -510,9 +524,13 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   <Ionicons name="gift" size={40} color="#FF9800" />
                 </View>
 
-                <Text style={styles.emailModalTitle}>Claim Amazon Voucher</Text>
+                <Text style={styles.emailModalTitle}>
+                  {walletData.is_amazon_voucher ? "Claim Amazon Voucher" : `Claim ₹${walletData.target_amount} Reward`}
+                </Text>
                 <Text style={styles.emailModalSubtitle}>
-                  Please enter your email address and phone number to receive Amazon voucher
+                  {walletData.is_amazon_voucher
+                    ? "Please enter your email address and phone number to receive Amazon voucher"
+                    : "Please enter your details to receive your reward via UPI"}
                 </Text>
 
                 {claimMessage && (
@@ -557,6 +575,20 @@ const CofauWalletModal = ({ visible, onClose }) => {
                       onChangeText={setClaimPhone}
                       editable={!claimLoading}
                     />
+
+                    {!walletData.is_amazon_voucher && (
+                      <TextInput
+                        style={styles.emailInput}
+                        placeholder="Enter your UPI ID (e.g. name@upi)"
+                        placeholderTextColor="#999"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        value={claimUpi}
+                        onChangeText={setClaimUpi}
+                        editable={!claimLoading}
+                      />
+                    )}
 
                     <TouchableOpacity
                       style={[styles.submitButton, claimLoading && styles.submitButtonDisabled]}

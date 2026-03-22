@@ -158,7 +158,9 @@ export default function VoucherClaims({ token, onStatsChange }) {
                       <VoucherStatusBadge status={claim.status} />
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
-                      <span className="font-medium text-green-600">₹{claim.amount_deducted} voucher</span>
+                      <span className="font-medium text-green-600">
+                        ₹{claim.amount_deducted} {claim.claim_type === 'milestone_claim' ? 'milestone' : 'voucher'}
+                      </span>
                       <span>·</span>
                       <span>Wallet: ₹{claim.wallet_balance}</span>
                       {claim.level && (
@@ -177,6 +179,7 @@ export default function VoucherClaims({ token, onStatsChange }) {
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
                       {claim.user_email && <span>📧 {claim.user_email}</span>}
                       {claim.user_phone && <span>📱 {claim.user_phone}</span>}
+                      {claim.user_upi && <span>💳 UPI: {claim.user_upi}</span>}
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
                       Requested: {formatDate(claim.created_at)}

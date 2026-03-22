@@ -57,6 +57,108 @@ const BACKEND = BACKEND_URL;
 import { muteState } from "../../utils/muteState";
 
 /* -------------------------
+   Animated Wallet Button
+------------------------- */
+const WalletButton = React.memo(({ onPress, unreadCount }: { onPress: () => void; unreadCount: number }) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.3)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.12, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      ])
+    );
+    const glow = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 0.7, duration: 1200, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.2, duration: 1200, useNativeDriver: true }),
+      ])
+    );
+    const shimmer = Animated.loop(
+      Animated.timing(shimmerAnim, { toValue: 1, duration: 3000, useNativeDriver: true })
+    );
+    pulse.start();
+    glow.start();
+    shimmer.start();
+    return () => { pulse.stop(); glow.stop(); shimmer.stop(); };
+  }, []);
+
+  const shimmerRotate = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      {/* Outer glow ring */}
+      <Animated.View style={{
+        position: 'absolute', top: -4, left: -4, right: -4, bottom: -4,
+        borderRadius: 24,
+        backgroundColor: '#FFD700',
+        opacity: glowAnim,
+        transform: [{ scale: pulseAnim }],
+      }} />
+      {/* Spinning shimmer border */}
+      <Animated.View style={{
+        width: 42, height: 42, borderRadius: 21,
+        borderWidth: 2, borderColor: 'transparent',
+        justifyContent: 'center', alignItems: 'center',
+        transform: [{ rotate: shimmerRotate }],
+        borderTopColor: '#FFD700',
+        borderRightColor: '#FFA500',
+      }}>
+        {/* Main coin button */}
+        <LinearGradient
+          colors={['#FFD700', '#FFA500']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            width: 34, height: 34, borderRadius: 17,
+            justifyContent: 'center', alignItems: 'center',
+            shadowColor: '#FFD700',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.6,
+            shadowRadius: 6,
+            elevation: 6,
+          }}
+        >
+          {/* Inner ring for coin effect */}
+          <View style={{
+            width: 28, height: 28, borderRadius: 14,
+            borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)',
+            justifyContent: 'center', alignItems: 'center',
+          }}>
+            <Text style={{
+              fontSize: 16, fontWeight: '900', color: '#FFF',
+              textShadowColor: 'rgba(0,0,0,0.2)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 2,
+            }}>₹</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+      {/* Badge */}
+      {unreadCount > 0 && (
+        <View style={{
+          position: 'absolute', top: -4, right: -4,
+          backgroundColor: '#FF3B30', borderRadius: 10,
+          minWidth: 18, height: 16, paddingHorizontal: 4,
+          alignItems: 'center', justifyContent: 'center',
+          borderWidth: 1.5, borderColor: '#fff', zIndex: 10,
+        }}>
+          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+});
+
+/* -------------------------
    Animated Slide Pill
 ------------------------- */
 const PILL_WORDS = ['EARN REWARDS', 'GET FEATURED', 'LEVEL UP', 'EXPLORE DISHES'];
@@ -275,6 +377,21 @@ useEffect(() => {
     fetchRestaurantReviewsCount();
   }
 }, []);
+
+// Auto-play the first video post when feed finishes loading
+// onViewableItemsChanged won't fire for items already visible on mount
+useEffect(() => {
+  if (!loading && displayData.length > 0 && visibleVideoId === null) {
+    const firstVideo = displayData.find((post: any) => {
+      if (post.type === 'suggested_header') return false;
+      return post.media_type === 'video' || post.media_url?.toLowerCase().endsWith('.mp4');
+    });
+    if (firstVideo) {
+      setVisibleVideoId(String(firstVideo.id));
+      visibleVideoIdRef.current = String(firstVideo.id);
+    }
+  }
+}, [loading, displayData]);
 
 // Fetch own story as soon as auth is ready (token + user)
 useEffect(() => {
@@ -1058,7 +1175,7 @@ const renderPost = useCallback(
               <AnimatedPillText />
             </View>
 
-            <TouchableOpacity
+            <WalletButton
               onPress={async () => {
                 setShowWalletModal(true);
                 try {
@@ -1071,24 +1188,8 @@ const renderPost = useCallback(
                 } catch (err) {
                 }
               }}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={["#FF7A18", "#FF2E2E"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.walletGradientButton}
-              >
-                <Ionicons name="gift" size={18} color="#fff" />
-              </LinearGradient>
-              {walletUnreadCount > 0 && (
-                <View style={styles.walletPillBadge}>
-                  <Text style={styles.walletPillBadgeText}>
-                    {walletUnreadCount > 99 ? "99+" : walletUnreadCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+              unreadCount={walletUnreadCount}
+            />
           </View>
         </View>
       )}

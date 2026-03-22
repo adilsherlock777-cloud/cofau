@@ -38,7 +38,7 @@ async def create_notification(
     Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward", "new_order", "order_preparing", "order_in_progress", "order_completed"
     """
     # Don't notify yourself (except for wallet rewards and order notifications)
-    order_notification_types = ["wallet_reward", "order_preparing", "order_in_progress", "order_completed", "delivery_completed_reward", "reward_earned"]
+    order_notification_types = ["wallet_reward", "milestone_reached", "order_preparing", "order_in_progress", "order_completed", "delivery_completed_reward", "reward_earned"]
     if from_user_id == to_user_id and notification_type not in order_notification_types:
         return None
 
@@ -93,6 +93,8 @@ async def create_notification(
             message = f"{from_user['full_name']} liked your story"
         elif notification_type == "wallet_reward":
             message = "Congratulations! Wallet reward earned"
+        elif notification_type == "milestone_reached":
+            message = "Congratulations! You've reached a milestone! Claim your reward now!"
         elif notification_type == "restaurant_reply":
             message = f"{from_user['full_name']} replied to your review"
     
@@ -166,6 +168,8 @@ async def create_notification(
                     title = "Story Like"
                 elif notification_type == "wallet_reward":
                     title = "Wallet Reward"
+                elif notification_type == "milestone_reached":
+                    title = "Milestone Reached! 🎉"
                 elif notification_type == "new_order":
                     title = "New Order"
                 elif notification_type == "order_preparing":

@@ -5109,6 +5109,135 @@ async def share_preview(request: Request, post_id: str):
 
     return HTMLResponse(content=html)
 
+
+@app.get("/profile/{username}", response_class=HTMLResponse)
+async def share_profile_preview(request: Request, username: str):
+    """
+    Profile share page — returns OG meta tags for bots and smart redirect for users.
+    Opens the user's profile in the Cofau app, or redirects to app/play store.
+    """
+    db = get_database()
+
+    # Look up user by username
+    user = await db.users.find_one({"username": username})
+    if not user:
+        # Try as restaurant
+        user = await db.restaurants.find_one({"restaurant_name": username})
+
+    if not user:
+        # Try by user ID as fallback
+        try:
+            user = await db.users.find_one({"_id": ObjectId(username)})
+        except:
+            pass
+
+    if not user:
+        return HTMLResponse("<h1>Profile not found</h1>", status_code=404)
+
+    user_id = str(user["_id"])
+    display_name = user.get("full_name") or user.get("restaurant_name") or user.get("username", "Cofau User")
+    bio = user.get("bio", "")
+    uname = user.get("username") or user.get("restaurant_name", "")
+
+    BASE_URL = "https://api.cofau.com"
+    DEEP_LINK_URL = f"cofau://profile/{user_id}"
+    APP_STORE_URL = "https://apps.apple.com/app/cofau/id6758019920"
+    PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.cofau.app"
+
+    title = f"{display_name} (@{uname}) on Cofau"
+    description = bio[:160] if bio else f"Check out {display_name}'s profile on Cofau — discover amazing food reviews!"
+
+    # Profile picture
+    profile_pic = user.get("profile_picture") or user.get("profile_picture_url", "")
+    if profile_pic and not profile_pic.startswith("http"):
+        profile_pic = f"{BASE_URL}{profile_pic}"
+    if not profile_pic:
+        profile_pic = f"{BASE_URL}/static/cofau-logo.png"
+
+    # Detect bots
+    user_agent = request.headers.get("user-agent", "").lower()
+    is_bot = any(bot in user_agent for bot in [
+        "facebookexternalhit", "facebot", "twitterbot", "whatsapp",
+        "linkedinbot", "slackbot", "telegrambot", "pinterest",
+        "googlebot", "bingbot", "yandex", "applebot"
+    ])
+
+    if is_bot:
+        html = f"""<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>{title}</title>
+            <meta property="og:title" content="{title}" />
+            <meta property="og:description" content="{description}" />
+            <meta property="og:image" content="{profile_pic}" />
+            <meta property="og:url" content="{BASE_URL}/profile/{username}" />
+            <meta property="og:type" content="profile" />
+            <meta property="og:site_name" content="Cofau" />
+            <meta name="twitter:card" content="summary" />
+            <meta name="twitter:title" content="{title}" />
+            <meta name="twitter:description" content="{description}" />
+            <meta name="twitter:image" content="{profile_pic}" />
+        </head>
+        <body></body>
+        </html>"""
+        return HTMLResponse(content=html)
+
+    html = f"""<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>{title}</title>
+        <meta property="og:title" content="{title}" />
+        <meta property="og:description" content="{description}" />
+        <meta property="og:image" content="{profile_pic}" />
+        <meta property="og:url" content="{BASE_URL}/profile/{username}" />
+        <meta property="og:type" content="profile" />
+        <meta property="og:site_name" content="Cofau" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="{title}" />
+        <meta name="twitter:description" content="{description}" />
+        <meta name="twitter:image" content="{profile_pic}" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#FFF5F2; display:flex; justify-content:center; align-items:center; min-height:100vh;">
+        <div style="text-align:center; padding:40px 20px;">
+            <div style="width:80px; height:80px; background:linear-gradient(135deg,#FF2E2E,#FF7A18); border-radius:50%; margin:0 auto 20px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                <img src="{profile_pic}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size:32px; color:white; font-weight:bold;\\'>{display_name[0].upper()}</span>'" />
+            </div>
+            <h2 style="color:#333; margin:0 0 4px;">{display_name}</h2>
+            <p style="color:#888; font-size:14px; margin:0 0 8px;">@{uname}</p>
+            <p style="color:#666; font-size:13px; margin:0 0 24px; max-width:300px;">{description}</p>
+            <a id="store-link" href="#" style="display:inline-block; background:linear-gradient(90deg,#FF2E2E,#FF7A18); color:white; text-decoration:none; padding:14px 32px; border-radius:12px; font-weight:600; font-size:16px;">
+                Open in Cofau
+            </a>
+            <p style="color:#aaa; font-size:12px; margin-top:12px;">Don't have the app? Download it free!</p>
+        </div>
+        <script>
+            (function() {{
+                var deepLink = "{DEEP_LINK_URL}";
+                var ua = navigator.userAgent || '';
+                var isIOS = /iPhone|iPad|iPod/i.test(ua);
+                var isAndroid = /Android/i.test(ua);
+                var storeUrl = isIOS ? "{APP_STORE_URL}" : "{PLAY_STORE_URL}";
+
+                document.getElementById('store-link').href = storeUrl;
+
+                window.location.href = deepLink;
+
+                setTimeout(function() {{
+                    if (!document.hidden) {{
+                        window.location.href = storeUrl;
+                    }}
+                }}, 1500);
+            }})();
+        </script>
+    </body>
+    </html>"""
+
+    return HTMLResponse(content=html)
+
+
 # Debug endpoint for checking data
 from routers import check_data
 app.include_router(check_data.router)

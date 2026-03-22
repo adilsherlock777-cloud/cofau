@@ -17,6 +17,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Linking,
+  Share,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1093,6 +1094,20 @@ useEffect(() => {
     } catch (err) {
       console.error('❌ Error fetching follow status:', err);
       setIsFollowing(false);
+    }
+  };
+
+  const handleShareProfile = async () => {
+    const username = userData?.username || userData?.restaurant_name || 'user';
+    const displayName = userData?.full_name || userData?.restaurant_name || username;
+    const shareUrl = `https://api.cofau.com/profile/${username}`;
+    try {
+      await Share.share({
+        message: `Check out ${displayName}'s profile on Cofau! ${shareUrl}`,
+        url: shareUrl,
+      });
+    } catch (err) {
+      // user cancelled
     }
   };
 
@@ -5091,6 +5106,21 @@ if (isRestaurantProfile) {
                 <Text style={styles.actionButtonText}>Messages</Text>
               </LinearGradient>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={handleShareProfile}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="share-social" size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Share</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </>
         ) : (
           <>
@@ -5257,6 +5287,21 @@ if (isRestaurantProfile) {
               >
                 <Ionicons name="chatbubble" size={16} color="#fff" />
                 <Text style={styles.actionButtonText}>Messages</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButtonInsideWrapper}
+              onPress={handleShareProfile}
+            >
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                locations={[0, 0.35, 0.9]}
+                style={styles.actionButtonInside}
+              >
+                <Ionicons name="share-social" size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Share</Text>
               </LinearGradient>
             </TouchableOpacity>
           </>

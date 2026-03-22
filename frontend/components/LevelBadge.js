@@ -19,6 +19,11 @@ export default function LevelBadge({ level, size = 'small' }) {
 
   // Size configurations
   const sizeConfig = {
+    tiny: {
+      container: 11,
+      fontSize: 6,
+      borderWidth: 1,
+    },
     small: {
       container: 14,
       fontSize: 8,

@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Image as ExpoImage } from 'expo-image';
 import * as Location from 'expo-location';
 import { Video, ResizeMode } from 'expo-av';
 // createPost and createRestaurantPost replaced by UploadContext
@@ -276,6 +277,32 @@ const CATEGORIES = [
   { id: 'pizza', name: 'Pizza', emoji: '🍕' },
   { id: 'dosa', name: 'Dosa', emoji: '🫕' },
 ];
+
+const CATEGORY_IMAGES: { [id: string]: any } = {
+  'vegetarian-vegan': require('../assets/categories/vegetarian-vegan.png'),
+  'non-vegetarian': require('../assets/categories/non-vegetarian.png'),
+  'biryani': require('../assets/categories/biryani.png'),
+  'italian': require('../assets/categories/italian.png'),
+  'desserts': require('../assets/categories/desserts.png'),
+  'arabic': require('../assets/categories/arabic.png'),
+  'karnataka-style': require('../assets/categories/karnataka-style.png'),
+  'north-indian-style': require('../assets/categories/north-indian-style.png'),
+  'south-indian-style': require('../assets/categories/south-indian-style.png'),
+  'hyderabadi-style': require('../assets/categories/hyderabadi-style.png'),
+  'kerala-style': require('../assets/categories/kerala-style.png'),
+  'andhra-style': require('../assets/categories/andhra-style.png'),
+  'punjabi-style': require('../assets/categories/punjabi-style.png'),
+  'tea-coffee': require('../assets/categories/tea-coffee.png'),
+  'bengali-style': require('../assets/categories/bengali-style.png'),
+  'odia-style': require('../assets/categories/odia-style.png'),
+  'gujarati-style': require('../assets/categories/gujarati-style.png'),
+  'maharashtrian-style': require('../assets/categories/maharashtrian-style.png'),
+  'rajasthani-style': require('../assets/categories/rajasthani-style.png'),
+  'mangaluru-style': require('../assets/categories/mangaluru-style.png'),
+  'asian': require('../assets/categories/asian.png'),
+  'dosa': require('../assets/categories/dosa.png'),
+  'kashmiri': require('../assets/categories/kashmiri-style.png'),
+};
 
   // ------------------------------ MEDIA PICKERS ------------------------------
 
@@ -1206,7 +1233,11 @@ return (
             onPress={() => toggleCategory(item.name)}
           >
             <View style={styles.categoryItemContent}>
-              <View style={styles.categoryEmoji}>{renderCategoryIcon(item.emoji, 18)}</View>
+              {CATEGORY_IMAGES[item.id] ? (
+                <ExpoImage source={CATEGORY_IMAGES[item.id]} style={{ width: 32, height: 32, borderRadius: 16, marginRight: 8 }} contentFit="cover" />
+              ) : (
+                <View style={styles.categoryEmoji}>{renderCategoryIcon(item.emoji, 18)}</View>
+              )}
               <Text style={[
                 styles.categoryItemText,
                 categories.includes(item.name) && styles.categoryItemTextSelected

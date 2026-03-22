@@ -687,6 +687,7 @@ postId={post.id}
               size={32}
               level={post.user_level}
               showLevelBadge
+              badgeSize="tiny"
             />
             
             <View>

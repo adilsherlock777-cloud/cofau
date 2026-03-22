@@ -18,10 +18,14 @@ def get_create_notification():
 
 # Wallet reward amounts
 WALLET_REWARD_PER_POST = 10.0  # ₹10 per post (max 3 per week)
-WALLET_FIRST_POST_BONUS = 50.0  # First post bonus for new users
+WALLET_FIRST_POST_BONUS = 25.0  # First post bonus for new users
 POINTS_PER_POST = 25
 MAX_REWARDED_POSTS_PER_WEEK = 3  # Only first 3 posts per week earn rewards
 AMAZON_VOUCHER_THRESHOLD = 500.0  # Threshold to claim Amazon voucher
+
+# Milestone progression: user must complete each level before moving to next
+# After 250, jumps to 500 (Amazon voucher)
+MILESTONES = [100, 125, 150, 175, 200, 225, 250, 500]
 
 
 class WalletRewardResult:
@@ -256,11 +260,60 @@ async def process_wallet_reward(
 
     # 5. Get updated wallet balance
     updated_user = await db.users.find_one({"_id": ObjectId(user_id)})
+    new_balance = updated_user.get("wallet_balance", 0.0)
+
+    # 6. Check if user just reached a milestone — send congratulations notification
+    try:
+        claims_count = await db.voucher_claims.count_documents({"user_id": user_id})
+        milestone_info = get_current_milestone(claims_count)
+        current_target = milestone_info["target_amount"]
+        old_balance = new_balance - reward_result.wallet_earned
+
+        if old_balance < current_target <= new_balance:
+            create_notification = get_create_notification()
+            if milestone_info["is_amazon_voucher"]:
+                milestone_msg = f"You've reached ₹{int(current_target)}! Claim your Amazon voucher now!"
+            else:
+                milestone_msg = f"You've reached ₹{int(current_target)}! Claim your reward now!"
+
+            await create_notification(
+                db=db,
+                notification_type="milestone_reached",
+                from_user_id=user_id,
+                to_user_id=user_id,
+                post_id=post_id,
+                message=milestone_msg,
+                send_push=True
+            )
+            print(f"🎯 Milestone notification sent: {milestone_msg}")
+    except Exception as e:
+        print(f"⚠️ Failed to send milestone notification: {e}")
 
     return {
-        "wallet_balance": updated_user.get("wallet_balance", 0.0),
+        "wallet_balance": new_balance,
         "amount_earned": reward_result.wallet_earned,
         "transaction_id": str(transaction_result.inserted_id)
+    }
+
+
+def get_current_milestone(claims_count: int) -> dict:
+    """
+    Determine the current milestone target based on how many claims the user has completed.
+    Returns dict with target_amount, milestone_index, and is_amazon_voucher.
+    """
+    if claims_count < len(MILESTONES):
+        idx = claims_count
+    else:
+        # After completing all milestones, stay at 500 (Amazon voucher) forever
+        idx = len(MILESTONES) - 1
+
+    target = MILESTONES[idx]
+    is_amazon = (target == 500)
+
+    return {
+        "target_amount": float(target),
+        "milestone_index": idx,
+        "is_amazon_voucher": is_amazon,
     }
 
 
@@ -268,7 +321,8 @@ async def get_wallet_info(db, user_id: str) -> dict:
     """
     Get user's wallet information including:
     - Current balance
-    - Amount needed for Amazon voucher
+    - Current milestone target (progressive: 100 → 125 → ... → 250 → 500)
+    - Amount needed for current milestone
     - Recent transactions
     """
 
@@ -278,23 +332,29 @@ async def get_wallet_info(db, user_id: str) -> dict:
 
     wallet_balance = user.get("wallet_balance", 0.0)
 
-    amount_needed = max(0, AMAZON_VOUCHER_THRESHOLD - wallet_balance)
-    
+    # Count completed milestone/voucher claims to determine current target
+    claims_count = await db.voucher_claims.count_documents({"user_id": user_id})
+    milestone_info = get_current_milestone(claims_count)
+    current_target = milestone_info["target_amount"]
+
+    amount_needed = max(0, current_target - wallet_balance)
+    progress_percent = min((wallet_balance / current_target) * 100, 100) if current_target > 0 else 0
+
     # Get recent transactions (last 10)
     transactions = await db.wallet_transactions.find(
         {"user_id": user_id}
     ).sort("created_at", -1).limit(10).to_list(10)
-    
+
     formatted_transactions = []
     for tx in transactions:
         created_at = tx.get("created_at")
-        
+
         # Format date
         if isinstance(created_at, datetime):
             today = datetime.utcnow().date()
             yesterday = today - timedelta(days=1)
             tx_date = created_at.date()
-            
+
             if tx_date == today:
                 date_str = "Today"
             elif tx_date == yesterday:
@@ -303,7 +363,7 @@ async def get_wallet_info(db, user_id: str) -> dict:
                 date_str = created_at.strftime("%b %d")
         else:
             date_str = "Unknown"
-        
+
         formatted_transactions.append({
             "id": str(tx["_id"]),
             "date": date_str,
@@ -312,12 +372,14 @@ async def get_wallet_info(db, user_id: str) -> dict:
             "description": tx.get("description", ""),
             "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None
         })
-    
+
     return {
         "balance": wallet_balance,
-        "target_amount": AMAZON_VOUCHER_THRESHOLD,
+        "target_amount": current_target,
         "amount_needed": amount_needed,
-        "progress_percent": min((wallet_balance / AMAZON_VOUCHER_THRESHOLD) * 100, 100),
-        "can_claim_voucher": wallet_balance >= AMAZON_VOUCHER_THRESHOLD,
+        "progress_percent": progress_percent,
+        "can_claim": wallet_balance >= current_target,
+        "is_amazon_voucher": milestone_info["is_amazon_voucher"],
+        "milestone_index": milestone_info["milestone_index"],
         "recent_transactions": formatted_transactions
     }

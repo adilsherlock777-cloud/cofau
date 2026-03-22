@@ -466,21 +466,6 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
         tracksViewChanges={tracksChanges && !imageLoaded}
       >
         <View style={{ alignItems: 'center' }}>
-          {/* Post count pill badge */}
-          <View style={{
-            backgroundColor: '#E94A37',
-            borderRadius: 10,
-            paddingVertical: 2,
-            paddingHorizontal: 8,
-            marginBottom: 4,
-            flexDirection: 'row',
-            alignItems: 'center',
-            elevation: 6,
-          }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-              {count} {count === 1 ? 'post' : 'posts'}
-            </Text>
-          </View>
           {/* Photo thumbnail */}
           <View style={{ backgroundColor: '#FFFFFF', padding: 3, elevation: 5, borderRadius: 8 }}>
             {imageUrl ? (
@@ -501,6 +486,21 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
               <Ionicons name="eye" size={8} color="#fff" />
               <Text style={styles.markerViewsText}>{viewDisplay}</Text>
             </View>
+            {/* Post count badge - centered at bottom of image */}
+            <View style={{
+              position: 'absolute',
+              bottom: -8,
+              alignSelf: 'center',
+              backgroundColor: '#E94A37',
+              borderRadius: 10,
+              paddingVertical: 2,
+              paddingHorizontal: 8,
+              elevation: 6,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                {count} {count === 1 ? 'post' : 'posts'}
+              </Text>
+            </View>
           </View>
         </View>
       </Marker>
@@ -518,12 +518,6 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
       anchor={{ x: 0.5, y: 1 }}
     >
       <View style={{ alignItems: 'center' }}>
-        {/* Post count pill badge */}
-        <View style={styles.locationPostsBadge}>
-          <Text style={styles.locationPostsBadgeText}>
-            {count} {count === 1 ? 'post' : 'posts'}
-          </Text>
-        </View>
         {/* Photo thumbnail */}
         <View style={styles.locationMarkerBubble}>
           {imageUrl ? (
@@ -543,6 +537,20 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
           <View style={styles.markerViewsBadge}>
             <Ionicons name="eye" size={8} color="#fff" />
             <Text style={styles.markerViewsText}>{viewDisplay}</Text>
+          </View>
+          {/* Post count badge - centered at bottom of image */}
+          <View style={{
+            position: 'absolute',
+            bottom: -8,
+            alignSelf: 'center',
+            backgroundColor: '#E94A37',
+            borderRadius: 10,
+            paddingVertical: 2,
+            paddingHorizontal: 8,
+          }}>
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+              {count} {count === 1 ? 'post' : 'posts'}
+            </Text>
           </View>
         </View>
         <View style={styles.postMarkerArrow} />
@@ -3248,13 +3256,13 @@ return (
                         </View>
                       )}
                     </View>
-                    {/* Count badge — only on Map tab when posts exist */}
-                    {activeTab === 'map' && (preview?.count ?? 0) > 0 && (
-                      <View style={styles.categoryCardCountBadge}>
-                        <Text style={styles.categoryCardCountText}>{preview!.count > 99 ? '99+' : preview!.count}</Text>
-                      </View>
-                    )}
                   </View>
+                  {/* Count badge — above category name, centered */}
+                  {activeTab === 'map' && (preview?.count ?? 0) > 0 && (
+                    <View style={styles.categoryCardCountBadge}>
+                      <Text style={styles.categoryCardCountText}>{preview!.count > 99 ? '99+' : preview!.count}</Text>
+                    </View>
+                  )}
                   <Text
                     style={[
                       styles.categoryCardLabel,
@@ -3783,7 +3791,11 @@ return (
         }}
       >
         <View style={styles.categoryItemContent}>
-          <View style={styles.categoryEmoji}>{renderCategoryIcon(item.emoji, 18)}</View>
+          {CATEGORY_IMAGES[item.id] ? (
+            <Image source={CATEGORY_IMAGES[item.id]} style={{ width: 32, height: 32, borderRadius: 16, marginRight: 8 }} contentFit="cover" />
+          ) : (
+            <View style={styles.categoryEmoji}>{renderCategoryIcon(item.emoji, 18)}</View>
+          )}
           <Text style={[styles.categoryItemText, isSelected && styles.categoryItemTextSelected]}>
             {item.name}
           </Text>
@@ -5364,9 +5376,6 @@ categoryCardPlaceholder: {
   alignItems: 'center',
 },
 categoryCardCountBadge: {
-  position: 'absolute',
-  top: 0,
-  right: -2,
   backgroundColor: '#E94A37',
   borderRadius: 8,
   minWidth: 16,
@@ -5374,7 +5383,9 @@ categoryCardCountBadge: {
   justifyContent: 'center',
   alignItems: 'center',
   paddingHorizontal: 3,
-  borderWidth: 1,
+  marginTop: -10,
+  alignSelf: 'center',
+  borderWidth: 1.5,
   borderColor: '#fff',
 },
 categoryCardCountText: {
