@@ -178,16 +178,36 @@ export default function PendingRestaurants({ token, onStatsChange }) {
                     </div>
 
                     {/* FSSAI Document */}
-                    {docUrl && (
-                      <div className="mt-3">
-                        <button
-                          onClick={() => setDocPreview(docUrl)}
-                          className="inline-flex items-center gap-2 text-sm text-teal-600 hover:text-teal-800 font-medium bg-teal-50 px-3 py-1.5 rounded-lg transition"
-                        >
-                          {isPdf ? '📄' : '🖼️'} View FSSAI Document
-                        </button>
-                      </div>
-                    )}
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold text-gray-500 mb-2">FSSAI Document:</p>
+                      {docUrl ? (
+                        isPdf ? (
+                          <button
+                            onClick={() => setDocPreview(docUrl)}
+                            className="inline-flex items-center gap-2 text-sm text-teal-600 hover:text-teal-800 font-medium bg-teal-50 px-3 py-2 rounded-lg transition border border-teal-200"
+                          >
+                            📄 View PDF Document
+                          </button>
+                        ) : (
+                          <div
+                            className="cursor-pointer inline-block border-2 border-gray-200 rounded-lg overflow-hidden hover:border-teal-400 transition"
+                            onClick={() => setDocPreview(docUrl)}
+                          >
+                            <img
+                              src={docUrl}
+                              alt="FSSAI Document"
+                              className="w-48 h-32 object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                            />
+                            <div className="hidden w-48 h-32 items-center justify-center bg-gray-100 text-gray-400 text-sm">
+                              Failed to load image
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <span className="text-sm text-red-400 italic">No document uploaded</span>
+                      )}
+                    </div>
 
                     {/* Referred By */}
                     {r.referred_by && (
