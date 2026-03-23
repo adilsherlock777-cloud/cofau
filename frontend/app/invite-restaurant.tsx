@@ -151,11 +151,11 @@ export default function InviteRestaurantScreen() {
   // Filter referrals by tab
   const getFilteredReferrals = () => {
     switch (activeTab) {
-      case 0: // Onboarded
+      case 0:
         return data.referrals.filter((r) => r.status === 'approved');
-      case 1: // Pending
+      case 1:
         return data.referrals.filter((r) => r.status === 'pending_verification' || r.status === 'request_sent');
-      case 2: // Rejected
+      case 2:
         return data.referrals.filter((r) => r.status === 'rejected');
       default:
         return data.referrals;
@@ -184,7 +184,8 @@ export default function InviteRestaurantScreen() {
 
   const filteredReferrals = getFilteredReferrals();
   const progressWidth = Math.min(data.progress_percent, 100);
-  const milestoneMarkers = Array.from({ length: 10 }, (_, i) => i + 1);
+  const milestoneMarkers = Array.from({ length: 5 }, (_, i) => i + 1);
+  const remaining = data.claim_threshold - data.onboarded_count;
 
   if (loading) {
     return (
@@ -211,7 +212,7 @@ export default function InviteRestaurantScreen() {
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#1B7C82', '#2BA8B0']}
+        colors={['#FF2E2E', '#FF7A18']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.header}
@@ -224,8 +225,8 @@ export default function InviteRestaurantScreen() {
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Ionicons name="restaurant" size={20} color="#FFF" />
-          <Text style={styles.headerTitle}>INVITE RESTAURANT</Text>
+          <Ionicons name="storefront-outline" size={20} color="#FFF" />
+          <Text style={styles.headerTitle}>INVITE & EARN</Text>
           <Ionicons name="gift" size={20} color="#FFD700" />
         </View>
         <TouchableOpacity
@@ -243,6 +244,20 @@ export default function InviteRestaurantScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
+        {/* Hero Banner */}
+        <View style={styles.heroBanner}>
+          <LinearGradient
+            colors={['#FFF3E0', '#FFE0B2']}
+            style={styles.heroBannerBg}
+          >
+            <Text style={styles.heroEmoji}>₹375</Text>
+            <Text style={styles.heroTitle}>Refer 5 Restaurants. Get ₹375 Credited!</Text>
+            <Text style={styles.heroSubtitle}>
+              Earn ₹75 for every restaurant you bring to Cofau. Help local restaurants grow online!
+            </Text>
+          </LinearGradient>
+        </View>
+
         {/* Referral Code Card */}
         <View style={styles.codeCard}>
           <Text style={styles.codeLabel}>YOUR REFERRAL CODE</Text>
@@ -265,13 +280,13 @@ export default function InviteRestaurantScreen() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#1B7C82', '#2BA8B0']}
+              colors={['#FF2E2E', '#FF7A18']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.shareButtonGradient}
             >
               <Ionicons name="share-social" size={18} color="#FFF" />
-              <Text style={styles.shareButtonText}>Share with Restaurant</Text>
+              <Text style={styles.shareButtonText}>Share with Restaurant Owner</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -283,35 +298,38 @@ export default function InviteRestaurantScreen() {
               <View style={styles.coinIcon}>
                 <Text style={styles.coinText}>₹</Text>
               </View>
-              <Text style={styles.balanceAmount}>₹{data.referral_balance}</Text>
+              <View>
+                <Text style={styles.balanceAmount}>₹{data.referral_balance}</Text>
+                <Text style={styles.balanceLabel}>Referral Balance</Text>
+              </View>
             </View>
             <View style={styles.earningsRight}>
-              <Text style={styles.earningsLabel}>Earned</Text>
+              <Text style={styles.earningsLabel}>Total Earned</Text>
               <Text style={styles.totalEarned}>₹{data.total_earned}</Text>
             </View>
           </View>
 
-          {/* Progress Bar with milestone markers */}
+          {/* Progress Bar - 0 to 5 */}
           <View style={styles.progressSection}>
             <View style={styles.progressLabels}>
-              <Text style={styles.progressLabelLeft}>0</Text>
-              <Text style={styles.progressLabelRight}>{data.claim_threshold * data.reward_per_referral}</Text>
+              <Text style={styles.progressLabelLeft}>₹0</Text>
+              <Text style={styles.progressLabelRight}>₹{data.claim_threshold * data.reward_per_referral}</Text>
             </View>
             <View style={styles.progressBarBg}>
               <LinearGradient
-                colors={['#4CAF50', '#66BB6A']}
+                colors={['#FF8C42', '#FF7A18']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[styles.progressBarFill, { width: `${progressWidth}%` }]}
               />
-              {/* Milestone dots */}
+              {/* 5 milestone dots */}
               {milestoneMarkers.map((m) => (
                 <View
                   key={m}
                   style={[
                     styles.milestoneDot,
                     {
-                      left: `${(m / 10) * 100}%`,
+                      left: `${(m / 5) * 100}%`,
                       backgroundColor: data.onboarded_count >= m ? '#FFF' : 'rgba(255,255,255,0.4)',
                     },
                   ]}
@@ -321,9 +339,9 @@ export default function InviteRestaurantScreen() {
             <View style={styles.progressMeta}>
               <Text style={styles.referralCount}>
                 <Text style={styles.referralCountBold}>{data.onboarded_count}</Text>
-                <Text>/10 restaurants onboarded</Text>
+                <Text style={{ color: '#888' }}> / 5 restaurants onboarded</Text>
               </Text>
-              <Text style={styles.perReferral}>₹{data.reward_per_referral}/referral</Text>
+              <Text style={styles.perReferral}>₹{data.reward_per_referral} each</Text>
             </View>
           </View>
 
@@ -351,7 +369,7 @@ export default function InviteRestaurantScreen() {
                 <Ionicons name="lock-closed" size={18} color="#FFF" />
                 <Text style={styles.claimButtonText}>
                   {data.onboarded_count < data.claim_threshold
-                    ? `Onboard ${data.claim_threshold - data.onboarded_count} more to unlock`
+                    ? `Locked - Onboard ${remaining} more`
                     : 'No balance to claim'}
                 </Text>
               </>
@@ -408,7 +426,7 @@ export default function InviteRestaurantScreen() {
               </Text>
               {activeTab === 0 && (
                 <Text style={styles.emptyStateSubtext}>
-                  Share your referral code with restaurants to start earning!
+                  Share your code with restaurant owners to start earning ₹75 per referral!
                 </Text>
               )}
             </View>
@@ -471,7 +489,7 @@ export default function InviteRestaurantScreen() {
 
             <View style={styles.howItWorksIcon}>
               <LinearGradient
-                colors={['#1B7C82', '#2BA8B0']}
+                colors={['#FF2E2E', '#FF7A18']}
                 style={styles.howItWorksIconBg}
               >
                 <Ionicons name="gift" size={32} color="#FFF" />
@@ -515,8 +533,8 @@ export default function InviteRestaurantScreen() {
                 <Text style={styles.stepNumberText}>4</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>You Earn ₹75</Text>
-                <Text style={styles.stepDesc}>Once approved, ₹75 is added to your referral balance instantly</Text>
+                <Text style={styles.stepTitle}>You Earn ₹75 Instantly</Text>
+                <Text style={styles.stepDesc}>Once approved, ₹75 is credited to your referral balance</Text>
               </View>
             </View>
 
@@ -525,8 +543,8 @@ export default function InviteRestaurantScreen() {
                 <Text style={[styles.stepNumberText, { color: '#333' }]}>5</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Claim After 5 Referrals</Text>
-                <Text style={styles.stepDesc}>Once 5 restaurants are onboarded, claim your earnings via UPI</Text>
+                <Text style={styles.stepTitle}>Claim ₹375 After 5 Referrals</Text>
+                <Text style={styles.stepDesc}>Hit 5 successful referrals and withdraw your earnings via UPI</Text>
               </View>
             </View>
 
@@ -535,7 +553,14 @@ export default function InviteRestaurantScreen() {
               onPress={() => setShowHowItWorks(false)}
               activeOpacity={0.8}
             >
-              <Text style={styles.gotItButtonText}>Got It!</Text>
+              <LinearGradient
+                colors={['#FF2E2E', '#FF7A18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gotItButtonGradient}
+              >
+                <Text style={styles.gotItButtonText}>Start Earning Now!</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -568,7 +593,7 @@ export default function InviteRestaurantScreen() {
               </TouchableOpacity>
 
               <View style={styles.claimModalIcon}>
-                <Ionicons name="gift" size={40} color="#1B7C82" />
+                <Ionicons name="gift" size={40} color="#FF7A18" />
               </View>
 
               <Text style={styles.claimModalTitle}>Claim ₹{data.referral_balance}</Text>
@@ -716,7 +741,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -735,7 +760,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -744,10 +769,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  // Hero Banner
+  heroBanner: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  heroBannerBg: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  heroEmoji: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#FF7A18',
+    marginBottom: 6,
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
   // Code Card
   codeCard: {
     backgroundColor: '#FFF',
-    margin: 16,
+    marginHorizontal: 16,
     marginBottom: 10,
     borderRadius: 16,
     padding: 20,
@@ -772,10 +829,10 @@ const styles = StyleSheet.create({
   },
   codeBox: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#FFF5F0',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#1B7C82',
+    borderColor: '#FF7A18',
     borderStyle: 'dashed',
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -784,13 +841,13 @@ const styles = StyleSheet.create({
   codeText: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#1B7C82',
+    color: '#FF7A18',
     letterSpacing: 2,
   },
   copyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1B7C82',
+    backgroundColor: '#FF7A18',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
@@ -865,9 +922,14 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   balanceAmount: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '800',
     color: '#222',
+  },
+  balanceLabel: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '500',
   },
   earningsRight: {
     alignItems: 'flex-end',
@@ -886,7 +948,7 @@ const styles = StyleSheet.create({
 
   // Progress
   progressSection: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   progressLabels: {
     flexDirection: 'row',
@@ -900,12 +962,12 @@ const styles = StyleSheet.create({
   },
   progressLabelRight: {
     fontSize: 11,
-    color: '#999',
-    fontWeight: '600',
+    color: '#FF7A18',
+    fontWeight: '700',
   },
   progressBarBg: {
     height: 14,
-    backgroundColor: '#E8E8E8',
+    backgroundColor: '#F0F0F0',
     borderRadius: 7,
     overflow: 'hidden',
     position: 'relative',
@@ -930,17 +992,41 @@ const styles = StyleSheet.create({
   },
   referralCount: {
     fontSize: 12,
-    color: '#666',
   },
   referralCountBold: {
     fontWeight: '800',
-    color: '#222',
-    fontSize: 14,
+    color: '#FF7A18',
+    fontSize: 15,
   },
   perReferral: {
     fontSize: 12,
+    fontWeight: '700',
+    color: '#FF9800',
+    backgroundColor: '#FFF5F0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+
+  // Motivation
+  motivationBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F0',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FFE0CC',
+  },
+  motivationText: {
+    fontSize: 13,
+    color: '#E65100',
     fontWeight: '600',
-    color: '#4CAF50',
+    flex: 1,
+    lineHeight: 18,
   },
 
   // Claim Button
@@ -948,11 +1034,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1B7C82',
+    backgroundColor: '#FF7A18',
     paddingVertical: 14,
     borderRadius: 25,
     gap: 8,
-    shadowColor: '#1B7C82',
+    shadowColor: '#FF7A18',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -993,7 +1079,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tabActive: {
-    backgroundColor: '#1B7C82',
+    backgroundColor: '#FF7A18',
   },
   tabText: {
     fontSize: 13,
@@ -1013,7 +1099,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   tabBadgeActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   tabBadgeText: {
     fontSize: 11,
@@ -1045,6 +1131,7 @@ const styles = StyleSheet.create({
     color: '#BBB',
     textAlign: 'center',
     marginTop: 6,
+    lineHeight: 18,
   },
   referralItem: {
     flexDirection: 'row',
@@ -1164,7 +1251,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#1B7C82',
+    backgroundColor: '#FF7A18',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1190,11 +1277,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   gotItButton: {
-    backgroundColor: '#1B7C82',
-    paddingVertical: 14,
     borderRadius: 25,
-    alignItems: 'center',
+    overflow: 'hidden',
     marginTop: 8,
+  },
+  gotItButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
   },
   gotItButtonText: {
     fontSize: 15,
@@ -1216,7 +1305,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#E0F2F1',
+    backgroundColor: '#FFF5F0',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -1270,13 +1359,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1B7C82',
+    backgroundColor: '#FF7A18',
     paddingVertical: 14,
     borderRadius: 25,
     width: '100%',
     marginTop: 4,
     gap: 8,
-    shadowColor: '#1B7C82',
+    shadowColor: '#FF7A18',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1292,7 +1381,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   doneButton: {
-    backgroundColor: '#1B7C82',
+    backgroundColor: '#FF7A18',
     paddingVertical: 14,
     borderRadius: 25,
     alignItems: 'center',

@@ -5707,12 +5707,12 @@ if (isRestaurantProfile) {
                 }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.sidebarMenuIconContainer, { backgroundColor: '#E0F2F1' }]}>
-                  <Ionicons name="restaurant" size={22} color="#1B7C82" />
+                <View style={[styles.sidebarMenuIconContainer, { backgroundColor: '#FFF5F0' }]}>
+                  <Ionicons name="storefront-outline" size={22} color="#FF7A18" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sidebarMenuText}>Invite Restaurant & Earn</Text>
-                  <Text style={{ fontSize: 11, color: '#999', marginTop: 1 }}>Earn ₹75 per referral</Text>
+                  <Text style={{ fontSize: 11, color: '#FF9800', marginTop: 1, fontWeight: '600' }}>Earn ₹75 per referral</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>

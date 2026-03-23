@@ -124,6 +124,7 @@ function FeedCard({
   const shouldPlayRef = useRef(shouldPlay);
   shouldPlayRef.current = shouldPlay;
   const [isMuted, setIsMuted] = useState(muteState.isMuted);
+  const isMutedRef = useRef(muteState.isMuted);
 
 const [isLiked, setIsLiked] = useState(post.is_liked || false);
 const [likesCount, setLikes] = useState(post.likes || 0);
@@ -213,11 +214,19 @@ useEffect(() => {
 
 const dpRaw = normalizeProfilePicture(post.user_profile_picture);
 
-// Handle mute toggle - update local state + shared global state
-const handleMutePress = () => {
-  const newMuteState = !isMuted;
-  setIsMuted(newMuteState);
+// Handle mute toggle - update imperatively to avoid re-render pausing video
+const handleMutePress = async () => {
+  const newMuteState = !isMutedRef.current;
+  isMutedRef.current = newMuteState;
   muteState.isMuted = newMuteState;
+  // Update icon state
+  setIsMuted(newMuteState);
+  // Directly set mute on video without going through useEffect
+  if (videoRef.current) {
+    try {
+      await videoRef.current.setIsMutedAsync(newMuteState);
+    } catch (err) {}
+  }
   if (onMuteToggle) {
     onMuteToggle(newMuteState);
   }
@@ -242,7 +251,7 @@ useEffect(() => {
             setVideoReady(true);
           }
           // Set mute state based on global state
-          await videoRef.current.setIsMutedAsync(isMuted);
+          await videoRef.current.setIsMutedAsync(isMutedRef.current);
         } else {
           // If not loaded, wait a bit and try again (iOS sometimes needs this)
           setTimeout(async () => {
@@ -250,7 +259,7 @@ useEffect(() => {
               const newStatus = await videoRef.current.getStatusAsync();
               if (newStatus.isLoaded && !newStatus.isPlaying) {
                 await videoRef.current.playAsync();
-                await videoRef.current.setIsMutedAsync(isMuted);
+                await videoRef.current.setIsMutedAsync(isMutedRef.current);
               }
             } catch (err) {
             }
@@ -303,27 +312,15 @@ useEffect(() => {
 useEffect(() => {
   if (!isVideo || !shouldPlay) return;
   // Read global mute state when becoming the active video
-  if (isMuted !== muteState.isMuted) {
+  if (isMutedRef.current !== muteState.isMuted) {
+    isMutedRef.current = muteState.isMuted;
     setIsMuted(muteState.isMuted);
+    // Apply mute state directly
+    if (videoRef.current) {
+      videoRef.current.setIsMutedAsync(muteState.isMuted).catch(() => {});
+    }
   }
 }, [shouldPlay, isVideo]);
-
-// Update mute state on the video when isMuted changes
-useEffect(() => {
-  if (!isVideo || !videoRef.current || !shouldPlay) return;
-
-  const updateMuteState = async () => {
-    try {
-      const status = await videoRef.current.getStatusAsync();
-      if (status.isLoaded) {
-        await videoRef.current.setIsMutedAsync(isMuted);
-      }
-    } catch (err) {
-    }
-  };
-
-  updateMuteState();
-}, [isMuted, shouldPlay, isVideo]);
 
 const handleLike = async () => {
   const prev = isLiked;
@@ -779,7 +776,7 @@ postId={post.id}
             resizeMode="contain"
             shouldPlay={false}
             isLooping
-            isMuted={isMuted}
+            isMuted={true}
             useNativeControls={false}
             allowsExternalPlayback={false}
             playInSilentModeIOS={true}
@@ -805,7 +802,7 @@ postId={post.id}
                     const currentStatus = await videoRef.current.getStatusAsync();
                     if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlayRef.current) {
                       await videoRef.current.playAsync();
-                      await videoRef.current.setIsMutedAsync(isMuted);
+                      await videoRef.current.setIsMutedAsync(isMutedRef.current);
                     }
                   } catch (err) {
                   }
@@ -842,13 +839,13 @@ postId={post.id}
         
         {/* Mute/Unmute Button - Bottom right corner, only show when video is playing */}
         {shouldPlay && videoReady && !videoError && (
-          <TouchableOpacity
+          <View
             style={styles.muteButton}
-            onPress={(e) => {
+            onStartShouldSetResponder={() => true}
+            onResponderRelease={(e) => {
               e.stopPropagation();
               handleMutePress();
             }}
-            activeOpacity={0.7}
           >
             <View style={styles.muteButtonBackground}>
               <Ionicons
@@ -857,7 +854,7 @@ postId={post.id}
                 color="#fff"
               />
             </View>
-          </TouchableOpacity>
+          </View>
         )}
       </>
     ) : (
@@ -1377,9 +1374,10 @@ dishNameArrow: {
 // Mute button styles
 muteButton: {
   position: 'absolute',
-  bottom: 16,
-  right: 16,
-  zIndex: 15,
+  bottom: 12,
+  right: 12,
+  zIndex: 20,
+  padding: 6,
 },
 
 muteButtonBackground: {

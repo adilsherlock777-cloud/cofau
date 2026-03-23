@@ -1010,6 +1010,51 @@ const renderPost = useCallback(
         {showSuggestions && (
           <SuggestedUsersBar refreshTrigger={refreshing} />
         )}
+
+        {/* Referral promo card every 10 posts (regular users only) */}
+        {accountType !== 'restaurant' && realPostIndex >= 0 && (realPostIndex + 1) % 10 === 0 && (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => router.push('/invite-restaurant')}
+            style={{
+              marginHorizontal: 16,
+              marginVertical: 10,
+              borderRadius: 16,
+              overflow: 'hidden',
+            }}
+          >
+            <LinearGradient
+              colors={['#FF2E2E', '#FF7A18']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                padding: 18,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFF', marginBottom: 4 }}>
+                  Know a Restaurant Owner?
+                </Text>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', lineHeight: 18 }}>
+                  Invite them to Cofau & earn <Text style={{ fontWeight: '800', color: '#FFD700' }}>₹75</Text> per referral. Refer 5, get <Text style={{ fontWeight: '800', color: '#FFD700' }}>₹375!</Text>
+                </Text>
+              </View>
+              <View style={{
+                backgroundColor: '#FFF',
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 20,
+                marginLeft: 12,
+              }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FF2E2E' }}>
+                  Refer Now
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
     );
   },
