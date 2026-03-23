@@ -58,6 +58,13 @@ export default function RestaurantSignupScreen() {
   const [hasGst, setHasGst] = useState(false);
   const [fssaiDocument, setFssaiDocument] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
+  // Invite code states
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
+  const [inviteReferrer, setInviteReferrer] = useState<{ name: string; username: string } | null>(null);
+  const [checkingInviteCode, setCheckingInviteCode] = useState(false);
+  const inviteCodeTimeout = useRef<NodeJS.Timeout | null>(null);
+
   // UI states
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -271,6 +278,36 @@ const handleVerifyOtp = async () => {
     }
   };
 
+  // Invite code validation with debounce
+  const handleInviteCodeChange = (text: string) => {
+    const upperText = text.toUpperCase();
+    setInviteCode(upperText);
+    setInviteCodeValid(null);
+    setInviteReferrer(null);
+
+    if (inviteCodeTimeout.current) {
+      clearTimeout(inviteCodeTimeout.current);
+    }
+
+    if (upperText.trim().length < 5) return;
+
+    inviteCodeTimeout.current = setTimeout(async () => {
+      try {
+        setCheckingInviteCode(true);
+        const res = await axios.get(`${API_URL}/referral/validate-code/${encodeURIComponent(upperText.trim())}`);
+        if (res.data.valid) {
+          setInviteCodeValid(true);
+          setInviteReferrer({ name: res.data.referrer_name, username: res.data.referrer_username });
+        }
+      } catch {
+        setInviteCodeValid(false);
+        setInviteReferrer(null);
+      } finally {
+        setCheckingInviteCode(false);
+      }
+    }, 500);
+  };
+
   // Main signup handler
   const handleSignup = async () => {
     // Basic validation
@@ -355,6 +392,9 @@ const handleVerifyOtp = async () => {
         formData.append('phone_number', formatPhoneNumber(phoneNumber));
       }
       formData.append('phone_verified', otpVerified ? 'true' : 'false');
+      if (inviteCode.trim()) {
+        formData.append('invite_code', inviteCode.trim());
+      }
       if (latitude !== null) {
         formData.append('latitude', String(latitude));
       }
@@ -385,7 +425,7 @@ const handleVerifyOtp = async () => {
 
         showAlert(
           'Account Created! 🎉',
-          'Welcome to Cofau! Your restaurant account has been created.',
+          'Your profile is under review. If we need any additional documents, our team will contact you. Meanwhile, feel free to explore Cofau!',
           () => {
             router.replace('/(tabs)/feed');
           }
@@ -590,6 +630,48 @@ const handleVerifyOtp = async () => {
           <Ionicons name="shield-checkmark" size={18} color="#4CAF50" />
           <Text style={styles.verifiedPhoneText}>{formatPhoneNumber(phoneNumber)}</Text>
           <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+        </View>
+
+        {/* Invite Code Section */}
+        <View style={styles.inviteCodeSection}>
+          <Text style={styles.inviteCodeLabel}>Have an Invite Code?</Text>
+          <View style={[
+            styles.inputContainer,
+            inviteCodeValid === true && styles.inputSuccessBorder,
+            inviteCodeValid === false && styles.inputErrorBorder,
+          ]}>
+            <Ionicons name="ticket-outline" size={20} color="#1B7C82" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter invite code (optional)"
+              placeholderTextColor="#999"
+              value={inviteCode}
+              onChangeText={handleInviteCodeChange}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            {checkingInviteCode && (
+              <ActivityIndicator size="small" color="#1B7C82" style={{ marginRight: 10 }} />
+            )}
+            {inviteCodeValid === true && (
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={{ marginRight: 10 }} />
+            )}
+            {inviteCodeValid === false && inviteCode.length >= 5 && (
+              <Ionicons name="close-circle" size={20} color="#F44336" style={{ marginRight: 10 }} />
+            )}
+          </View>
+          {inviteReferrer && inviteCodeValid && (
+            <View style={styles.referrerInfo}>
+              <Ionicons name="person-circle" size={20} color="#1B7C82" />
+              <Text style={styles.referrerText}>
+                <Text style={styles.referrerName}>{inviteReferrer.name}</Text>
+                {' referred you to Cofau!'}
+              </Text>
+            </View>
+          )}
+          {inviteCodeValid === false && inviteCode.length >= 5 && (
+            <Text style={styles.inviteCodeError}>Invalid invite code. Please check and try again.</Text>
+          )}
         </View>
 
         {/* Form */}
@@ -1329,5 +1411,48 @@ coordsText: {
     fontSize: 16,
     color: '#2E7D32',
     fontWeight: '600',
+  },
+  inviteCodeSection: {
+    marginHorizontal: 4,
+    marginBottom: 8,
+    backgroundColor: '#F0FAFA',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#B2DFDB',
+  },
+  inviteCodeLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1B7C82',
+    marginBottom: 10,
+  },
+  inputSuccessBorder: {
+    borderColor: '#4CAF50',
+    borderWidth: 1.5,
+  },
+  referrerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+    gap: 8,
+  },
+  referrerText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  referrerName: {
+    fontWeight: '700',
+    color: '#1B7C82',
+  },
+  inviteCodeError: {
+    fontSize: 12,
+    color: '#F44336',
+    marginTop: 6,
+    marginLeft: 4,
   },
 });

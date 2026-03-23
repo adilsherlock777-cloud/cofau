@@ -39,6 +39,7 @@ from routers.places import router as places_router
 from routers.menu import router as menu_router
 from routers.admin_auth import router as admin_auth_router
 from routers.badge_requests import router as badge_requests_router
+from routers.restaurant_referral import router as referral_router
 from utils.wallet_system import calculate_wallet_reward, process_wallet_reward, WalletRewardResult
 
 # Import utils
@@ -574,6 +575,7 @@ app.include_router(places_router)
 app.include_router(menu_router)
 app.include_router(admin_auth_router)
 app.include_router(badge_requests_router)
+app.include_router(referral_router)
 
 
 

@@ -10,6 +10,10 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -505,7 +509,11 @@ const CofauWalletModal = ({ visible, onClose }) => {
 
           {/* Email Claim Modal */}
           {showEmailModal && (
-            <View style={styles.overlayModal}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <KeyboardAvoidingView
+              style={styles.overlayModal}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
               <View style={styles.emailModalContainer}>
                 <TouchableOpacity
                   style={styles.emailModalClose}
@@ -591,13 +599,23 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     )}
 
                     <TouchableOpacity
-                      style={[styles.submitButton, claimLoading && styles.submitButtonDisabled]}
-                      onPress={handleClaimVoucher}
-                      activeOpacity={0.8}
-                      disabled={claimLoading}
+                      style={[
+                        styles.submitButton,
+                        (claimLoading || !walletData.can_claim) && styles.submitButtonDisabled
+                      ]}
+                      onPress={walletData.can_claim ? handleClaimVoucher : null}
+                      activeOpacity={walletData.can_claim ? 0.8 : 1}
+                      disabled={claimLoading || !walletData.can_claim}
                     >
                       {claimLoading ? (
                         <ActivityIndicator size="small" color="#FFF" />
+                      ) : !walletData.can_claim ? (
+                        <>
+                          <Ionicons name="lock-closed" size={18} color="#FFF" />
+                          <Text style={styles.submitButtonText}>
+                            Earn ₹{walletData.amount_needed} more to unlock
+                          </Text>
+                        </>
                       ) : (
                         <>
                           <Ionicons name="send" size={18} color="#FFF" />
@@ -621,7 +639,8 @@ const CofauWalletModal = ({ visible, onClose }) => {
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
+            </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
           )}
         </View>
       </View>

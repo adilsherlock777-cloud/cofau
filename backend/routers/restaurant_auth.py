@@ -202,6 +202,7 @@ async def restaurant_signup_with_fssai(
     longitude: Optional[float] = Form(None),
     phone_number: Optional[str] = Form(None),
     phone_verified: Optional[bool] = Form(False),
+    invite_code: Optional[str] = Form(None),
 ):
     """Register a new restaurant with mandatory FSSAI document upload"""
     db = get_database()
@@ -317,7 +318,25 @@ async def restaurant_signup_with_fssai(
         "created_at": datetime.utcnow()
     }
 
-    await db.restaurants.insert_one(restaurant_doc)
+    # Add verification_status for admin review
+    restaurant_doc["verification_status"] = "pending"
+
+    result = await db.restaurants.insert_one(restaurant_doc)
+    restaurant_id = str(result.inserted_id)
+
+    # Handle invite/referral code
+    if invite_code and invite_code.strip():
+        referrer = await db.users.find_one({"referral_code": invite_code.strip().upper()})
+        if referrer:
+            await db.restaurant_referrals.insert_one({
+                "referrer_user_id": str(referrer["_id"]),
+                "referrer_username": referrer.get("username", ""),
+                "restaurant_id": restaurant_id,
+                "restaurant_name": restaurant_name.strip(),
+                "invite_code": invite_code.strip().upper(),
+                "status": "pending_verification",
+                "created_at": datetime.utcnow(),
+            })
 
     access_token = create_access_token(data={
         "sub": email,
@@ -327,7 +346,8 @@ async def restaurant_signup_with_fssai(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "account_type": "restaurant"
+        "account_type": "restaurant",
+        "verification_pending": True,
     }
 
 

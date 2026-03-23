@@ -5698,6 +5698,25 @@ if (isRestaurantProfile) {
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </TouchableOpacity>
 
+              {/* INVITE RESTAURANT & EARN */}
+              <TouchableOpacity
+                style={styles.sidebarMenuItem}
+                onPress={() => {
+                  setSettingsModalVisible(false);
+                  router.push('/invite-restaurant');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.sidebarMenuIconContainer, { backgroundColor: '#E0F2F1' }]}>
+                  <Ionicons name="restaurant" size={22} color="#1B7C82" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sidebarMenuText}>Invite Restaurant & Earn</Text>
+                  <Text style={{ fontSize: 11, color: '#999', marginTop: 1 }}>Earn ₹75 per referral</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+
               {/* APPLY FOR COFAU BADGE */}
               <TouchableOpacity
                 style={styles.sidebarMenuItem}

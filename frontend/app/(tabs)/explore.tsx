@@ -18,6 +18,7 @@ import {
   Easing,
   Keyboard,
   InteractionManager,
+  Linking,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -57,6 +58,9 @@ import * as Location from "expo-location";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "https://api.cofau.com";
 const API_URL = `${API_BASE_URL}/api`;
+
+// Default map location: JP Nagar / Jayanagar, Bangalore
+const DEFAULT_LOCATION = { latitude: 12.9100, longitude: 77.5850 };
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -876,10 +880,13 @@ const FollowingMarker = memo(({ location, onPress }: any) => {
   );
 });
 
-const LocationButton = memo(({ onPress }: { onPress: () => void }) => (
+const LocationButton = memo(({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) => (
   <TouchableOpacity style={styles.locationButton} onPress={onPress} activeOpacity={0.8}>
-    <View style={styles.locationButtonInner}>
-      <Ionicons name="locate" size={22} color="#E94A37" />
+    <View style={[styles.locationButtonInner, disabled && { backgroundColor: '#f0f0f0' }]}>
+      <Ionicons name={disabled ? "location-outline" : "locate"} size={22} color={disabled ? "#bbb" : "#E94A37"} />
+      {disabled && (
+        <View style={{ position: 'absolute', width: 26, height: 2, backgroundColor: '#bbb', transform: [{ rotate: '45deg' }] }} />
+      )}
     </View>
   </TouchableOpacity>
 ));
@@ -926,6 +933,9 @@ const MapViewComponent = memo(({
   selectedCategory,
   selectedFollowingUser,
   onBackToFollowingGrid,
+  locationPermissionDenied,
+  showLocationBanner,
+  onDismissLocationBanner,
 }: any) => {
   // Delay map mount on Android to let Google Play Services initialize
   const [mapReady, setMapReady] = React.useState(Platform.OS !== 'android');
@@ -1041,10 +1051,24 @@ const MapViewComponent = memo(({
     // Sort by post count descending — cap visible markers to prevent clutter
     visibleLocations.sort((a: any, b: any) => b.count - a.count);
     const maxMarkers = delta > 0.3 ? 8 : delta > 0.08 ? 15 : delta > 0.02 ? 30 : 999;
-    const locations = visibleLocations.slice(0, maxMarkers);
+    let locations = visibleLocations.slice(0, maxMarkers);
+
+    // Guarantee at least 10 nearby posts are always visible (for new app with less data)
+    const MIN_VISIBLE = 10;
+    if (locations.length < MIN_VISIBLE && allLocations.length > locations.length && userLocation) {
+      const already = new Set(locations.map((l: any) => l.id));
+      const remaining = allLocations
+        .filter((loc: any) => !already.has(loc.id))
+        .sort((a: any, b: any) => {
+          const distA = Math.abs(a.latitude - userLocation.latitude) + Math.abs(a.longitude - userLocation.longitude);
+          const distB = Math.abs(b.latitude - userLocation.latitude) + Math.abs(b.longitude - userLocation.longitude);
+          return distA - distB;
+        });
+      locations = [...locations, ...remaining.slice(0, MIN_VISIBLE - locations.length)];
+    }
 
     return { locations, zoomClusters: [], followingLocations };
-  }, [posts, filterType, selectedFollowingUser, currentRegion]);
+  }, [posts, filterType, selectedFollowingUser, currentRegion, userLocation]);
 
  // Get category emoji
 const getCategoryEmoji = (categoryName: string | null) => {
@@ -1098,20 +1122,23 @@ const getCategoryEmoji = (categoryName: string | null) => {
   const categoryEmoji = getCategoryEmoji(selectedCategory);
   
 
+  const mapCenter = userLocation || DEFAULT_LOCATION;
+  const showMap = mapReady && (userLocation || locationPermissionDenied);
+
   return (
     <View style={styles.mapContainer}>
-      {userLocation && mapReady ? (
+      {showMap ? (
         <MapErrorBoundary>
         <MapView
           ref={mapRef}
           style={styles.map}
           initialRegion={{
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
+            latitude: mapCenter.latitude,
+            longitude: mapCenter.longitude,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
-          showsUserLocation={true}
+          showsUserLocation={!!userLocation}
           showsMyLocationButton={false}
           showsCompass={true}
           onRegionChangeComplete={(region: any) => setCurrentRegion(region)}
@@ -1142,6 +1169,35 @@ const getCategoryEmoji = (categoryName: string | null) => {
         <View style={styles.mapLoadingContainer}>
           <ActivityIndicator size="large" color="#E94A37" />
           <Text style={styles.mapLoadingText}>Getting your location...</Text>
+        </View>
+      )}
+
+      {/* Location permission banner */}
+      {showLocationBanner && locationPermissionDenied && (
+        <View style={styles.locationBanner}>
+          <View style={styles.locationBannerContent}>
+            <Ionicons name="location-sharp" size={20} color="#E94A37" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.locationBannerTitle}>Turn on location</Text>
+              <Text style={styles.locationBannerText}>Discover local food gems around you</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.locationBannerButton}
+              onPress={() => {
+                Linking.openSettings();
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.locationBannerButtonText}>Enable</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onDismissLocationBanner}
+              style={{ padding: 4, marginLeft: 4 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={18} color="#999" />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -1191,7 +1247,7 @@ const getCategoryEmoji = (categoryName: string | null) => {
       </View>
 
       {/* Location Button */}
-      <LocationButton onPress={onCenterLocation} />
+      <LocationButton onPress={onCenterLocation} disabled={locationPermissionDenied} />
 
       {/* Back to Following Grid button */}
       {filterType === 'following' && selectedFollowingUser && (
@@ -1736,6 +1792,7 @@ export default function ExploreScreen() {
   const loadingRef = useRef(true);
   const pageRef = useRef(1);
   const feedSeedRef = useRef(Date.now().toString());
+  const feedLoopRef = useRef(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -1823,6 +1880,8 @@ export default function ExploreScreen() {
 
   // Map-specific state
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+  const [showLocationBanner, setShowLocationBanner] = useState(false);
   const [mapRestaurants, setMapRestaurants] = useState<any[]>([]);
   const [mapPosts, setMapPosts] = useState<any[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
@@ -1990,6 +2049,16 @@ const centerOnUserLocation = useCallback(async () => {
       latitudeDelta: 0.01,
       longitudeDelta: 0.01,
     }, 500);
+  } else if (locationPermissionDenied) {
+    // Permission was denied — prompt user to open settings
+    Alert.alert(
+      "Location Access Needed",
+      "Enable location to discover nearby food posts and restaurants around you.",
+      [
+        { text: "Not now", style: "cancel" },
+        { text: "Open Settings", onPress: () => Linking.openSettings() },
+      ]
+    );
   } else {
     const coords = await getCurrentLocation();
     if (coords && mapRef.current) {
@@ -2001,7 +2070,7 @@ const centerOnUserLocation = useCallback(async () => {
       }, 500);
     }
   }
-}, [userLocation]);
+}, [userLocation, locationPermissionDenied]);
   // ======================================================
   // LOCATION PERMISSION & FETCH
   // ======================================================
@@ -2010,15 +2079,16 @@ const centerOnUserLocation = useCallback(async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Location Permission Required",
-          "Please enable location access to see nearby restaurants and posts on the map.",
-          [{ text: "OK" }]
-        );
+        setLocationPermissionDenied(true);
+        setShowLocationBanner(true);
         return false;
       }
+      setLocationPermissionDenied(false);
+      setShowLocationBanner(false);
       return true;
     } catch (error) {
+      setLocationPermissionDenied(true);
+      setShowLocationBanner(true);
       return false;
     }
   };
@@ -2067,7 +2137,6 @@ const centerOnUserLocation = useCallback(async () => {
     return coords;
   } catch (error) {
     if (!mountedRef.current) return null;
-    Alert.alert("Location Error", "Could not get your current location. Please try again.");
     return null;
   }
 };
@@ -2076,7 +2145,7 @@ const centerOnUserLocation = useCallback(async () => {
   // ======================================================
 
 const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
-  if (!userLocation) return;
+  const loc = userLocation || DEFAULT_LOCATION;
 
   // If we have cached posts and not forcing refresh, use cache
   if (!forceRefresh && !searchTerm && cachedMapPosts.current.length > 0) {
@@ -2089,9 +2158,9 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
     let url: string;
 
     if (searchTerm && searchTerm.trim()) {
-      url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=50`;
+      url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${loc.latitude}&lng=${loc.longitude}&radius_km=50`;
     } else {
-      url = `${API_URL}/map/pins?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius_km=50`;
+      url = `${API_URL}/map/pins?lat=${loc.latitude}&lng=${loc.longitude}&radius_km=50`;
     }
 
     const response = await axios.get(url, {
@@ -2145,11 +2214,24 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
   }
 };
 
+// Fit map to search results when map search is active
+useEffect(() => {
+  if (mapSearchQuery && mapPosts.length > 0 && mapRef.current) {
+    const coords = mapPosts
+      .filter((p: any) => p.latitude && p.longitude)
+      .map((p: any) => ({ latitude: p.latitude, longitude: p.longitude }));
+    if (coords.length > 0) {
+      mapRef.current.fitToCoordinates(coords, {
+        edgePadding: { top: 120, right: 60, bottom: 60, left: 60 },
+        animated: true,
+      });
+    }
+  }
+}, [mapSearchQuery, mapPosts]);
+
 // Fetch followers posts for map with caching (NO RADIUS LIMIT - worldwide)
 const fetchFollowersPosts = async (forceRefresh = false) => {
-  if (!userLocation) {
-    return;
-  }
+  const loc = userLocation || DEFAULT_LOCATION;
 
   // If we have cached followers posts and not forcing refresh, use cache
   if (!forceRefresh && cachedFollowersPosts.current.length > 0) {
@@ -2160,7 +2242,7 @@ const fetchFollowersPosts = async (forceRefresh = false) => {
   setMapLoading(true);
   try {
     // No radius limit for followers - show all worldwide
-    const url = `${API_URL}/map/followers-posts?lat=${userLocation.latitude}&lng=${userLocation.longitude}`;
+    const url = `${API_URL}/map/followers-posts?lat=${loc.latitude}&lng=${loc.longitude}`;
 
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token || ""}` },
@@ -2502,6 +2584,12 @@ useEffect(() => {
     // If we don't have location, get it first
     if (!userLocation) {
       const coords = await getCurrentLocation();
+      // If permission denied, still fetch pins using default location
+      if (!coords && locationPermissionDenied) {
+        if (cachedMapPosts.current.length === 0 && mapPosts.length === 0) {
+          await fetchMapPins(undefined, true);
+        }
+      }
       // fetchMapPins will be called by the next useEffect run when userLocation updates
       return;
     }
@@ -2515,13 +2603,13 @@ useEffect(() => {
   };
 
   loadMapData();
-}, [activeTab, userLocation, accountType]);
+}, [activeTab, userLocation, locationPermissionDenied, accountType]);
 
 useFocusEffect(
   useCallback(() => {
     
     // When returning to this screen and map tab is active
-    if (activeTab === 'map' && userLocation) {
+    if (activeTab === 'map' && (userLocation || locationPermissionDenied)) {
       // Determine which cache to use based on filter type, filtered to selected user if applicable
       const cacheToUse = mapFilterType === 'following'
         ? (selectedFollowingUser
@@ -2777,7 +2865,7 @@ useFocusEffect(
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     scrollYRef.current = contentOffset.y;
     calculateVisibleVideos(contentOffset.y);
-    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - SCREEN_HEIGHT * 3) {
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - SCREEN_HEIGHT * 5) {
       if (hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) fetchPostsRef.current(false);
     }
   }, [calculateVisibleVideos]);
@@ -2811,6 +2899,7 @@ useFocusEffect(
         setPage(1); pageRef.current = 1;
         setHasMore(true); hasMoreRef.current = true;
         feedSeedRef.current = Date.now().toString();
+        feedLoopRef.current = 0;
         videoPositions.current.clear();
       } else {
         if (!hasMoreRef.current || loadingMoreRef.current) return;
@@ -2872,27 +2961,65 @@ useFocusEffect(
             const existingIds = new Set(prev.map((p) => p.id));
             return [...prev, ...restPosts.filter((np: any) => !existingIds.has(np.id))];
           });
+
+          // Pre-fetch thumbnails for background batch
+          InteractionManager.runAfterInteractions(() => {
+            restPosts.forEach((post: any) => {
+              const urlToPreFetch = post.full_thumbnail_url || post.full_image_url;
+              if (urlToPreFetch && !post._isVideo) {
+                Image.prefetch(urlToPreFetch);
+              }
+            });
+          });
         }
 
         const totalFetched = firstRes.data.length + (restRes.data?.length || 0);
-        if (totalFetched < POSTS_PER_PAGE) { setHasMore(false); hasMoreRef.current = false; }
-        setPage(2); pageRef.current = 2;
+        if (totalFetched < POSTS_PER_PAGE) {
+          // Not enough posts for a full page — reset seed so next fetch loops
+          feedSeedRef.current = Date.now().toString();
+          setPage(1); pageRef.current = 1;
+        } else {
+          setPage(2); pageRef.current = 2;
+        }
       } else {
         // Pagination: load next page normally
         let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}${sortParam}${seedParam}`;
         const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
-        if (res.data.length === 0) {
-          setHasMore(false); hasMoreRef.current = false;
+        if (res.data.length === 0 || res.data.length < POSTS_PER_PAGE) {
+          // End of feed reached — loop back with a new seed to reshuffle
+          feedLoopRef.current += 1;
+          const loop = feedLoopRef.current;
+          const newPosts = res.data.length > 0 ? res.data.map(mapPostData).map((p: any) => ({ ...p, _key: `${p.id}_L${loop}` })) : [];
+          if (newPosts.length > 0) {
+            setPosts((p) => [...p, ...newPosts]);
+          }
+          // Reset pagination with new seed for infinite scroll
+          feedSeedRef.current = Date.now().toString();
+          setPage(1); pageRef.current = 1;
+          // Keep hasMore true so scrolling continues
           return;
         }
 
-        const newPosts = res.data.map(mapPostData);
-        setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]);
+        const loop = feedLoopRef.current;
+        const newPosts = res.data.map(mapPostData).map((p: any) => loop > 0 ? { ...p, _key: `${p.id}_L${loop}` } : p);
+        if (loop > 0) {
+          setPosts((p) => [...p, ...newPosts]);
+        } else {
+          setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]);
+        }
         setPage((prev) => { pageRef.current = prev + 1; return prev + 1; });
 
-        if (newPosts.length < POSTS_PER_PAGE) { setHasMore(false); hasMoreRef.current = false; }
+        // Pre-fetch thumbnails for new posts so images are ready when they scroll into view
+        InteractionManager.runAfterInteractions(() => {
+          newPosts.forEach((post: any) => {
+            const urlToPreFetch = post.full_thumbnail_url || post.full_image_url;
+            if (urlToPreFetch && !post._isVideo) {
+              Image.prefetch(urlToPreFetch);
+            }
+          });
+        });
       }
     } catch (err) {
       if (!mountedRef.current) return;
@@ -2938,7 +3065,40 @@ useFocusEffect(
     }
   }, [tab]);
 
-  const performSearch = () => { if (searchQuery.trim()) { Keyboard.dismiss(); const q = searchQuery.trim(); setSearchQuery(''); router.push({ pathname: "/search-results", params: { query: q } }); } };
+  const performSearch = () => {
+    if (!searchQuery.trim()) return;
+    Keyboard.dismiss();
+    const q = searchQuery.trim();
+    if (activeTab === 'map') {
+      // Search on map — show results as pins, then fit map to results
+      setMapSearchQuery(q);
+      setSearchQuery('');
+      fetchMapPins(q, true);
+    } else {
+      setSearchQuery('');
+      router.push({ pathname: "/search-results", params: { query: q } });
+    }
+  };
+
+  const clearMapSearch = () => {
+    setMapSearchQuery('');
+    // Restore cached nearby posts
+    if (cachedMapPosts.current.length > 0) {
+      setMapPosts(cachedMapPosts.current);
+      setMapRestaurants(cachedMapRestaurants.current);
+    } else {
+      fetchMapPins(undefined, true);
+    }
+    // Re-center map on user location
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 500);
+    }
+  };
   const toggleCategory = (itemName: string) => { 
   setSelectedCategories((prev) => 
     prev.includes(itemName) 
@@ -3105,6 +3265,7 @@ return (
       style={[styles.toggleTab, activeTab === 'users' && styles.toggleTabActive]}
       onPress={() => {
         if (activeTab !== 'users') {
+          if (mapSearchQuery) clearMapSearch();
           setActiveTab('users');
           if (posts.length === 0) {
             setLoading(true);
@@ -3131,6 +3292,7 @@ return (
       style={[styles.toggleTab, activeTab === 'popular' && styles.toggleTabActive]}
       onPress={() => {
         if (activeTab !== 'popular') {
+          if (mapSearchQuery) clearMapSearch();
           setActiveTab('popular');
           setPlayingVideos([]);
           if (accountType === 'restaurant' && posts.length === 0) {
@@ -3174,33 +3336,44 @@ return (
                 <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
               </TouchableOpacity>
               <View style={{ flex: 1, justifyContent: 'center' }}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder=""
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  returnKeyType="search"
-                  onSubmitEditing={performSearch}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                />
-                {!searchQuery && !searchFocused && (
-                  <View style={styles.animatedPlaceholder} pointerEvents="none">
-                    <Text style={styles.animatedPlaceholderStatic}>Search for </Text>
-                    <View style={{ height: 18, overflow: 'hidden', justifyContent: 'center' }}>
-                      <Animated.Text
-                        style={[
-                          styles.animatedPlaceholderTyping,
-                          {
-                            transform: [{ translateY: slideAnim }],
-                            opacity: opacityAnim,
-                          },
-                        ]}
-                      >
-                        {currentPhrase}
-                      </Animated.Text>
-                    </View>
+                {activeTab === 'map' && mapSearchQuery ? (
+                  <View style={styles.mapSearchChip}>
+                    <Text style={styles.mapSearchChipText} numberOfLines={1}>{mapSearchQuery}</Text>
+                    <TouchableOpacity onPress={clearMapSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="close-circle" size={18} color="#E94A37" />
+                    </TouchableOpacity>
                   </View>
+                ) : (
+                  <>
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder=""
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      returnKeyType="search"
+                      onSubmitEditing={performSearch}
+                      onFocus={() => setSearchFocused(true)}
+                      onBlur={() => setSearchFocused(false)}
+                    />
+                    {!searchQuery && !searchFocused && (
+                      <View style={styles.animatedPlaceholder} pointerEvents="none">
+                        <Text style={styles.animatedPlaceholderStatic}>Search for </Text>
+                        <View style={{ height: 18, overflow: 'hidden', justifyContent: 'center' }}>
+                          <Animated.Text
+                            style={[
+                              styles.animatedPlaceholderTyping,
+                              {
+                                transform: [{ translateY: slideAnim }],
+                                opacity: opacityAnim,
+                              },
+                            ]}
+                          >
+                            {currentPhrase}
+                          </Animated.Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
 
@@ -3685,6 +3858,9 @@ return (
       selectedCategory={selectedQuickCategory ? QUICK_CATEGORIES.find(c => c.id === selectedQuickCategory)?.name : null}
       selectedFollowingUser={selectedFollowingUser}
       onBackToFollowingGrid={handleBackToFollowingGrid}
+      locationPermissionDenied={locationPermissionDenied}
+      showLocationBanner={showLocationBanner}
+      onDismissLocationBanner={() => setShowLocationBanner(false)}
     />
 ) : activeTab === 'popular' && accountType !== 'restaurant' ? (
         // POPULAR / HAPPENING PLACES VIEW (regular users only)
@@ -3714,7 +3890,7 @@ return (
               <View style={styles.masonryContainer}>
                 {columns.map((column, columnIndex) => (
                   <View key={columnIndex} style={styles.column}>
-                    {column.map((item) => <GridTile key={item.id} item={item} onPress={handlePostPressGrid} onLike={handleLike} onVideoLayout={handleVideoLayout} playingVideos={playingVideos} onView={handleView} />)}
+                    {column.map((item) => <GridTile key={item._key || item.id} item={item} onPress={handlePostPressGrid} onLike={handleLike} onVideoLayout={handleVideoLayout} playingVideos={playingVideos} onView={handleView} />)}
                   </View>
                 ))}
               </View>
@@ -4099,6 +4275,21 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'android' ? 4 : 0,
     includeFontPadding: false,
     textAlignVertical: 'center',
+  },
+  mapSearchChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: '#FFF0EE',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 6,
+  },
+  mapSearchChipText: {
+    fontSize: 13,
+    color: '#E94A37',
+    fontWeight: '600' as const,
+    flexShrink: 1,
   },
   animatedPlaceholder: {
     position: 'absolute' as const,
@@ -5185,6 +5376,50 @@ clusterCountTextAndroid: {
   fontWeight: 'bold',
 },
 
+// LOCATION PERMISSION BANNER
+locationBanner: {
+  position: 'absolute',
+  top: 56,
+  left: 12,
+  right: 12,
+  zIndex: 200,
+},
+locationBannerContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#fff',
+  borderRadius: 14,
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.15,
+  shadowRadius: 6,
+  elevation: 6,
+},
+locationBannerTitle: {
+  fontSize: 13,
+  fontWeight: '700',
+  color: '#222',
+},
+locationBannerText: {
+  fontSize: 11,
+  color: '#777',
+  marginTop: 1,
+},
+locationBannerButton: {
+  backgroundColor: '#E94A37',
+  borderRadius: 8,
+  paddingHorizontal: 14,
+  paddingVertical: 7,
+  marginLeft: 8,
+},
+locationBannerButtonText: {
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: '700',
+},
+
 // FLOATING MAP TOGGLE STYLES
 mapFloatingToggle: {
   position: 'absolute',
@@ -5230,7 +5465,7 @@ mapToggleTextActive: {
 },
 locationButton: {
   position: 'absolute',
-  bottom: 140,
+  bottom: 80,
   right: 16,
   zIndex: 100,
 },

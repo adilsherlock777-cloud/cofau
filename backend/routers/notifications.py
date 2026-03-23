@@ -38,7 +38,7 @@ async def create_notification(
     Types: "like", "comment", "follow", "new_post", "message", "compliment", "wallet_reward", "new_order", "order_preparing", "order_in_progress", "order_completed"
     """
     # Don't notify yourself (except for wallet rewards and order notifications)
-    order_notification_types = ["wallet_reward", "milestone_reached", "order_preparing", "order_in_progress", "order_completed", "delivery_completed_reward", "reward_earned"]
+    order_notification_types = ["wallet_reward", "milestone_reached", "order_preparing", "order_in_progress", "order_completed", "delivery_completed_reward", "reward_earned", "referral_approved", "referral_rejected", "restaurant_approved", "restaurant_rejected"]
     if from_user_id == to_user_id and notification_type not in order_notification_types:
         return None
 
@@ -182,6 +182,14 @@ async def create_notification(
                     title = "Delivery Reward!"
                 elif notification_type == "reward_earned":
                     title = "Reward Earned!"
+                elif notification_type == "referral_approved":
+                    title = "Referral Reward! 🎉"
+                elif notification_type == "referral_rejected":
+                    title = "Referral Update"
+                elif notification_type == "restaurant_approved":
+                    title = "Restaurant Approved! 🎉"
+                elif notification_type == "restaurant_rejected":
+                    title = "Verification Update"
 
                 await send_push_notification(
                     device_tokens=device_tokens,

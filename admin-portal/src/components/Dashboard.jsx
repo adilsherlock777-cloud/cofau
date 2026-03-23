@@ -5,6 +5,7 @@ import VoucherClaims from './VoucherClaims';
 import NewUsers from './NewUsers';
 import ManagePosts from './ManagePosts';
 import SendNotification from './SendNotification';
+import PendingRestaurants from './PendingRestaurants';
 
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000/api'
@@ -151,6 +152,11 @@ export default function Dashboard({ admin, onLogout }) {
             label="Send Notification"
           />
           <TabButton
+            active={activeTab === 'restaurants'}
+            onClick={() => setActiveTab('restaurants')}
+            label="Restaurants"
+          />
+          <TabButton
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
             label="Overview"
@@ -176,6 +182,10 @@ export default function Dashboard({ admin, onLogout }) {
 
         {activeTab === 'send-notification' && (
           <SendNotification token={admin.token} />
+        )}
+
+        {activeTab === 'restaurants' && (
+          <PendingRestaurants token={admin.token} onStatsChange={fetchStats} />
         )}
 
         {activeTab === 'overview' && (
