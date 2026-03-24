@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cofau",
     "slug": "cofau-app",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "scheme": "cofau",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "10",
+      "buildNumber": "11",
       "bundleIdentifier": "com.cofau.app",
       "googleServicesFile": "./GoogleService-Info.plist", 
       "associatedDomains": ["applinks:api.cofau.com"],
@@ -34,7 +34,7 @@
     },
     "android": {
       "package": "com.cofau.app",
-      "versionCode": 12,
+      "versionCode": 13,
       "googleServicesFile": "./google-services.json",
       "useNextNotificationsApi": true,
       "intentFilters": [
@@ -102,7 +102,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#4dd0e1",
+          "color": "#FF8C42",
           "sounds": [],
           "defaultChannel": "default_v3"
         }
