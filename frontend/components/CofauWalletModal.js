@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -14,12 +14,14 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  Animated,
 } from "react-native";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import ConfettiCannon from "react-native-confetti-cannon";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -41,7 +43,13 @@ const CofauWalletModal = ({ visible, onClose }) => {
   const [claimUpi, setClaimUpi] = useState("");
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimMessage, setClaimMessage] = useState(null);
+  const [claimSuccess, setClaimSuccess] = useState(false);
+  const [claimSuccessAmount, setClaimSuccessAmount] = useState(0);
+  const [claimSuccessIsAmazon, setClaimSuccessIsAmazon] = useState(false);
   const [transactionsVersion, setTransactionsVersion] = useState(0);
+  const confettiRef = useRef(null);
+  const successScaleAnim = useRef(new Animated.Value(0)).current;
+  const successOpacityAnim = useRef(new Animated.Value(0)).current;
   const [walletData, setWalletData] = useState({
     balance: 0,
     target_amount: 100,
@@ -127,10 +135,29 @@ const CofauWalletModal = ({ visible, onClose }) => {
       );
 
       if (response.data.success) {
-        setClaimMessage({ type: "success", text: response.data.message });
+        setClaimSuccessAmount(walletData.target_amount);
+        setClaimSuccessIsAmazon(walletData.is_amazon_voucher);
         setClaimEmail("");
         setClaimPhone("");
         setClaimUpi("");
+        setShowEmailModal(false);
+        setClaimMessage(null);
+        setClaimSuccess(true);
+        // Trigger animations
+        Animated.parallel([
+          Animated.spring(successScaleAnim, {
+            toValue: 1,
+            friction: 4,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+          Animated.timing(successOpacityAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        setTimeout(() => confettiRef.current?.start(), 300);
         // Refresh from backend to get next milestone target
         await fetchWalletData();
         setTransactionsVersion((prev) => prev + 1);
@@ -541,106 +568,149 @@ const CofauWalletModal = ({ visible, onClose }) => {
                     : "Please enter your details to receive your reward via UPI"}
                 </Text>
 
-                {claimMessage && (
-                  <View style={[
-                    styles.claimMessageBox,
-                    claimMessage.type === "success" ? styles.claimMessageSuccess : styles.claimMessageError
-                  ]}>
-                    <Ionicons
-                      name={claimMessage.type === "success" ? "checkmark-circle" : "alert-circle"}
-                      size={20}
-                      color={claimMessage.type === "success" ? "#4CAF50" : "#F44336"}
-                    />
-                    <Text style={[
-                      styles.claimMessageText,
-                      claimMessage.type === "success" ? styles.claimMessageTextSuccess : styles.claimMessageTextError
-                    ]}>
+                {claimMessage && claimMessage.type === "error" && (
+                  <View style={[styles.claimMessageBox, styles.claimMessageError]}>
+                    <Ionicons name="alert-circle" size={20} color="#F44336" />
+                    <Text style={[styles.claimMessageText, styles.claimMessageTextError]}>
                       {claimMessage.text}
                     </Text>
                   </View>
                 )}
 
-                {!claimMessage?.type || claimMessage?.type === "error" ? (
-                  <>
-                    <TextInput
-                      style={styles.emailInput}
-                      placeholder="Enter your email address"
-                      placeholderTextColor="#999"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      value={claimEmail}
-                      onChangeText={setClaimEmail}
-                      editable={!claimLoading}
-                    />
+                <TextInput
+                  style={styles.emailInput}
+                  placeholder="Enter your email address"
+                  placeholderTextColor="#999"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={claimEmail}
+                  onChangeText={setClaimEmail}
+                  editable={!claimLoading}
+                />
 
-                    <TextInput
-                      style={styles.emailInput}
-                      placeholder="Enter your phone number"
-                      placeholderTextColor="#999"
-                      keyboardType="phone-pad"
-                      value={claimPhone}
-                      onChangeText={setClaimPhone}
-                      editable={!claimLoading}
-                    />
+                <TextInput
+                  style={styles.emailInput}
+                  placeholder="Enter your phone number"
+                  placeholderTextColor="#999"
+                  keyboardType="phone-pad"
+                  value={claimPhone}
+                  onChangeText={setClaimPhone}
+                  editable={!claimLoading}
+                />
 
-                    {!walletData.is_amazon_voucher && (
-                      <TextInput
-                        style={styles.emailInput}
-                        placeholder="Enter your UPI ID (e.g. name@upi)"
-                        placeholderTextColor="#999"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        value={claimUpi}
-                        onChangeText={setClaimUpi}
-                        editable={!claimLoading}
-                      />
-                    )}
-
-                    <TouchableOpacity
-                      style={[
-                        styles.submitButton,
-                        (claimLoading || !walletData.can_claim) && styles.submitButtonDisabled
-                      ]}
-                      onPress={walletData.can_claim ? handleClaimVoucher : null}
-                      activeOpacity={walletData.can_claim ? 0.8 : 1}
-                      disabled={claimLoading || !walletData.can_claim}
-                    >
-                      {claimLoading ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                      ) : !walletData.can_claim ? (
-                        <>
-                          <Ionicons name="lock-closed" size={18} color="#FFF" />
-                          <Text style={styles.submitButtonText}>
-                            Earn ₹{walletData.amount_needed} more to unlock
-                          </Text>
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons name="send" size={18} color="#FFF" />
-                          <Text style={styles.submitButtonText}>Submit</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.doneButton}
-                    onPress={() => {
-                      setShowEmailModal(false);
-                      setClaimEmail("");
-                      setClaimPhone("");
-                      setClaimMessage(null);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.doneButtonText}>Done</Text>
-                  </TouchableOpacity>
+                {!walletData.is_amazon_voucher && (
+                  <TextInput
+                    style={styles.emailInput}
+                    placeholder="Enter your UPI ID (e.g. name@upi)"
+                    placeholderTextColor="#999"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={claimUpi}
+                    onChangeText={setClaimUpi}
+                    editable={!claimLoading}
+                  />
                 )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    (claimLoading || !walletData.can_claim) && styles.submitButtonDisabled
+                  ]}
+                  onPress={walletData.can_claim ? handleClaimVoucher : null}
+                  activeOpacity={walletData.can_claim ? 0.8 : 1}
+                  disabled={claimLoading || !walletData.can_claim}
+                >
+                  {claimLoading ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : !walletData.can_claim ? (
+                    <>
+                      <Ionicons name="lock-closed" size={18} color="#FFF" />
+                      <Text style={styles.submitButtonText}>
+                        Earn ₹{walletData.amount_needed} more to unlock
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={18} color="#FFF" />
+                      <Text style={styles.submitButtonText}>Submit</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
             </KeyboardAvoidingView>
             </TouchableWithoutFeedback>
+          )}
+
+          {/* Claim Success Celebration */}
+          {claimSuccess && (
+            <View style={styles.celebrationOverlay}>
+              <ConfettiCannon
+                ref={confettiRef}
+                count={150}
+                origin={{ x: SCREEN_WIDTH / 2, y: -20 }}
+                autoStart={false}
+                fadeOut={true}
+                fallSpeed={3000}
+                colors={["#FF9800", "#FFD700", "#4CAF50", "#FF5722", "#2196F3", "#E91E63"]}
+              />
+              <Animated.View
+                style={[
+                  styles.celebrationCard,
+                  {
+                    opacity: successOpacityAnim,
+                    transform: [{ scale: successScaleAnim }],
+                  },
+                ]}
+              >
+                <View style={styles.celebrationCheckCircle}>
+                  <Ionicons name="checkmark" size={44} color="#FFF" />
+                </View>
+
+                <Text style={styles.celebrationTitle}>Congratulations!</Text>
+
+                <Text style={styles.celebrationAmount}>
+                  {claimSuccessIsAmazon ? "Amazon Voucher" : `₹${claimSuccessAmount}`}
+                </Text>
+
+                <Text style={styles.celebrationMessage}>
+                  {claimSuccessIsAmazon
+                    ? "Your Amazon voucher request has been submitted! You'll receive it in your email soon."
+                    : "Your reward has been claimed successfully! Money will be credited to your UPI account."}
+                </Text>
+
+                <View style={styles.celebrationDivider} />
+
+                <View style={styles.celebrationInfoRow}>
+                  <Ionicons name="time-outline" size={18} color="#888" />
+                  <Text style={styles.celebrationInfoText}>
+                    {claimSuccessIsAmazon
+                      ? "Voucher will be sent within 24-48 hours"
+                      : "Amount will be credited within 24-48 hours"}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.celebrationDoneButton}
+                  onPress={() => {
+                    setClaimSuccess(false);
+                    successScaleAnim.setValue(0);
+                    successOpacityAnim.setValue(0);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={["#4CAF50", "#66BB6A"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.celebrationDoneGradient}
+                  >
+                    <Text style={styles.celebrationDoneText}>Awesome!</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
           )}
         </View>
       </View>
@@ -1311,6 +1381,99 @@ const styles = StyleSheet.create({
   },
   claimMessageTextError: {
     color: "#C62828",
+  },
+  celebrationOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+  },
+  celebrationCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    padding: 32,
+    width: "88%",
+    maxWidth: 340,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  celebrationCheckCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  celebrationTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#222",
+    marginBottom: 8,
+  },
+  celebrationAmount: {
+    fontSize: 36,
+    fontWeight: "900",
+    color: "#FF9800",
+    marginBottom: 12,
+  },
+  celebrationMessage: {
+    fontSize: 15,
+    color: "#555",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 20,
+    paddingHorizontal: 8,
+  },
+  celebrationDivider: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#F0F0F0",
+    marginBottom: 16,
+  },
+  celebrationInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 24,
+  },
+  celebrationInfoText: {
+    fontSize: 13,
+    color: "#888",
+  },
+  celebrationDoneButton: {
+    width: "100%",
+    borderRadius: 25,
+    overflow: "hidden",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  celebrationDoneGradient: {
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  celebrationDoneText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFF",
   },
 });
 

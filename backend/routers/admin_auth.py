@@ -10,7 +10,7 @@ from utils.level_system import recalculate_points_from_post_count
 from config import settings
 from pydantic import BaseModel
 from typing import Optional, List
-from utils.push_notifications import send_push_notification, separate_tokens_by_platform
+from utils.push_notifications import send_push_notification, separate_tokens_by_platform, get_user_device_tokens
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
@@ -202,19 +202,43 @@ async def process_voucher_claim(
         },
     )
 
-    # Notify user
+    # Notify user - save notification and send push
+    user_id = claim["user_id"]
+    claim_type = claim.get("claim_type", "voucher_claim")
+    is_amazon = claim_type == "voucher_claim"
+    milestone_amount = claim.get("milestone_amount", 0)
+
+    notif_title = "Voucher Sent!" if is_amazon else "Reward Processed!"
+    notif_message = (
+        "Your Amazon voucher has been processed and sent to your email."
+        if is_amazon
+        else f"Your ₹{int(milestone_amount)} reward has been processed and will be credited to your UPI account."
+    )
+
     try:
         notification = {
-            "to_user_id": claim["user_id"],
             "type": "voucher_processed",
-            "title": "Voucher Sent!",
-            "message": "Your Amazon voucher has been processed and sent to your email.",
-            "read": False,
-            "created_at": datetime.utcnow(),
+            "fromUserId": user_id,
+            "fromUserName": "Cofau",
+            "toUserId": user_id,
+            "message": notif_message,
+            "isRead": False,
+            "createdAt": datetime.utcnow(),
         }
         await db.notifications.insert_one(notification)
-    except Exception:
-        pass
+
+        # Send push notification
+        device_tokens = await get_user_device_tokens(user_id)
+        if device_tokens:
+            await send_push_notification(
+                device_tokens=device_tokens,
+                title=notif_title,
+                body=notif_message,
+                data={"type": "voucher_processed"},
+                user_id=user_id,
+            )
+    except Exception as e:
+        print(f"Error sending voucher processed notification: {e}")
 
     return {"message": "Voucher claim marked as processed"}
 
