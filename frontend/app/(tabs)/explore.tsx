@@ -470,6 +470,21 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
         tracksViewChanges={tracksChanges && !imageLoaded}
       >
         <View style={{ alignItems: 'center' }}>
+          {/* Post count pill badge — above image */}
+          <View style={{
+            backgroundColor: '#E94A37',
+            borderRadius: 10,
+            paddingVertical: 2,
+            paddingHorizontal: 8,
+            marginBottom: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+            elevation: 6,
+          }}>
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+              {count} {count === 1 ? 'post' : 'posts'}
+            </Text>
+          </View>
           {/* Photo thumbnail */}
           <View style={{ backgroundColor: '#FFFFFF', padding: 3, elevation: 5, borderRadius: 8 }}>
             {imageUrl ? (
@@ -490,21 +505,6 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
               <Ionicons name="eye" size={8} color="#fff" />
               <Text style={styles.markerViewsText}>{viewDisplay}</Text>
             </View>
-            {/* Post count badge - centered at bottom of image */}
-            <View style={{
-              position: 'absolute',
-              bottom: -8,
-              alignSelf: 'center',
-              backgroundColor: '#E94A37',
-              borderRadius: 10,
-              paddingVertical: 2,
-              paddingHorizontal: 8,
-              elevation: 6,
-            }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-                {count} {count === 1 ? 'post' : 'posts'}
-              </Text>
-            </View>
           </View>
         </View>
       </Marker>
@@ -522,6 +522,12 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
       anchor={{ x: 0.5, y: 1 }}
     >
       <View style={{ alignItems: 'center' }}>
+        {/* Post count pill badge — above image */}
+        <View style={styles.locationPostsBadge}>
+          <Text style={styles.locationPostsBadgeText}>
+            {count} {count === 1 ? 'post' : 'posts'}
+          </Text>
+        </View>
         {/* Photo thumbnail */}
         <View style={styles.locationMarkerBubble}>
           {imageUrl ? (
@@ -541,20 +547,6 @@ const LocationMarker = memo(({ location, onPostPress, onClusterPress }: any) => 
           <View style={styles.markerViewsBadge}>
             <Ionicons name="eye" size={8} color="#fff" />
             <Text style={styles.markerViewsText}>{viewDisplay}</Text>
-          </View>
-          {/* Post count badge - centered at bottom of image */}
-          <View style={{
-            position: 'absolute',
-            bottom: -8,
-            alignSelf: 'center',
-            backgroundColor: '#E94A37',
-            borderRadius: 10,
-            paddingVertical: 2,
-            paddingHorizontal: 8,
-          }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
-              {count} {count === 1 ? 'post' : 'posts'}
-            </Text>
           </View>
         </View>
         <View style={styles.postMarkerArrow} />
@@ -1053,16 +1045,21 @@ const MapViewComponent = memo(({
     const maxMarkers = delta > 0.3 ? 8 : delta > 0.08 ? 15 : delta > 0.02 ? 30 : 999;
     let locations = visibleLocations.slice(0, maxMarkers);
 
-    // Guarantee at least 10 nearby posts are always visible (for new app with less data)
+    // Always show at least 10 cluster image previews on the map
     const MIN_VISIBLE = 10;
-    if (locations.length < MIN_VISIBLE && allLocations.length > locations.length && userLocation) {
+    if (locations.length < MIN_VISIBLE && allLocations.length > locations.length) {
       const already = new Set(locations.map((l: any) => l.id));
       const remaining = allLocations
         .filter((loc: any) => !already.has(loc.id))
         .sort((a: any, b: any) => {
-          const distA = Math.abs(a.latitude - userLocation.latitude) + Math.abs(a.longitude - userLocation.longitude);
-          const distB = Math.abs(b.latitude - userLocation.latitude) + Math.abs(b.longitude - userLocation.longitude);
-          return distA - distB;
+          // Sort by post count first, then by distance if user location available
+          if (b.count !== a.count) return b.count - a.count;
+          if (userLocation) {
+            const distA = Math.abs(a.latitude - userLocation.latitude) + Math.abs(a.longitude - userLocation.longitude);
+            const distB = Math.abs(b.latitude - userLocation.latitude) + Math.abs(b.longitude - userLocation.longitude);
+            return distA - distB;
+          }
+          return 0;
         });
       locations = [...locations, ...remaining.slice(0, MIN_VISIBLE - locations.length)];
     }
