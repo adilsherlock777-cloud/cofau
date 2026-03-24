@@ -2862,7 +2862,7 @@ useFocusEffect(
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     scrollYRef.current = contentOffset.y;
     calculateVisibleVideos(contentOffset.y);
-    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - SCREEN_HEIGHT * 5) {
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - SCREEN_HEIGHT * 2) {
       if (hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) fetchPostsRef.current(false);
     }
   }, [calculateVisibleVideos]);
@@ -2971,12 +2971,10 @@ useFocusEffect(
         }
 
         const totalFetched = firstRes.data.length + (restRes.data?.length || 0);
+        setPage(2); pageRef.current = 2;
         if (totalFetched < POSTS_PER_PAGE) {
-          // Not enough posts for a full page — reset seed so next fetch loops
-          feedSeedRef.current = Date.now().toString();
-          setPage(1); pageRef.current = 1;
-        } else {
-          setPage(2); pageRef.current = 2;
+          // Not enough posts for a full page — no more to load
+          setHasMore(false); hasMoreRef.current = false;
         }
       } else {
         // Pagination: load next page normally
@@ -2984,28 +2982,21 @@ useFocusEffect(
         const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
-        if (res.data.length === 0 || res.data.length < POSTS_PER_PAGE) {
-          // End of feed reached — loop back with a new seed to reshuffle
-          feedLoopRef.current += 1;
-          const loop = feedLoopRef.current;
-          const newPosts = res.data.length > 0 ? res.data.map(mapPostData).map((p: any) => ({ ...p, _key: `${p.id}_L${loop}` })) : [];
-          if (newPosts.length > 0) {
-            setPosts((p) => [...p, ...newPosts]);
-          }
-          // Reset pagination with new seed for infinite scroll
-          feedSeedRef.current = Date.now().toString();
-          setPage(1); pageRef.current = 1;
-          // Keep hasMore true so scrolling continues
+        if (res.data.length === 0) {
+          // No more posts from backend — stop pagination
+          setHasMore(false); hasMoreRef.current = false;
           return;
         }
 
-        const loop = feedLoopRef.current;
-        const newPosts = res.data.map(mapPostData).map((p: any) => loop > 0 ? { ...p, _key: `${p.id}_L${loop}` } : p);
-        if (loop > 0) {
-          setPosts((p) => [...p, ...newPosts]);
-        } else {
-          setPosts((p) => [...p, ...newPosts.filter((np: any) => !p.some((ep) => ep.id === np.id))]);
-        }
+        const newPosts = res.data.map(mapPostData);
+        // Deduplicate against already-loaded posts
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const unique = newPosts.filter((np: any) => !existingIds.has(np.id));
+          return [...prev, ...unique];
+        });
+
+        // Always advance page — only stop when backend returns empty
         setPage((prev) => { pageRef.current = prev + 1; return prev + 1; });
 
         // Pre-fetch thumbnails for new posts so images are ready when they scroll into view
@@ -3066,15 +3057,8 @@ useFocusEffect(
     if (!searchQuery.trim()) return;
     Keyboard.dismiss();
     const q = searchQuery.trim();
-    if (activeTab === 'map') {
-      // Search on map — show results as pins, then fit map to results
-      setMapSearchQuery(q);
-      setSearchQuery('');
-      fetchMapPins(q, true);
-    } else {
-      setSearchQuery('');
-      router.push({ pathname: "/search-results", params: { query: q } });
-    }
+    setSearchQuery('');
+    router.push({ pathname: "/search-results", params: { query: q } });
   };
 
   const clearMapSearch = () => {

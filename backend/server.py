@@ -1321,7 +1321,7 @@ async def get_feed(
     # Fetch from both collections
     if sort == "engagement":
         page_size = limit or 30
-        fetch_limit = min((skip + page_size) * 8, 3000)
+        fetch_limit = 3000
 
         # Fetch user posts
         user_posts_raw = await db.posts.find(user_query).sort("created_at", -1).limit(fetch_limit).to_list(fetch_limit)
@@ -1340,40 +1340,38 @@ async def get_feed(
 
         # ======================================================
         # DISCOVERY POSTS - Mix in random older posts for variety
-        # Prevents the feed from showing the same posts every day
+        # Only on first page to avoid breaking pagination consistency
         # ======================================================
-        recent_post_ids = {str(p["_id"]) for p in all_posts}
-        discovery_count = max(3, page_size // 5)  # ~20% of feed page = discovery posts
+        if skip == 0:
+            recent_post_ids = {str(p["_id"]) for p in all_posts}
+            discovery_count = max(3, page_size // 5)
 
-        # Fetch random posts from both collections using $sample
-        discovery_pipeline = [{"$sample": {"size": discovery_count * 2}}]
-        if user_query:
-            discovery_pipeline.insert(0, {"$match": user_query})
+            discovery_pipeline = [{"$sample": {"size": discovery_count * 2}}]
+            if user_query:
+                discovery_pipeline.insert(0, {"$match": user_query})
 
-        restaurant_discovery_pipeline = [{"$sample": {"size": discovery_count * 2}}]
-        if restaurant_query:
-            restaurant_discovery_pipeline.insert(0, {"$match": restaurant_query})
+            restaurant_discovery_pipeline = [{"$sample": {"size": discovery_count * 2}}]
+            if restaurant_query:
+                restaurant_discovery_pipeline.insert(0, {"$match": restaurant_query})
 
-        try:
-            user_discovery = await db.posts.aggregate(discovery_pipeline).to_list(discovery_count * 2)
-            restaurant_discovery = await db.restaurant_posts.aggregate(restaurant_discovery_pipeline).to_list(discovery_count * 2)
+            try:
+                user_discovery = await db.posts.aggregate(discovery_pipeline).to_list(discovery_count * 2)
+                restaurant_discovery = await db.restaurant_posts.aggregate(restaurant_discovery_pipeline).to_list(discovery_count * 2)
 
-            for post in user_discovery:
-                post["_source"] = "user"
-            for post in restaurant_discovery:
-                post["_source"] = "restaurant"
+                for post in user_discovery:
+                    post["_source"] = "user"
+                for post in restaurant_discovery:
+                    post["_source"] = "restaurant"
 
-            # Filter out duplicates (posts already in the recent feed)
-            discovery_posts = [
-                p for p in (user_discovery + restaurant_discovery)
-                if str(p["_id"]) not in recent_post_ids
-            ][:discovery_count]
+                discovery_posts = [
+                    p for p in (user_discovery + restaurant_discovery)
+                    if str(p["_id"]) not in recent_post_ids
+                ][:discovery_count]
 
-            if discovery_posts:
-                all_posts.extend(discovery_posts)
-                print(f"🔀 Added {len(discovery_posts)} discovery posts to feed for variety")
-        except Exception as e:
-            print(f"⚠️ Discovery posts fetch failed (non-critical): {e}")
+                if discovery_posts:
+                    all_posts.extend(discovery_posts)
+            except Exception:
+                pass
 
         # Calculate engagement scores with time decay for each post
         posts_with_scores = []
@@ -1384,7 +1382,9 @@ async def get_feed(
         # Sort by engagement score (highest first)
         posts_with_scores.sort(key=lambda x: x[1], reverse=True)
 
-        # Shuffle posts with similar scores for variety on each refresh
+        # Shuffle posts with similar scores — use deterministic seed so pagination is consistent
+        engagement_seed = seed or (str(current_user["_id"]) + current_time.strftime("%Y-%m-%d-%H"))
+        engagement_rng = random.Random(engagement_seed)
         shuffled = []
         i = 0
         while i < len(posts_with_scores):
@@ -1398,7 +1398,7 @@ async def get_feed(
                     j += 1
                 else:
                     break
-            random.shuffle(similar_group)
+            engagement_rng.shuffle(similar_group)
             shuffled.extend(similar_group)
             i = j
 
@@ -1414,52 +1414,48 @@ async def get_feed(
             spread_result.append(post)
             last_user_id = post.get("user_id")
 
-        # Get list of user IDs that the current user follows
-        current_uid = str(current_user["_id"])
-        following_docs = await db.follows.find({"followerId": current_uid}).to_list(None)
-        following_ids = {doc["followingId"] for doc in following_docs}
+        # Boosting: only apply on first page to keep pagination consistent
+        if skip == 0:
+            # Get list of user IDs that the current user follows
+            current_uid = str(current_user["_id"])
+            following_docs = await db.follows.find({"followerId": current_uid}).to_list(None)
+            following_ids = {doc["followingId"] for doc in following_docs}
 
-        # 1) Extract ALL recent posts (uploaded within last 3 hours) -> show first
-        #    This ensures new content from any user gets visibility at the top of everyone's feed
-        recent_cutoff = current_time - timedelta(hours=3)
-        recent_own = [p for p in spread_result
-                      if p.get("user_id") == current_uid
-                      and p.get("created_at", datetime.min) >= recent_cutoff]
-        recent_others = [p for p in spread_result
-                         if p.get("user_id") != current_uid
-                         and p.get("created_at", datetime.min) >= recent_cutoff]
-        # Sort other recent posts newest first
-        recent_others.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
-        # Combined: own recent posts first, then other recent posts
-        recent_all = recent_own + recent_others
+            # 1) Extract ALL recent posts (uploaded within last 3 hours) -> show first
+            recent_cutoff = current_time - timedelta(hours=3)
+            recent_own = [p for p in spread_result
+                          if p.get("user_id") == current_uid
+                          and p.get("created_at", datetime.min) >= recent_cutoff]
+            recent_others = [p for p in spread_result
+                             if p.get("user_id") != current_uid
+                             and p.get("created_at", datetime.min) >= recent_cutoff]
+            recent_others.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+            recent_all = recent_own + recent_others
 
-        # 2) Extract following users' posts (sorted newest first) that aren't already in recent
-        recent_ids = set(id(p) for p in recent_all)
-        following_posts = [p for p in spread_result
-                          if p.get("user_id") in following_ids
-                          and id(p) not in recent_ids]
-        following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+            # 2) Extract following users' posts
+            recent_ids = set(id(p) for p in recent_all)
+            following_posts = [p for p in spread_result
+                              if p.get("user_id") in following_ids
+                              and id(p) not in recent_ids]
+            following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
 
-        # 3) Remaining engagement-ranked posts
-        boosted_ids = recent_ids | set(id(p) for p in following_posts)
-        other_posts = [p for p in spread_result if id(p) not in boosted_ids]
+            # 3) Remaining engagement-ranked posts
+            boosted_ids = recent_ids | set(id(p) for p in following_posts)
+            other_posts = [p for p in spread_result if id(p) not in boosted_ids]
 
-        # 4) Build final feed: recent posts first, then interleave following every 5 posts
-        final_feed = list(recent_all)
-        following_idx = 0
-        for i, post in enumerate(other_posts):
-            final_feed.append(post)
-            # After every 5 engagement posts, insert a following post
-            if (i + 1) % 5 == 0 and following_idx < len(following_posts):
+            # 4) Build final feed: recent posts first, then interleave following every 5 posts
+            final_feed = list(recent_all)
+            following_idx = 0
+            for i, post in enumerate(other_posts):
+                final_feed.append(post)
+                if (i + 1) % 5 == 0 and following_idx < len(following_posts):
+                    final_feed.append(following_posts[following_idx])
+                    following_idx += 1
+            while following_idx < len(following_posts):
                 final_feed.append(following_posts[following_idx])
                 following_idx += 1
 
-        # Append any remaining following posts at the end
-        while following_idx < len(following_posts):
-            final_feed.append(following_posts[following_idx])
-            following_idx += 1
-
-        spread_result = final_feed
+            spread_result = final_feed
 
         posts = spread_result[skip:]
         if limit:
@@ -1487,13 +1483,12 @@ async def get_feed(
         by_oldest = sorted(all_posts, key=lambda x: x.get("created_at", datetime.min))
         by_likes = sorted(all_posts, key=lambda x: x.get("likes_count", 0), reverse=True)
 
-        # Build mixed feed: pick 3 from each bucket per group of 9
+        # Build the FULL mixed feed from all available posts so pagination works correctly
         mixed = []
         used_ids = set()
         newest_idx, oldest_idx, likes_idx = 0, 0, 0
-        total_needed = skip + page_size
 
-        while len(mixed) < total_needed and (newest_idx < len(by_newest) or oldest_idx < len(by_oldest) or likes_idx < len(by_likes)):
+        while newest_idx < len(by_newest) or oldest_idx < len(by_oldest) or likes_idx < len(by_likes):
             batch = []
 
             # Pick 3 newest
@@ -1526,6 +1521,9 @@ async def get_feed(
                     count += 1
                 likes_idx += 1
 
+            if not batch:
+                break
+
             feed_rng.shuffle(batch)
             mixed.extend(batch)
 
@@ -1534,28 +1532,30 @@ async def get_feed(
         following_docs_m = await db.follows.find({"followerId": current_uid}).to_list(None)
         following_ids_m = {doc["followingId"] for doc in following_docs_m}
 
-        recent_cutoff = current_time - timedelta(hours=2)
-        recent_own = [p for p in mixed
-                      if p.get("user_id") == current_uid
-                      and p.get("created_at", datetime.min) >= recent_cutoff]
-        following_posts = [p for p in mixed
-                          if p.get("user_id") in following_ids_m
-                          and p not in recent_own]
-        following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
-        boosted_ids = set(id(p) for p in recent_own) | set(id(p) for p in following_posts)
-        other_posts = [p for p in mixed if id(p) not in boosted_ids]
+        # Boosting: only apply on first page to avoid pagination inconsistency
+        if skip == 0:
+            recent_cutoff = current_time - timedelta(hours=2)
+            recent_own = [p for p in mixed
+                          if p.get("user_id") == current_uid
+                          and p.get("created_at", datetime.min) >= recent_cutoff]
+            following_posts = [p for p in mixed
+                              if p.get("user_id") in following_ids_m
+                              and p not in recent_own]
+            following_posts.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+            boosted_ids = set(id(p) for p in recent_own) | set(id(p) for p in following_posts)
+            other_posts = [p for p in mixed if id(p) not in boosted_ids]
 
-        final_feed = list(recent_own)
-        f_idx = 0
-        for i, post in enumerate(other_posts):
-            final_feed.append(post)
-            if (i + 1) % 5 == 0 and f_idx < len(following_posts):
+            final_feed = list(recent_own)
+            f_idx = 0
+            for i, post in enumerate(other_posts):
+                final_feed.append(post)
+                if (i + 1) % 5 == 0 and f_idx < len(following_posts):
+                    final_feed.append(following_posts[f_idx])
+                    f_idx += 1
+            while f_idx < len(following_posts):
                 final_feed.append(following_posts[f_idx])
                 f_idx += 1
-        while f_idx < len(following_posts):
-            final_feed.append(following_posts[f_idx])
-            f_idx += 1
-        mixed = final_feed
+            mixed = final_feed
 
         posts = mixed[skip:skip + page_size] if limit else mixed[skip:]
 

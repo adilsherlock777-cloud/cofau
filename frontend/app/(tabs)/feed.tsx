@@ -306,6 +306,9 @@ export default function FeedScreen() {
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const pageRef = useRef(1);
   const isMutedRef = useRef(muteState.isMuted);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [ownStoryData, setOwnStoryData] = useState<any>(null);
@@ -694,24 +697,23 @@ const viewabilityConfigCallbackPairs = useRef([
     try {
       if (forceRefresh) {
         if (!silent) setLoading(true);
-        setPage(1);
-        setHasMore(true);
+        setPage(1); pageRef.current = 1;
+        setHasMore(true); hasMoreRef.current = true;
         setSuggestedPosts([]);
-        paginationTriggeredRef.current = false;
+        loadingMoreRef.current = false;
       } else {
-        if (!hasMore || loadingMore || paginationTriggeredRef.current) return;
-        setLoadingMore(true);
-        paginationTriggeredRef.current = true;
+        if (!hasMoreRef.current || loadingMoreRef.current) return;
+        setLoadingMore(true); loadingMoreRef.current = true;
       }
 
-      const skip = forceRefresh ? 0 : (page - 1) * POSTS_PER_PAGE;
+      const skip = forceRefresh ? 0 : (pageRef.current - 1) * POSTS_PER_PAGE;
       const ts = forceRefresh ? `&_t=${Date.now()}` : "";
       const res = await axios.get(
         `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}&sort=engagement${ts}`
       );
 
       if (res.data.length === 0) {
-        setHasMore(false);
+        setHasMore(false); hasMoreRef.current = false;
         if (forceRefresh) {
           setFeedPosts([]);
         }
@@ -825,19 +827,20 @@ const viewabilityConfigCallbackPairs = useRef([
         }
         setShowNewPostsPill(false);
       } else {
-        setFeedPosts((prev) => [...prev, ...mapped]);
-        setPage((prev) => prev + 1);
-      }
-
-      if (res.data.length < POSTS_PER_PAGE) {
-        setHasMore(false);
+        // Deduplicate against already-loaded posts
+        setFeedPosts((prev) => {
+          const existingIds = new Set(prev.map((p: any) => p.id));
+          const unique = mapped.filter((np: any) => !existingIds.has(np.id));
+          return [...prev, ...unique];
+        });
+        setPage((prev) => { pageRef.current = prev + 1; return prev + 1; });
       }
 
       setVisibleVideoId(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
-      setLoadingMore(false);
+      setLoadingMore(false); loadingMoreRef.current = false;
     }
   };
 
@@ -930,31 +933,17 @@ const handleScroll = useCallback(
       setShowNewPostsPill(false);
     }
 
-    if (scrollY < lastScrollYRef.current - 100) {
-      paginationTriggeredRef.current = false;
-    }
     lastScrollYRef.current = scrollY;
 
     // Pagination check
-    const paddingToBottom = 100;
+    const paddingToBottom = 300;
     const isNearBottom = scrollY + viewportHeight >= contentHeight - paddingToBottom;
 
-    if (
-      isNearBottom &&
-      hasMore &&
-      !loadingMore &&
-      !loading &&
-      !paginationTriggeredRef.current
-    ) {
-      paginationTriggeredRef.current = true;
-      fetchFeed(false).finally(() => {
-        setTimeout(() => {
-          paginationTriggeredRef.current = false;
-        }, 1000);
-      });
+    if (isNearBottom && hasMoreRef.current && !loadingMoreRef.current) {
+      fetchFeedRef.current?.(false);
     }
   },
-  [hasMore, loadingMore, loading, showNewPostsPill]
+  [showNewPostsPill]
 );
 
 const handleNewPostsPillPress = useCallback(() => {

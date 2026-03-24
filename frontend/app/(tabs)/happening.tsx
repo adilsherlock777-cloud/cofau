@@ -559,7 +559,7 @@ export default function SavedLocationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategory, setActiveCategory] = useState('map');
   const [mapFilter, setMapFilter] = useState<'users' | 'restaurants'>('users');
   const mapRef = useRef<any>(null);
 
