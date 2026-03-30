@@ -67,9 +67,10 @@ export default function RestaurantDashboard() {
       const bestPostRes = await axios.get(`${API_URL}/restaurant/analytics/best-post`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (bestPostRes.data) {
+      // Handle both wrapped {best_post: ...} and direct response formats
+      const post = bestPostRes.data?.best_post !== undefined ? bestPostRes.data.best_post : bestPostRes.data;
+      if (post && post.post_id) {
         // Normalize media URLs - backend returns relative paths
-        const post = bestPostRes.data;
         if (post.media_url && !post.media_url.startsWith('http')) {
           post.media_url = `${BACKEND_URL}${post.media_url.startsWith('/') ? '' : '/'}${post.media_url}`;
         }
@@ -81,6 +82,7 @@ export default function RestaurantDashboard() {
         setBestPost(null);
       }
     } catch (e) {
+      console.error('Error fetching best post:', e);
       setBestPost(null);
     }
 

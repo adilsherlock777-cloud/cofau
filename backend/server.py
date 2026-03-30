@@ -1458,6 +1458,39 @@ async def get_feed(
 
             spread_result = final_feed
 
+        # ======================================================
+        # RESTAURANT POST INTERLEAVING
+        # Ensure at least 1 restaurant post appears per every 10 posts
+        # ======================================================
+        restaurant_posts_pool = [p for p in spread_result if p.get("_source") == "restaurant"]
+        if restaurant_posts_pool:
+            restaurant_ids_in_feed = set()
+            interleaved = []
+            rp_idx = 0
+            since_last_restaurant = 0
+
+            for post in spread_result:
+                if post.get("_source") == "restaurant":
+                    interleaved.append(post)
+                    restaurant_ids_in_feed.add(str(post["_id"]))
+                    since_last_restaurant = 0
+                else:
+                    interleaved.append(post)
+                    since_last_restaurant += 1
+
+                    # If 10 user posts in a row, inject a restaurant post
+                    if since_last_restaurant >= 10:
+                        while rp_idx < len(restaurant_posts_pool):
+                            rp = restaurant_posts_pool[rp_idx]
+                            rp_idx += 1
+                            if str(rp["_id"]) not in restaurant_ids_in_feed:
+                                interleaved.append(rp)
+                                restaurant_ids_in_feed.add(str(rp["_id"]))
+                                since_last_restaurant = 0
+                                break
+
+            spread_result = interleaved
+
         posts = spread_result[skip:]
         if limit:
             posts = posts[:limit]

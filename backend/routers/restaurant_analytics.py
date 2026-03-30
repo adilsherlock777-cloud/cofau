@@ -522,7 +522,13 @@ async def get_best_post(
     ).to_list(None)
 
     if not posts:
-        return None
+        # Also check regular posts collection where restaurant posts may be stored
+        posts = await db.posts.find(
+            {"user_id": restaurant_id, "account_type": "restaurant"}
+        ).to_list(None)
+
+    if not posts:
+        return {"best_post": None}
 
     # Get click counts per post from analytics
     click_pipeline = [
@@ -549,9 +555,9 @@ async def get_best_post(
 
     for post in posts:
         post_id = str(post["_id"])
-        likes = post.get("likes_count", 0)
-        comments = post.get("comments_count", 0)
-        views = post.get("views_count", 0)
+        likes = post.get("likes_count", 0) or 0
+        comments = post.get("comments_count", 0) or 0
+        views = post.get("views_count", 0) or 0
         clicks = clicks_map.get(post_id, 0)
         score = likes + views + clicks + comments
 
@@ -559,9 +565,9 @@ async def get_best_post(
             best_score = score
             best_post = {
                 "post_id": post_id,
-                "dish_name": post.get("dish_name", ""),
-                "about": post.get("about", ""),
-                "media_url": post.get("media_url", ""),
+                "dish_name": post.get("dish_name", "") or post.get("title", ""),
+                "about": post.get("about", "") or post.get("description", ""),
+                "media_url": post.get("media_url", "") or post.get("image_url", ""),
                 "media_type": post.get("media_type", "image"),
                 "thumbnail_url": post.get("thumbnail_url", ""),
                 "likes_count": likes,
@@ -571,6 +577,25 @@ async def get_best_post(
                 "total_score": score,
                 "created_at": str(post.get("created_at", "")),
             }
+
+    # If all posts have 0 engagement, still return the most recent one as hero
+    if best_post is None and posts:
+        post = posts[-1]  # most recent
+        post_id = str(post["_id"])
+        best_post = {
+            "post_id": post_id,
+            "dish_name": post.get("dish_name", "") or post.get("title", ""),
+            "about": post.get("about", "") or post.get("description", ""),
+            "media_url": post.get("media_url", "") or post.get("image_url", ""),
+            "media_type": post.get("media_type", "image"),
+            "thumbnail_url": post.get("thumbnail_url", ""),
+            "likes_count": 0,
+            "comments_count": 0,
+            "views_count": 0,
+            "clicks_count": 0,
+            "total_score": 0,
+            "created_at": str(post.get("created_at", "")),
+        }
 
     return best_post
 

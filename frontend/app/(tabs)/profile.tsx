@@ -168,6 +168,21 @@ const fetchRestaurantPosts = async () => {
      }
    };
 
+const BannerImageSlide = ({ uri, duration, onFinish }: { uri: string; duration: number; onFinish: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onFinish, duration);
+    return () => clearTimeout(timer);
+  }, [uri]);
+
+  return (
+    <RNImage
+      source={{ uri }}
+      style={{ width: '100%', height: '100%' }}
+      resizeMode="cover"
+    />
+  );
+};
+
 const ProfileSkeleton = () => {
   const animatedValue = useRef(new Animated.Value(0)).current;
 
@@ -466,6 +481,8 @@ export default function ProfileScreen() {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [uploadingHighlightVideo, setUploadingHighlightVideo] = useState(false);
   const [highlightVideosModalVisible, setHighlightVideosModalVisible] = useState(false);
+  const [coverPreviewVisible, setCoverPreviewVisible] = useState(false);
+  const [coverPreviewIndex, setCoverPreviewIndex] = useState(0);
   const videoRef = useRef<any>(null);
   const [timingsModalVisible, setTimingsModalVisible] = useState(false);
   const [editTimings, setEditTimings] = useState<any[]>([]);
@@ -1619,12 +1636,7 @@ const handlePickHighlightVideo = async () => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      if (asset.duration && asset.duration > 11000) {
-        Alert.alert('Too Long', 'Highlight videos must be 10 seconds or less.');
-        return;
-      }
-      await uploadHighlightVideo(asset.uri);
+      await uploadHighlightVideo(result.assets[0].uri);
     }
   } catch (error) {
     console.error('Error picking highlight video:', error);
@@ -2588,77 +2600,104 @@ const renderRestaurantProfile = () => {
             onPress={() => {
               if (isOwnProfile) {
                 handleBannerPress();
+              } else {
+                // For visitors: open fullscreen preview with sound
+                const coverUrl = bannerImage || userData?.cover_image;
+                const hasMedia = highlightVideos.length > 0 || coverUrl;
+                if (hasMedia) {
+                  setCoverPreviewIndex(activeVideoIndex);
+                  setCoverPreviewVisible(true);
+                }
               }
             }}
-            activeOpacity={isOwnProfile ? 0.8 : 1}
+            activeOpacity={0.8}
           >
-            {/* Highlight Videos Carousel */}
+            {/* Highlight Videos + Banner Carousel */}
             {highlightVideos.length > 0 ? (
-              <>
-                <Video
-                  ref={videoRef}
-                  source={{ uri: fixUrl(highlightVideos[activeVideoIndex]) }}
-                  style={restaurantStyles.bannerImage}
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay
-                  isLooping={highlightVideos.length === 1}
-                  isMuted
-                  onPlaybackStatusUpdate={(status: any) => {
-                    if (status.didJustFinish && highlightVideos.length > 1) {
-                      setActiveVideoIndex((prev) => (prev + 1) % highlightVideos.length);
-                    }
-                  }}
-                />
-                {/* Video indicator dots */}
-                {highlightVideos.length > 1 && (
-                  <View style={{
-                    position: 'absolute',
-                    bottom: 12,
-                    left: 0,
-                    right: 0,
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    gap: 6,
-                  }}>
-                    {highlightVideos.map((_: string, idx: number) => (
-                      <View key={idx} style={{
-                        width: idx === activeVideoIndex ? 16 : 6,
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: idx === activeVideoIndex ? '#FF2E2E' : 'rgba(255,255,255,0.6)',
-                      }} />
-                    ))}
-                  </View>
-                )}
-                {/* Video badge */}
-                <View style={{
-                  position: 'absolute',
-                  top: 10,
-                  left: 10,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(0,0,0,0.5)',
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 12,
-                  gap: 4,
-                }}>
-                  <Ionicons name="videocam" size={12} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>
-                    {activeVideoIndex + 1}/{highlightVideos.length}
-                  </Text>
-                </View>
-                {isOwnProfile && !uploadingBanner && (
-                  <View style={restaurantStyles.bannerEditPen}>
-                    <Ionicons name="pencil" size={18} color="#fff" />
-                  </View>
-                )}
-                {(uploadingBanner || uploadingHighlightVideo) && (
-                  <View style={restaurantStyles.bannerUploadingOverlay}>
-                    <ActivityIndicator size="large" color="#fff" />
-                  </View>
-                )}
-              </>
+              (() => {
+                const coverUrl = bannerImage || userData?.cover_image;
+                const mediaItems: { type: 'video' | 'image'; url: string }[] = highlightVideos.map((v: string) => ({ type: 'video' as const, url: v }));
+                if (coverUrl) mediaItems.push({ type: 'image', url: coverUrl });
+                const currentItem = mediaItems[activeVideoIndex % mediaItems.length];
+                const totalItems = mediaItems.length;
+                const safeIndex = activeVideoIndex % totalItems;
+
+                return (
+                  <>
+                    {currentItem.type === 'video' ? (
+                      <Video
+                        key={`highlight-${safeIndex}`}
+                        source={{ uri: fixUrl(currentItem.url) }}
+                        style={restaurantStyles.bannerImage}
+                        resizeMode={ResizeMode.COVER}
+                        shouldPlay
+                        isLooping={false}
+                        isMuted
+                        onPlaybackStatusUpdate={(status: any) => {
+                          if (status.didJustFinish) {
+                            setActiveVideoIndex((prev) => (prev + 1) % totalItems);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <BannerImageSlide
+                        uri={fixUrl(currentItem.url)}
+                        duration={10000}
+                        onFinish={() => setActiveVideoIndex((prev) => (prev + 1) % totalItems)}
+                      />
+                    )}
+                    {/* Indicator dots */}
+                    {totalItems > 1 && (
+                      <View style={{
+                        position: 'absolute',
+                        bottom: 12,
+                        left: 0,
+                        right: 0,
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        gap: 6,
+                      }}>
+                        {mediaItems.map((_: any, idx: number) => (
+                          <View key={idx} style={{
+                            width: idx === safeIndex ? 16 : 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: idx === safeIndex ? '#FF2E2E' : 'rgba(255,255,255,0.6)',
+                          }} />
+                        ))}
+                      </View>
+                    )}
+                    {/* Media badge */}
+                    <View style={{
+                      position: 'absolute',
+                      top: 10,
+                      left: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                      gap: 4,
+                    }}>
+                      <Ionicons name={currentItem.type === 'video' ? 'videocam' : 'image'} size={12} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>
+                        {safeIndex + 1}/{totalItems}
+                      </Text>
+                    </View>
+                    {isOwnProfile && !uploadingBanner && (
+                      <View style={restaurantStyles.bannerEditPen}>
+                        <Ionicons name="pencil" size={18} color="#fff" />
+                      </View>
+                    )}
+                    {(uploadingBanner || uploadingHighlightVideo) && (
+                      <View style={restaurantStyles.bannerUploadingOverlay}>
+                        <ActivityIndicator size="large" color="#fff" />
+                      </View>
+                    )}
+                  </>
+                );
+              })()
             ) : bannerImage || userData?.cover_image ? (
               <>
                 <RNImage
@@ -2736,7 +2775,7 @@ const renderRestaurantProfile = () => {
           </View>
         )}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -6 }}>
         <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
         {userData?.timings && userData.timings.length > 0 ? (
           <TouchableOpacity
@@ -2888,7 +2927,7 @@ const renderRestaurantProfile = () => {
                   end={{ x: 1, y: 1 }}
                   style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name="create" size={18} color="#fff" />
+                  <Ionicons name="create" size={13} color="#fff" />
                   <Text style={restaurantStyles.actionButtonTextGradient}>Edit Profile</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -2908,7 +2947,7 @@ const renderRestaurantProfile = () => {
                   end={{ x: 1, y: 1 }}
                   style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name={userData?.phone_number ? 'call' : 'add-circle'} size={18} color="#fff" />
+                  <Ionicons name={userData?.phone_number ? 'call' : 'add-circle'} size={13} color="#fff" />
                   <Text style={restaurantStyles.actionButtonTextGradient}>
                     {userData?.phone_number ? 'Change Phone' : 'Add Phone'}
                   </Text>
@@ -2926,7 +2965,7 @@ const renderRestaurantProfile = () => {
                   end={{ x: 1, y: 1 }}
                   style={restaurantStyles.actionButtonGradient}
                 >
-                  <Ionicons name="chatbubble" size={18} color="#fff" />
+                  <Ionicons name="chatbubble" size={13} color="#fff" />
                   <Text style={restaurantStyles.actionButtonTextGradient}>Messages</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -3981,6 +4020,129 @@ const renderRestaurantProfile = () => {
       )}
     </View>
   </KeyboardAvoidingView>
+</Modal>
+
+{/* ================= COVER PREVIEW MODAL (fullscreen with sound) ================= */}
+<Modal
+  animationType="fade"
+  transparent={true}
+  visible={coverPreviewVisible}
+  onRequestClose={() => setCoverPreviewVisible(false)}
+  statusBarTranslucent
+>
+  <View style={{
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}>
+    {(() => {
+      const coverUrl = bannerImage || userData?.cover_image;
+      const mediaItems: { type: 'video' | 'image'; url: string }[] = highlightVideos.map((v: string) => ({ type: 'video' as const, url: v }));
+      if (coverUrl) mediaItems.push({ type: 'image', url: coverUrl });
+      if (mediaItems.length === 0) return null;
+      const safeIdx = coverPreviewIndex % mediaItems.length;
+      const item = mediaItems[safeIdx];
+
+      return (
+        <>
+          {item.type === 'video' ? (
+            <Video
+              key={`preview-video-${safeIdx}`}
+              source={{ uri: fixUrl(item.url) }}
+              style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH * (16 / 9) }}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay
+              isLooping={mediaItems.length === 1}
+              isMuted={false}
+              onPlaybackStatusUpdate={(status: any) => {
+                if (status.didJustFinish && mediaItems.length > 1) {
+                  setCoverPreviewIndex((prev) => (prev + 1) % mediaItems.length);
+                }
+              }}
+            />
+          ) : (
+            <BannerImageSlide
+              uri={fixUrl(item.url)}
+              duration={10000}
+              onFinish={() => {
+                if (mediaItems.length > 1) {
+                  setCoverPreviewIndex((prev) => (prev + 1) % mediaItems.length);
+                }
+              }}
+            />
+          )}
+
+          {/* Indicator dots */}
+          {mediaItems.length > 1 && (
+            <View style={{
+              position: 'absolute',
+              bottom: 80,
+              left: 0,
+              right: 0,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 6,
+            }}>
+              {mediaItems.map((_: any, idx: number) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => setCoverPreviewIndex(idx)}
+                  style={{
+                    width: idx === safeIdx ? 20 : 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: idx === safeIdx ? '#FF2E2E' : 'rgba(255,255,255,0.5)',
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </>
+      );
+    })()}
+
+    {/* Close button */}
+    <TouchableOpacity
+      onPress={() => setCoverPreviewVisible(false)}
+      style={{
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 56 : 30,
+        right: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <Ionicons name="close" size={24} color="#fff" />
+    </TouchableOpacity>
+
+    {/* Media counter */}
+    {(() => {
+      const coverUrl = bannerImage || userData?.cover_image;
+      const total = highlightVideos.length + (coverUrl ? 1 : 0);
+      if (total <= 1) return null;
+      const safeIdx = coverPreviewIndex % total;
+      return (
+        <View style={{
+          position: 'absolute',
+          top: Platform.OS === 'ios' ? 56 : 30,
+          left: 16,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 12,
+        }}>
+          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>
+            {safeIdx + 1} / {total}
+          </Text>
+        </View>
+      );
+    })()}
+  </View>
 </Modal>
 
 {/* ================= MANAGE HIGHLIGHT VIDEOS MODAL ================= */}
@@ -7282,43 +7444,43 @@ cornerBottomLeft: {
 },
 actionButtonWrapperLight: {
   flex: 1,
-  maxWidth: 140,
-  borderRadius: 20,
+  maxWidth: 120,
+  borderRadius: 16,
 },
 actionButtonLight: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  paddingVertical: 10,
-  paddingHorizontal: 16,
-  borderRadius: 20,
-  backgroundColor: '#FFF5EE',  // Very light orange
-  borderWidth: 1.5,
-  borderColor: '#FFB380',  // Light orange border
-  gap: 6,
+  paddingVertical: 7,
+  paddingHorizontal: 10,
+  borderRadius: 16,
+  backgroundColor: '#FFF5EE',
+  borderWidth: 1,
+  borderColor: '#FFB380',
+  gap: 4,
 },
 actionButtonTextLight: {
-  color: '#FF7A18',  // Orange text
-  fontSize: 14,
+  color: '#FF7A18',
+  fontSize: 11,
   fontWeight: '600',
 },
 actionButtonGradient: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  paddingVertical: 9,
-  paddingHorizontal: 14,
-  borderRadius: 20,
-  gap: 5,
+  paddingVertical: 6,
+  paddingHorizontal: 10,
+  borderRadius: 16,
+  gap: 4,
   shadowColor: '#D62828',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.3,
-  shadowRadius: 4,
-  elevation: 4,
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.2,
+  shadowRadius: 3,
+  elevation: 3,
 },
 actionButtonTextGradient: {
   color: '#fff',
-  fontSize: 12,
+  fontSize: 10,
   fontWeight: '700',
 },
  bannerContainer: {
