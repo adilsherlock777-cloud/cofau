@@ -518,6 +518,8 @@ async def get_restaurant_profile(current_restaurant: dict = Depends(get_current_
         "address": current_restaurant.get("address"),
         "cuisine_type": current_restaurant.get("cuisine_type"),
         "food_type": current_restaurant.get("food_type"),  # veg, non_veg, or veg_and_non_veg
+        "timings": current_restaurant.get("timings"),
+        "highlight_videos": current_restaurant.get("highlight_videos"),
         "posts_count": current_restaurant.get("posts_count", 0),
         "reviews_count": current_restaurant.get("reviews_count", 0),
         "followers_count": followers_count,
@@ -563,7 +565,9 @@ async def update_restaurant_profile(
         update_dict["address"] = update_data.address
     if update_data.cuisine_type is not None:
         update_dict["cuisine_type"] = update_data.cuisine_type
-    
+    if update_data.timings is not None:
+        update_dict["timings"] = [t.dict() for t in update_data.timings]
+
     if update_dict:
         update_dict["updated_at"] = datetime.utcnow()
         await db.restaurants.update_one(
@@ -585,6 +589,8 @@ async def update_restaurant_profile(
         "address": updated_restaurant.get("address"),
         "cuisine_type": updated_restaurant.get("cuisine_type"),
         "food_type": updated_restaurant.get("food_type"),  # veg, non_veg, or veg_and_non_veg
+        "timings": updated_restaurant.get("timings"),
+        "highlight_videos": updated_restaurant.get("highlight_videos"),
         "posts_count": updated_restaurant.get("posts_count", 0),
         "reviews_count": updated_restaurant.get("reviews_count", 0),
         "followers_count": updated_restaurant.get("followers_count", 0),

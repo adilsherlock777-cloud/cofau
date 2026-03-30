@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Literal
+from typing import Optional, Literal, List, Dict
 from datetime import datetime
 
 
@@ -51,6 +51,8 @@ class RestaurantResponse(BaseModel):
     address: Optional[str] = None
     cuisine_type: Optional[str] = None
     food_type: Optional[str] = None  # veg, non_veg, or veg_and_non_veg
+    timings: Optional[List[Dict]] = None
+    highlight_videos: Optional[List[str]] = None
     posts_count: int = 0
     reviews_count: int = 0
     followers_count: int = 0
@@ -79,6 +81,14 @@ class RestaurantResponse(BaseModel):
         }
 
 
+class RestaurantTimings(BaseModel):
+    """Schema for a single day's timing"""
+    day: str = Field(..., description="Day of the week e.g. Monday")
+    open_time: str = Field(..., description="Opening time e.g. 09:00 AM")
+    close_time: str = Field(..., description="Closing time e.g. 10:00 PM")
+    is_closed: bool = Field(False, description="Whether the restaurant is closed on this day")
+
+
 class RestaurantUpdate(BaseModel):
     """Schema for updating restaurant profile"""
     restaurant_name: Optional[str] = Field(None, min_length=3, max_length=50)
@@ -86,6 +96,7 @@ class RestaurantUpdate(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
     cuisine_type: Optional[str] = None
+    timings: Optional[List[RestaurantTimings]] = Field(None, description="Weekly operating hours")
 
 
 class Token(BaseModel):

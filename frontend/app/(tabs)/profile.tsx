@@ -45,6 +45,7 @@ try {
   firebaseAuth = require('@react-native-firebase/auth').default;
 } catch (e) {
 }
+import { Video, ResizeMode } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import { normalizeMediaUrl, normalizeProfilePicture, BACKEND_URL } from '../../utils/imageUrlFix';
 
@@ -461,6 +462,22 @@ export default function ProfileScreen() {
   const [priceEditModalVisible, setPriceEditModalVisible] = useState(false);
   const [editingMenuItem, setEditingMenuItem] = useState<any>(null);
   const [editingPrice, setEditingPrice] = useState('');
+  const [highlightVideos, setHighlightVideos] = useState<string[]>([]);
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+  const [uploadingHighlightVideo, setUploadingHighlightVideo] = useState(false);
+  const [highlightVideosModalVisible, setHighlightVideosModalVisible] = useState(false);
+  const videoRef = useRef<any>(null);
+  const [timingsModalVisible, setTimingsModalVisible] = useState(false);
+  const [editTimings, setEditTimings] = useState<any[]>([]);
+
+  const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const getDefaultTimings = () => DAYS_OF_WEEK.map(day => ({
+    day,
+    open_time: '09:00 AM',
+    close_time: '10:00 PM',
+    is_closed: false,
+  }));
   const [savingPrice, setSavingPrice] = useState(false);
   const [manualMenuModalVisible, setManualMenuModalVisible] = useState(false);
   const [manualMenuName, setManualMenuName] = useState('');
@@ -850,10 +867,12 @@ const response = await axios.get(endpoint, {
       }
 
       setUserData(user);
+      setHighlightVideos(user.highlight_videos || []);
+      setActiveVideoIndex(0);
       setEditedBio(user.bio || '');
       setEditedName(
-  accountType === 'restaurant' 
-    ? (user.restaurant_name || user.full_name || '') 
+  accountType === 'restaurant'
+    ? (user.restaurant_name || user.full_name || '')
     : (user.full_name || user.username || '')
 );
 
@@ -1392,6 +1411,16 @@ useEffect(() => {
     { text: 'Choose from Library', onPress: () => handleChooseBannerPhoto() },
   ];
 
+  // Add highlight video options for restaurant accounts
+  if (accountType === 'restaurant' || isRestaurantProfile) {
+    if (highlightVideos.length < 3) {
+      options.push({ text: 'Add Highlight Video', onPress: () => handlePickHighlightVideo() });
+    }
+    if (highlightVideos.length > 0) {
+      options.push({ text: 'Manage Highlight Videos', onPress: () => setHighlightVideosModalVisible(true) });
+    }
+  }
+
   if (bannerImage || userData?.cover_image) {
     options.push({
       text: 'Remove Photo',
@@ -1566,6 +1595,114 @@ const removeBannerImage = async () => {
   } finally {
     setUploadingBanner(false);
   }
+};
+
+// ======== HIGHLIGHT VIDEOS ========
+const handlePickHighlightVideo = async () => {
+  if (highlightVideos.length >= 3) {
+    Alert.alert('Limit Reached', 'You can add up to 3 highlight videos. Remove one first.');
+    return;
+  }
+
+  try {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Photo library permission is required.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: true,
+      videoMaxDuration: 10,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      if (asset.duration && asset.duration > 11000) {
+        Alert.alert('Too Long', 'Highlight videos must be 10 seconds or less.');
+        return;
+      }
+      await uploadHighlightVideo(asset.uri);
+    }
+  } catch (error) {
+    console.error('Error picking highlight video:', error);
+    Alert.alert('Error', 'Failed to pick video.');
+  }
+};
+
+const uploadHighlightVideo = async (uri: string) => {
+  setUploadingHighlightVideo(true);
+  try {
+    const formData = new FormData();
+    const filename = uri.split('/').pop() || 'highlight.mp4';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `video/${match[1]}` : 'video/mp4';
+
+    formData.append('file', {
+      uri,
+      name: filename,
+      type,
+    } as any);
+
+    const response = await axios.post(
+      `${API_URL}/restaurant/highlight-videos`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    setHighlightVideos(response.data.highlight_videos);
+    setUserData((prev: any) => ({
+      ...prev,
+      highlight_videos: response.data.highlight_videos,
+    }));
+    Alert.alert('Success', 'Highlight video added!');
+  } catch (error: any) {
+    console.error('Error uploading highlight video:', error.response?.data || error.message);
+    Alert.alert('Error', error.response?.data?.detail || 'Failed to upload video.');
+  } finally {
+    setUploadingHighlightVideo(false);
+  }
+};
+
+const handleDeleteHighlightVideo = async (videoUrl: string) => {
+  Alert.alert(
+    'Remove Video',
+    'Are you sure you want to remove this highlight video?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const response = await axios.delete(
+              `${API_URL}/restaurant/highlight-videos`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { video_url: videoUrl },
+              }
+            );
+            setHighlightVideos(response.data.highlight_videos);
+            setUserData((prev: any) => ({
+              ...prev,
+              highlight_videos: response.data.highlight_videos,
+            }));
+            setActiveVideoIndex(0);
+          } catch (error: any) {
+            console.error('Error deleting highlight video:', error.response?.data || error.message);
+            Alert.alert('Error', 'Failed to remove video.');
+          }
+        },
+      },
+    ]
+  );
 };
 
 // Menu item image upload functions
@@ -2455,7 +2592,74 @@ const renderRestaurantProfile = () => {
             }}
             activeOpacity={isOwnProfile ? 0.8 : 1}
           >
-            {bannerImage || userData?.cover_image ? (
+            {/* Highlight Videos Carousel */}
+            {highlightVideos.length > 0 ? (
+              <>
+                <Video
+                  ref={videoRef}
+                  source={{ uri: fixUrl(highlightVideos[activeVideoIndex]) }}
+                  style={restaurantStyles.bannerImage}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay
+                  isLooping={highlightVideos.length === 1}
+                  isMuted
+                  onPlaybackStatusUpdate={(status: any) => {
+                    if (status.didJustFinish && highlightVideos.length > 1) {
+                      setActiveVideoIndex((prev) => (prev + 1) % highlightVideos.length);
+                    }
+                  }}
+                />
+                {/* Video indicator dots */}
+                {highlightVideos.length > 1 && (
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}>
+                    {highlightVideos.map((_: string, idx: number) => (
+                      <View key={idx} style={{
+                        width: idx === activeVideoIndex ? 16 : 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: idx === activeVideoIndex ? '#FF2E2E' : 'rgba(255,255,255,0.6)',
+                      }} />
+                    ))}
+                  </View>
+                )}
+                {/* Video badge */}
+                <View style={{
+                  position: 'absolute',
+                  top: 10,
+                  left: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  gap: 4,
+                }}>
+                  <Ionicons name="videocam" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>
+                    {activeVideoIndex + 1}/{highlightVideos.length}
+                  </Text>
+                </View>
+                {isOwnProfile && !uploadingBanner && (
+                  <View style={restaurantStyles.bannerEditPen}>
+                    <Ionicons name="pencil" size={18} color="#fff" />
+                  </View>
+                )}
+                {(uploadingBanner || uploadingHighlightVideo) && (
+                  <View style={restaurantStyles.bannerUploadingOverlay}>
+                    <ActivityIndicator size="large" color="#fff" />
+                  </View>
+                )}
+              </>
+            ) : bannerImage || userData?.cover_image ? (
               <>
                 <RNImage
                   source={{ uri: fixUrl(bannerImage || userData?.cover_image) }}
@@ -2467,7 +2671,7 @@ const renderRestaurantProfile = () => {
                     <Ionicons name="pencil" size={18} color="#fff" />
                   </View>
                 )}
-                {uploadingBanner && (
+                {(uploadingBanner || uploadingHighlightVideo) && (
                   <View style={restaurantStyles.bannerUploadingOverlay}>
                     <ActivityIndicator size="large" color="#fff" />
                   </View>
@@ -2532,7 +2736,55 @@ const renderRestaurantProfile = () => {
           </View>
         )}
       </View>
-      <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={restaurantStyles.restaurantLabel}>RESTAURANT</Text>
+        {userData?.timings && userData.timings.length > 0 ? (
+          <TouchableOpacity
+            onPress={() => {
+              setEditTimings(userData.timings);
+              setTimingsModalVisible(true);
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+            activeOpacity={0.7}
+          >
+            {(() => {
+              const now = new Date();
+              const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const todayName = dayNames[now.getDay()];
+              const todayTiming = userData.timings.find((t: any) => t.day === todayName);
+              if (todayTiming?.is_closed) {
+                return (
+                  <>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#E94A37' }} />
+                    <Text style={{ fontSize: 9, color: '#E94A37', fontWeight: '600' }}>Closed today</Text>
+                  </>
+                );
+              }
+              return (
+                <>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#4CAF50' }} />
+                  <Text style={{ fontSize: 9, color: '#4CAF50', fontWeight: '600' }}>
+                    {todayTiming ? `${todayTiming.open_time} - ${todayTiming.close_time}` : 'Open'}
+                  </Text>
+                </>
+              );
+            })()}
+            <Ionicons name="chevron-down" size={10} color="#999" />
+          </TouchableOpacity>
+        ) : isOwnProfile ? (
+          <TouchableOpacity
+            onPress={() => {
+              setEditTimings(getDefaultTimings());
+              setTimingsModalVisible(true);
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={11} color="#999" />
+            <Text style={{ fontSize: 9, color: '#999', fontWeight: '500' }}>Add Timings</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   </View>
 
@@ -3570,6 +3822,30 @@ const renderRestaurantProfile = () => {
               />
 
               <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  borderWidth: 1.5,
+                  borderColor: '#E94A37',
+                  marginBottom: 12,
+                }}
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setEditTimings(userData?.timings?.length > 0 ? userData.timings : getDefaultTimings());
+                  setTimeout(() => setTimingsModalVisible(true), 300);
+                }}
+              >
+                <Ionicons name="time-outline" size={18} color="#E94A37" />
+                <Text style={{ color: '#E94A37', fontWeight: '600', fontSize: 15 }}>
+                  {userData?.timings?.length > 0 ? 'Edit Timings' : 'Add Timings'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.saveButton}
                 onPress={handleUpdateProfile}
               >
@@ -3579,6 +3855,203 @@ const renderRestaurantProfile = () => {
           </KeyboardAvoidingView>
         </Modal>
       )}
+{/* ================= TIMINGS MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={timingsModalVisible}
+  onRequestClose={() => setTimingsModalVisible(false)}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalContainer}
+  >
+    <View style={[styles.modalContent, { maxHeight: '85%' }]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Restaurant Timings</Text>
+        <TouchableOpacity onPress={() => setTimingsModalVisible(false)}>
+          <Ionicons name="close" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={{ marginBottom: 16 }} showsVerticalScrollIndicator={false}>
+        {editTimings.map((timing: any, index: number) => (
+          <View key={timing.day} style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: 12,
+            borderBottomWidth: index < editTimings.length - 1 ? 1 : 0,
+            borderBottomColor: '#F0F0F0',
+          }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 4 }}>{timing.day}</Text>
+              {timing.is_closed ? (
+                <Text style={{ fontSize: 13, color: '#E94A37', fontWeight: '500' }}>Closed</Text>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {isOwnProfile ? (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const times = ['06:00 AM','07:00 AM','08:00 AM','09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM','02:00 PM','03:00 PM','04:00 PM','05:00 PM','06:00 PM'];
+                          const currentIdx = times.indexOf(timing.open_time);
+                          const nextIdx = (currentIdx + 1) % times.length;
+                          const updated = [...editTimings];
+                          updated[index] = { ...timing, open_time: times[nextIdx] };
+                          setEditTimings(updated);
+                        }}
+                        style={{ backgroundColor: '#F5F5F5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                      >
+                        <Text style={{ fontSize: 13, color: '#333', fontWeight: '500' }}>{timing.open_time}</Text>
+                      </TouchableOpacity>
+                      <Text style={{ color: '#999', fontSize: 13 }}>to</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const times = ['12:00 PM','01:00 PM','02:00 PM','03:00 PM','04:00 PM','05:00 PM','06:00 PM','07:00 PM','08:00 PM','09:00 PM','10:00 PM','11:00 PM','12:00 AM','01:00 AM','02:00 AM'];
+                          const currentIdx = times.indexOf(timing.close_time);
+                          const nextIdx = (currentIdx + 1) % times.length;
+                          const updated = [...editTimings];
+                          updated[index] = { ...timing, close_time: times[nextIdx] };
+                          setEditTimings(updated);
+                        }}
+                        style={{ backgroundColor: '#F5F5F5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                      >
+                        <Text style={{ fontSize: 13, color: '#333', fontWeight: '500' }}>{timing.close_time}</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <Text style={{ fontSize: 13, color: '#666' }}>{timing.open_time} - {timing.close_time}</Text>
+                  )}
+                </View>
+              )}
+            </View>
+            {isOwnProfile && (
+              <TouchableOpacity
+                onPress={() => {
+                  const updated = [...editTimings];
+                  updated[index] = { ...timing, is_closed: !timing.is_closed };
+                  setEditTimings(updated);
+                }}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  backgroundColor: timing.is_closed ? '#FFEBEE' : '#E8F5E9',
+                }}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  fontWeight: '600',
+                  color: timing.is_closed ? '#E94A37' : '#4CAF50',
+                }}>
+                  {timing.is_closed ? 'Closed' : 'Open'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+      </ScrollView>
+
+      {isOwnProfile && (
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={async () => {
+            try {
+              await axios.put(
+                `${API_URL}/restaurant/auth/update`,
+                { timings: editTimings },
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+              Alert.alert('Success', 'Timings updated successfully!');
+              setTimingsModalVisible(false);
+              fetchProfileData();
+            } catch (err: any) {
+              console.error('Error updating timings:', err.response?.data || err.message);
+              Alert.alert('Error', 'Failed to update timings.');
+            }
+          }}
+        >
+          <Text style={styles.saveButtonText}>Save Timings</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
+
+{/* ================= MANAGE HIGHLIGHT VIDEOS MODAL ================= */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={highlightVideosModalVisible}
+  onRequestClose={() => setHighlightVideosModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Highlight Videos</Text>
+        <TouchableOpacity onPress={() => setHighlightVideosModalVisible(false)}>
+          <Ionicons name="close" size={28} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={{ fontSize: 13, color: '#999', marginBottom: 16 }}>
+        {highlightVideos.length}/3 videos added. These play in your cover area.
+      </Text>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {highlightVideos.map((videoUrl: string, idx: number) => (
+          <View key={idx} style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 12,
+            backgroundColor: '#F8F8F8',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}>
+            <Video
+              source={{ uri: fixUrl(videoUrl) }}
+              style={{ width: 120, height: 70 }}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={false}
+              isMuted
+            />
+            <View style={{ flex: 1, paddingHorizontal: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#333' }}>
+                Video {idx + 1}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>Max 10 seconds</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => handleDeleteHighlightVideo(videoUrl)}
+              style={{ paddingRight: 12 }}
+            >
+              <Ionicons name="trash-outline" size={22} color="#E94A37" />
+            </TouchableOpacity>
+          </View>
+        ))}
+      </ScrollView>
+
+      {highlightVideos.length < 3 && (
+        <TouchableOpacity
+          style={[styles.saveButton, { flexDirection: 'row', justifyContent: 'center', gap: 8 }]}
+          onPress={() => {
+            setHighlightVideosModalVisible(false);
+            setTimeout(() => handlePickHighlightVideo(), 300);
+          }}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#fff" />
+          <Text style={styles.saveButtonText}>Add Video</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+</Modal>
+
 {/* ================= REVIEW FILTER MODAL ================= */}
 <Modal
   animationType="slide"
@@ -8860,7 +9333,7 @@ statDivider: {
     textAlignVertical: 'top',
   },
   saveButton: {
-    backgroundColor: '#4dd0e1',
+    backgroundColor: '#FF2E2E',
     paddingVertical: 15,
     borderRadius: 25,
     alignItems: 'center',

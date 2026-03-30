@@ -281,6 +281,7 @@ async def android_asset_links():
                 "namespace": "android_app",
                 "package_name": "com.cofau.app",
                 "sha256_cert_fingerprints": [
+                    "D0:84:58:B7:94:4B:01:1D:12:69:97:A5:2A:C6:CD:D5:D5:B2:62:57:4B:D3:92:59:15:7E:C9:46:10:84:18:2B",
                     "1D:DD:C9:56:6C:B1:53:82:C6:27:8A:FD:10:00:D2:60:1D:9B:39:89:35:10:E1:E2:15:E7:CE:59:33:E4:EB:24"
                 ]
             }
@@ -4669,6 +4670,127 @@ async def delete_banner_image(
     print(f"✅ Banner image removed for {account_type} {current_account['_id']}")
     
     return {"message": "Banner image removed successfully"}
+
+
+# ==================== RESTAURANT HIGHLIGHT VIDEOS ====================
+
+@app.post("/api/restaurant/highlight-videos")
+async def upload_highlight_video(
+    file: UploadFile = File(...),
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login"))
+):
+    """Upload a highlight video for restaurant cover (max 3 videos, max 10s each)"""
+    from utils.jwt import verify_token
+    import jwt
+
+    db = get_database()
+
+    try:
+        email = verify_token(token)
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        payload = jwt.decode(token, options={"verify_signature": False})
+        account_type = payload.get("account_type", "user")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if account_type != "restaurant":
+        raise HTTPException(status_code=403, detail="Only restaurant accounts can upload highlight videos")
+
+    restaurant = await db.restaurants.find_one({"email": email})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    # Check existing videos count
+    existing_videos = restaurant.get("highlight_videos", [])
+    if len(existing_videos) >= 3:
+        raise HTTPException(status_code=400, detail="Maximum 3 highlight videos allowed. Remove one first.")
+
+    # Validate file type
+    file_ext = (file.filename or "video.mp4").split(".")[-1].lower()
+    if file_ext not in ["mp4", "mov", "m4v"]:
+        raise HTTPException(status_code=400, detail="Only MP4, MOV, and M4V video formats are allowed.")
+
+    # Save file
+    upload_dir = os.path.join(settings.UPLOAD_DIR, "restaurants", "highlights")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    unique_id = str(ObjectId())
+    filename = f"highlight_{str(restaurant['_id'])}_{unique_id}.{file_ext}"
+    file_path = os.path.join(upload_dir, filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    video_url = f"/api/static/uploads/restaurants/highlights/{filename}"
+
+    # Add to highlight_videos array
+    existing_videos.append(video_url)
+    await db.restaurants.update_one(
+        {"_id": restaurant["_id"]},
+        {"$set": {"highlight_videos": existing_videos}}
+    )
+
+    return {
+        "message": "Highlight video uploaded successfully",
+        "video_url": video_url,
+        "highlight_videos": existing_videos,
+        "count": len(existing_videos)
+    }
+
+
+@app.delete("/api/restaurant/highlight-videos")
+async def delete_highlight_video(
+    video_url: str,
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login"))
+):
+    """Remove a highlight video"""
+    from utils.jwt import verify_token
+    import jwt
+
+    db = get_database()
+
+    try:
+        email = verify_token(token)
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        payload = jwt.decode(token, options={"verify_signature": False})
+        account_type = payload.get("account_type", "user")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if account_type != "restaurant":
+        raise HTTPException(status_code=403, detail="Only restaurant accounts can manage highlight videos")
+
+    restaurant = await db.restaurants.find_one({"email": email})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    existing_videos = restaurant.get("highlight_videos", [])
+    if video_url not in existing_videos:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Delete file from disk
+    if "/api/static/uploads/restaurants/highlights/" in video_url:
+        fname = video_url.split("/api/static/uploads/restaurants/highlights/")[-1]
+        fpath = os.path.join(settings.UPLOAD_DIR, "restaurants", "highlights", fname)
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except Exception:
+                pass
+
+    existing_videos.remove(video_url)
+    await db.restaurants.update_one(
+        {"_id": restaurant["_id"]},
+        {"$set": {"highlight_videos": existing_videos}}
+    )
+
+    return {
+        "message": "Highlight video removed",
+        "highlight_videos": existing_videos,
+        "count": len(existing_videos)
+    }
 
 
 # ==================== LOGOUT ENDPOINT ====================

@@ -782,6 +782,8 @@ async def get_restaurant_profile_public(restaurant_id: str):
         "address": restaurant.get("address"),
         "cuisine_type": restaurant.get("cuisine_type"),
         "food_type": restaurant.get("food_type"),
+        "timings": restaurant.get("timings"),
+        "highlight_videos": restaurant.get("highlight_videos"),
         "posts_count": posts_count,
         "reviews_count": restaurant.get("reviews_count", 0),
         "total_orders": total_orders,
