@@ -113,8 +113,38 @@ export default function LoginScreen() {
     }
   };
 
+  // Proceed with backend login after OTP is verified
+  const proceedWithLogin = async () => {
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    const result = await loginWithPhone(formattedPhone, isRestaurant);
+
+    // Sign out from Firebase (we only used it for OTP verification)
+    await auth().signOut();
+
+    if (result.success) {
+      const welcomeMessage = isRestaurant
+        ? 'Welcome back, Restaurant!'
+        : 'Welcome back to Cofau';
+      showAlert('Login Successful!', welcomeMessage);
+    } else {
+      setPhoneError(result.error || 'Login failed. Phone number may not be registered.');
+    }
+  };
+
   // Verify OTP and login
   const handleVerifyOtpAndLogin = async () => {
+    // Check if already auto-verified by Android
+    const currentUser = auth().currentUser;
+    if (currentUser) {
+      setVerifyingOtp(true);
+      try {
+        await proceedWithLogin();
+      } finally {
+        setVerifyingOtp(false);
+      }
+      return;
+    }
+
     if (!otp || otp.length < 6) {
       setPhoneError('Please enter the 6-digit OTP');
       return;
@@ -132,27 +162,24 @@ export default function LoginScreen() {
       await confirm.confirm(otp);
 
       // Now login with phone number via backend
-      const formattedPhone = formatPhoneNumber(phoneNumber);
-      const result = await loginWithPhone(formattedPhone, isRestaurant);
-
-      // Sign out from Firebase (we only used it for OTP verification)
-      await auth().signOut();
-
-      if (result.success) {
-        const welcomeMessage = isRestaurant
-          ? 'Welcome back, Restaurant!'
-          : 'Welcome back to Cofau';
-        showAlert('Login Successful!', welcomeMessage);
-      } else {
-        setPhoneError(result.error || 'Login failed. Phone number may not be registered.');
-      }
+      await proceedWithLogin();
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
+      console.error('Error verifying OTP:', error?.code, error?.message, error);
       let errorMessage = 'Invalid OTP. Please try again.';
       if (error.code === 'auth/invalid-verification-code') {
-        errorMessage = 'Incorrect verification code.';
+        errorMessage = 'Incorrect verification code. Please check and try again.';
       } else if (error.code === 'auth/code-expired') {
         errorMessage = 'OTP has expired. Please request a new one.';
+      } else if (error.code === 'auth/session-expired') {
+        // Session expired likely means auto-verification already happened
+        const autoVerifiedUser = auth().currentUser;
+        if (autoVerifiedUser) {
+          await proceedWithLogin();
+          return;
+        }
+        errorMessage = 'Verification session expired. Please request a new OTP.';
+      } else if (error.code) {
+        errorMessage = `Verification failed (${error.code}). Please try again.`;
       }
       setPhoneError(errorMessage);
     } finally {

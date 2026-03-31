@@ -96,6 +96,22 @@ export default function SignupScreen() {
     return phone.startsWith('+') ? phone : `+${cleaned}`;
   };
 
+  // Listen for auto-verification (Android auto-reads SMS and verifies)
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = auth().onAuthStateChanged((user: any) => {
+      if (user && otpSent && !otpVerified) {
+        // Phone was auto-verified by Android
+        setOtpVerified(true);
+        setOtp('');
+        Alert.alert('Verified!', 'Phone number auto-verified. Now complete your signup.', [
+          { text: 'Continue', onPress: () => setCurrentStep('signup') }
+        ]);
+      }
+    });
+    return () => unsubscribe();
+  }, [otpSent, otpVerified]);
+
   // Send OTP
   const handleSendOtp = async () => {
     // Check if Firebase is available
@@ -144,6 +160,22 @@ export default function SignupScreen() {
 
   // Verify OTP and proceed to signup form
   const handleVerifyOtp = async () => {
+    // If already auto-verified by Android, skip manual verification
+    if (otpVerified) {
+      setCurrentStep('signup');
+      return;
+    }
+
+    // Check if user is already signed in (auto-verified)
+    const currentUser = auth().currentUser;
+    if (currentUser) {
+      setOtpVerified(true);
+      Alert.alert('Verified!', 'Phone number verified. Now complete your signup.', [
+        { text: 'Continue', onPress: () => setCurrentStep('signup') }
+      ]);
+      return;
+    }
+
     if (!otp || otp.length < 6) {
       setPhoneError('Please enter the 6-digit OTP');
       return;
@@ -163,12 +195,25 @@ export default function SignupScreen() {
         { text: 'Continue', onPress: () => setCurrentStep('signup') }
       ]);
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
+      console.error('Error verifying OTP:', error?.code, error?.message, error);
       let errorMessage = 'Invalid OTP. Please try again.';
       if (error.code === 'auth/invalid-verification-code') {
-        errorMessage = 'Incorrect verification code.';
+        errorMessage = 'Incorrect verification code. Please check and try again.';
       } else if (error.code === 'auth/code-expired') {
         errorMessage = 'OTP has expired. Please request a new one.';
+      } else if (error.code === 'auth/session-expired') {
+        // Session expired likely means auto-verification already happened
+        const autoVerifiedUser = auth().currentUser;
+        if (autoVerifiedUser) {
+          setOtpVerified(true);
+          Alert.alert('Verified!', 'Phone number verified. Now complete your signup.', [
+            { text: 'Continue', onPress: () => setCurrentStep('signup') }
+          ]);
+          return;
+        }
+        errorMessage = 'Verification session expired. Please request a new OTP.';
+      } else if (error.code) {
+        errorMessage = `Verification failed (${error.code}). Please try again.`;
       }
       setPhoneError(errorMessage);
     } finally {
