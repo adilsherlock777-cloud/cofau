@@ -13,6 +13,7 @@ ActivityIndicator,
 Platform,
 Pressable,
 Animated,
+AppState,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -236,11 +237,16 @@ const handleMutePress = async () => {
 useEffect(() => {
   if (!isVideo || !videoRef.current) return;
 
+  let retryTimer = null;
+
   const controlVideo = async () => {
     try {
+      if (!videoRef.current) return;
       // Get current status to check if video is loaded
       const status = await videoRef.current.getStatusAsync();
       if (shouldPlay) {
+        // Re-check ref in case it changed during the async call
+        if (!shouldPlayRef.current) return;
         // For iOS, ensure video is loaded before playing
         if (status.isLoaded) {
           if (!status.isPlaying) {
@@ -254,10 +260,12 @@ useEffect(() => {
           await videoRef.current.setIsMutedAsync(isMutedRef.current);
         } else {
           // If not loaded, wait a bit and try again (iOS sometimes needs this)
-          setTimeout(async () => {
+          retryTimer = setTimeout(async () => {
             try {
+              // Guard: only play if shouldPlay is still true
+              if (!shouldPlayRef.current || !videoRef.current) return;
               const newStatus = await videoRef.current.getStatusAsync();
-              if (newStatus.isLoaded && !newStatus.isPlaying) {
+              if (newStatus.isLoaded && !newStatus.isPlaying && shouldPlayRef.current) {
                 await videoRef.current.playAsync();
                 await videoRef.current.setIsMutedAsync(isMutedRef.current);
               }
@@ -267,6 +275,11 @@ useEffect(() => {
         }
       } else {
         // FULLY STOP video when not visible - pause, stop audio, and reset position
+        // Also clear any pending load timer from onLoad
+        if (videoRef.current._loadTimer) {
+          clearTimeout(videoRef.current._loadTimer);
+          videoRef.current._loadTimer = null;
+        }
         if (status.isLoaded) {
           try {
             // First pause the video
@@ -292,10 +305,18 @@ useEffect(() => {
 
   return () => {
     clearTimeout(timer);
+    if (retryTimer) clearTimeout(retryTimer);
     // Cleanup: Ensure video is stopped when component unmounts or shouldPlay changes
-    if (videoRef.current && !shouldPlay) {
-      videoRef.current.pauseAsync().catch(() => { });
-      videoRef.current.setPositionAsync(0).catch(() => { });
+    if (videoRef.current) {
+      if (videoRef.current._loadTimer) {
+        clearTimeout(videoRef.current._loadTimer);
+        videoRef.current._loadTimer = null;
+      }
+      if (!shouldPlay) {
+        videoRef.current.pauseAsync().catch(() => { });
+        videoRef.current.setPositionAsync(0).catch(() => { });
+        videoRef.current.setIsMutedAsync(true).catch(() => { });
+      }
     }
   };
 }, [shouldPlay, isVideo, videoLoaded]);
@@ -307,6 +328,18 @@ useEffect(() => {
     setVideoReady(false);
   }
 }, [shouldPlay, isVideo]);
+
+// Pause video when app goes to background
+useEffect(() => {
+  if (!isVideo) return;
+  const sub = AppState.addEventListener('change', (state) => {
+    if (state !== 'active' && videoRef.current) {
+      videoRef.current.pauseAsync().catch(() => {});
+      videoRef.current.setIsMutedAsync(true).catch(() => {});
+    }
+  });
+  return () => sub.remove();
+}, [isVideo]);
 
 // Sync local mute state from global when this card starts playing
 useEffect(() => {
@@ -796,8 +829,10 @@ postId={post.id}
                 setVideoError(false);
               }
               if (shouldPlayRef.current && videoRef.current) {
-                setTimeout(async () => {
+                // Use a ref-guarded timeout so we never start playback after tab switch
+                const loadTimer = setTimeout(async () => {
                   try {
+                    // Double-check shouldPlay — it may have changed during the delay
                     if (!shouldPlayRef.current || !videoRef.current) return;
                     const currentStatus = await videoRef.current.getStatusAsync();
                     if (currentStatus.isLoaded && !currentStatus.isPlaying && shouldPlayRef.current) {
@@ -807,6 +842,8 @@ postId={post.id}
                   } catch (err) {
                   }
                 }, 200);
+                // Store timer so it can be cleared if shouldPlay changes
+                videoRef.current._loadTimer = loadTimer;
               }
             }}
             onError={(error) => {
@@ -966,7 +1003,7 @@ postId={post.id}
 {(post.rating != null || post.price || post.description || post.about || post.location_name || post.location_address) && (
   <View style={styles.glassCardShadow}>
     <View style={styles.glassCardClipper}>
-    <BlurView intensity={100} tint="default" style={styles.glassCard}>
+    <BlurView intensity={100} tint="light" style={styles.glassCard}>
       <View style={styles.glassCardInner}>
 
         {/* RATING + REVIEW (unified row) */}

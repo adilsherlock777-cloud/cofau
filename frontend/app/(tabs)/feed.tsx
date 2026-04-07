@@ -301,6 +301,11 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { unreadCount, refreshUnreadCount } = useNotifications();
+
+  // Notification icon drop-down animation (Instagram style)
+  const notifTranslateY = useRef(new Animated.Value(-20)).current;
+  const notifOpacity = useRef(new Animated.Value(0)).current;
+
   const [visibleVideoId, setVisibleVideoId] = useState<string | null>(null);
   const [showFixedLine, setShowFixedLine] = useState(false);
   const [page, setPage] = useState(1);
@@ -380,6 +385,37 @@ useEffect(() => {
     fetchRestaurantReviewsCount();
   }
 }, []);
+
+// Notification icon drop-down animation — plays on mount & refresh
+const playNotifDrop = useCallback(() => {
+  notifTranslateY.setValue(-20);
+  notifOpacity.setValue(0);
+  Animated.parallel([
+    Animated.spring(notifTranslateY, {
+      toValue: 0,
+      friction: 6,
+      tension: 120,
+      useNativeDriver: true,
+    }),
+    Animated.timing(notifOpacity, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }),
+  ]).start();
+}, []);
+
+useEffect(() => {
+  const t = setTimeout(playNotifDrop, 400);
+  return () => clearTimeout(t);
+}, []);
+
+useEffect(() => {
+  if (refreshing) {
+    const t = setTimeout(playNotifDrop, 200);
+    return () => clearTimeout(t);
+  }
+}, [refreshing]);
 
 // Auto-play the first video post when feed finishes loading
 // onViewableItemsChanged won't fire for items already visible on mount
@@ -464,8 +500,9 @@ useFocusEffect(
       fetchRestaurantReviewsCount();
     }
 
-    // When leaving this tab, stop all video playback
+    // When leaving this tab, stop all video playback immediately
     return () => {
+      visibleVideoIdRef.current = null;
       setVisibleVideoId(null);
     };
   }, [hasInitiallyLoaded, accountType])
@@ -1104,26 +1141,28 @@ const renderPost = useCallback(
 
       {/* Right Icons Container */}
       <View style={styles.headerIcons}>
-        {/* Notifications Icon with Gradient */}
+        {/* Notifications Icon — Drop-down Animation */}
         <TouchableOpacity
-          style={styles.leftIcon}
+          style={styles.notifIconWrap}
           onPress={() => router.push("/notifications")}
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaskedView
-            maskElement={
-              <Ionicons name="notifications" size={22} color="#000" />
-            }
+          <Animated.View
+            style={{
+              opacity: notifOpacity,
+              transform: [{ translateY: notifTranslateY }],
+            }}
           >
             <LinearGradient
-              colors={["#FF2E2E", "#FF7A18"]}
+              colors={["#FF6B6B", "#FF2E2E", "#FF7A18"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
+              style={styles.notifIconCircle}
             >
-              <Ionicons name="notifications" size={22} color="transparent" />
+              <Ionicons name="flame" size={18} color="#fff" />
             </LinearGradient>
-          </MaskedView>
+          </Animated.View>
           {unreadCount > 0 && (
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationBadgeText}>
@@ -1543,35 +1582,52 @@ chatBadgeText: {
   fontWeight: "800",
 },
 
-// 🔔 Notification badge
+// 🔔 Notification icon wrapper
+notifIconWrap: {
+  width: 44,
+  height: 44,
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 10,
+},
+notifIconCircle: {
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  justifyContent: "center",
+  alignItems: "center",
+  shadowColor: "#FF2E2E",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.45,
+  shadowRadius: 6,
+  elevation: 6,
+},
 notificationBadge: {
   position: "absolute",
-  top: -2,
-  right: 11,
-  backgroundColor: "#FF3B30",   // stronger red
+  top: 0,
+  right: 0,
+  backgroundColor: "#fff",
   borderRadius: 10,
-  minWidth: 22,
+  minWidth: 18,
   height: 18,
   paddingHorizontal: 4,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1.5,
-  borderColor: "#fff",
+  borderColor: "#FF3B30",
 },
-
 notificationBadgeText: {
-  color: "#fff",
+  color: "#FF3B30",
   fontSize: 9,
-  fontWeight: "700",
+  fontWeight: "800",
 },
-
-  leftIcon: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
+leftIcon: {
+  width: 40,
+  height: 40,
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 10,
+},
   restaurantLogoContainer: {
   width: 70,
   height: 70,

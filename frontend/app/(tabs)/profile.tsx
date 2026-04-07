@@ -521,6 +521,21 @@ export default function ProfileScreen() {
       setError(true);
       return;
     }
+    // Reset all profile state immediately to prevent stale data flash
+    setLoading(true);
+    setUserData(null);
+    setUserPosts([]);
+    setUserStats(null);
+    setMenuItems([]);
+    setRestaurantReviews([]);
+    setBannerImage(null);
+    setHighlightVideos([]);
+    setIsFollowing(false);
+    setComplimentsCount(0);
+    setHasComplimented(false);
+    setPostsPage(0);
+    setHasMorePosts(true);
+    setIsRestaurantProfile(false);
     fetchProfileData();
     fetchBadgeRequestStatus();
   }, [token, userId]);
