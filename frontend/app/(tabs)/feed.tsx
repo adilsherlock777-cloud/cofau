@@ -1135,8 +1135,10 @@ const viewabilityConfigCallbackPairs = useRef([
 
       const skip = forceRefresh ? 0 : (pageRef.current - 1) * POSTS_PER_PAGE;
       const ts = forceRefresh ? `&_t=${Date.now()}` : "";
+      const ul = userLocationRef.current;
+      const locParam = ul ? `&user_lat=${ul.latitude}&user_lng=${ul.longitude}` : '';
       const res = await axios.get(
-        `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}&sort=engagement${ts}`
+        `${BACKEND}/api/feed?skip=${skip}&limit=${POSTS_PER_PAGE}&sort=engagement${ts}${locParam}`
       );
 
       if (res.data.length === 0) {
@@ -1148,15 +1150,30 @@ const viewabilityConfigCallbackPairs = useRef([
       }
 
       const mapped = res.data.map((post: any) => {
-        let distance_km: number | null = null;
-        const ul = userLocationRef.current;
-        if (ul && post.latitude && post.longitude) {
-          const dLat = (post.latitude - ul.latitude) * Math.PI / 180;
-          const dLon = (post.longitude - ul.longitude) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(ul.latitude * Math.PI / 180) * Math.cos(post.latitude * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-          distance_km = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+        // Use distance_km from API if available, otherwise calculate client-side
+        let distance_km: number | null = post.distance_km ?? null;
+        if (distance_km == null) {
+          const ul = userLocationRef.current;
+          if (ul) {
+            let postLat = post.latitude;
+            let postLng = post.longitude;
+            if ((!postLat || !postLng) && post.map_link) {
+              const coordMatch = post.map_link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/) ||
+                post.map_link.match(/query=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+              if (coordMatch) {
+                postLat = parseFloat(coordMatch[1]);
+                postLng = parseFloat(coordMatch[2]);
+              }
+            }
+            if (postLat && postLng) {
+              const dLat = (postLat - ul.latitude) * Math.PI / 180;
+              const dLon = (postLng - ul.longitude) * Math.PI / 180;
+              const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(ul.latitude * Math.PI / 180) * Math.cos(postLat * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+              distance_km = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+            }
+          }
         }
         return {
           id: post.id,

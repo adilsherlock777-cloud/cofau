@@ -2886,17 +2886,32 @@ useFocusEffect(
 
   const mapPostData = (post: any) => {
     const fullUrl = fixUrl(post.media_url || post.image_url);
-    // Calculate distance from user location to post location
-    let distance_km: number | null = null;
-    if (userLocation && post.latitude && post.longitude) {
-      const R = 6371;
-      const dLat = (post.latitude - userLocation.latitude) * Math.PI / 180;
-      const dLon = (post.longitude - userLocation.longitude) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(userLocation.latitude * Math.PI / 180) * Math.cos(post.latitude * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      distance_km = Math.round(R * c * 10) / 10;
+    // Use distance_km from API if available, otherwise calculate client-side
+    let distance_km: number | null = post.distance_km ?? null;
+    if (distance_km == null) {
+      const ul = cachedUserLocation.current || userLocation;
+      if (ul) {
+        let postLat = post.latitude;
+        let postLng = post.longitude;
+        if ((!postLat || !postLng) && post.map_link) {
+          const coordMatch = post.map_link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/) ||
+            post.map_link.match(/query=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+          if (coordMatch) {
+            postLat = parseFloat(coordMatch[1]);
+            postLng = parseFloat(coordMatch[2]);
+          }
+        }
+        if (postLat && postLng) {
+          const R = 6371;
+          const dLat = (postLat - ul.latitude) * Math.PI / 180;
+          const dLon = (postLng - ul.longitude) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(ul.latitude * Math.PI / 180) * Math.cos(postLat * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          distance_km = Math.round(R * c * 10) / 10;
+        }
+      }
     }
     return {
       ...post,
@@ -2934,11 +2949,13 @@ useFocusEffect(
         : '';
       const sortParam = '&sort=mixed';
       const seedParam = `&seed=${feedSeedRef.current}`;
+      const ul = cachedUserLocation.current || userLocation;
+      const locationParam = ul ? `&user_lat=${ul.latitude}&user_lng=${ul.longitude}` : '';
 
       // Progressive loading: on refresh, fetch first 6 posts fast, then load the rest
       if (refresh) {
         const INITIAL_BATCH = 6;
-        const firstUrl = `${API_URL}/feed?skip=0&limit=${INITIAL_BATCH}${categoryParam}${sortParam}${seedParam}`;
+        const firstUrl = `${API_URL}/feed?skip=0&limit=${INITIAL_BATCH}${categoryParam}${sortParam}${seedParam}${locationParam}`;
         const firstRes = await axios.get(firstUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
@@ -2971,7 +2988,7 @@ useFocusEffect(
         }
 
         // Load remaining posts in background
-        const restUrl = `${API_URL}/feed?skip=${INITIAL_BATCH}&limit=${POSTS_PER_PAGE - INITIAL_BATCH}${categoryParam}${sortParam}${seedParam}`;
+        const restUrl = `${API_URL}/feed?skip=${INITIAL_BATCH}&limit=${POSTS_PER_PAGE - INITIAL_BATCH}${categoryParam}${sortParam}${seedParam}${locationParam}`;
         const restRes = await axios.get(restUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
@@ -3001,7 +3018,7 @@ useFocusEffect(
         }
       } else {
         // Pagination: load next page normally
-        let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}${sortParam}${seedParam}`;
+        let feedUrl = `${API_URL}/feed?skip=${skip}&limit=${POSTS_PER_PAGE}${categoryParam}${sortParam}${seedParam}${locationParam}`;
         const res = await axios.get(feedUrl, { headers: { Authorization: `Bearer ${token || ""}` } });
         if (!mountedRef.current) return;
 
