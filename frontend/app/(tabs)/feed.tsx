@@ -25,7 +25,10 @@ import {
   Modal,
   FlatList,
   Animated,
+  Dimensions,
+  ScrollView,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect, useNavigation, useLocalSearchParams } from "expo-router";
@@ -52,6 +55,9 @@ import {
 // ⭐ ADD THIS IMPORT - adjust path based on where you place the file
 import { FeedSkeleton } from "../../components/FeedSkeleton";
 import CofauWalletModal from "../../components/CofauWalletModal";
+import * as Location from "expo-location";
+import Svg, { Circle as SvgCircle } from "react-native-svg";
+const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 
 const BACKEND = BACKEND_URL;
 import { muteState } from "../../utils/muteState";
@@ -59,91 +65,129 @@ import { muteState } from "../../utils/muteState";
 /* -------------------------
    Animated Wallet Button
 ------------------------- */
-const WalletButton = React.memo(({ onPress, unreadCount }: { onPress: () => void; unreadCount: number }) => {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0.3)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
+/* Circular progress ring — SVG-based with fill animation */
+const CircularProgress = React.memo(({ size, strokeWidth, progress, color, bgColor }: {
+  size: number; strokeWidth: number; progress: number; color: string; bgColor: string;
+}) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const animValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.12, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      ])
-    );
-    const glow = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 0.7, duration: 1200, useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0.2, duration: 1200, useNativeDriver: true }),
-      ])
-    );
-    const shimmer = Animated.loop(
-      Animated.timing(shimmerAnim, { toValue: 1, duration: 3000, useNativeDriver: true })
-    );
-    pulse.start();
-    glow.start();
-    shimmer.start();
-    return () => { pulse.stop(); glow.stop(); shimmer.stop(); };
-  }, []);
+    animValue.setValue(0);
+    Animated.timing(animValue, {
+      toValue: Math.min(Math.max(progress, 0), 100),
+      duration: 900,
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
 
-  const shimmerRotate = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+  const animatedOffset = animValue.interpolate({
+    inputRange: [0, 100],
+    outputRange: [circumference, 0],
   });
 
   return (
+    <Svg width={size} height={size}>
+      <SvgCircle
+        cx={size / 2} cy={size / 2} r={radius}
+        stroke={bgColor} strokeWidth={strokeWidth} fill="none"
+      />
+      <AnimatedSvgCircle
+        cx={size / 2} cy={size / 2} r={radius}
+        stroke={color} strokeWidth={strokeWidth} fill="none"
+        strokeDasharray={`${circumference}`}
+        strokeDashoffset={animatedOffset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </Svg>
+  );
+});
+
+const WalletButton = React.memo(({ onPress, unreadCount, progressPercent, canClaim }: {
+  onPress: () => void; unreadCount: number; progressPercent: number; canClaim: boolean;
+}) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (canClaim) {
+      // Pulse animation when reward is claimable
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      const glow = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(glowAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      pulse.start();
+      glow.start();
+      return () => { pulse.stop(); glow.stop(); };
+    } else {
+      pulseAnim.setValue(1);
+      glowAnim.setValue(0);
+    }
+  }, [canClaim]);
+
+  return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      {/* Outer glow ring */}
       <Animated.View style={{
-        position: 'absolute', top: -4, left: -4, right: -4, bottom: -4,
-        borderRadius: 24,
-        backgroundColor: '#FFD700',
-        opacity: glowAnim,
+        width: 48, height: 48, justifyContent: 'center', alignItems: 'center',
         transform: [{ scale: pulseAnim }],
-      }} />
-      {/* Spinning shimmer border */}
-      <Animated.View style={{
-        width: 42, height: 42, borderRadius: 21,
-        borderWidth: 2, borderColor: 'transparent',
-        justifyContent: 'center', alignItems: 'center',
-        transform: [{ rotate: shimmerRotate }],
-        borderTopColor: '#FFD700',
-        borderRightColor: '#FFA500',
       }}>
-        {/* Main coin button */}
-        <LinearGradient
-          colors={['#FFD700', '#FFA500']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            width: 34, height: 34, borderRadius: 17,
-            justifyContent: 'center', alignItems: 'center',
-            shadowColor: '#FFD700',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.6,
-            shadowRadius: 6,
-            elevation: 6,
-          }}
-        >
-          {/* Inner ring for coin effect */}
-          <View style={{
-            width: 28, height: 28, borderRadius: 14,
-            borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)',
-            justifyContent: 'center', alignItems: 'center',
-          }}>
-            <Text style={{
-              fontSize: 16, fontWeight: '900', color: '#FFF',
+        {/* Circular progress ring */}
+        <CircularProgress
+          size={48}
+          strokeWidth={3}
+          progress={progressPercent}
+          color={canClaim ? '#4CAF50' : '#FF7A18'}
+          bgColor="#E8E8E8"
+        />
+        {/* Premium 3D gift icon */}
+        <Animated.View style={{
+          position: 'absolute',
+          width: 38, height: 38, borderRadius: 19,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.45] }),
+          shadowRadius: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [5, 10] }),
+          elevation: 6,
+        }}>
+          <LinearGradient
+            colors={canClaim ? ['#66BB6A', '#388E3C'] : ['#FFAD42', '#FF7A18']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={{
+              width: 38, height: 38, borderRadius: 19,
+              justifyContent: 'center', alignItems: 'center',
+              borderWidth: 1.5,
+              borderColor: canClaim ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.3)',
+            }}
+          >
+            {/* Inner highlight for 3D depth */}
+            <View style={{
+              position: 'absolute', top: 2, left: 5, right: 5,
+              height: 14, borderRadius: 10,
+              backgroundColor: 'rgba(255,255,255,0.25)',
+            }} />
+            <Ionicons name="gift" size={19} color="#FFF" style={{
               textShadowColor: 'rgba(0,0,0,0.2)',
               textShadowOffset: { width: 0, height: 1 },
               textShadowRadius: 2,
-            }}>₹</Text>
-          </View>
-        </LinearGradient>
+            }} />
+          </LinearGradient>
+        </Animated.View>
       </Animated.View>
       {/* Badge */}
       {unreadCount > 0 && (
         <View style={{
-          position: 'absolute', top: -4, right: -4,
+          position: 'absolute', top: -2, right: -2,
           backgroundColor: '#FF3B30', borderRadius: 10,
           minWidth: 18, height: 16, paddingHorizontal: 4,
           alignItems: 'center', justifyContent: 'center',
@@ -283,6 +327,291 @@ const SuggestedPostsHeader = React.memo(() => (
   </View>
 ));
 
+/* -------------------------
+   Trending Inline Card
+   (horizontal scroll slides)
+------------------------- */
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+const TrendingInlineCard = React.memo(({ trendingPosts, router }: { trendingPosts: any[]; router: any }) => {
+  const scrollRef = useRef<ScrollView>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const CARD_WIDTH = SCREEN_WIDTH - 32;
+
+  const handleScroll = useCallback((e: any) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const idx = Math.round(x / CARD_WIDTH);
+    setActiveSlide(idx);
+  }, [CARD_WIDTH]);
+
+  const formatCount = (n: number) => n > 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+
+  return (
+    <View style={trendingStyles.container}>
+      {/* Header */}
+      <LinearGradient
+        colors={['#FF2E2E', '#FF7A18']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={trendingStyles.header}
+      >
+        <View style={trendingStyles.headerLeft}>
+          <Text style={{ fontSize: 16 }}>🔥</Text>
+          <View>
+            <Text style={trendingStyles.headerTitle}>TRENDING NOW</Text>
+            <Text style={trendingStyles.headerSubtitle}>Popular dishes on Cofau</Text>
+          </View>
+        </View>
+        <View style={trendingStyles.dots}>
+          {trendingPosts.map((_: any, i: number) => (
+            <View
+              key={i}
+              style={[trendingStyles.dot, i === activeSlide && trendingStyles.dotActive]}
+            />
+          ))}
+        </View>
+      </LinearGradient>
+
+      {/* Horizontal slides */}
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        style={trendingStyles.scrollView}
+      >
+        {trendingPosts.map((post: any, idx: number) => (
+          <TouchableOpacity
+            key={post.id || idx}
+            activeOpacity={0.9}
+            onPress={() => router.push(`/post-details/${post.id}`)}
+            style={[trendingStyles.slide, { width: CARD_WIDTH }]}
+          >
+            {/* Image */}
+            <View style={trendingStyles.imageWrapper}>
+              <ExpoImage
+                source={{ uri: post.thumbnail_url || post.media_url }}
+                style={trendingStyles.image}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={150}
+              />
+              <LinearGradient
+                colors={['#FFD700', '#FFA500']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={trendingStyles.rankBadge}
+              >
+                <Text style={trendingStyles.rankText}>#{idx + 1} Trending</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Stats row */}
+            <View style={trendingStyles.statsRow}>
+              <View style={[trendingStyles.statPill, { backgroundColor: '#FFE8E8' }]}>
+                <Text style={{ fontSize: 11 }}>❤️</Text>
+                <Text style={[trendingStyles.statText, { color: '#E94A37' }]}>{formatCount(post.likes_count || 0)}</Text>
+              </View>
+              <View style={[trendingStyles.statPill, { backgroundColor: '#E8F4FF' }]}>
+                <Ionicons name="eye" size={12} color="#3B82F6" />
+                <Text style={[trendingStyles.statText, { color: '#3B82F6' }]}>{formatCount(post.clicks_count || 0)}</Text>
+              </View>
+            </View>
+
+            {/* Info */}
+            <View style={trendingStyles.info}>
+              <View style={trendingStyles.userRow}>
+                <UserAvatar
+                  profilePicture={post.user_profile_picture}
+                  username={post.username}
+                  size={32}
+                  showLevelBadge={true}
+                  level={post.user_level || 1}
+                  style={{}}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={trendingStyles.username} numberOfLines={1}>{post.username}</Text>
+                  {post.account_type === 'restaurant' ? (
+                    <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={trendingStyles.restaurantTag}>
+                      <Ionicons name="storefront-outline" size={8} color="#fff" />
+                      <Text style={trendingStyles.restaurantTagText}>Restaurant</Text>
+                    </LinearGradient>
+                  ) : post.location_name ? (
+                    <View style={trendingStyles.locationTag}>
+                      <Ionicons name="location-sharp" size={9} color="#E94A37" />
+                      <Text style={trendingStyles.locationText} numberOfLines={1}>{post.location_name}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={trendingStyles.dishName} numberOfLines={1}>
+                  {post.dish_name || post.review_text?.slice(0, 25) || 'Trending Dish'}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+});
+
+const trendingStyles = StyleSheet.create({
+  container: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 1,
+  },
+  headerSubtitle: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 1,
+  },
+  dots: {
+    flexDirection: 'row',
+    gap: 4,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  dotActive: {
+    width: 16,
+    backgroundColor: '#fff',
+  },
+  scrollView: {
+    flexGrow: 0,
+  },
+  slide: {
+    flexDirection: 'column',
+  },
+  imageWrapper: {
+    position: 'relative',
+    width: '100%',
+  },
+  image: {
+    width: '100%',
+    height: SCREEN_WIDTH * 0.6,
+  },
+  rankBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  rankText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: -14,
+    zIndex: 10,
+    paddingHorizontal: 16,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  statText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  info: {
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 10,
+  },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  username: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  dishName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555',
+  },
+  restaurantTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+  },
+  restaurantTagText: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  locationTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    alignSelf: 'flex-start',
+  },
+  locationText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#777',
+    maxWidth: 120,
+  },
+});
+
 export default function FeedScreen() {
   const router = useRouter();
   const { openWallet } = useLocalSearchParams<{ openWallet?: string }>();
@@ -319,7 +648,13 @@ export default function FeedScreen() {
   const [ownStoryData, setOwnStoryData] = useState<any>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletUnreadCount, setWalletUnreadCount] = useState(0);
+  const [walletProgress, setWalletProgress] = useState(0);
+  const [walletCanClaim, setWalletCanClaim] = useState(false);
   const [suggestedPosts, setSuggestedPosts] = useState<any[]>([]);
+
+  // Trending posts state
+  const [trendingPosts, setTrendingPosts] = useState<any[]>([]);
+  const trendingFetchedRef = useRef(false);
 
   const flatListRef = useRef<FlatList>(null);
   const postPositionsRef = useRef<Map<string, { y: number; height: number }>>(new Map());
@@ -339,6 +674,10 @@ export default function FeedScreen() {
 
   const POSTS_PER_PAGE = 30;
   const VISIBILITY_THRESHOLD = 0.2;
+
+  // User location for distance calculation
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   // Register double-tap Home tab handler: scroll to top + refresh
   const { register: registerFeedRefresh } = useFeedRefresh();
@@ -385,6 +724,53 @@ useEffect(() => {
     fetchRestaurantReviewsCount();
   }
 }, []);
+
+// Fetch user location for distance calculation
+useEffect(() => {
+  (async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+        setUserLocation(coords);
+        userLocationRef.current = coords;
+      }
+    } catch (e) {}
+  })();
+}, []);
+
+// Fetch trending posts for inline cards
+useEffect(() => {
+  if (trendingFetchedRef.current || loading) return;
+  if (!feedPosts.length) return;
+  trendingFetchedRef.current = true;
+  const fetchTrending = async () => {
+    try {
+      const res = await axios.get(
+        `${BACKEND}/api/feed?skip=0&limit=30&sort=engagement`
+      );
+      const posts = (res.data || []).map((p: any) => ({
+        id: p.id || p._id,
+        username: p.username,
+        user_profile_picture: p.user_profile_picture || p.profile_picture,
+        user_level: p.user_level || p.level || 1,
+        account_type: p.account_type,
+        dish_name: p.dish_name,
+        location_name: p.location_name || p.location,
+        review_text: p.review_text || p.about,
+        likes_count: p.likes_count || p.likes || 0,
+        clicks_count: p.clicks_count || 0,
+        media_url: normalizeMediaUrl(p.media_url || p.image_url),
+        thumbnail_url: p.thumbnail_url ? normalizeMediaUrl(p.thumbnail_url) : null,
+      }));
+      // Sort by engagement
+      posts.sort((a: any, b: any) => ((b.likes_count || 0) + (b.clicks_count || 0)) - ((a.likes_count || 0) + (a.clicks_count || 0)));
+      setTrendingPosts(posts.slice(0, 5));
+    } catch {}
+  };
+  fetchTrending();
+}, [loading, feedPosts.length]);
 
 // Notification icon drop-down animation — plays on mount & refresh
 const playNotifDrop = useCallback(() => {
@@ -459,11 +845,15 @@ const fetchWalletUnreadCount = async () => {
     return;
   }
   try {
-    const response = await axios.get(
-      `${BACKEND}/api/wallet/unread-count`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    setWalletUnreadCount(response.data?.unread_count || 0);
+    const [unreadRes, balanceRes] = await Promise.all([
+      axios.get(`${BACKEND}/api/wallet/unread-count`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${BACKEND}/api/wallet/balance`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null),
+    ]);
+    setWalletUnreadCount(unreadRes.data?.unread_count || 0);
+    if (balanceRes?.data) {
+      setWalletProgress(balanceRes.data.progress_percent || 0);
+      setWalletCanClaim(balanceRes.data.can_claim || false);
+    }
   } catch (err) {
     setWalletUnreadCount(0);
   }
@@ -757,38 +1147,51 @@ const viewabilityConfigCallbackPairs = useRef([
         return;
       }
 
-      const mapped = res.data.map((post: any) => ({
-        id: post.id,
-        user_id: post.user_id,
-        username: post.username,
-        user_profile_picture: getPostDP(post),
-        description: post.review_text || post.description || post.about,
-        rating: post.rating,
-        price: post.price,
-        about: post.about,
-        account_type: post.account_type,
-        media_url: normalizeMediaUrl(post.image_url || post.media_url),
-        thumbnail_url: post.thumbnail_url
-          ? normalizeMediaUrl(post.thumbnail_url)
-          : null,
-        media_type: post.media_type,
-        created_at: post.created_at,
-        user_level: post.user_level || post.level || post.userLevel,
-        location_name: post.location_name || post.location || post.place_name,
-        location_address: post.location_address || post.address,
-        map_link: post.map_link || post.google_maps_link,
-        likes: post.likes || post.likes_count || 0,
-        comments: post.comments || post.comments_count || 0,
-        shares_count: post.shares_count || post.shares || 0,
-        saves_count: post.saves_count || 0,
-        is_liked: post.is_liked || false,
-        is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
-        is_following: post.is_following || false,
-        tagged_restaurant: post.tagged_restaurant || null,
-        dish_name: post.dish_name || null,
-        user_badge: post.user_badge || null,
-        is_first_discovery: post.is_first_discovery || false,
-      }));
+      const mapped = res.data.map((post: any) => {
+        let distance_km: number | null = null;
+        const ul = userLocationRef.current;
+        if (ul && post.latitude && post.longitude) {
+          const dLat = (post.latitude - ul.latitude) * Math.PI / 180;
+          const dLon = (post.longitude - ul.longitude) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(ul.latitude * Math.PI / 180) * Math.cos(post.latitude * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          distance_km = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+        }
+        return {
+          id: post.id,
+          user_id: post.user_id,
+          username: post.username,
+          user_profile_picture: getPostDP(post),
+          description: post.review_text || post.description || post.about,
+          rating: post.rating,
+          price: post.price,
+          about: post.about,
+          account_type: post.account_type,
+          media_url: normalizeMediaUrl(post.image_url || post.media_url),
+          thumbnail_url: post.thumbnail_url
+            ? normalizeMediaUrl(post.thumbnail_url)
+            : null,
+          media_type: post.media_type,
+          created_at: post.created_at,
+          user_level: post.user_level || post.level || post.userLevel,
+          location_name: post.location_name || post.location || post.place_name,
+          location_address: post.location_address || post.address,
+          map_link: post.map_link || post.google_maps_link,
+          likes: post.likes || post.likes_count || 0,
+          comments: post.comments || post.comments_count || 0,
+          shares_count: post.shares_count || post.shares || 0,
+          saves_count: post.saves_count || 0,
+          is_liked: post.is_liked || false,
+          is_saved_by_user: post.is_saved_by_user || post.is_saved || false,
+          is_following: post.is_following || false,
+          tagged_restaurant: post.tagged_restaurant || null,
+          dish_name: post.dish_name || null,
+          user_badge: post.user_badge || null,
+          is_first_discovery: post.is_first_discovery || false,
+          distance_km,
+        };
+      });
 
       // Pin own post to top if user just uploaded
       if (forceRefresh && justUploadedRef.current && user?.id) {
@@ -1037,8 +1440,13 @@ const renderPost = useCallback(
           <SuggestedUsersBar refreshTrigger={refreshing} />
         )}
 
-        {/* Referral promo card every 10 posts (regular users only) */}
-        {accountType !== 'restaurant' && realPostIndex >= 0 && (realPostIndex + 1) % 10 === 0 && (
+        {/* Trending card after every 10 posts */}
+        {realPostIndex >= 0 && (realPostIndex + 1) % 10 === 0 && trendingPosts.length > 0 && (
+          <TrendingInlineCard trendingPosts={trendingPosts} router={router} />
+        )}
+
+        {/* Referral promo card every 20 posts (regular users only) */}
+        {accountType !== 'restaurant' && realPostIndex >= 0 && (realPostIndex + 1) % 20 === 0 && (
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => router.push('/invite-restaurant')}
@@ -1084,14 +1492,19 @@ const renderPost = useCallback(
       </View>
     );
   },
-  [visibleVideoId, handleMuteToggle, refreshing, displayData]
+  [visibleVideoId, handleMuteToggle, refreshing, displayData, trendingPosts]
 );
 
   // List Header Component
   const ListHeader = useCallback(() => (
     <>
       <View style={styles.headerContainer}>
-        <View style={styles.whiteHeader}>
+        <LinearGradient
+          colors={['#FFF8F2', '#FFF3EA', '#FFEDE0']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.whiteHeader}
+        >
           <View style={styles.headerRow}>
       {/* Chat Icon with Gradient */}
       <TouchableOpacity
@@ -1154,14 +1567,19 @@ const renderPost = useCallback(
               transform: [{ translateY: notifTranslateY }],
             }}
           >
-            <LinearGradient
-              colors={["#FF6B6B", "#FF2E2E", "#FF7A18"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.notifIconCircle}
+            <MaskedView
+              maskElement={
+                <Ionicons name="notifications" size={22} color="#000" />
+              }
             >
-              <Ionicons name="flame" size={18} color="#fff" />
-            </LinearGradient>
+              <LinearGradient
+                colors={["#FF2E2E", "#FF7A18"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Ionicons name="notifications" size={22} color="transparent" />
+              </LinearGradient>
+            </MaskedView>
           </Animated.View>
           {unreadCount > 0 && (
             <View style={styles.notificationBadge}>
@@ -1174,7 +1592,7 @@ const renderPost = useCallback(
       </View>
           </View>
 
-        </View>
+        </LinearGradient>
       </View>
 
       {/* Share bar - half in gradient, half in white */}
@@ -1262,6 +1680,8 @@ const renderPost = useCallback(
                 }
               }}
               unreadCount={walletUnreadCount}
+              progressPercent={walletProgress}
+              canClaim={walletCanClaim}
             />
           </View>
         </View>
@@ -1380,7 +1800,7 @@ const renderPost = useCallback(
         <FeedSkeleton showStories={false} />
       )}
     </>
-), [user, ownStoryData, unreadCount, unreadMessagesCount, refreshing, loading, feedPosts.length, router]);
+), [user, ownStoryData, unreadCount, unreadMessagesCount, refreshing, loading, feedPosts.length, router, walletProgress, walletCanClaim]);
 
   // List Footer Component
   const ListFooter = useCallback(() => (
@@ -1392,7 +1812,13 @@ const renderPost = useCallback(
   ), [loadingMore]);
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFF8F2', '#FFF3EA', '#FFEDE0', '#FFF0E4', '#FFF6F0']}
+      locations={[0, 0.2, 0.45, 0.7, 1]}
+      start={{ x: 0.1, y: 0 }}
+      end={{ x: 0.9, y: 1 }}
+      style={styles.container}
+    >
       {/* Fixed Line */}
       {showFixedLine && <View style={styles.fixedLine} />}
 
@@ -1509,7 +1935,7 @@ const renderPost = useCallback(
       {/* Cofau Wallet Modal */}
       <CofauWalletModal
         visible={showWalletModal}
-        onClose={() => setShowWalletModal(false)}
+        onClose={() => { setShowWalletModal(false); fetchWalletUnreadCount(); }}
       />
 
       {/* Points Earned Animation */}
@@ -1519,7 +1945,7 @@ const renderPost = useCallback(
         levelData={levelData}
         onClose={() => setShowPointsAnimation(false)}
       />
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -1527,7 +1953,6 @@ const renderPost = useCallback(
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   fixedLine: {
     position: "absolute",
@@ -1553,7 +1978,6 @@ const styles = StyleSheet.create({
   paddingTop: 60,
   paddingBottom: 50,
   paddingHorizontal: 20,
-  backgroundColor: "#FFE5D9",
 },
   headerRow: {
     flexDirection: "row",

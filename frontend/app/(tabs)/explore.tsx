@@ -69,6 +69,13 @@ const COLUMN_WIDTH = (SCREEN_WIDTH - SPACING * 3) / 3;
 const SQUARE_HEIGHT = COLUMN_WIDTH;
 const VERTICAL_HEIGHT = COLUMN_WIDTH * 1.5;
 const SMALL_HEIGHT = COLUMN_WIDTH * 0.75;
+
+// Mixed grid layout constants
+const MIX_GAP = 4;
+const LARGE_TILE_W = (SCREEN_WIDTH - MIX_GAP * 3) / 2;
+const LARGE_TILE_H = LARGE_TILE_W * 1.25;
+const SMALL_TILE_W = (SCREEN_WIDTH - MIX_GAP * 4) / 3;
+const SMALL_TILE_H = SMALL_TILE_W * 1.15;
 const BLUR_HASH = "L5H2EC=PM+yV0g-mq.wG9c010J}I";
 const MAX_CONCURRENT_VIDEOS = Platform.OS === 'android' ? 1 : 2;
 
@@ -323,6 +330,186 @@ const GridTile = memo(({ item, onPress, onLike, onVideoLayout, playingVideos, on
     return <VideoTile item={item} onPress={onPress} onLike={onLike} shouldPlay={playingVideos.includes(item.id)} onLayout={onVideoLayout} onView={onView} />;
   }
   return <ImageTile item={item} onPress={onPress} onLike={onLike} />;
+});
+
+// Mixed grid: rows of [2, 2, 3, 3] repeating
+// Videos stay in their natural API order — no reordering
+const distributePostsInRows = (posts: any[]) => {
+  const rows: { items: any[]; size: 'large' | 'small' }[] = [];
+  const pattern = [2, 2, 3, 3];
+  let idx = 0;
+  let patIdx = 0;
+  while (idx < posts.length) {
+    const count = pattern[patIdx % pattern.length];
+    const chunk = posts.slice(idx, idx + count);
+    if (chunk.length > 0) {
+      rows.push({ items: chunk, size: count === 2 ? 'large' : 'small' });
+    }
+    idx += count;
+    patIdx++;
+  }
+  return rows;
+};
+
+const MixedTile = memo(({ item, size, onPress, shouldPlay, onView }: { item: any; size: 'large' | 'small'; onPress: (id: string) => void; shouldPlay?: boolean; onView?: (id: string) => void }) => {
+  const tileRouter = useRouter();
+  const videoRef = useRef<Video>(null);
+  const [isActuallyPlaying, setIsActuallyPlaying] = useState(false);
+  const viewTracked = useRef(false);
+  const w = size === 'large' ? LARGE_TILE_W : SMALL_TILE_W;
+  const h = size === 'large' ? LARGE_TILE_H : SMALL_TILE_H;
+  const displayUrl = item.full_thumbnail_url || item.full_image_url;
+  const isLarge = size === 'large';
+  const isVideo = item._isVideo;
+
+  // Video playback control
+  useEffect(() => {
+    if (!isVideo) return;
+    const controlVideo = async () => {
+      if (!videoRef.current) return;
+      try {
+        if (shouldPlay) {
+          const status = await videoRef.current.getStatusAsync();
+          if (!status.isLoaded) {
+            await videoRef.current.loadAsync(
+              { uri: item.full_image_url },
+              { shouldPlay: true, isLooping: true, isMuted: true }
+            );
+          } else {
+            await videoRef.current.setPositionAsync(0);
+            await videoRef.current.playAsync();
+          }
+          if (!viewTracked.current && !item.is_viewed && onView) {
+            viewTracked.current = true;
+            onView(item.id);
+          }
+        } else {
+          // Only pause/unload if video was actually loaded
+          const status = await videoRef.current.getStatusAsync();
+          if (status.isLoaded) {
+            if (Platform.OS === 'android') {
+              await videoRef.current.unloadAsync();
+            } else {
+              await videoRef.current.pauseAsync();
+            }
+          }
+        }
+      } catch (e) {}
+    };
+    controlVideo();
+    return () => { videoRef.current?.unloadAsync().catch(() => {}); };
+  }, [shouldPlay, item.full_image_url]);
+
+  return (
+    <TouchableOpacity
+      style={{ width: w, height: h, borderRadius: 12, overflow: 'hidden', backgroundColor: '#1a1a1a' }}
+      activeOpacity={0.9}
+      onPress={() => onPress(item.id)}
+    >
+      {isVideo ? (
+        <>
+          <Video
+            ref={videoRef}
+            source={{ uri: item.full_image_url }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode={ResizeMode.COVER}
+            isLooping
+            isMuted={true}
+            useNativeControls={false}
+            shouldPlay={false}
+            posterSource={{ uri: displayUrl }}
+            usePoster={true}
+            onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
+              if (status.isLoaded) setIsActuallyPlaying(status.isPlaying);
+            }}
+          />
+          {/* Show thumbnail + play icon when not actually playing */}
+          {!isActuallyPlaying && (
+            <>
+              {displayUrl ? (
+                <Image source={{ uri: displayUrl }} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} placeholder={{ blurhash: BLUR_HASH }} cachePolicy="memory-disk" contentFit="cover" />
+              ) : (
+                <View style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, backgroundColor: '#2a2a2a', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="videocam-outline" size={32} color="#ccc" />
+                </View>
+              )}
+              <View style={{ position: 'absolute', top: '50%', left: '50%', transform: [{ translateX: -(isLarge ? 20 : 16) }, { translateY: -(isLarge ? 20 : 16) }], width: isLarge ? 40 : 32, height: isLarge ? 40 : 32, borderRadius: isLarge ? 20 : 16, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="play" size={isLarge ? 22 : 16} color="#fff" />
+              </View>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          {displayUrl ? (
+            <Image source={{ uri: displayUrl }} style={{ width: '100%', height: '100%' }} placeholder={{ blurhash: BLUR_HASH }} cachePolicy="memory-disk" contentFit="cover" transition={200} recyclingKey={item.id} />
+          ) : (
+            <View style={{ width: '100%', height: '100%', backgroundColor: '#2a2a2a', justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="image-outline" size={32} color="#ccc" />
+            </View>
+          )}
+        </>
+      )}
+      {/* Gradient overlay */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.65)']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: h * 0.5 }}
+      />
+      {/* Views badge top-right */}
+      <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
+        <Ionicons name="eye" size={isLarge ? 13 : 11} color="#fff" />
+        <Text style={{ color: '#fff', fontSize: isLarge ? 11 : 9, fontWeight: '700' }}>
+          {(item.clicks_count || 0) > 1000 ? `${((item.clicks_count || 0) / 1000).toFixed(1)}K` : (item.clicks_count || 0)}
+        </Text>
+      </View>
+      {/* Bottom info: dish name tag + rating + distance */}
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isLarge ? 10 : 7 }}>
+        {item.dish_name && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={(e) => { e.stopPropagation(); tileRouter.push({ pathname: "/search-results", params: { query: item.dish_name } }); }}
+            style={{
+              alignSelf: 'flex-start',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: isLarge ? 4 : 3,
+              backgroundColor: 'rgba(0,0,0,0.65)',
+              paddingHorizontal: isLarge ? 8 : 5,
+              paddingVertical: isLarge ? 4 : 3,
+              borderRadius: isLarge ? 6 : 4,
+              marginBottom: 4,
+              maxWidth: '90%',
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: isLarge ? 12 : 9, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>
+              {item.dish_name}
+            </Text>
+            <View style={{ width: isLarge ? 14 : 12, height: isLarge ? 14 : 12, borderRadius: isLarge ? 7 : 6, backgroundColor: '#E94A37', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Ionicons name="chevron-forward" size={isLarge ? 9 : 7} color="#fff" />
+            </View>
+          </TouchableOpacity>
+        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {item.rating > 0 && (
+            <>
+              <Ionicons name="star" size={isLarge ? 12 : 10} color="#F2CF68" />
+              <Text style={{ color: '#fff', fontSize: isLarge ? 12 : 9, fontWeight: '600' }}>
+                {item.rating}
+              </Text>
+            </>
+          )}
+          {item.rating > 0 && item.distance_km != null && (
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: isLarge ? 10 : 8 }}>{'\u00B7'}</Text>
+          )}
+          {item.distance_km != null && (
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: isLarge ? 11 : 9, fontWeight: '500' }}>
+              {item.distance_km} km
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 });
 
 // ======================================================
@@ -1793,18 +1980,6 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // Trending banner state
-  const [trendingPosts, setTrendingPosts] = useState<any[]>([]);
-  const [showTrendingBanner, setShowTrendingBanner] = useState(false);
-  const [trendingSlide, setTrendingSlide] = useState(0);
-  const [trendingCountdown, setTrendingCountdown] = useState(10);
-  const trendingBannerY = useRef(new Animated.Value(-400)).current;
-  const trendingScale = useRef(new Animated.Value(0.8)).current;
-  const trendingOpacity = useRef(new Animated.Value(0)).current;
-  const trendingSlideAnim = useRef(new Animated.Value(0)).current;
-  const trendingBannerShown = useRef(false);
-  const [trendingTrigger, setTrendingTrigger] = useState(0);
-  const trendingTimerRotation = useRef(new Animated.Value(0)).current;
 
   // Slide animated placeholder
   const PLACEHOLDER_PHRASES = [
@@ -2152,57 +2327,59 @@ const fetchMapPins = async (searchTerm?: string, forceRefresh = false) => {
 
   setMapLoading(true);
   try {
-    let url: string;
-
     if (searchTerm && searchTerm.trim()) {
-      url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${loc.latitude}&lng=${loc.longitude}&radius_km=50`;
-    } else {
-      url = `${API_URL}/map/pins?lat=${loc.latitude}&lng=${loc.longitude}&radius_km=50`;
-    }
-
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${token || ""}` },
-    });
-    if (!mountedRef.current) return;
-
-    if (searchTerm && searchTerm.trim()) {
-      // Search results - don't cache these
-      const results = response.data.results || [];
-
-      // Process results to add full URLs
-      const processedResults = results.map((post: any) => {
-        const fullUrl = fixUrl(post.media_url || post.image_url);
-        return {
-          ...post,
-          full_image_url: fullUrl,
-          full_thumbnail_url: fixUrl(post.thumbnail_url),
-        };
+      const url = `${API_URL}/map/search?q=${encodeURIComponent(searchTerm)}&lat=${loc.latitude}&lng=${loc.longitude}&radius_km=50`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (!mountedRef.current) return;
+
+      const results = response.data.results || [];
+      const processedResults = results.map((post: any) => ({
+        ...post,
+        full_image_url: fixUrl(post.media_url || post.image_url),
+        full_thumbnail_url: fixUrl(post.thumbnail_url),
+      }));
 
       setMapPosts(processedResults);
       setMapRestaurants([]);
     } else {
-      // All pins - cache these
-      const posts = response.data.posts || [];
-      const restaurants = response.data.restaurants || [];
-
-      // Process posts to add full URLs
-      const processedPosts = posts.map((post: any) => {
-        const fullUrl = fixUrl(post.media_url || post.image_url);
-        const thumbnailUrl = fixUrl(post.thumbnail_url);
-        return {
+      // Progressive loading: fetch nearby (10km) first for instant results
+      const processPostsData = (data: any) => {
+        const posts = (data.posts || []).map((post: any) => ({
           ...post,
-          full_image_url: fullUrl,
-          full_thumbnail_url: thumbnailUrl,
-        };
+          full_image_url: fixUrl(post.media_url || post.image_url),
+          full_thumbnail_url: fixUrl(post.thumbnail_url),
+        }));
+        return { posts, restaurants: data.restaurants || [] };
+      };
+
+      // Phase 1: Quick nearby fetch (10km) — shows pins fast
+      const nearbyUrl = `${API_URL}/map/pins?lat=${loc.latitude}&lng=${loc.longitude}&radius_km=10`;
+      const nearbyRes = await axios.get(nearbyUrl, {
+        headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (!mountedRef.current) return;
 
-      // Cache the processed posts
-      cachedMapPosts.current = processedPosts;
+      const nearby = processPostsData(nearbyRes.data);
+      setMapPosts(nearby.posts);
+      setMapRestaurants(nearby.restaurants);
+      cachedMapRestaurants.current = nearby.restaurants;
+      if (mountedRef.current) setMapLoading(false);
 
-      setMapPosts(processedPosts);
-      setMapRestaurants(restaurants);
-      cachedMapRestaurants.current = restaurants;
+      // Phase 2: Full radius (50km) in background — merges with existing
+      const fullUrl = `${API_URL}/map/pins?lat=${loc.latitude}&lng=${loc.longitude}&radius_km=50`;
+      const fullRes = await axios.get(fullUrl, {
+        headers: { Authorization: `Bearer ${token || ""}` },
+      });
+      if (!mountedRef.current) return;
+
+      const full = processPostsData(fullRes.data);
+      cachedMapPosts.current = full.posts;
+      setMapPosts(full.posts);
+      setMapRestaurants(full.restaurants);
+      cachedMapRestaurants.current = full.restaurants;
+      return; // Skip the finally setMapLoading since we already cleared it
     }
   } catch (error) {
     if (!mountedRef.current) return;
@@ -2660,173 +2837,6 @@ useFocusEffect(
   // ======================================================
   // TRENDING BANNER - fetch and auto-slide
   // ======================================================
-  // Also trigger banner on screen focus (single tab click)
-  useFocusEffect(
-    useCallback(() => {
-      if (token && !trendingBannerShown.current && !showTrendingBanner) {
-        setTrendingTrigger(t => t + 1);
-      }
-    }, [token, showTrendingBanner])
-  );
-
-  useEffect(() => {
-    if (!token || trendingBannerShown.current) return;
-    const buildTrending = (posts: any[]) => {
-      const mapped = posts.map((p: any) => ({
-        ...p,
-        full_image_url: fixUrl(p.media_url || p.image_url),
-        full_thumbnail_url: fixUrl(p.thumbnail_url),
-      }));
-      mapped.sort((a: any, b: any) => ((b.likes_count || 0) + (b.clicks_count || 0)) - ((a.likes_count || 0) + (a.clicks_count || 0)));
-      // Balanced mix: 3 regular + up to 2 restaurant (or fill with whatever is available)
-      const regular = mapped.filter((p: any) => p.account_type !== 'restaurant');
-      const restaurant = mapped.filter((p: any) => p.account_type === 'restaurant');
-      const trending: any[] = [];
-      // Take top 3 regular
-      trending.push(...regular.slice(0, 3));
-      // Insert up to 2 restaurant posts at positions 2 and 4
-      if (restaurant.length > 0) trending.splice(2, 0, restaurant[0]);
-      if (restaurant.length > 1) trending.splice(4, 0, restaurant[1]);
-      // If not enough regular posts, fill remaining slots from restaurant
-      if (trending.length < 5) trending.push(...restaurant.slice(trending.length - regular.length > 0 ? trending.length - regular.length : 0).filter((p: any) => !trending.includes(p)));
-      // If not enough restaurant posts, fill from remaining regular
-      if (trending.length < 5) trending.push(...regular.slice(3, 3 + (5 - trending.length)));
-      return trending.slice(0, 5);
-    };
-
-    const animateBannerIn = () => {
-      trendingBannerY.setValue(-400);
-      trendingScale.setValue(0.8);
-      trendingOpacity.setValue(0);
-      Animated.parallel([
-        Animated.spring(trendingBannerY, { toValue: 0, useNativeDriver: true, tension: 50, friction: 8 }),
-        Animated.spring(trendingScale, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }),
-        Animated.timing(trendingOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]).start();
-    };
-
-    const fetchTrending = async () => {
-      const headers = { Authorization: `Bearer ${token}` };
-      const allPosts: any[] = [];
-      const seenIds = new Set();
-      let bannerShown = false;
-
-      const addPosts = (posts: any[]) => {
-        posts.forEach((p: any) => {
-          const pid = p.id || p._id;
-          if (!seenIds.has(pid)) {
-            seenIds.add(pid);
-            allPosts.push(p);
-          }
-        });
-      };
-
-      const tryShowBanner = () => {
-        if (!mountedRef.current) return;
-        const trending = buildTrending(allPosts);
-        if (trending.length === 0) return;
-        setTrendingPosts(trending);
-        if (!trendingBannerShown.current) {
-          trendingBannerShown.current = true;
-          setShowTrendingBanner(true);
-          animateBannerIn();
-          bannerShown = true;
-        }
-      };
-
-      // Fast small request for instant banner + full request for complete data
-      const promises = [
-        axios.get(`${API_URL}/feed?skip=0&limit=15&sort=engagement`, { headers }).then(res => {
-          addPosts(res.data || []);
-          tryShowBanner();
-        }).catch(() => {}),
-        axios.get(`${API_URL}/feed?skip=0&limit=50&sort=engagement`, { headers }).then(res => {
-          addPosts(res.data || []);
-          tryShowBanner();
-        }).catch(() => {}),
-      ];
-
-      await Promise.allSettled(promises);
-
-      if (!mountedRef.current) return;
-      const trending = buildTrending(allPosts);
-      if (trending.length > 0) {
-        setTrendingPosts(trending);
-        if (!bannerShown && !trendingBannerShown.current) {
-          trendingBannerShown.current = true;
-          setShowTrendingBanner(true);
-          animateBannerIn();
-        }
-      }
-    };
-    fetchTrending();
-  }, [token, trendingTrigger]);
-
-  // Keep a ref of trending posts length to avoid stale closures
-  const trendingPostsLenRef = useRef(trendingPosts.length);
-  trendingPostsLenRef.current = trendingPosts.length;
-
-  // Reset slide to 0 when posts list grows (more data arrived)
-  useEffect(() => {
-    if (trendingPosts.length > 1) {
-      setTrendingSlide(0);
-    }
-  }, [trendingPosts.length]);
-
-  // Auto-slide trending posts — 2 seconds per post
-  useEffect(() => {
-    if (!showTrendingBanner || trendingPosts.length <= 1) return;
-
-    const slideInterval = setInterval(() => {
-      setTrendingSlide(prev => {
-        const next = prev + 1;
-        if (next >= trendingPostsLenRef.current) {
-          return prev; // stay on last
-        }
-        trendingSlideAnim.setValue(1);
-        Animated.timing(trendingSlideAnim, { toValue: 0, duration: 250, useNativeDriver: true, easing: Easing.out(Easing.cubic) }).start();
-        return next;
-      });
-    }, 2000);
-
-    return () => clearInterval(slideInterval);
-  }, [showTrendingBanner, trendingPosts.length]);
-
-  // Countdown timer for trending banner with rotation animation
-  useEffect(() => {
-    if (!showTrendingBanner) return;
-    trendingTimerRotation.setValue(0);
-    // Animate full rotation over 10 seconds (anti-clockwise)
-    Animated.timing(trendingTimerRotation, {
-      toValue: 1,
-      duration: 10000,
-      useNativeDriver: true,
-      easing: Easing.linear,
-    }).start();
-    const countdownInterval = setInterval(() => {
-      setTrendingCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval);
-          closeTrendingBanner();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(countdownInterval);
-  }, [showTrendingBanner]);
-
-  const closeTrendingBanner = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(trendingBannerY, { toValue: -500, duration: 400, useNativeDriver: true, easing: Easing.in(Easing.back(1.5)) }),
-      Animated.timing(trendingScale, { toValue: 0.5, duration: 400, useNativeDriver: true }),
-      Animated.timing(trendingOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
-    ]).start(() => {
-      setShowTrendingBanner(false);
-      setTrendingCountdown(10);
-      setTrendingSlide(0);
-    });
-  }, []);
 
   // ======================================================
   // EXISTING FEED LOGIC (for USERS tab)
@@ -2876,6 +2886,18 @@ useFocusEffect(
 
   const mapPostData = (post: any) => {
     const fullUrl = fixUrl(post.media_url || post.image_url);
+    // Calculate distance from user location to post location
+    let distance_km: number | null = null;
+    if (userLocation && post.latitude && post.longitude) {
+      const R = 6371;
+      const dLat = (post.latitude - userLocation.latitude) * Math.PI / 180;
+      const dLon = (post.longitude - userLocation.longitude) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(userLocation.latitude * Math.PI / 180) * Math.cos(post.latitude * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      distance_km = Math.round(R * c * 10) / 10;
+    }
     return {
       ...post,
       full_image_url: fullUrl,
@@ -2885,7 +2907,8 @@ useFocusEffect(
       is_viewed: post.is_viewed_by_user || false,
       _isVideo: isVideoFile(fullUrl || "", post.media_type),
       category: post.category?.trim() || null,
-      aspect_ratio: post.aspect_ratio || null
+      aspect_ratio: post.aspect_ratio || null,
+      distance_km,
     };
   };
 
@@ -3126,17 +3149,10 @@ useFocusEffect(
   };
   const onRefresh = useCallback(() => { setRefreshing(true); setPlayingVideos([]); fetchPosts(true); }, [appliedCategories]);
 
-  // Register explore tab tap to refresh + re-show trending banner
+  // Register explore tab tap to refresh
   // Don't call onRefresh() which shows loading spinner - refresh silently in background
   useEffect(() => {
     registerExploreRefresh(() => {
-      // Show banner immediately
-      trendingBannerShown.current = false;
-      setShowTrendingBanner(false);
-      setTrendingPosts([]);
-      setTrendingSlide(0);
-      setTrendingCountdown(10);
-      setTrendingTrigger(t => t + 1);
       // Silent background refresh - no loading spinner
       setPlayingVideos([]);
       fetchPostsRef.current?.(true);
@@ -3182,6 +3198,44 @@ useFocusEffect(
 };
 
   const columns = React.useMemo(() => distributePosts(posts), [posts]);
+  const mixedRows = React.useMemo(() => distributePostsInRows(posts), [posts]);
+
+  // Collect video IDs from mixed rows for autoplay
+  const mixedVideoIds = React.useMemo(() => {
+    const ids: { id: string; top: number; height: number }[] = [];
+    let y = MIX_GAP;
+    mixedRows.forEach((row) => {
+      const h = row.size === 'large' ? LARGE_TILE_H : SMALL_TILE_H;
+      row.items.forEach((item) => {
+        if (item._isVideo) {
+          ids.push({ id: item.id, top: y, height: h });
+        }
+      });
+      y += h + MIX_GAP;
+    });
+    return ids;
+  }, [mixedRows]);
+
+  // Sync mixed grid video positions into videoPositions ref for calculateVisibleVideos
+  useEffect(() => {
+    mixedVideoIds.forEach(({ id, top, height }) => {
+      videoPositions.current.set(id, { top, height });
+    });
+    // Trigger visibility check after positions are set
+    const timer = setTimeout(() => {
+      const scrollY = scrollYRef.current;
+      const visibleTop = scrollY;
+      const visibleBottom = scrollY + SCREEN_HEIGHT;
+      const visible: string[] = [];
+      mixedVideoIds.forEach(({ id, top, height }) => {
+        if (top + height > visibleTop && top < visibleBottom) {
+          visible.push(id);
+        }
+      });
+      setPlayingVideos(visible.slice(0, MAX_CONCURRENT_VIDEOS));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [mixedVideoIds]);
 
   if (!user || !token) return <View style={styles.center}><ActivityIndicator size="large" color="#E94A37" /><Text>Authenticating…</Text></View>;
 
@@ -3855,26 +3909,31 @@ return (
         // DISHES / POSTS GRID VIEW (regular users 'users' tab + restaurant users 'popular/Dishes' tab)
         <>
           {loading && posts.length === 0 ? (
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-              <View style={styles.masonryContainer}>
-                {[0, 1, 2].map((col) => (
-                  <View key={col} style={styles.column}>
-                    {[0, 1, 2, 3].map((i) => (
-                      <View key={i} style={{ width: '100%', height: COLUMN_WIDTH * (1 + (i % 3) * 0.3), borderRadius: 12, backgroundColor: '#F0F0F0', marginBottom: SPACING }} />
-                    ))}
-                  </View>
-                ))}
+            <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingHorizontal: MIX_GAP, paddingTop: MIX_GAP }} showsVerticalScrollIndicator={false}>
+              {/* Skeleton: 2 large + 3 small rows */}
+              <View style={{ flexDirection: 'row', gap: MIX_GAP, marginBottom: MIX_GAP }}>
+                <View style={{ width: LARGE_TILE_W, height: LARGE_TILE_H, borderRadius: 12, backgroundColor: '#F0F0F0' }} />
+                <View style={{ width: LARGE_TILE_W, height: LARGE_TILE_H, borderRadius: 12, backgroundColor: '#F0F0F0' }} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: MIX_GAP, marginBottom: MIX_GAP }}>
+                <View style={{ width: LARGE_TILE_W, height: LARGE_TILE_H, borderRadius: 12, backgroundColor: '#F0F0F0' }} />
+                <View style={{ width: LARGE_TILE_W, height: LARGE_TILE_H, borderRadius: 12, backgroundColor: '#F0F0F0' }} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: MIX_GAP, marginBottom: MIX_GAP }}>
+                <View style={{ width: SMALL_TILE_W, height: SMALL_TILE_H, borderRadius: 12, backgroundColor: '#F0F0F0' }} />
+                <View style={{ width: SMALL_TILE_W, height: SMALL_TILE_H, borderRadius: 12, backgroundColor: '#F0F0F0' }} />
+                <View style={{ width: SMALL_TILE_W, height: SMALL_TILE_H, borderRadius: 12, backgroundColor: '#F0F0F0' }} />
               </View>
             </ScrollView>
           ) : (
-            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={Platform.OS === 'android' ? 64 : 16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E94A37" />}>
-              <View style={styles.masonryContainer}>
-                {columns.map((column, columnIndex) => (
-                  <View key={columnIndex} style={styles.column}>
-                    {column.map((item) => <GridTile key={item._key || item.id} item={item} onPress={handlePostPressGrid} onLike={handleLike} onVideoLayout={handleVideoLayout} playingVideos={playingVideos} onView={handleView} />)}
-                  </View>
-                ))}
-              </View>
+            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={{ paddingHorizontal: MIX_GAP, paddingTop: MIX_GAP }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={Platform.OS === 'android' ? 64 : 16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E94A37" />}>
+              {mixedRows.map((row, rowIndex) => (
+                <View key={rowIndex} style={{ flexDirection: 'row', gap: MIX_GAP, marginBottom: MIX_GAP }}>
+                  {row.items.map((item) => (
+                    <MixedTile key={item._key || item.id} item={item} size={row.size} onPress={handlePostPressGrid} shouldPlay={item._isVideo ? playingVideos.includes(item.id) : false} onView={handleView} />
+                  ))}
+                </View>
+              ))}
               {loadingMore && <View style={styles.loadingMore}><ActivityIndicator size="small" color="#E94A37" /></View>}
               {!loading && posts.length === 0 && (
                 <View style={styles.emptyState}>
@@ -4056,132 +4115,6 @@ return (
         onViewProfile={handleViewSuggestedProfile}
       />
 
-      {/* TRENDING BANNER OVERLAY */}
-      {showTrendingBanner && trendingPosts.length > 0 && (
-        <Animated.View style={[styles.trendingOverlay, { opacity: trendingOpacity }]}>
-          <Animated.View style={[styles.trendingBanner, {
-            transform: [
-              { translateY: trendingBannerY },
-              { scale: trendingScale },
-              { perspective: 1000 },
-              { rotateX: trendingBannerY.interpolate({ inputRange: [-400, 0], outputRange: ['15deg', '0deg'] }) },
-            ],
-          }]}>
-            {/* Gradient Header */}
-            <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.trendingHeaderGradient}>
-              <View style={styles.trendingHeaderLeft}>
-                <Text style={{ fontSize: 18 }}>🔥</Text>
-                <View>
-                  <Text style={styles.trendingTitle}>TRENDING DISH</Text>
-                  <Text style={styles.trendingSubtitle}>in Cofau right now</Text>
-                </View>
-              </View>
-              <View style={styles.trendingDots}>
-                {trendingPosts.map((_: any, i: number) => (
-                  i === trendingSlide ? (
-                    <View key={i} style={[styles.trendingDot, styles.trendingDotActive]} />
-                  ) : (
-                    <View key={i} style={styles.trendingDot} />
-                  )
-                ))}
-              </View>
-            </LinearGradient>
-
-            {/* Slide content - vertical layout */}
-            <Animated.View style={[styles.trendingSlideContainer, {
-              transform: [{ translateX: trendingSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) }],
-              opacity: trendingSlideAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.3, 0] }),
-            }]}>
-              {trendingPosts[trendingSlide] && (
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => { closeTrendingBanner(); router.push(`/post-details/${trendingPosts[trendingSlide].id || trendingPosts[trendingSlide]._id}`); }}
-                  style={styles.trendingCard}
-                >
-                  {/* Big food image */}
-                  <View style={styles.trendingImageWrapper}>
-                    <Image
-                      source={{ uri: trendingPosts[trendingSlide].full_thumbnail_url || trendingPosts[trendingSlide].full_image_url }}
-                      style={styles.trendingImage}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                      transition={150}
-                    />
-                    {/* Rank label - stretched to left edge */}
-                    <LinearGradient colors={['#FFD700', '#FFA500']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.trendingRankBadge}>
-                      <Text style={styles.trendingRankText}>#{trendingSlide + 1} Trending</Text>
-                    </LinearGradient>
-                  </View>
-                  {/* Stats pills - sitting half on image, half on info */}
-                  <View style={styles.trendingStatsRow}>
-                    <LinearGradient colors={['#FFE8E8', '#FFF0F0']} style={styles.trendingStatPill}>
-                      <Text style={{ fontSize: 12 }}>❤️</Text>
-                      <Text style={styles.trendingStatTextLikes}>{(trendingPosts[trendingSlide].likes_count || 0) > 1000 ? `${((trendingPosts[trendingSlide].likes_count || 0) / 1000).toFixed(1)}K` : (trendingPosts[trendingSlide].likes_count || 0)}</Text>
-                    </LinearGradient>
-                    <LinearGradient colors={['#E8F4FF', '#F0F8FF']} style={styles.trendingStatPill}>
-                      <Ionicons name="eye" size={13} color="#3B82F6" />
-                      <Text style={styles.trendingStatTextViews}>{(trendingPosts[trendingSlide].clicks_count || 0) > 1000 ? `${((trendingPosts[trendingSlide].clicks_count || 0) / 1000).toFixed(1)}K` : (trendingPosts[trendingSlide].clicks_count || 0)}</Text>
-                    </LinearGradient>
-                  </View>
-                  {/* Info below image */}
-                  <View style={styles.trendingCardInfo}>
-                    <View style={styles.trendingUserRow}>
-                      <UserAvatar
-                        profilePicture={trendingPosts[trendingSlide].user_profile_picture}
-                        username={trendingPosts[trendingSlide].username}
-                        size={36}
-                        showLevelBadge={true}
-                        level={trendingPosts[trendingSlide].user_level || 1}
-                      />
-                      <View style={styles.trendingUserInfo}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Text style={styles.trendingUsername} numberOfLines={1}>{trendingPosts[trendingSlide].username}</Text>
-                        </View>
-                        {trendingPosts[trendingSlide].account_type === 'restaurant' ? (
-                          <LinearGradient colors={['#FF2E2E', '#FF7A18']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.trendingRestaurantTag}>
-                            <Ionicons name="storefront-outline" size={8} color="#fff" />
-                            <Text style={styles.trendingRestaurantTagText}>Restaurant</Text>
-                          </LinearGradient>
-                        ) : trendingPosts[trendingSlide].location_name ? (
-                          <View style={styles.trendingLocationTag}>
-                            <Ionicons name="location-sharp" size={9} color="#E94A37" />
-                            <Text style={styles.trendingLocationText} numberOfLines={1}>{trendingPosts[trendingSlide].location_name}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={styles.trendingDishName} numberOfLines={1}>
-                        {trendingPosts[trendingSlide].dish_name || trendingPosts[trendingSlide].review_text?.slice(0, 25) || 'Trending Dish'}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </Animated.View>
-
-            {/* Timer + close at bottom center */}
-            <View style={styles.trendingFooter}>
-              <TouchableOpacity onPress={closeTrendingBanner} activeOpacity={0.7} style={styles.trendingCloseBottom}>
-                {/* Circular timer */}
-                <View style={styles.trendingTimerOuter}>
-                  <Animated.View style={[styles.trendingTimerRing, {
-                    transform: [{ rotate: trendingTimerRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] }) }],
-                  }]}>
-                    <View style={styles.trendingTimerArc} />
-                  </Animated.View>
-                  <View style={styles.trendingTimerInner}>
-                    <Text style={styles.trendingCountdownText}>{trendingCountdown}</Text>
-                  </View>
-                </View>
-                <View style={styles.trendingCloseLabels}>
-                  <Text style={styles.trendingCloseBottomLabel}>Closes in {trendingCountdown}s</Text>
-                  <Ionicons name="close-circle" size={16} color="#ccc" />
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.trendingDoubleTapHint}>Double Tap to see Trending</Text>
-            </View>
-          </Animated.View>
-        </Animated.View>
-      )}
 
     </View>
   );
@@ -6242,278 +6175,5 @@ toggleTabTextActive: {
     fontSize: 13,
     fontWeight: '600' as const,
     flexShrink: 1,
-  },
-  // Trending banner styles
-  trendingOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  trendingBanner: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    width: SCREEN_WIDTH * 0.92,
-    overflow: 'hidden',
-    shadowColor: '#FF2E2E',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 28,
-    elevation: 28,
-  },
-  trendingHeaderGradient: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-  trendingHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  trendingTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: 1.5,
-  },
-  trendingSubtitle: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 1,
-  },
-  trendingClose: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trendingSlideContainer: {
-    overflow: 'hidden',
-  },
-  trendingCard: {
-    flexDirection: 'column',
-    backgroundColor: '#fff',
-    overflow: 'hidden',
-  },
-  trendingImageWrapper: {
-    position: 'relative',
-    width: '100%',
-  },
-  trendingImage: {
-    width: '100%',
-    height: SCREEN_WIDTH * 0.75,
-  },
-  trendingRankBadge: {
-    position: 'absolute',
-    top: 12,
-    left: 0,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
-  },
-  trendingRankText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  trendingStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: -18,
-    zIndex: 10,
-    paddingHorizontal: 16,
-  },
-  trendingCardInfo: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
-  trendingUserRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  trendingAvatarRing: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    padding: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trendingAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  trendingAvatarPlaceholder: {
-    backgroundColor: '#bbb',
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    borderColor: '#fff',
-  },
-  trendingUserInfo: {
-    gap: 3,
-  },
-  trendingUsername: {
-    fontSize: 14,
-    color: '#1a1a1a',
-    fontWeight: '700',
-  },
-  trendingDishName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#555',
-    textAlign: 'right' as const,
-  },
-  trendingRestaurantTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: 'flex-start' as const,
-  },
-  trendingRestaurantTagText: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  trendingLocationTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    alignSelf: 'flex-start' as const,
-  },
-  trendingLocationText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#777',
-    maxWidth: 120,
-  },
-  trendingLevelBadge: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FF7A18',
-    backgroundColor: '#FFF5EB',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-    overflow: 'hidden' as const,
-  },
-  trendingStatPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  trendingStatTextLikes: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#E94A37',
-  },
-  trendingStatTextViews: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#3B82F6',
-  },
-  trendingFooter: {
-    alignItems: 'center',
-    paddingBottom: 14,
-    paddingTop: 8,
-    gap: 8,
-  },
-  trendingCloseBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  trendingTimerOuter: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trendingTimerRing: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 3,
-    borderColor: '#E8E8E8',
-    borderTopColor: '#1a1a1a',
-    borderRightColor: '#1a1a1a',
-  },
-  trendingTimerArc: {
-    width: '100%',
-    height: '100%',
-  },
-  trendingTimerInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trendingCloseLabels: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  trendingCloseBottomLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#999',
-  },
-  trendingDoubleTapHint: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#bbb',
-    letterSpacing: 0.3,
-  },
-  trendingDots: {
-    flexDirection: 'row',
-    gap: 5,
-    alignItems: 'center',
-  },
-  trendingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  trendingDotActive: {
-    width: 18,
-    backgroundColor: '#fff',
-  },
-  trendingCountdownText: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#fff',
   },
 });

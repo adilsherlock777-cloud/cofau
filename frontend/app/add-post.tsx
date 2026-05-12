@@ -14,9 +14,6 @@ import {
   Modal,
   KeyboardAvoidingView,
   FlatList,
-  PanResponder,
-  Dimensions,
-  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,152 +43,6 @@ const renderCategoryIcon = (emoji: string, size: number) => {
   return <Text style={{ fontSize: size }}>{emoji}</Text>;
 };
 
-// Slider Component - drag to rate
-const StarSlider = ({ value, onValueChange, maxStars = 10 }: {
-  value: number;
-  onValueChange: (val: number) => void;
-  maxStars?: number;
-}) => {
-  const trackRef = React.useRef<View>(null);
-  const layoutRef = React.useRef({ x: 0, width: 0 });
-  const onValueChangeRef = React.useRef(onValueChange);
-  onValueChangeRef.current = onValueChange;
-
-  // Star pop animation
-  const starScale = React.useRef(new Animated.Value(0)).current;
-  const starOpacity = React.useRef(new Animated.Value(0)).current;
-  const starTranslateY = React.useRef(new Animated.Value(0)).current;
-  const lastValueRef = React.useRef(value);
-  lastValueRef.current = value;
-
-  const calcValue = (pageX: number) => {
-    const { x, width } = layoutRef.current;
-    if (width === 0) return value;
-    const relativeX = pageX - x;
-    const ratio = Math.max(0, Math.min(1, relativeX / width));
-    return Math.max(0, Math.min(maxStars, Math.round(ratio * maxStars)));
-  };
-
-  const panResponder = React.useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > Math.abs(gs.dy),
-    onPanResponderGrant: (evt) => {
-      onValueChangeRef.current(calcValue(evt.nativeEvent.pageX));
-    },
-    onPanResponderMove: (evt) => {
-      onValueChangeRef.current(calcValue(evt.nativeEvent.pageX));
-    },
-    onPanResponderRelease: () => {
-      if (lastValueRef.current > 0) {
-        starScale.setValue(0);
-        starOpacity.setValue(1);
-        starTranslateY.setValue(0);
-        Animated.parallel([
-          Animated.spring(starScale, {
-            toValue: 1,
-            friction: 3,
-            tension: 200,
-            useNativeDriver: true,
-          }),
-          Animated.sequence([
-            Animated.delay(500),
-            Animated.parallel([
-              Animated.timing(starOpacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(starTranslateY, {
-                toValue: -10,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-            ]),
-          ]),
-        ]).start();
-      }
-    },
-  }), [maxStars]);
-
-  const fillPercent = (value / maxStars) * 100;
-
-  return (
-    <View
-      ref={trackRef}
-      onLayout={() => {
-        trackRef.current?.measureInWindow((x: number, _y: number, width: number) => {
-          layoutRef.current = { x, width };
-        });
-      }}
-      {...panResponder.panHandlers}
-      style={{ height: 32, justifyContent: 'center', marginTop: 4 }}
-    >
-      {/* Track background */}
-      <View style={{ height: 8, borderRadius: 4, backgroundColor: '#EBEBEB' }}>
-        {/* Filled portion */}
-        {value > 0 && (
-          <View style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: `${fillPercent}%`,
-            borderRadius: 4,
-            overflow: 'hidden',
-          }}>
-            <LinearGradient
-              colors={['#FF2E2E', '#FF7A18']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ flex: 1 }}
-            />
-          </View>
-        )}
-      </View>
-      {/* Thumb */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: `${fillPercent}%`,
-          marginLeft: -11,
-          width: 22,
-          height: 14,
-          borderRadius: 4,
-          backgroundColor: '#FFF',
-          padding: 2,
-          elevation: 4,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.25,
-          shadowRadius: 3,
-        }}
-      >
-        <LinearGradient
-          colors={['#FF2E2E', '#FF7A18']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{ flex: 1, borderRadius: 2 }}
-        />
-      </View>
-      {/* Star pop animation */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: `${fillPercent}%`,
-          marginLeft: -12,
-          top: -16,
-          opacity: starOpacity,
-          transform: [{ scale: starScale }, { translateY: starTranslateY }],
-        }}
-      >
-        <Ionicons name="star" size={24} color="#FF7A18" />
-      </Animated.View>
-    </View>
-  );
-};
-
 export default function AddPostScreen() {
   const router = useRouter();
   const auth = useAuth() as any;
@@ -202,11 +53,7 @@ export default function AddPostScreen() {
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
-  const [pendingMedia, setPendingMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
-  const [showMediaConfirm, setShowMediaConfirm] = useState(false);
-  const [tasteRating, setTasteRating] = useState(0);
-  const [valueRating, setValueRating] = useState(0);
-  const [portionRating, setPortionRating] = useState(0);
+  const [overallRating, setOverallRating] = useState(0);
   const [review, setReview] = useState('');
 
   const [locationName, setLocationName] = useState('');
@@ -236,6 +83,11 @@ export default function AddPostScreen() {
   const [correctedReview, setCorrectedReview] = useState('');
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarChecked, setGrammarChecked] = useState(false);
+
+  // Dish name suggestions
+  const [dishSuggestions, setDishSuggestions] = useState<any[]>([]);
+  const [showDishSuggestions, setShowDishSuggestions] = useState(false);
+  const [loadingDishSuggestions, setLoadingDishSuggestions] = useState(false);
 
 // Categories list with emojis
 const CATEGORIES = [
@@ -321,16 +173,12 @@ const CATEGORY_IMAGES: { [id: string]: any } = {
   });
 
   if (!result.canceled && result.assets[0]) {
-    setPendingMedia({ uri: result.assets[0].uri, type: 'image' });
-    setShowMediaConfirm(true);
+    setMediaUri(result.assets[0].uri);
+    setMediaType('image');
   }
 };
 
-const getAverageRating = () => {
-  const total = tasteRating + valueRating + portionRating;
-  if (total === 0) return 0;
-  return Math.round((total / 3) * 10) / 10; // Round to 1 decimal
-};
+const getAverageRating = () => overallRating;
 
   const takePhoto = async () => {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -347,8 +195,8 @@ const getAverageRating = () => {
   });
 
   if (!result.canceled && result.assets[0]) {
-    setPendingMedia({ uri: result.assets[0].uri, type: 'image' });
-    setShowMediaConfirm(true);
+    setMediaUri(result.assets[0].uri);
+    setMediaType('image');
   }
 };
 
@@ -367,8 +215,8 @@ const getAverageRating = () => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setPendingMedia({ uri: result.assets[0].uri, type: 'video' });
-      setShowMediaConfirm(true);
+      setMediaUri(result.assets[0].uri);
+      setMediaType('video');
     }
   };
 
@@ -401,26 +249,13 @@ const getAverageRating = () => {
           asset.type === 'video' || asset.uri.includes('.mp4') || asset.uri.includes('.mov')
             ? 'video'
             : 'image';
-        setPendingMedia({ uri: asset.uri, type: inferredType });
-        setShowMediaConfirm(true);
+        setMediaUri(asset.uri);
+        setMediaType(inferredType);
       }
     } catch (error) {
       console.error('Error picking media:', error);
       Alert.alert('Error', 'Failed to pick media. Please try again.');
     }
-  };
-
-  const handleConfirmMedia = () => {
-    if (!pendingMedia) return;
-    setMediaUri(pendingMedia.uri);
-    setMediaType(pendingMedia.type);
-    setPendingMedia(null);
-    setShowMediaConfirm(false);
-  };
-
-  const handleCancelMedia = () => {
-    setPendingMedia(null);
-    setShowMediaConfirm(false);
   };
 
   // ------------------------------ GOOGLE MAPS (FREE) ------------------------------
@@ -521,8 +356,8 @@ const handlePost = async () => {
   let numericRating = 0;
   
   if (accountType !== 'restaurant') {
-  if (tasteRating === 0 || valueRating === 0 || portionRating === 0) {
-    Alert.alert('Rating Required', 'Please rate all three categories (Taste, Value, Portion).');
+  if (overallRating === 0) {
+    Alert.alert('Rating Required', 'Please select a rating.');
     return;
   }
   numericRating = getAverageRating();
@@ -639,6 +474,60 @@ if (accountType !== 'restaurant' && !grammarChecked) {
     console.error('❌ Error preparing post:', error);
     Alert.alert('Error', 'Failed to prepare post for upload.');
   }
+};
+
+  // ------------------------------ DISH NAME SUGGESTIONS ------------------------------
+
+const dishDebounceTimeout = React.useRef<NodeJS.Timeout | null>(null);
+
+const fetchDishSuggestions = async (text: string) => {
+  if (!text || text.trim().length < 2) {
+    setDishSuggestions([]);
+    setShowDishSuggestions(false);
+    return;
+  }
+
+  setLoadingDishSuggestions(true);
+  try {
+    const response = await axios.get(
+      `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.cofau.com'}/api/dishes/suggestions`,
+      {
+        params: { q: text.trim(), limit: 5 },
+        headers: { Authorization: `Bearer ${auth?.token}` },
+      }
+    );
+
+    if (response.data && response.data.length > 0) {
+      setDishSuggestions(response.data);
+      setShowDishSuggestions(true);
+    } else {
+      setDishSuggestions([]);
+      setShowDishSuggestions(false);
+    }
+  } catch (error) {
+    setDishSuggestions([]);
+    setShowDishSuggestions(false);
+  } finally {
+    setLoadingDishSuggestions(false);
+  }
+};
+
+const handleDishNameChange = (text: string) => {
+  setDishName(text);
+
+  if (dishDebounceTimeout.current) {
+    clearTimeout(dishDebounceTimeout.current);
+  }
+
+  dishDebounceTimeout.current = setTimeout(() => {
+    fetchDishSuggestions(text);
+  }, 300);
+};
+
+const selectDishSuggestion = (suggestion: any) => {
+  setDishName(suggestion.dish_name);
+  setShowDishSuggestions(false);
+  setDishSuggestions([]);
 };
 
   // ------------------------------ LOCATION SUGGESTIONS ------------------------------
@@ -800,7 +689,7 @@ return (
         {/* Media Upload */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Photo / Video</Text>
-          <TouchableOpacity style={styles.mediaBox} onPress={showMediaOptions}>
+          <TouchableOpacity style={[styles.mediaBox, !mediaUri && styles.mediaBoxEmpty]} onPress={showMediaOptions}>
             {mediaUri ? (
               <View style={styles.mediaPreview}>
                 {mediaType === 'image' ? (
@@ -836,48 +725,20 @@ return (
         {/* Rating - Only for Users */}
 {accountType !== 'restaurant' && (
   <View style={styles.section}>
-    <Text style={styles.sectionLabel}>Rating</Text>
-    
-    {/* Average Rating Display */}
-    <LinearGradient
-      colors={['#FF2E2E', '#FF7A18']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.avgRatingContainer}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Ionicons name="star" size={18} color="#FFF" />
-        <Text style={styles.avgRatingLabel}>Average Rating</Text>
+    <Text style={styles.sectionLabel}>Rate (Taste, Value & Portion)</Text>
+    <View style={styles.starRowContainer}>
+      <View style={styles.starRow}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
+          <TouchableOpacity key={star} onPress={() => setOverallRating(star)} activeOpacity={0.7}>
+            <Ionicons
+              name={star <= overallRating ? 'star' : 'star-outline'}
+              size={28}
+              color={star <= overallRating ? '#FF7A18' : '#CCC'}
+            />
+          </TouchableOpacity>
+        ))}
       </View>
-      <Text style={styles.avgRatingNumber}>{getAverageRating()} / 10</Text>
-    </LinearGradient>
-
-    {/* All Ratings in one box */}
-    <View style={styles.ratingContainer}>
-      <View style={styles.ratingHeader}>
-        <Text style={{ fontSize: 14 }}>😋</Text>
-        <Text style={styles.ratingTitle}>Taste</Text>
-        <Text style={styles.ratingValue}>{tasteRating}/10</Text>
-      </View>
-      <StarSlider value={tasteRating} onValueChange={setTasteRating} />
-
-      <View style={styles.ratingDivider} />
-
-      <View style={styles.ratingHeader}>
-        <Text style={{ fontSize: 14 }}>💰</Text>
-        <Text style={styles.ratingTitle}>Value for Money</Text>
-        <Text style={styles.ratingValue}>{valueRating}/10</Text>
-      </View>
-      <StarSlider value={valueRating} onValueChange={setValueRating} />
-
-      <View style={styles.ratingDivider} />
-
-      <View style={styles.ratingHeader}>
-        <Text style={{ fontSize: 14 }}>🍽️</Text>
-        <Text style={styles.ratingTitle}>Portion Size</Text>
-        <Text style={styles.ratingValue}>{portionRating}/10</Text>
-      </View>
-      <StarSlider value={portionRating} onValueChange={setPortionRating} />
+      <Text style={styles.starRatingText}>{overallRating}/10</Text>
     </View>
   </View>
 )}
@@ -885,13 +746,62 @@ return (
         {/* Dish Name - Mandatory for all posts */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Dish Name *</Text>
-          <TextInput
-            style={styles.linkInput}
-            placeholder="e.g., Butter Chicken, Margherita Pizza"
-            placeholderTextColor="#999"
-            value={dishName}
-            onChangeText={setDishName}
-          />
+          <View style={styles.dishInputContainer}>
+            <TextInput
+              style={styles.linkInput}
+              placeholder="e.g., Butter Chicken, Margherita Pizza"
+              placeholderTextColor="#999"
+              value={dishName}
+              onChangeText={handleDishNameChange}
+              onFocus={() => {
+                if (dishSuggestions.length > 0) {
+                  setShowDishSuggestions(true);
+                }
+              }}
+            />
+
+            {loadingDishSuggestions && (
+              <ActivityIndicator
+                size="small"
+                color="#FF9A4D"
+                style={styles.suggestionLoader}
+              />
+            )}
+
+            {showDishSuggestions && dishSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <Text style={styles.suggestionsTitle}>Did you mean?</Text>
+                {dishSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionItem}
+                    onPress={() => selectDishSuggestion(suggestion)}
+                  >
+                    <View style={styles.suggestionContent}>
+                      <Ionicons name="restaurant-outline" size={18} color="#FF9A4D" />
+                      <View style={styles.suggestionTextContainer}>
+                        <Text style={styles.suggestionName}>{suggestion.dish_name}</Text>
+                        <Text style={styles.suggestionMeta}>
+                          {suggestion.post_count} post{suggestion.post_count !== 1 ? 's' : ''} • {suggestion.similarity_score}% match
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#CCC" />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={styles.suggestionItemNew}
+                  onPress={() => {
+                    setShowDishSuggestions(false);
+                    setDishSuggestions([]);
+                  }}
+                >
+                  <Ionicons name="add-circle-outline" size={18} color="#666" />
+                  <Text style={styles.suggestionNewText}>Add "{dishName}" as new dish</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
 {/* Price - Only for Restaurants */}
@@ -913,12 +823,47 @@ return (
         <Text style={styles.sectionLabel}>
           {accountType === 'restaurant' ? 'About' : 'Review'}
         </Text>
+
+          {/* Quick Review Chips - Only for regular users */}
+          {accountType !== 'restaurant' && (
+            <View style={styles.quickReviewContainer}>
+              {[
+                'Absolutely delicious!',
+                'Great taste and value',
+                'Must try this dish!',
+                'Loved every bite',
+                'Flavors were on point',
+                'Perfectly cooked',
+                'Best I have had in a while',
+                'Decent but nothing special',
+              ].map((quickReview) => (
+                <TouchableOpacity
+                  key={quickReview}
+                  style={[
+                    styles.quickReviewChip,
+                    review === quickReview && styles.quickReviewChipSelected,
+                  ]}
+                  onPress={() => setReview(review === quickReview ? '' : quickReview)}
+                >
+                  <Text
+                    style={[
+                      styles.quickReviewChipText,
+                      review === quickReview && styles.quickReviewChipTextSelected,
+                    ]}
+                  >
+                    {quickReview}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           <TextInput
             style={styles.reviewInput}
             placeholder={
               accountType === 'restaurant'
                 ? 'Write about this dish...'
-                : 'Write your review...'
+                : 'Or write your own review...'
 }
             placeholderTextColor="#999"
             value={review}
@@ -1150,48 +1095,7 @@ return (
       </ScrollView>
     </KeyboardAvoidingView>
 
-    {/* Media Confirm Modal */}
-    <Modal
-      visible={showMediaConfirm}
-      transparent
-      animationType="fade"
-      onRequestClose={handleCancelMedia}
-    >
-      <View style={styles.mediaConfirmOverlay}>
-        <View style={styles.mediaConfirmCard}>
-          <View style={styles.mediaConfirmPreview}>
-            {pendingMedia?.type === 'video' ? (
-              <Video
-                source={{ uri: pendingMedia.uri }}
-                style={styles.mediaConfirmVideo}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={false}
-                useNativeControls={true}
-                isLooping={false}
-                isMuted={false}
-              />
-            ) : (
-              <Image source={{ uri: pendingMedia?.uri }} style={styles.mediaConfirmImage} />
-            )}
-          </View>
 
-          <View style={styles.mediaConfirmActions}>
-            <TouchableOpacity
-              style={[styles.mediaConfirmButton, styles.mediaConfirmButtonSecondary]}
-              onPress={handleCancelMedia}
-            >
-              <Text style={styles.mediaConfirmButtonSecondaryText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mediaConfirmButton, styles.mediaConfirmButtonPrimary]}
-              onPress={handleConfirmMedia}
-            >
-              <Text style={styles.mediaConfirmButtonPrimaryText}>Next</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
 
     {/* Category Selection Modal - MULTI-SELECT */}
 <Modal
@@ -1345,11 +1249,13 @@ const styles = StyleSheet.create({
   mediaBox: {
     height: 280,
     backgroundColor: '#FFF',
-    borderRadius: 16,
+    overflow: 'hidden',
+    marginHorizontal: -16,
+  },
+  mediaBoxEmpty: {
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#E5E5E5',
-    overflow: 'hidden',
   },
 
   uploadPrompt: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -1380,26 +1286,58 @@ const styles = StyleSheet.create({
   },
   changeMediaText: { color: '#FFF', fontSize: 14 },
 
-  ratingContainer: {
+  starRowContainer: {
     backgroundColor: '#FFF',
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    alignItems: 'center',
+  },
+  starRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  starRatingText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF7A18',
+    marginTop: 8,
+  },
+
+  quickReviewContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickReviewChip: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    paddingVertical: 8,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
-  ratingDivider: {
-    height: 1,
-    backgroundColor: '#F0F0F0',
-    marginVertical: 8,
+  quickReviewChipSelected: {
+    backgroundColor: '#FFF5E6',
+    borderColor: '#FF7A18',
+  },
+  quickReviewChipText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  quickReviewChipTextSelected: {
+    color: '#FF7A18',
+    fontWeight: '600',
   },
 
   reviewInput: {
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
-    minHeight: 60,  // Reduced from 120 - will expand with content
-    maxHeight: 200,  // Max height to prevent too large
+    minHeight: 60,
+    maxHeight: 200,
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: '#E5E5E5',
@@ -1463,41 +1401,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E5E5',
   },
-  avgRatingContainer: {
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-},
-avgRatingLabel: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: '#FFF',
-},
-avgRatingNumber: {
-  fontSize: 24,
-  fontWeight: 'bold',
-  color: '#FFF',
-},
-ratingHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 2,
-  gap: 6,
-},
-ratingTitle: {
-  fontSize: 13,
-  fontWeight: '600',
-  color: '#333',
-  flex: 1,
-},
-ratingValue: {
-  fontSize: 12,
-  fontWeight: 'bold',
-  color: '#666',
-},
   categoryButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1603,61 +1506,6 @@ grammarButtonPrimary: {
     color: '#FFF',
     fontWeight: '600',
   },
-  mediaConfirmOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  mediaConfirmCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    width: '100%',
-    maxWidth: 420,
-  },
-  mediaConfirmPreview: {
-    width: '100%',
-    height: 320,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#000',
-  },
-  mediaConfirmImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  mediaConfirmVideo: {
-    width: '100%',
-    height: '100%',
-  },
-  mediaConfirmActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  mediaConfirmButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  mediaConfirmButtonSecondary: {
-    backgroundColor: '#F0F0F0',
-  },
-  mediaConfirmButtonSecondaryText: {
-    color: '#666',
-    fontWeight: '600',
-  },
-  mediaConfirmButtonPrimary: {
-    backgroundColor: '#1B7C82',
-  },
-  mediaConfirmButtonPrimaryText: {
-    color: '#FFF',
-    fontWeight: '700',
-  },
 taggedRestaurantInfo: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -1748,6 +1596,11 @@ restaurantSuggestionBio: {
   },
 
   // Location Suggestions Styles
+dishInputContainer: {
+  position: 'relative',
+  zIndex: 1001,
+},
+
 locationInputContainer: {
   position: 'relative',
   zIndex: 1000,

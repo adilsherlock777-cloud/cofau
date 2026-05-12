@@ -146,17 +146,28 @@ export default function TabsLayout() {
           options={{
             title: "Upload",
             tabBarIcon: () => (
-              <LinearGradient
-                colors={["#FF8C00", "#E94A37"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.centerCircleGradient}
-              >
-                <Ionicons name="camera" size={22} color="#fff" />
-              </LinearGradient>
+              <View style={styles.cameraIconWrapper}>
+                <LinearGradient
+                  colors={["#FF8C00", "#E94A37"]}
+                  start={{ x: 0.2, y: 0 }}
+                  end={{ x: 0.8, y: 1 }}
+                  style={styles.cameraIconGradient}
+                >
+                  {/* Inner highlight for 3D depth */}
+                  <View style={styles.cameraIconHighlight} />
+                  <Ionicons
+                    name="camera"
+                    size={19}
+                    color="#FFF"
+                    style={{
+                      textShadowColor: "rgba(0,0,0,0.2)",
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 2,
+                    }}
+                  />
+                </LinearGradient>
+              </View>
             ),
-            tabBarItemStyle: styles.centerItem,
-            tabBarActiveTintColor: "#E94A37",
           }}
           listeners={{
             tabPress: (e) => {
@@ -168,12 +179,12 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="happening"
           options={{
-            title: isRestaurant ? "Dashboard" : "Saved",
+            title: isRestaurant ? "Dashboard" : "Locations",
             tabBarIcon: ({ focused }) =>
               focused ? (
-                <GradientIcon name={isRestaurant ? "analytics" : "location"} size={22} />
+                <GradientIcon name={isRestaurant ? "analytics" : "bookmark"} size={22} />
               ) : (
-                <Ionicons name={isRestaurant ? "analytics-outline" : "location-outline"} size={22} color="#000" />
+                <Ionicons name={isRestaurant ? "analytics-outline" : "bookmark-outline"} size={22} color="#000" />
               ),
           }}
         />
@@ -280,8 +291,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#eee",
     paddingVertical: 4,
-    height: Platform.OS === "ios" ? 85 : 65,
-    paddingBottom: Platform.OS === "ios" ? 25 : 8,
+    height: Platform.OS === "ios" ? 75 : 60,
+    paddingBottom: Platform.OS === "ios" ? 18 : 6,
   },
   tabLabel: {
     fontSize: 11,
@@ -304,14 +315,6 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     justifyContent: "center",
     alignItems: "center",
-  },
-  centerCircleGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: -28,
   },
   centerItem: {
     marginTop: 0,
@@ -369,5 +372,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#999",
+  },
+  cameraIconWrapper: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  cameraIconGradient: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  cameraIconHighlight: {
+    position: "absolute" as const,
+    top: 2,
+    left: 5,
+    right: 5,
+    height: 14,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.25)",
   },
 });

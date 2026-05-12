@@ -980,21 +980,31 @@ postId={post.id}
       </TouchableOpacity>
     ) : null}
 
-    {/* Dish Name Overlay - Bottom left */}
-    {post.dish_name ? (
-      <TouchableOpacity
-        style={styles.dishNameOverlay}
-        activeOpacity={0.7}
-        onPress={(e) => {
-          e.stopPropagation();
-          router.push({ pathname: "/search-results", params: { query: post.dish_name } });
-        }}
-      >
-        <Text style={styles.dishNameOverlayText} numberOfLines={1}>
-          {post.dish_name.toUpperCase()}
-        </Text>
-        <View style={styles.dishNameArrow}><Ionicons name="chevron-forward" size={10} color="#fff" /></View>
-      </TouchableOpacity>
+    {/* Dish Name + Distance Overlay - Bottom left */}
+    {(post.dish_name || post.distance_km != null) ? (
+      <View style={styles.dishDistanceContainer}>
+        {post.dish_name ? (
+          <TouchableOpacity
+            style={styles.dishNameOverlay}
+            activeOpacity={0.7}
+            onPress={(e) => {
+              e.stopPropagation();
+              router.push({ pathname: "/search-results", params: { query: post.dish_name } });
+            }}
+          >
+            <Text style={styles.dishNameOverlayText} numberOfLines={1}>
+              {post.dish_name.toUpperCase()}
+            </Text>
+            <View style={styles.dishNameArrow}><Ionicons name="chevron-forward" size={10} color="#fff" /></View>
+          </TouchableOpacity>
+        ) : null}
+        {post.distance_km != null ? (
+          <View style={styles.distanceBadge}>
+            <Ionicons name="navigate" size={10} color="#fff" />
+            <Text style={styles.distanceBadgeText}>{post.distance_km} km away</Text>
+          </View>
+        ) : null}
+      </View>
     ) : null}
   </Pressable>
 )}
@@ -1377,18 +1387,22 @@ restaurantTagText: {
   fontWeight: '600',
 },
 
-dishNameOverlay: {
+dishDistanceContainer: {
   position: 'absolute',
   bottom: 10,
   left: 10,
+  zIndex: 20,
+  gap: 4,
+},
+dishNameOverlay: {
   backgroundColor: 'rgba(233, 74, 55, 0.85)',
   paddingHorizontal: 8,
   paddingVertical: 4,
   borderRadius: 6,
-  maxWidth: '55%',
-  zIndex: 20,
+  maxWidth: '100%',
   flexDirection: 'row',
   alignItems: 'center',
+  alignSelf: 'flex-start',
   gap: 4,
   overflow: 'hidden',
 },
@@ -1406,6 +1420,21 @@ dishNameArrow: {
   alignItems: 'center',
   justifyContent: 'center',
   flexShrink: 0,
+},
+distanceBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  gap: 4,
+  backgroundColor: 'rgba(0,0,0,0.55)',
+  paddingHorizontal: 7,
+  paddingVertical: 3,
+  borderRadius: 10,
+},
+distanceBadgeText: {
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: '600',
 },
 
 // Mute button styles
