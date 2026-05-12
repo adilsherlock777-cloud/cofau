@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import datetime
 from database import get_database
@@ -7,6 +7,7 @@ from utils.hashing import hash_password, verify_password
 from utils.jwt import create_access_token, verify_token
 from pydantic import BaseModel
 from utils.level_system import calculate_level
+import httpx
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -47,10 +48,27 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 @router.post("/signup", response_model=Token)
-async def signup(user: UserCreate):
+async def signup(user: UserCreate, request: Request):
     """Register a new user"""
     db = get_database()
-    
+
+    # Get user's location from IP address
+    signup_location = {}
+    try:
+        client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
+        if client_ip and client_ip not in ("127.0.0.1", "::1", "localhost"):
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                geo_res = await client.get(f"http://ip-api.com/json/{client_ip}?fields=status,city,regionName,country")
+                geo_data = geo_res.json()
+                if geo_data.get("status") == "success":
+                    signup_location = {
+                        "city": geo_data.get("city", ""),
+                        "region": geo_data.get("regionName", ""),
+                        "country": geo_data.get("country", ""),
+                    }
+    except Exception:
+        pass  # Don't block signup if geolocation fails
+
     # Normalize username (lowercase, remove spaces)
     username_normalized = user.username.strip().lower().replace(" ", "")
     
@@ -104,6 +122,7 @@ async def signup(user: UserCreate):
         "following_count": 0,
         "wallet_enabled": True,  # Enable wallet for new users
         "wallet_balance": 0.0,   # Initialize wallet balance
+        "signup_location": signup_location,
         "created_at": datetime.utcnow()
     }
     

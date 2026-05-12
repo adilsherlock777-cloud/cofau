@@ -89,6 +89,7 @@ export default function NewUsers({ token }) {
                   <th className="px-6 py-3">Email</th>
                   <th className="px-6 py-3">Phone</th>
                   <th className="px-6 py-3">Level</th>
+                  <th className="px-6 py-3">Location</th>
                   <th className="px-6 py-3">Signed Up</th>
                 </tr>
               </thead>
@@ -119,6 +120,18 @@ export default function NewUsers({ token }) {
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
                         Lv {user.level || 1}
                       </span>
+                    </td>
+                    <td className="px-6 py-3">
+                      {user.signup_location ? (
+                        <div>
+                          <div className="text-sm text-gray-700">{user.signup_location.city || '—'}</div>
+                          <div className="text-xs text-gray-400">
+                            {[user.signup_location.region, user.signup_location.country].filter(Boolean).join(', ') || '—'}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-3">
                       <div className="text-sm text-gray-700">{formatDate(user.created_at)}</div>

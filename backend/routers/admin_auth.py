@@ -263,6 +263,7 @@ async def get_new_users(
 
     users = []
     async for user in cursor:
+        signup_loc = user.get("signup_location", {})
         users.append({
             "user_id": str(user["_id"]),
             "full_name": user.get("full_name", ""),
@@ -272,6 +273,11 @@ async def get_new_users(
             "profile_picture": user.get("profile_picture"),
             "level": user.get("level", 1),
             "total_points": user.get("total_points", 0),
+            "signup_location": {
+                "city": signup_loc.get("city", ""),
+                "region": signup_loc.get("region", ""),
+                "country": signup_loc.get("country", ""),
+            } if signup_loc else None,
             "created_at": user["created_at"].isoformat() if user.get("created_at") else None,
         })
 

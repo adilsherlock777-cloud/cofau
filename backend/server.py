@@ -706,6 +706,63 @@ async def get_location_suggestions_endpoint(
     return suggestions
 
 
+# ======================================================
+# DISH NAME SUGGESTIONS (for fuzzy matching)
+# ======================================================
+
+@app.get("/api/dishes/suggestions")
+async def get_dish_suggestions_endpoint(
+    q: str,
+    limit: int = 5,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get dish name suggestions based on user input (fuzzy matching).
+    Used for autocomplete when typing dish name.
+    """
+    if not q or len(q.strip()) < 2:
+        return []
+
+    db = get_database()
+
+    # Get all unique dish names from posts
+    pipeline = [
+        {"$match": {"dish_name": {"$exists": True, "$ne": None, "$ne": ""}}},
+        {"$group": {
+            "_id": "$dish_name",
+            "count": {"$sum": 1}
+        }},
+        {"$project": {
+            "dish_name": "$_id",
+            "post_count": "$count",
+            "_id": 0
+        }}
+    ]
+
+    existing_dishes_cursor = db.posts.aggregate(pipeline)
+    existing_dishes = await existing_dishes_cursor.to_list(None)
+
+    # Add normalized names for matching
+    for dish in existing_dishes:
+        dish['normalized_name'] = normalize_location_name(dish['dish_name'])
+
+    # Reuse the same fuzzy matching logic
+    suggestions = get_location_suggestions(q.strip(), [
+        {**d, 'location_name': d['dish_name']} for d in existing_dishes
+    ], limit)
+
+    # Rename fields back to dish-specific names
+    result = []
+    for s in suggestions:
+        result.append({
+            'dish_name': s['location_name'],
+            'post_count': s['post_count'],
+            'similarity_score': s['similarity_score']
+        })
+
+    return result
+
+
 @app.get("/api/locations/check-duplicate")
 async def check_location_duplicate(
     location_name: str,
@@ -1275,11 +1332,14 @@ async def get_feed(
     categories: str = None,
     sort: str = "engagement",
     seed: str = None,
+    user_lat: float = None,
+    user_lng: float = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Get feed posts from both users and restaurants.
     """
+    from routers.map import calculate_distance_km
     db = get_database()
     blocked_user_ids = await get_blocked_user_ids(str(current_user["_id"]), db)
     
@@ -1713,6 +1773,9 @@ async def get_feed(
                 "is_following": False,
                 "account_type": "restaurant",
                 "tagged_restaurant": None,
+                "latitude": post.get("latitude"),
+                "longitude": post.get("longitude"),
+                "distance_km": round(calculate_distance_km(user_lat, user_lng, post.get("latitude"), post.get("longitude")), 1) if (user_lat and user_lng and post.get("latitude") and post.get("longitude")) else None,
                 "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
             })
         else:
@@ -1795,10 +1858,48 @@ async def get_feed(
                 "is_following": is_following,
                 "account_type": "user",
                 "tagged_restaurant": tagged_restaurant,
+                "latitude": post.get("latitude"),
+                "longitude": post.get("longitude"),
+                "distance_km": round(calculate_distance_km(user_lat, user_lng, post.get("latitude"), post.get("longitude")), 1) if (user_lat and user_lng and post.get("latitude") and post.get("longitude")) else None,
                 "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", ""),
             })
 
     return result
+
+# ==================== BACKFILL COORDINATES ====================
+
+@app.post("/api/admin/backfill-coordinates")
+async def backfill_coordinates():
+    """One-time backfill: extract lat/lng from map_link for all posts missing coordinates."""
+    from routers.map import get_coordinates_for_map_link
+    db = get_database()
+    updated = 0
+    errors = 0
+
+    for collection_name in ["posts", "restaurant_posts"]:
+        collection = db[collection_name]
+        cursor = collection.find({
+            "map_link": {"$ne": None, "$ne": ""},
+            "$or": [
+                {"latitude": None},
+                {"latitude": {"$exists": False}},
+            ]
+        })
+        async for post in cursor:
+            try:
+                coords = await get_coordinates_for_map_link(post["map_link"], db)
+                if coords and coords.get("latitude") and coords.get("longitude"):
+                    await collection.update_one(
+                        {"_id": post["_id"]},
+                        {"$set": {"latitude": coords["latitude"], "longitude": coords["longitude"]}}
+                    )
+                    updated += 1
+                    print(f"Updated {collection_name}/{post['_id']}: {coords['latitude']}, {coords['longitude']}")
+            except Exception as e:
+                errors += 1
+                print(f"Error backfilling {collection_name}/{post['_id']}: {e}")
+
+    return {"updated": updated, "errors": errors}
 
 # ==================== LAST 3 DAYS POSTS ENDPOINT ====================
 

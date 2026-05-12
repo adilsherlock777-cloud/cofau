@@ -234,137 +234,182 @@ async def get_map_pins(
 ):
     """
     Get all map pins (restaurants + user posts + restaurant posts) within radius.
-    OPTIMIZED: Only fetches posts with pre-stored coordinates.
+    OPTIMIZED: Batched user/restaurant lookups instead of N+1 queries.
+    Uses bounding box pre-filter for faster distance checks.
     """
     db = get_database()
-    
+
     restaurants_pins = []
     posts_pins = []
-    
+
+    # Pre-compute bounding box for fast filtering (avoids distance calc for far-away points)
+    lat_delta = radius_km / 111.0  # ~111km per degree latitude
+    lng_delta = radius_km / (111.0 * math.cos(math.radians(lat)))
+    bbox_filter = {
+        "latitude": {"$gte": lat - lat_delta, "$lte": lat + lat_delta, "$ne": None},
+        "longitude": {"$gte": lng - lng_delta, "$lte": lng + lng_delta, "$ne": None},
+    }
+
     # ==================== RESTAURANTS ====================
-    restaurants = await db.restaurants.find({
-        "latitude": {"$exists": True, "$ne": None},
-        "longitude": {"$exists": True, "$ne": None}
-    }).to_list(None)
-    
+    restaurants = await db.restaurants.find(bbox_filter).to_list(None)
+
+    # Batch: collect restaurant IDs for count queries
+    restaurant_ids_in_range = []
+    restaurants_in_range = []
     for restaurant in restaurants:
-        distance = calculate_distance_km(
-            lat, lng, 
-            restaurant["latitude"], 
-            restaurant["longitude"]
-        )
-        
+        distance = calculate_distance_km(lat, lng, restaurant["latitude"], restaurant["longitude"])
         if distance <= radius_km:
-            review_count = await db.posts.count_documents({
-                "tagged_restaurant_id": str(restaurant["_id"])
-            })
+            restaurant_ids_in_range.append(str(restaurant["_id"]))
+            restaurants_in_range.append((restaurant, distance))
 
-            # Count posts uploaded by the restaurant itself
-            own_posts_count = await db.restaurant_posts.count_documents({
-                "restaurant_id": str(restaurant["_id"])
-            })
+    # Batch count queries using aggregation
+    review_counts = {}
+    own_post_counts = {}
+    if restaurant_ids_in_range:
+        # Batch review counts
+        pipeline = [
+            {"$match": {"tagged_restaurant_id": {"$in": restaurant_ids_in_range}}},
+            {"$group": {"_id": "$tagged_restaurant_id", "count": {"$sum": 1}}}
+        ]
+        async for doc in db.posts.aggregate(pipeline):
+            review_counts[doc["_id"]] = doc["count"]
 
-            restaurants_pins.append({
-                "id": str(restaurant["_id"]),
-                "type": "restaurant",
-                "name": restaurant.get("restaurant_name", "Unknown"),
-                "profile_picture": restaurant.get("profile_picture"),
-                "food_type": restaurant.get("food_type"),
-                "latitude": restaurant["latitude"],
-                "longitude": restaurant["longitude"],
-                "review_count": review_count,
-                "posts_count": own_posts_count,
-                "distance_km": round(distance, 2),
-                "map_link": restaurant.get("map_link"),
-                "bio": restaurant.get("bio", ""),
-                "is_verified": restaurant.get("is_verified", False)
-            })
+        # Batch own post counts
+        pipeline = [
+            {"$match": {"restaurant_id": {"$in": restaurant_ids_in_range}}},
+            {"$group": {"_id": "$restaurant_id", "count": {"$sum": 1}}}
+        ]
+        async for doc in db.restaurant_posts.aggregate(pipeline):
+            own_post_counts[doc["_id"]] = doc["count"]
+
+    for restaurant, distance in restaurants_in_range:
+        rid = str(restaurant["_id"])
+        restaurants_pins.append({
+            "id": rid,
+            "type": "restaurant",
+            "name": restaurant.get("restaurant_name", "Unknown"),
+            "profile_picture": restaurant.get("profile_picture"),
+            "food_type": restaurant.get("food_type"),
+            "latitude": restaurant["latitude"],
+            "longitude": restaurant["longitude"],
+            "review_count": review_counts.get(rid, 0),
+            "posts_count": own_post_counts.get(rid, 0),
+            "distance_km": round(distance, 2),
+            "map_link": restaurant.get("map_link"),
+            "bio": restaurant.get("bio", ""),
+            "is_verified": restaurant.get("is_verified", False)
+        })
 
     # ==================== USER POSTS ====================
-    posts = await db.posts.find({
-        "latitude": {"$exists": True, "$ne": None},
-        "longitude": {"$exists": True, "$ne": None}
-    }).to_list(None)
-    
+    posts = await db.posts.find(bbox_filter).to_list(None)
+
+    # Filter by exact distance and collect user IDs
+    posts_in_range = []
+    user_ids_needed = set()
     for post in posts:
-        distance = calculate_distance_km(
-            lat, lng,
-            post["latitude"],
-            post["longitude"]
-        )
-        
+        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
         if distance <= radius_km:
-            user = await db.users.find_one({"_id": ObjectId(post["user_id"])})
-            posts_pins.append({
-                "id": str(post["_id"]),
-                "type": "post",
-                "user_id": post["user_id"],
-                "username": user.get("full_name", "Unknown") if user else "Unknown",
-                "user_profile_picture": user.get("profile_picture") if user else None,
-                "user_level": user.get("level", 1) if user else 1,
-                "latitude": post["latitude"],
-                "longitude": post["longitude"],
-                "distance_km": round(distance, 2),
-                "media_url": post.get("media_url") or post.get("image_url"),
-                "thumbnail_url": post.get("thumbnail_url"),
-                "media_type": post.get("media_type", "image"),
-                "rating": post.get("rating"),
-                "location_name": post.get("location_name"),
-                "category": post.get("category"),
-                "review_text": post.get("review_text", "")[:100],
-                "likes_count": post.get("likes_count", 0),
-                "clicks_count": post.get("clicks_count", 0),
-                "map_link": post.get("map_link"),
-                "tagged_restaurant_id": post.get("tagged_restaurant_id"),
-                "account_type": "user",
-                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
-            })
-    
+            posts_in_range.append((post, distance))
+            user_ids_needed.add(post["user_id"])
+
+    # Batch fetch all users at once
+    users_map = {}
+    if user_ids_needed:
+        user_oids = []
+        for uid in user_ids_needed:
+            try:
+                user_oids.append(ObjectId(uid))
+            except Exception:
+                pass
+        if user_oids:
+            users_cursor = db.users.find({"_id": {"$in": user_oids}})
+            async for u in users_cursor:
+                users_map[str(u["_id"])] = u
+
+    for post, distance in posts_in_range:
+        user = users_map.get(post["user_id"])
+        posts_pins.append({
+            "id": str(post["_id"]),
+            "type": "post",
+            "user_id": post["user_id"],
+            "username": user.get("full_name", "Unknown") if user else "Unknown",
+            "user_profile_picture": user.get("profile_picture") if user else None,
+            "user_level": user.get("level", 1) if user else 1,
+            "latitude": post["latitude"],
+            "longitude": post["longitude"],
+            "distance_km": round(distance, 2),
+            "media_url": post.get("media_url") or post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "rating": post.get("rating"),
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "review_text": post.get("review_text", "")[:100],
+            "likes_count": post.get("likes_count", 0),
+            "clicks_count": post.get("clicks_count", 0),
+            "map_link": post.get("map_link"),
+            "tagged_restaurant_id": post.get("tagged_restaurant_id"),
+            "account_type": "user",
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
+        })
+
     # ==================== RESTAURANT POSTS ====================
-    restaurant_posts = await db.restaurant_posts.find({
-        "latitude": {"$exists": True, "$ne": None},
-        "longitude": {"$exists": True, "$ne": None}
-    }).to_list(None)
-    
+    restaurant_posts = await db.restaurant_posts.find(bbox_filter).to_list(None)
+
+    # Filter by distance and collect restaurant IDs
+    rp_in_range = []
+    restaurant_ids_needed = set()
     for post in restaurant_posts:
-        distance = calculate_distance_km(
-            lat, lng,
-            post["latitude"],
-            post["longitude"]
-        )
-        
+        distance = calculate_distance_km(lat, lng, post["latitude"], post["longitude"])
         if distance <= radius_km:
-            restaurant = await db.restaurants.find_one({"_id": ObjectId(post["restaurant_id"])})
-            
-            posts_pins.append({
-                "id": str(post["_id"]),
-                "type": "post",
-                "user_id": post["restaurant_id"],
-                "username": post.get("restaurant_name") or (restaurant.get("restaurant_name") if restaurant else "Unknown"),
-                "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
-                "food_type": restaurant.get("food_type") if restaurant else None,
-                "latitude": post["latitude"],
-                "longitude": post["longitude"],
-                "distance_km": round(distance, 2),
-                "media_url": post.get("media_url") or post.get("image_url"),
-                "thumbnail_url": post.get("thumbnail_url"),
-                "media_type": post.get("media_type", "image"),
-                "rating": None,
-                "location_name": post.get("location_name"),
-                "category": post.get("category"),
-                "review_text": post.get("about", "")[:100],
-                "likes_count": post.get("likes_count", 0),
-                "clicks_count": post.get("clicks_count", 0),
-                "map_link": post.get("map_link"),
-                "price": post.get("price"),
-                "account_type": "restaurant",
-                "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
-            })
-    
+            rp_in_range.append((post, distance))
+            restaurant_ids_needed.add(post["restaurant_id"])
+
+    # Batch fetch restaurants
+    restaurants_map = {}
+    if restaurant_ids_needed:
+        r_oids = []
+        for rid in restaurant_ids_needed:
+            try:
+                r_oids.append(ObjectId(rid))
+            except Exception:
+                pass
+        if r_oids:
+            r_cursor = db.restaurants.find({"_id": {"$in": r_oids}})
+            async for r in r_cursor:
+                restaurants_map[str(r["_id"])] = r
+
+    for post, distance in rp_in_range:
+        restaurant = restaurants_map.get(post["restaurant_id"])
+        posts_pins.append({
+            "id": str(post["_id"]),
+            "type": "post",
+            "user_id": post["restaurant_id"],
+            "username": post.get("restaurant_name") or (restaurant.get("restaurant_name") if restaurant else "Unknown"),
+            "user_profile_picture": restaurant.get("profile_picture") if restaurant else None,
+            "food_type": restaurant.get("food_type") if restaurant else None,
+            "latitude": post["latitude"],
+            "longitude": post["longitude"],
+            "distance_km": round(distance, 2),
+            "media_url": post.get("media_url") or post.get("image_url"),
+            "thumbnail_url": post.get("thumbnail_url"),
+            "media_type": post.get("media_type", "image"),
+            "rating": None,
+            "location_name": post.get("location_name"),
+            "category": post.get("category"),
+            "review_text": post.get("about", "")[:100],
+            "likes_count": post.get("likes_count", 0),
+            "clicks_count": post.get("clicks_count", 0),
+            "map_link": post.get("map_link"),
+            "price": post.get("price"),
+            "account_type": "restaurant",
+            "created_at": post["created_at"].isoformat() if isinstance(post.get("created_at"), datetime) else post.get("created_at", "")
+        })
+
     # Sort by distance
     restaurants_pins.sort(key=lambda x: x["distance_km"])
     posts_pins.sort(key=lambda x: x["distance_km"])
-    
+
     return {
         "user_location": {"latitude": lat, "longitude": lng},
         "radius_km": radius_km,
