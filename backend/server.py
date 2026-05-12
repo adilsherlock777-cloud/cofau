@@ -1879,10 +1879,11 @@ async def backfill_coordinates():
     for collection_name in ["posts", "restaurant_posts"]:
         collection = db[collection_name]
         cursor = collection.find({
-            "map_link": {"$ne": None, "$ne": ""},
+            "map_link": {"$exists": True, "$nin": [None, ""]},
             "$or": [
                 {"latitude": None},
                 {"latitude": {"$exists": False}},
+                {"latitude": 0},
             ]
         })
         async for post in cursor:
